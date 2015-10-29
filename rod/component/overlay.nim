@@ -9,7 +9,7 @@ import rod.viewport
 
 import rod.component
 
-type Overlay* = ref object of Component
+type Overlay* = ref object of OverlayComponent
 
 var overlayComposition = newComposition """
 uniform Image uBackground;
@@ -26,28 +26,27 @@ void compose() {
 """
 
 method draw*(o: Overlay) =
-    when false:
-        let vp = o.node.viewport
-        let tmpBuf = vp.aquireTempFramebuffer()
+    let vp = o.node.viewport
+    let tmpBuf = vp.aquireTempFramebuffer()
 
-        let c = currentContext()
-        bindFramebuffer(c.gl, tmpBuf)
+    let c = currentContext()
+    bindFramebuffer(c.gl, tmpBuf)
 
-        c.gl.clear(c.gl.COLOR_BUFFER_BIT or c.gl.STENCIL_BUFFER_BIT or c.gl.DEPTH_BUFFER_BIT)
-        for c in o.node.children: c.recursiveDraw()
+    c.gl.clear(c.gl.COLOR_BUFFER_BIT or c.gl.STENCIL_BUFFER_BIT or c.gl.DEPTH_BUFFER_BIT)
+    for c in o.node.children: c.recursiveDraw()
 
-        vp.swapCompositingBuffers()
-        let vpbounds = c.gl.getViewport()
-        let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
+    vp.swapCompositingBuffers()
+    let vpbounds = c.gl.getViewport()
+    let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
 
-        c.withTransform vp.getViewMatrix():
-            overlayComposition.draw newRect(0, 0, 1920, 1080):
-                setUniform("uBackground", vp.mBackupFrameBuffer)
-                setUniform("uForeground", tmpBuf)
-                setUniform("viewportSize", vpSize)
+    c.withTransform vp.getViewMatrix():
+        overlayComposition.draw newRect(0, 0, 1920, 1080):
+            setUniform("uBackground", vp.mBackupFrameBuffer)
+            setUniform("uForeground", tmpBuf)
+            setUniform("viewportSize", vpSize)
 
-        vp.releaseTempFramebuffer(tmpBuf)
+    vp.releaseTempFramebuffer(tmpBuf)
 
-#method isPosteffectComponent*(c: Overlay): bool = true
+method isPosteffectComponent*(c: Overlay): bool = true
 
 registerComponent[Overlay]()
