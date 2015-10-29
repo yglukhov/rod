@@ -17,7 +17,7 @@ type Attr = enum
     aPosition
     aTexCoord
 
-const vertexShader = """
+const vertexShaderDefault* = """
 attribute vec4 aPosition;
 attribute vec2 aTexCoord;
 
@@ -32,7 +32,7 @@ void main()
 }
 """
 
-const fragmentShader = """
+const fragmentShaderDefault* = """
 #ifdef GL_ES
 #extension GL_OES_standard_derivatives : enable
 precision mediump float;
@@ -51,8 +51,6 @@ void main() {
 }
 """
 
-var shader: GLuint
-
 type Mesh* = ref object of RootObj
     texture*: Image
     resourceName: string
@@ -63,8 +61,15 @@ type Mesh* = ref object of RootObj
     isWireframe*: bool
     alpha*: GLfloat
     red*: GLfloat
+    vertexShader*: string
+    fragmentShader*: string
+    shader*: GLuint
 
 const componentsCount = 5
+
+proc assignShaders*(m: Mesh, vertexShader: string = "", fragmentShader: string = "") =
+    m.vertexShader = if vertexShader != "": vertexShader else: vertexShaderDefault
+    m.fragmentShader = if fragmentShader != "": fragmentShader else: fragmentShaderDefault
 
 proc mergeIndexes(vertexData, texCoordData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ti: int): GLushort =
     vertexAttrData.add(vertexData[vi * 3 + 0])
@@ -77,6 +82,7 @@ proc mergeIndexes(vertexData, texCoordData: openarray[GLfloat], vertexAttrData: 
 proc newMeshWithResource*(resourceName: string): Mesh =
     result.new()
     result.alpha = 1.0
+    result.assignShaders() # Assign default shaders for mesh
     let m = result
     result.loadFunc = proc() =
         loadResourceAsync resourceName, proc(s: Stream) =
@@ -120,6 +126,7 @@ proc newMeshWithResource*(resourceName: string): Mesh =
 proc newMeshWithQuad*(v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point): Mesh =
     result.new()
     result.alpha = 1.0
+    result.assignShaders() # Assign default shaders for mesh
     let m = result
     result.loadFunc = proc() =
         let gl = currentContext().gl
@@ -147,8 +154,8 @@ proc load(m: Mesh) =
 proc draw*(m: Mesh) =
     let c = currentContext()
     let gl = c.gl
-    if shader == 0:
-        shader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
+    if m.shader == 0:
+        m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
 
     if m.indexBuffer == 0:
         m.load()
@@ -163,7 +170,7 @@ proc draw*(m: Mesh) =
     when not defined(ios) and not defined(android) and not defined(js):
         glPolygonMode(GL_FRONT_AND_BACK, if m.isWireframe: GL_LINE else: GL_FILL);
 
-    gl.useProgram(shader)
+    gl.useProgram(m.shader)
     gl.bindBuffer(gl.ARRAY_BUFFER, m.vertexBuffer)
     gl.enableVertexAttribArray(aPosition.GLuint)
     gl.vertexAttribPointer(aPosition.GLuint, 3, gl.FLOAT, false, 5 * sizeof(GLfloat), 0)
@@ -171,11 +178,11 @@ proc draw*(m: Mesh) =
     gl.vertexAttribPointer(aTexCoord.GLuint, 2, gl.FLOAT, false, 5 * sizeof(GLfloat), 3 * sizeof(GLfloat))
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
-    c.setTransformUniform(shader)
-    gl.uniform1f(gl.getUniformLocation(shader, "uAlpha"), m.alpha)
-    gl.uniform1f(gl.getUniformLocation(shader, "uRed"), m.red)
+    c.setTransformUniform(m.shader)
+    gl.uniform1f(gl.getUniformLocation(m.shader, "uAlpha"), m.alpha)
+    gl.uniform1f(gl.getUniformLocation(m.shader, "uRed"), m.red)
 
-    gl.uniform4fv(gl.getUniformLocation(shader, "uImageTexCoords"), texCoords)
+    gl.uniform4fv(gl.getUniformLocation(m.shader, "uImageTexCoords"), texCoords)
 
     gl.bindTexture(gl.TEXTURE_2D, tex)
     gl.enable(gl.BLEND)

@@ -53,7 +53,7 @@ type Node* = Node3D
 
 proc viewport*(n: Node2D): Viewport = n.mViewport
 
-import component
+import rod.component
 
 proc newNode*(name: string = nil): Node =
     result.new()
@@ -277,7 +277,6 @@ proc deserialize*(n: Node, j: JsonNode)
 
 proc loadComposition*(n: Node, compositionName: string) =
     loadJsonResourceAsync "compositions/" & compositionName & ".json", proc(j: JsonNode) =
-        echo "Loading composition: ", compositionName
         n.deserialize(j)
 
 import ae_animation
