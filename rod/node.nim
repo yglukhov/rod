@@ -85,7 +85,7 @@ proc component*(n: Node2D, T: typedesc[Component]): T =
 
 proc componentIfAvailable*(n: Node2D, name: string): Component =
     if not n.components.isNil:
-        result = n.components[name]
+        result = n.components.getOrDefault(name)
 
 proc componentIfAvailable*(n: Node2D, T: typedesc[Component]): T =
     type TT = T
