@@ -32,6 +32,7 @@ proc `image=`*(s: Sprite, i: Image) =
     s.currentFrame = 0
 
 method draw*(s: Sprite) =
+    if s.alpha < 0.00001: return
     let c = currentContext()
     var r: Rect
     r.origin = s.offset

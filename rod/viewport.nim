@@ -125,3 +125,5 @@ proc swapCompositingBuffers*(v: Viewport) =
         glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT, GL_NEAREST)
         discard
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
+
+import component.all_components
