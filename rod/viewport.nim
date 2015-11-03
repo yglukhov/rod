@@ -6,6 +6,8 @@ import nimx.types
 import nimx.image
 import nimx.render_to_image
 import nimx.portable_gl
+import nimx.animation
+import nimx.window
 
 import ray
 export Viewport
@@ -27,6 +29,8 @@ proc camera*(v: Viewport): Camera =
         if not nodeWithCamera.isNil:
             v.mCamera = nodeWithCamera.componentIfAvailable(Camera)
     result = v.mCamera
+
+template bounds*(v: Viewport): Rect = v.view.bounds
 
 template viewMatrix(v: Viewport): Matrix4 = v.mCamera.node.worldTransform.inversed
 
@@ -125,5 +129,7 @@ proc swapCompositingBuffers*(v: Viewport) =
         glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT, GL_NEAREST)
         discard
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
+
+proc addAnimation*(v: Viewport, a: Animation) = v.view.window.addAnimation(a)
 
 import component.all_components

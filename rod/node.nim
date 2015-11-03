@@ -9,6 +9,7 @@ import nimx.resource
 import nimx.animation
 import nimx.image
 import nimx.portable_gl
+import nimx.view
 
 import math
 import quaternion
@@ -41,7 +42,7 @@ type
     Viewport* = ref object
         mCamera*: Camera
         mRootNode*: Node3D
-        bounds*: Rect
+        view*: View
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int
         mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage

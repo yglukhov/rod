@@ -20,7 +20,6 @@ type EditView = ref object of View
     viewport: Viewport
 
 method draw*(ev: EditView, r: Rect) =
-    ev.viewport.bounds = ev.bounds
     ev.viewport.draw()
 
 proc startApplication() =
@@ -37,6 +36,7 @@ proc startApplication() =
     let editView = EditView.new(mainWindow.bounds)
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     editView.viewport.new()
+    editView.viewport.view = editView
     editView.viewport.rootNode = newNode("(root)")
     let cameraNode = editView.viewport.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
