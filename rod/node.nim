@@ -262,9 +262,10 @@ proc reparentTo*(n, newParent: Node2D) =
     let newTransform = newParent.worldTransform.inversed() * oldWorldTransform
     n.translation = translationFromMatrix(newTransform)
 
-proc animationNamed*(n: Node2D, name: string): Animation =
+proc animationNamed*(n: Node2D, name: string, preserveHandlers: bool = false): Animation =
     if not n.animations.isNil:
         result = n.animations.getOrDefault(name)
+        if not result.isNil and not preserveHandlers: result.removeHandlers()
 
 proc registerAnimation*(n: Node2D, name: string, a: Animation) =
     if n.animations.isNil:
