@@ -50,7 +50,7 @@ proc prepareFramebuffers(v: Viewport) =
         v.prepareFramebuffer(v.mActiveFrameBuffer)
         v.prepareFramebuffer(v.mBackupFrameBuffer)
         let gl = currentContext().gl
-        v.mScreenFramebuffer = gl.getParami(gl.FRAMEBUFFER_BINDING).GLuint
+        v.mScreenFramebuffer = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
         bindFramebuffer(gl, v.mActiveFrameBuffer)
 
 proc getViewMatrix*(v: Viewport): Matrix4 =
@@ -115,19 +115,30 @@ proc swapCompositingBuffers*(v: Viewport) =
     assert(v.numberOfNodesWithBackCompositionInCurrentFrame > 0)
     dec v.numberOfNodesWithBackCompositionInCurrentFrame
     let boundsSize = v.bounds.size
-    let vp = currentContext().gl.getViewport()
-    if v.numberOfNodesWithBackCompositionInCurrentFrame == 0:
-        # Swap active buffer to screen
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.mScreenFrameBuffer)
-        glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT, GL_NEAREST)
-        #glBindFramebuffer(GL_FRAMEBUFFER, v.mScreenFrameBuffer)
+    let c = currentContext()
+    let gl = c.gl
+    let vp = gl.getViewport()
+    when defined(js):
+        #proc ortho*(dest: var Matrix4, left, right, bottom, top, near, far: Coord) =
+        var mat = ortho(0, cast[Coord](vp[2]), 0, cast[Coord](vp[3]), -1, 1)
+
+        c.withTransform mat:
+            if v.numberOfNodesWithBackCompositionInCurrentFrame == 0:
+                gl.bindFramebuffer(gl.FRAMEBUFFER, v.mScreenFrameBuffer)
+            else:
+                gl.bindFramebuffer(gl.FRAMEBUFFER, v.mBackupFrameBuffer.framebuffer)
+            c.drawImage(v.mActiveFrameBuffer, newRect(0, 0, cast[Coord](vp[2]), cast[Coord](vp[3])))
     else:
-        # Swap active buffer to backup buffer
-        glBindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
-        glBindFramebuffer(GL_DRAW_FRAMEBUFFER, v.mBackupFrameBuffer.framebuffer)
+        if v.numberOfNodesWithBackCompositionInCurrentFrame == 0:
+            # Swap active buffer to screen
+            gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
+            gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, v.mScreenFrameBuffer)
+        else:
+            # Swap active buffer to backup buffer
+            gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
+            gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, v.mBackupFrameBuffer.framebuffer)
         glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT, GL_NEAREST)
-        discard
+
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 
 proc addAnimation*(v: Viewport, a: Animation) = v.view.window.addAnimation(a)

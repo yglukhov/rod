@@ -52,11 +52,11 @@ method draw*(cl: ChannelLevels) =
         let vp = cl.node.viewport
         let c = currentContext()
         let gl = c.gl
-        let oldBuf = gl.getParami(gl.FRAMEBUFFER_BINDING).GLuint
+        let oldBuf = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
 
         let tmpBuf = vp.aquireTempFramebuffer()
 
-        gl.bindFramebuffer(tmpBuf)
+        bindFramebuffer(gl, tmpBuf)
 
         gl.clear(c.gl.COLOR_BUFFER_BIT or c.gl.STENCIL_BUFFER_BIT or c.gl.DEPTH_BUFFER_BIT)
         for c in cl.node.children: c.recursiveDraw()
@@ -65,9 +65,6 @@ method draw*(cl: ChannelLevels) =
 
         let vpbounds = gl.getViewport()
         let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
-
-        var mat : MAtrix4
-        mat.loadIdentity()
 
         c.withTransform vp.getViewMatrix():
             levelsComposition.draw newRect(0, 0, 1920, 1080):
