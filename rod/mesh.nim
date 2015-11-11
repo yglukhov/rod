@@ -102,9 +102,9 @@ proc newMeshWithResource*(resourceName: string): Mesh =
                     texCoordData.add(1.0 - v)
 
                 template addFace(vi0, vi1, vi2, ti0, ti1, ti2, ni0, ni1, ni2: int) =
-                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi0 - 1, ti0 - 1))
-                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi1 - 1, ti1 - 1))
-                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi2 - 1, ti2 - 1))
+                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi0 - 1, if ti0 == 0: (vi0 - 1) else: (ti0 - 1)))
+                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi1 - 1, if ti1 == 0: (vi1 - 1) else: (ti1 - 1)))
+                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi2 - 1, if ti2 == 0: (vi2 - 1) else: (ti2 - 1)))
 
                 loader.loadMeshData(s, addVertex, addTexCoord, addFace)
                 s.close()
