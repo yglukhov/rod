@@ -1,5 +1,6 @@
 import nimx.view
 import nimx.context
+import nimx.composition
 import nimx.font
 import nimx.types
 import nimx.event
@@ -7,6 +8,7 @@ import nimx.table_view_cell
 import nimx.view_event_handling
 
 import typetraits
+import math
 
 # Quick and dirty implementation of outline view
 
@@ -76,15 +78,31 @@ method init*(v: OutlineView, r: Rect) =
 
 const rowHeight = 20.Coord
 
+var disclosureTriangleComposition = newComposition """
+uniform float uAngle;
+void compose() {
+    vec2 center = vec2(bounds.x + bounds.z / 2.0, bounds.y + bounds.w / 2.0 - 1.0);
+    float triangle = sdRegularPolygon(center, 4.0, 3, uAngle);
+    drawShape(triangle, vec4(0.0, 0, 0, 1));
+}
+"""
+
+proc drawDisclosureTriangle(disclosed: bool, r: Rect) =
+    disclosureTriangleComposition.draw r:
+        setUniform("uAngle", if disclosed: Coord(PI / 2.0) else: Coord(0))
+    discard
+
 proc drawNode(v: OutlineView, n: ItemNode, y: var Coord) =
     let c = currentContext()
     if n.cell.isNil:
         n.cell = v.createCell()
     n.cell.selected = v.tempIndexPath == v.selectedIndexPath
-    let indent = Coord(v.tempIndexPath.len * 3)
+    let indent = Coord(3 + v.tempIndexPath.len * 3)
     n.cell.setFrame(newRect(indent, y, v.bounds.width - indent, rowHeight))
     v.configureCell(n.cell, v.tempIndexPath)
     n.cell.drawWithinSuperview()
+    if n.expandable:
+        drawDisclosureTriangle(n.expanded, newRect(indent - 6, y, 6, rowHeight))
 
     y += rowHeight
     if n.expanded and not n.children.isNil:
