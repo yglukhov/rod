@@ -1,5 +1,6 @@
 import nimx.view
 import nimx.types
+import nimx.button
 
 import node
 import panel_view
@@ -19,7 +20,7 @@ proc newTreeView(e: Editor): PanelView =
     title.text = "Tree view"
     result.addSubview(title)
 
-    let outlineView = OutlineView.new(newRect(0, 20, result.bounds.width, result.bounds.height - 20))
+    let outlineView = OutlineView.new(newRect(0, 20, result.bounds.width, result.bounds.height - 40))
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
         if indexPath.len == 0:
@@ -47,6 +48,24 @@ proc newTreeView(e: Editor): PanelView =
 
     outlineView.reloadData()
     result.addSubview(outlineView)
+
+    let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
+    createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    createNodeButton.title = "+"
+    createNodeButton.onAction do():
+        let n = get[Node3D](outlineView.itemAtIndexPath(outlineView.selectedIndexPath))
+        discard n.newChild("New Node")
+        outlineView.reloadData()
+    result.addSubview(createNodeButton)
+
+    let deleteNodeButton = Button.new(newRect(24, result.bounds.height - 20, 20, 20))
+    deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    deleteNodeButton.title = "-"
+    deleteNodeButton.onAction do():
+        let n = get[Node3D](outlineView.itemAtIndexPath(outlineView.selectedIndexPath))
+        n.removeFromParent()
+        outlineView.reloadData()
+    result.addSubview(deleteNodeButton)
 
 proc newInspector(e: Editor): PanelView =
     result = PanelView.new(newRect(200, 0, 200, 500))

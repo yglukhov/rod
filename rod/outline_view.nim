@@ -63,7 +63,7 @@ type ItemNode = ref object
 type OutlineView* = ref object of View
     rootItem: ItemNode
     selectedItem: ItemNode
-    selectedIndexPath: seq[int]
+    selectedIndexPath*: seq[int]
     numberOfChildrenInItem*: proc(item: Variant, indexPath: openarray[int]): int
     childOfItem*: proc(item: Variant, indexPath: openarray[int]): Variant
     createCell*: proc(): TableViewCell
