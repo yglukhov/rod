@@ -62,13 +62,13 @@ type ItemNode = ref object
 
 type OutlineView* = ref object of View
     rootItem: ItemNode
-    selectedItem: ItemNode
     selectedIndexPath*: seq[int]
     numberOfChildrenInItem*: proc(item: Variant, indexPath: openarray[int]): int
     childOfItem*: proc(item: Variant, indexPath: openarray[int]): Variant
     createCell*: proc(): TableViewCell
     configureCell*: proc (cell: TableViewCell, indexPath: openarray[int])
-    tempIndexPath*: seq[int]
+    onSelectionChanged*: proc()
+    tempIndexPath: seq[int]
 
 method init*(v: OutlineView, r: Rect) =
     procCall v.View.init(r)
@@ -180,6 +180,9 @@ proc reloadData*(v: OutlineView) =
     v.tempIndexPath.setLen(0)
     v.reloadDataForNode(v.rootItem)
 
+template selectionChanged(v: OutlineView) =
+    if not v.onSelectionChanged.isNil: v.onSelectionChanged()
+
 method onMouseDown*(v: OutlineView, e: var Event): bool =
     result = true
     let pos = e.localPosition
@@ -189,6 +192,8 @@ method onMouseDown*(v: OutlineView, e: var Event): bool =
             i.expanded = not i.expanded
         elif v.tempIndexPath == v.selectedIndexPath:
             v.selectedIndexPath.setLen(0)
+            v.selectionChanged()
         else:
             v.selectedIndexPath = v.tempIndexPath
+            v.selectionChanged()
         v.setNeedsDisplay()

@@ -5,6 +5,7 @@ import nimx.button
 import node
 import panel_view
 import outline_view
+import inspector_view
 
 import nimx.text_field
 import nimx.table_view_cell
@@ -14,7 +15,7 @@ type Editor* = ref object
     eventCatchingView*: View
     treeView*: View
 
-proc newTreeView(e: Editor): PanelView =
+proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 500))
     let title = newLabel(newRect(2, 2, 100, 15))
     title.text = "Tree view"
@@ -46,6 +47,14 @@ proc newTreeView(e: Editor): PanelView =
         let textField = TextField(cell.subviews[0])
         textField.text = if n.name.isNil: "(nil)" else: n.name
 
+    outlineView.onSelectionChanged = proc() =
+        let ip = outlineView.selectedIndexPath
+        let n = if ip.len > 0:
+                get[Node3D](outlineView.itemAtIndexPath(ip))
+            else:
+                nil
+        inspector.inspectedNode = n
+
     outlineView.reloadData()
     result.addSubview(outlineView)
 
@@ -67,19 +76,14 @@ proc newTreeView(e: Editor): PanelView =
         outlineView.reloadData()
     result.addSubview(deleteNodeButton)
 
-proc newInspector(e: Editor): PanelView =
-    result = PanelView.new(newRect(200, 0, 200, 500))
-    let title = newLabel(newRect(2, 2, 100, 15))
-    title.text = "Inspector"
-    result.addSubview(title)
-
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
 
-    result.treeView = newTreeView(result)
+    let inspectorView = InspectorView.new(newRect(200, 0, 200, 500))
+    result.treeView = newTreeView(result, inspectorView)
     v.window.addSubview(result.treeView)
-    v.window.addSubview(newInspector(result))
+    v.window.addSubview(inspectorView)
 
 proc endEditing*(e: Editor) =
     discard
