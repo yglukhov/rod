@@ -48,6 +48,45 @@ proc newCoordPropertyView(y: Coord, propName: string, setter: proc(s: Coord), ge
         setter(textField.text.parseFloat())
     result.addSubview(textField)
 
+proc newColorPropertyView(y: Coord, propName: string, setter: proc(s: Color), getter: proc(): Color): View =
+    result = View.new(newRect(0, y, 200, 17))
+    let v = newLabel(newRect(0, 0, 100, 15))
+    v.text = propName & ":"
+    result.addSubview(v)
+
+    const vecLen = 3 + 1
+
+    let colorView = View.new(newRect(70, 0, 17, 17))
+    colorView.backgroundColor = getter()
+    result.addSubview(colorView)
+
+    var x = 88.Coord
+    let width = (result.bounds.width - x) / vecLen
+
+    let pv = result
+    proc complexSetter() =
+        let c = newColor(
+            TextField(pv.subviews[2]).text.parseFloat(),
+            TextField(pv.subviews[3]).text.parseFloat(),
+            TextField(pv.subviews[4]).text.parseFloat(),
+            TextField(pv.subviews[5]).text.parseFloat(),
+            )
+        setter(c)
+        colorView.backgroundColor = c
+
+    template toVector(c: Color): Vector4 = newVector4(c.r, c.g, c.b, c.a)
+
+    for i in 0 ..< vecLen:
+        let textField = newTextField(newRect(x, 0, width, result.bounds.height))
+        x += width
+        if i == vecLen - 1:
+            textField.autoresizingMask = {afFlexibleMaxX, afFlexibleMaxY}
+        else:
+            textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+        textField.text = formatFloat(getter().toVector[i], ffDecimal, 3)
+        textField.onAction complexSetter
+        result.addSubview(textField)
+
 proc newVecPropertyView[T](y: Coord, propName: string, setter: proc(s: T), getter: proc(): T): View =
     result = View.new(newRect(0, y, 200, 17))
     let v = newLabel(newRect(0, 0, 100, 15))
@@ -134,6 +173,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                     of pkVec2: pv = newVecPropertyView(y, visitor.name, visitor.tvec2.setter, visitor.tvec2.getter)
                     of pkVec3: pv = newVecPropertyView(y, visitor.name, visitor.tvec3.setter, visitor.tvec3.getter)
                     of pkVec4: pv = newVecPropertyView(y, visitor.name, visitor.tvec4.setter, visitor.tvec4.getter)
+                    of pkColor: pv = newColorPropertyView(y, visitor.name, visitor.tcolor.setter, visitor.tcolor.getter)
                     else: pv = newUnknownPropertyView(y, visitor.name)
                     y += pv.frame.height
                     propView.addSubview(pv)
