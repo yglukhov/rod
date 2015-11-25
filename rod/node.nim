@@ -2,6 +2,7 @@ import tables
 import typetraits
 import json
 import strutils
+import math
 
 import nimx.context
 import nimx.types
@@ -11,15 +12,15 @@ import nimx.image
 import nimx.portable_gl
 import nimx.view
 
-import math
 import quaternion
+import property_visitor
 
 type
     Node3D* = ref object
         translation*: Vector3
         rotation*: Quaternion
         scale*: Vector3
-        components: TableRef[string, Component]
+        components*: TableRef[string, Component]
         children*: seq[Node3D]
         parent*: Node3D
         name*: string
@@ -198,6 +199,18 @@ proc findNode*(n: Node2D, name: string): Node2D =
 proc childNamed*(n: Node2D, name: string): Node2D =
     for c in n.children:
         if c.name == name: return c
+
+proc visitProperties*(n: Node3D, p: var PropertyVisitor) =
+    p.visitProperty("translation", n.translation)
+    p.visitProperty("scale", n.scale)
+    p.visitProperty("rotation", n.rotation)
+
+proc visitComponentProperties*(n: Node3D, p: var PropertyVisitor) =
+    if not n.components.isNil:
+        for k, v in n.components:
+            p.pushQualifier(k)
+            v.visitProperties(p)
+            p.popQualifier()
 
 proc animatableProperty1*(n: Node2D, name: string): proc (val: Coord) =
     case name

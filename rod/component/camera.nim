@@ -4,6 +4,7 @@ import nimx.context
 
 import rod.component
 import rod.node
+import rod.property_visitor
 
 export CameraProjection
 export Camera
@@ -26,5 +27,9 @@ proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D)
 proc `manualGetProjectionMatrix=`*(c: Camera, p: proc(viewportBounds: Rect, mat: var Transform3D)) =
     c.mManualGetProjectionMatrix = p
     c.projectionMode = cpManual
+
+method visitProperties*(c: Camera, p: var PropertyVisitor) =
+    p.visitProperty("zNear", c.zNear)
+    p.visitProperty("zFar", c.zFar)
 
 registerComponent[Camera]()

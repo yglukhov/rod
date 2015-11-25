@@ -2,8 +2,10 @@ import json
 
 import nimx.types
 import nimx.context
+import nimx.matrixes
 
 import rod.component
+import rod.property_visitor
 
 type Solid* = ref object of Component
     size*: Size
@@ -28,6 +30,9 @@ method draw*(s: Solid) =
     c.fillColor = s.color
     c.strokeWidth = 0
     c.drawRect(r)
+
+method visitProperties*(c: Solid, p: var PropertyVisitor) =
+    p.visitProperty("color", c.color)
 
 method animatableProperty1*(s: Solid, name: string): proc (v: Coord) =
     case name

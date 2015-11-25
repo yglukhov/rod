@@ -1,8 +1,11 @@
 import typetraits
 import tables
-import node
-import nimx.types
 import json
+
+import nimx.types
+
+import node
+import property_visitor
 
 export Component
 
@@ -31,7 +34,7 @@ method componentNodeWillBeRemovedFromViewport*(c: Component) {.base.} = discard
 method isPosteffectComponent*(c: Component): bool {.base.} = false
 
 method animatableProperty1*(c: Component, name: string) : (proc (v: Coord)) {.base.} = discard
-
+method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method deserialize*(c: Component, j: JsonNode) {.base.} = discard
 
 type UpdateProcComponent = ref object of Component
