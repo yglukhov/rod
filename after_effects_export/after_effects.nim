@@ -23,6 +23,12 @@ type
     AVItem* = ref AVItemObj
     AVItemObj {.importc.} = object of ItemObj
         duration*: float
+        width*, height*: int
+
+    FootageItem* = ref FootageItemObj
+    FootageItemObj {.importc.} = object of AVItemObj
+        file*: File
+        mainSource*: FootageSource
 
     Composition* = ref CompositionObj
     CompositionObj {.importc.} = object of AVItemObj
@@ -49,7 +55,7 @@ type
         parent*: Layer
         enabled*: bool
         width*, height*: int
-        source*: Item
+        source*: AVItem
 
     TextLayer* = ref TextLayerObj
     TextLayerObj {.importc.} = object of LayerObj
@@ -69,7 +75,7 @@ type
         pvt1d, pvt2d, pvt2dSpatial, pvt3d, pvt3dSpatial
 
     AbstractProperty* = ref AbstractPropertyObj
-    AbstractPropertyObj = object of PropertyBaseObj
+    AbstractPropertyObj {.importc.} = object of PropertyBaseObj
         expression*: cstring
         expressionEnabled*: bool
         isTimeVarying*: bool
@@ -81,11 +87,28 @@ type
         thisFieldIsNeededOnlyToSuppressNimWarning: T
 
     PropertyGroup* = ref PropertyGroupObj
-    PropertyGroupObj = object of PropertyBaseObj
+    PropertyGroupObj {.importc.} = object of PropertyBaseObj
+        numProperties*: int
+
+    FootageSource* = ref FootageSourceObj
+    FootageSourceObj {.importc.} = object of RootObj
+
+    SolidSource* = ref SolidSourceObj
+    SolidSourceObj {.importc.} = object of FootageSourceObj
+        color*: array[3, float]
 
     EditText* = ref EditTextObj
     EditTextObj {.importc.} = object of RootObj
         text*: cstring
+
+    TextJustification* = enum
+        tjLeft, tjRight, tjCenter
+
+    TextDocument* = ref TextDocumentObj
+    TextDocumentObj {.importc.} = object of RootObj
+        text*: cstring
+        fontSize*: int
+        fillColor*: array[3, float]
 
 proc newFile*(path: cstring): File {.importc: "new File".}
 proc open*(f: File, mode: cstring) {.importcpp.}
@@ -140,6 +163,7 @@ template valueTypeFromType(t: typedesc[array[3, float32]]): expr = [pvt3d, pvt3d
 template valueTypeFromType(t: typedesc[float32]): expr = [pvt1d]
 template valueTypeFromType(t: typedesc[float]): expr = [pvt1d]
 template valueTypeFromType(t: typedesc[cstring]): expr = [pvt1d]
+template valueTypeFromType(t: typedesc[TextDocument]): expr = [pvtTextDocument]
 
 template isPropertyGroup*(p: PropertyBase): bool = p.propertyType != ptProperty
 
@@ -177,14 +201,13 @@ type PropertyOwner* = Layer or PropertyGroup
 template property*(owner: PropertyOwner, i: int): PropertyBase = owner.indexedProperty(i + 1)
 
 template propertyGroup*(owner: PropertyOwner, name: cstring): PropertyGroup =
-    owner.property(name).toPropertyGroup()
+    let p = owner.property(name)
+    if p.isNil: nil else: p.toPropertyGroup()
 
 proc property*(owner: PropertyOwner, name: cstring, T: typedesc): Property[T] =
     toPropertyOfType(owner.property(name), T)
 proc property*(owner: PropertyOwner, i: int, T: typedesc): Property[T] =
     toPropertyOfType(owner.property(i), T)
-
-proc numProperties*(owner: PropertyOwner): int {.importcpp.}
 
 proc value*[T](p: Property[T]): T = {.emit: "`result` = `p`.value;".}
 proc valueAtTime*[T](p: Property[T], t: float, e: bool = false): T =
@@ -196,5 +219,45 @@ proc children*(layer: Layer): seq[Layer] =
         if i.parent == layer: result.add(i)
 
 proc addText*(col: Collection[Layer], text: cstring): TextLayer {.importcpp.}
+proc addText*(col: Collection[Layer]): TextLayer {.importcpp.}
+
+proc getProtoName*(y): cstring {.importc: "Object.prototype.toString.call".}
+
+proc jsObjectType*(y): string =
+    var protoName = $getProtoName(y)
+    const start = "[object "
+    assert(protoName.startsWith(start))
+    result = protoName.substr(start.len, protoName.len - 2)
+
+proc getSequenceFilesFromSource*(source: File): seq[File] =
+    result = newSeq[File]()
+    {.emit: """
+    var allFilesInDir = newFolder(`source`.path).getFiles()
+    var pattern = /(.*)\[(\d+)-(\d+)\](.*)/
+
+    var matches = `source`.name.match(pattern)
+    if (matches === null) return null;
+
+    var startIndex = parseInt(matches[2]);
+    var endIndex = parseInt(matches[3]);
+
+    for (var i = 0; i < `allFilesInDir`.length; ++i) {
+          var fMatches = `allFilesInDir`[i].name.match(/([^\d]*)(\d+)(.*)/);
+          var index = parseInt(fMatches[2]);
+          if (matches[1] == fMatches[1] && matches[matches.length - 1] == fMatches[fMatches.length - 1] && index >= startIndex && index <= endIndex) {
+                `result`.push(getResourceNameFromSourceFile(`allFilesInDir`[i]));
+          }
+    }
+    """.}
+
+proc justification*(td: TextDocument): TextJustification =
+    {.emit: """
+    switch(`td`.justification) {
+        case ParagraphJustification.LEFT_JUSTIFY: `result` = 0; break;
+        case ParagraphJustification.RIGHT_JUSTIFY: `result` = 1; break;
+        case ParagraphJustification.CENTER_JUSTIFY: `result` = 2; break;
+    }
+    """.}
+
 
 var app* {.importc, nodecl.}: Application

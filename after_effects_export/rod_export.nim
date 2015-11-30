@@ -26,18 +26,9 @@ proc logi(args: varargs[string, `$`]) =
 
 proc getLayerChildren(layer: Layer): seq[Layer] {.exportc.} = layer.children
 
-proc jsonToJS(n: JsonNode): ref RootObj {.exportc.} =
-    let s: cstring = $n
-    {.emit: "`result` = JSON.parse(`s`);".}
-
-proc jsToJson(n: ref RootObj): JsonNode {.exportc.} =
-    var s: cstring
-    {.emit: "`s` = JSON.stringify(`n`);".}
-    result = parseJson($s)
-
 proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
 
-proc quaternionWithZRotation(zAngle: float32): Quaternion {.exportc.} = newQuaternion(zAngle, newVector3(0, 0, 1))
+template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
 
 var propertyNameMap = {
     "Rotation" : "rotation",
@@ -55,8 +46,8 @@ var propertyNameMap = {
 
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox"]
 
-proc getResourceNameFromSourceFile(file: after_effects.File): cstring {.exportc.} =
-    var footageToken = "(Footage)/"
+proc getResourceNameFromSourceFile(file: after_effects.File): string {.exportc.} =
+    const footageToken = "(Footage)/"
     let p = $file.path
     var n = p.find(footageToken)
     var path = ""
@@ -64,101 +55,68 @@ proc getResourceNameFromSourceFile(file: after_effects.File): cstring {.exportc.
         path = p.substr(n + footageToken.len) & "/"
     result = path & $file.name
 
-{.emit: """
+proc getSequenceFileNamesFromSource(f: after_effects.File): seq[string] =
+    result = newSeq[string]()
+    for c in getSequenceFilesFromSource(f):
+        result.add(getResourceNameFromSourceFile(c))
 
-var outputFile = null;
-
-function getSequenceFileNamesFromSource(source) {
-    var path = source.file.path;
-    var allFilesInDir = new Folder(path).getFiles();
-    var srcName = source.name;
-
-    var pattern = /(.*)\[(\d+)-(\d+)\](.*)/
-
-    var matches = srcName.match(pattern)
-    if (matches === null) return null;
-
-    var startIndex = parseInt(matches[2]);
-    var endIndex = parseInt(matches[3]);
-
-    var result = [];
-    for (var i = 0; i < allFilesInDir.length; ++i) {
-      var fMatches = allFilesInDir[i].name.match(/([^\d]*)(\d+)(.*)/);
-      var index = parseInt(fMatches[2]);
-      if (matches[1] == fMatches[1] && matches[matches.length - 1] == fMatches[fMatches.length - 1] && index >= startIndex && index <= endIndex) {
-        result.push(getResourceNameFromSourceFile(allFilesInDir[i]));
-      }
-    }
-
-    return result;
-}
-
-function serializeLayerComponents(layer) {
-    var result = {};
-    var source = layer.source;
-    if (source != null) {
-        if (source.file != null) {
-            var sprite = {};
-            if (source.duration > 0) {
-                sprite.fileNames = getSequenceFileNamesFromSource(source);
-            }
-            else {
-                sprite.fileNames = [getResourceNameFromSourceFile(source.file)];
-                sprite.name = getResourceNameFromSourceFile(source.file);
-            }
-
-            var opacity = layer.property("Opacity").valueAtTime(0, false);
-            if (opacity != 100) sprite.alpha = opacity / 100.0;
-            result["Sprite"] = sprite;
-        }
-        else if (source.name.indexOf("Null") != 0 && source.mainSource && source.mainSource.color !== undefined) { // Solid source
-            var solid = {};
-            solid.color = source.mainSource.color;
-            solid.size = [source.width, source.height];
-            var opacity = layer.property("Opacity").valueAtTime(0, false);
-            if (opacity != 100) solid.alpha = opacity / 100.0;
-            result["Solid"] = solid;
-        }
-    }
-    var levels = layer.Effects.property("Levels (Individual Controls)");
-    if (levels !== null) {
-        var lvl = {};
-        lvl.inWhite = levels.property("Input White").valueAtTime(0, false);
-        lvl.inBlack = levels.property("Input Black").valueAtTime(0, false);
-        lvl.inGamma = levels.property("Gamma").valueAtTime(0, false);
-        lvl.outWhite = levels.property("Output White").valueAtTime(0, false);
-        lvl.outBlack = levels.property("Output Black").valueAtTime(0, false);
-        result["ChannelLevels"] = lvl;
-    }
-
-    var text = layer.Text;
-    if (text !== null && text !== undefined) {
-        var textDoc = text.property("Source Text").value;
-        var txt = {};
-        txt.text = textDoc.text;
-        txt.fontSize = textDoc.fontSize;
-        txt.color = textDoc.fillColor;
-        txt.color.push(layer.property("Opacity").valueAtTime(0, false) / 100);
-        switch(textDoc.justification) {
-            case ParagraphJustification.LEFT_JUSTIFY: txt.justification = "left"; break;
-            case ParagraphJustification.RIGHT_JUSTIFY: txt.justification = "right"; break;
-            case ParagraphJustification.CENTER_JUSTIFY: txt.justification = "center"; break;
-        }
-        result["Text"] = txt;
-    }
-
-    return result;
-}
-
-""".}
-
-proc `%`[I: static[int]](v: TVector[I, float32]): JsonNode =
+proc `%`[T: string | SomeNumber](s: openarray[T]): JsonNode =
     result = newJArray()
-    for e in v: result.add(%e)
+    for c in s:
+        result.add(%c)
 
-proc `%`(v: Quaternion): JsonNode =
-    result = newJArray()
-    for e in v: result.add(%e)
+proc serializeLayerComponents(layer: Layer): JsonNode =
+    result = newJObject()
+    var source = layer.source
+    if not source.isNil:
+        if source.typeName == "FootageItem":
+            let footageSource = FootageItem(source)
+            if not footageSource.file.isNil:
+                var sprite = newJObject()
+                if footageSource.duration > 0:
+                    sprite["fileNames"] = % getSequenceFileNamesFromSource(footageSource.file)
+                else:
+                    sprite["fileNames"] = % [getResourceNameFromSourceFile(footageSource.file)]
+
+                var opacity = layer.property("Opacity", float).valueAtTime(0)
+                if opacity != 100: sprite["alpha"] = %(opacity / 100.0)
+                result["Sprite"] = sprite
+            elif ($source.name).find("Null") != 0 and
+                    not footageSource.mainSource.isNil and
+                    footageSource.mainSource.jsObjectType == "SolidSource": # Solid source
+                var solid = newJObject()
+                let solidSource = SolidSource(footageSource.mainSource)
+                solid["color"] = %* solidSource.color
+                solid["size"] = % [source.width, source.height]
+                var opacity = layer.property("Opacity", float).valueAtTime(0)
+                if opacity != 100: solid["alpha"] = %(opacity / 100.0)
+                result["Solid"] = solid
+
+    let effects = layer.propertyGroup("Effects")
+    if not effects.isNil:
+        let levels = effects.propertyGroup("Levels (Individual Controls)")
+        if not levels.isNil:
+            var lvl = newJObject()
+            lvl["inWhite"] = % levels.property("Input White", float).valueAtTime(0, false)
+            lvl["inBlack"] = % levels.property("Input Black", float).valueAtTime(0, false)
+            lvl["inGamma"] = % levels.property("Gamma", float).valueAtTime(0, false)
+            lvl["outWhite"] = % levels.property("Output White", float).valueAtTime(0, false)
+            lvl["outBlack"] = % levels.property("Output Black", float).valueAtTime(0, false)
+            result["ChannelLevels"] = lvl
+
+    var text = layer.propertyGroup("Text")
+    if not text.isNil:
+        var textDoc = text.property("Source Text", TextDocument).value
+        var txt = newJObject()
+        txt["text"] = % $textDoc.text
+        txt["fontSize"] = % textDoc.fontSize
+        txt["color"] = % textDoc.fillColor
+        txt["color"].add(%(layer.property("Opacity", float).valueAtTime(0) / 100))
+        case textDoc.justification
+        of tjLeft: txt["justification"] = %"left"
+        of tjRight: txt["justification"] = %"right"
+        of tjCenter: txt["justification"] = %"center"
+        result["Text"] = txt
 
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
@@ -187,8 +145,7 @@ proc serializeLayer(layer: Layer): JsonNode =
     if not layer.source.isNil and layer.source.typeName == "Composition":
         result["compositionRef"] = % $layer.source.name
 
-    var components : JsonNode
-    {.emit: "`components` = jsToJson(serializeLayerComponents(`layer`));".}
+    var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
 
 type Marker = object
@@ -199,18 +156,17 @@ type Marker = object
 
 proc getMarkers(comp: Composition): seq[Marker] =
     result = newSeq[Marker]()
-    var tempLayer = comp.layers.addText($comp.duration)
+    var tempLayer = comp.layers.addText()
 
-    var tempText = tempLayer.propertyGroup("Text").property("Source Text", cstring)
-
-    tempText.expression = "thisComp.marker.numKeys;"
-    var numMarkers = parseInt($tempText.value)
+    var tempText = tempLayer.propertyGroup("Text").property("Source Text", TextDocument)
+    tempText.expression = "thisComp.marker.numKeys"
+    var numMarkers = parseInt($tempText.value.text)
 
     for i in 1 .. numMarkers:
-        tempText.expression = "thisComp.marker.key(" & $i & ").time;"
-        var markerTime = parseFloat($tempText.value)
-        tempText.expression = "thisComp.marker.key(" & $i & ").comment;"
-        var markerComment = $tempText.value
+        tempText.expression = "thisComp.marker.key(" & $i & ").time"
+        var markerTime = parseFloat($tempText.value.text)
+        tempText.expression = "thisComp.marker.key(" & $i & ").comment"
+        var markerComment = $tempText.value.text
         result.add(Marker(
           time: markerTime,
           comment: markerComment
@@ -227,6 +183,8 @@ proc parseMarkerComment(comment: string, res: var Marker) =
             of "animation": res.animation = v
             of "loops": res.loops = parseInt(v)
             else: logi "Unknown marker key: ", k
+    if res.animation.len == 0:
+        logi "ERROR: WRONG MARKER COMMENT: ", comment
 
 proc getAnimationMarkers(comp: Composition): seq[Marker] =
     result = getMarkers(comp)
@@ -241,27 +199,33 @@ proc getAnimationMarkers(comp: Composition): seq[Marker] =
 proc jsonPropertyAccessor(p: AbstractProperty): proc(t: float): JsonNode =
     case $p.name
     of "Rotation":
+        let cp = p.toPropertyOfType(float)
         result = proc(t: float): JsonNode =
-            % quaternionWithZRotation(p.toPropertyOfType(float).valueAtTime(t))
+            % quaternionWithZRotation(cp.valueAtTime(t))
     of "Scale":
+        let cp = p.toPropertyOfType(Vector3)
         result = proc(t: float): JsonNode =
-            % (p.toPropertyOfType(Vector3).valueAtTime(t) / 100)
+            % (cp.valueAtTime(t) / 100)
     of "Opacity":
+        let cp = p.toPropertyOfType(float)
         result = proc(t: float): JsonNode =
-            % (p.toPropertyOfType(float).valueAtTime(t) / 100)
+            % (cp.valueAtTime(t) / 100)
     else:
         case p.propertyValueType
         of pvt2d, pvt2dSpatial:
+            let cp = p.toPropertyOfType(Vector2)
             result = proc(t: float): JsonNode =
-                % (p.toPropertyOfType(Vector2).valueAtTime(t))
+                % (cp.valueAtTime(t))
 
         of pvt3d, pvt3dSpatial:
+            let cp = p.toPropertyOfType(Vector3)
             result = proc(t: float): JsonNode =
-                % (p.toPropertyOfType(Vector3).valueAtTime(t))
+                % (cp.valueAtTime(t))
 
         of pvt1d:
+            let cp = p.toPropertyOfType(float)
             result = proc(t: float): JsonNode =
-                % (p.toPropertyOfType(float).valueAtTime(t))
+                % (cp.valueAtTime(t))
 
         else:
             raise newException(Exception, "Unknown property type to convert: " & $p.propertyValueType)
@@ -294,11 +258,9 @@ proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
     #  logi(JSON.stringify(sampledPropertyValues));
     #  sampledPropertyValues.push(converter(prop.valueAtTime(animationEndTime, false)));
 
-    result = %{
-      #"startTime": marker.startTime - animationStartTime,
-      "duration": %(animationEndTime - animationStartTime),
-      "values": sampledPropertyValues
-    };
+    result = newJObject()
+    result["duration"] = %(animationEndTime - animationStartTime)
+    result["values"] = sampledPropertyValues
     if marker.loops != 0: result["numberOfLoops"] = %marker.loops
 
 proc mapPropertyName(name: string): string =
@@ -313,17 +275,18 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
             getAnimatableProperties(p.toPropertyGroup(), res)
         else:
             let pr = p.toAbstractProperty()
-            if pr.isTimeVarying and $fromObj.name notin bannedPropertyNames:
+            if pr.isTimeVarying and $pr.name notin bannedPropertyNames:
+                logi "Animatable prop: ", pr.name
                 if not pr.isSeparationLeader or not pr.dimensionsSeparated:
                     res.add(pr)
 
 proc getLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var props = newSeq[AbstractProperty]()
-    getAnimatableProperties(layer, props);
+    getAnimatableProperties(layer, props)
     for pr in props:
         var anim = getPropertyAnimation(pr, marker)
         var fullyQualifiedPropName = $layer.name & "." & mapPropertyName($pr.name)
-        logi("PROP: ", fullyQualifiedPropName)
+        #logi("PROP: ", fullyQualifiedPropName)
         result[fullyQualifiedPropName] = anim
 
 proc serializeCompositionAnimations(composition: Composition): JsonNode =
@@ -334,8 +297,7 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
         logi("Exporting animation: ", m.animation);
         for layer in composition.layers:
             if shouldSerializeLayer(layer):
-                getLayerAnimationForMarker(layer, m,
-                  animations)
+                getLayerAnimationForMarker(layer, m, animations)
         if animations.len > 0:
             result[m.animation] = animations;
 
@@ -360,7 +322,37 @@ proc serializeComposition(composition: Composition): JsonNode =
 
     let animations = serializeCompositionAnimations(composition)
     if animations.len > 0:
-        result["animations"] = animations;
+        result["animations"] = animations
+
+proc replacer(n: JsonNode): ref RootObj {.exportc.} =
+    case n.kind
+    of JNull: result = nil
+    of JBool:
+        let b = n.bval
+        {.emit: "`result` = `b`;".}
+    of JArray:
+        var r = newSeq[ref RootObj]()
+        for e in n.elems:
+            r.add(replacer(e))
+        {.emit: "`result` = `r`;".}
+    of JString:
+        var e : cstring = n.str
+        {.emit: "`result` = `e`;".}
+    of JInt:
+        let e = n.num
+        {.emit: "`result` = `e`;".}
+    of JFloat:
+        let e = n.fnum
+        {.emit: "`result` = `e`;".}
+    of JObject:
+        {.emit: "`result` = {};"}
+        for v in n.fields:
+            let k : cstring = v.key
+            let val = replacer(v.val)
+            {.emit: "`result`[`k`] = `val`;".}
+
+proc fastJsonStringify(n: JsonNode): cstring =
+    {.emit: "`result` = JSON.stringify(`replacer`(`n`), null, 2);".}
 
 proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     let compositions = getSelectedCompositions()
@@ -372,7 +364,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
         file.openForWriting()
         try:
             var serializedComp = serializeComposition(c)
-            file.write(serializedComp.pretty)
+            file.write(fastJsonStringify(serializedComp))
         except:
             logi("Exception caught: ", getCurrentExceptionMsg())
         file.close()
@@ -382,7 +374,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
 {.emit: """
 
 function buildUI(contextObj) {
-  var debug = true;
+  var debug = false;
 
   var mainWindow = null;
   if (contextObj instanceof Panel) {
@@ -415,7 +407,7 @@ function buildUI(contextObj) {
   `logTextField`[0] = resultText;
 
   setPathButton.onClick = function(e) {
-    outputFile = Folder.selectDialog("Choose an output folder");
+    var outputFile = Folder.selectDialog("Choose an output folder");
     if (outputFile) {
       exportButton.enabled = true;
       filePath.text = outputFile.absoluteURI;
