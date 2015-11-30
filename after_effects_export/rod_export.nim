@@ -24,8 +24,6 @@ proc logi(args: varargs[string, `$`]) =
     text &= "\n"
     logTextField.text = text
 
-proc getLayerChildren(layer: Layer): seq[Layer] {.exportc.} = layer.children
-
 proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
@@ -62,14 +60,13 @@ proc getSequenceFileNamesFromSource(f: after_effects.File): seq[string] =
 
 proc `%`[T: string | SomeNumber](s: openarray[T]): JsonNode =
     result = newJArray()
-    for c in s:
-        result.add(%c)
+    for c in s: result.add(%c)
 
 proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJObject()
     var source = layer.source
     if not source.isNil:
-        if source.typeName == "FootageItem":
+        if source.typeName == "Footage":
             let footageSource = FootageItem(source)
             if not footageSource.file.isNil:
                 var sprite = newJObject()
@@ -118,6 +115,14 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         of tjCenter: txt["justification"] = %"center"
         result["Text"] = txt
 
+proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
+    result = layer.property("Anchor Point", Vector2).isTimeVarying and layer.name != "root"
+
+proc layerRequiresAuxParent(layer: Layer): bool =
+    let ap = layer.property("Anchor Point", Vector2)
+    if ap.value != newVector2(0, 0):
+        result = true
+
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
 
@@ -132,8 +137,8 @@ proc serializeLayer(layer: Layer): JsonNode =
     var rotation = layer.property("Rotation", float32).valueAtTime(0, false);
     if (rotation != 0):
         result["rotation"] = % quaternionWithZRotation(rotation)
-    var children = getLayerChildren(layer)
-    if (children.len > 0):
+    var children = layer.children
+    if children.len > 0:
         var chres = newJArray()
         for child in children:
             if shouldSerializeLayer(child):
@@ -156,17 +161,17 @@ type Marker = object
 
 proc getMarkers(comp: Composition): seq[Marker] =
     result = newSeq[Marker]()
-    var tempLayer = comp.layers.addText()
+    let tempLayer = comp.layers.addText()
 
-    var tempText = tempLayer.propertyGroup("Text").property("Source Text", TextDocument)
+    let tempText = tempLayer.propertyGroup("Text").property("Source Text", TextDocument)
     tempText.expression = "thisComp.marker.numKeys"
-    var numMarkers = parseInt($tempText.value.text)
+    let numMarkers = parseInt($tempText.value.text)
 
     for i in 1 .. numMarkers:
         tempText.expression = "thisComp.marker.key(" & $i & ").time"
-        var markerTime = parseFloat($tempText.value.text)
+        let markerTime = parseFloat($tempText.value.text)
         tempText.expression = "thisComp.marker.key(" & $i & ").comment"
-        var markerComment = $tempText.value.text
+        let markerComment = $tempText.value.text
         result.add(Marker(
           time: markerTime,
           comment: markerComment
@@ -248,7 +253,6 @@ proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
     var accessor = jsonPropertyAccessor(prop)
 
     var dEndTime = animationEndTime - 0.0001; # Due to floating point errors, we
-
     # may hit end time, so prevent that.
 
     var s = animationStartTime

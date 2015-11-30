@@ -204,10 +204,13 @@ template propertyGroup*(owner: PropertyOwner, name: cstring): PropertyGroup =
     let p = owner.property(name)
     if p.isNil: nil else: p.toPropertyGroup()
 
-proc property*(owner: PropertyOwner, name: cstring, T: typedesc): Property[T] =
-    toPropertyOfType(owner.property(name), T)
-proc property*(owner: PropertyOwner, i: int, T: typedesc): Property[T] =
-    toPropertyOfType(owner.property(i), T)
+template property*(owner: PropertyOwner, name: cstring, T: typedesc): auto =
+    let p = owner.property(name)
+    if p.isNil: nil else: p.toPropertyOfType(T)
+
+template property*(owner: PropertyOwner, i: int, T: typedesc): auto =
+    let p = owner.property(i)
+    if p.isNil: nil else: p.toPropertyOfType(T)
 
 proc value*[T](p: Property[T]): T = {.emit: "`result` = `p`.value;".}
 proc valueAtTime*[T](p: Property[T], t: float, e: bool = false): T =
@@ -220,6 +223,8 @@ proc children*(layer: Layer): seq[Layer] =
 
 proc addText*(col: Collection[Layer], text: cstring): TextLayer {.importcpp.}
 proc addText*(col: Collection[Layer]): TextLayer {.importcpp.}
+proc addNull*(col: Collection[Layer], duration: float): Layer {.importcpp.}
+proc addNull*(col: Collection[Layer]): Layer {.importcpp.}
 
 proc getProtoName*(y): cstring {.importc: "Object.prototype.toString.call".}
 
