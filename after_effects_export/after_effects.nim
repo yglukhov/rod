@@ -51,11 +51,15 @@ type
     Layer* = ref LayerObj
     LayerObj {.importc.} = object of ItemObj
         numProperties*: int
+        index*: int
         containingComp*: Composition
         parent*: Layer
         enabled*: bool
         width*, height*: int
         source*: AVItem
+        isNameSet*: bool
+        isTrackMatte*: bool
+        hasTrackMatte*: bool
 
     TextLayer* = ref TextLayerObj
     TextLayerObj {.importc.} = object of LayerObj
@@ -109,6 +113,9 @@ type
         text*: cstring
         fontSize*: int
         fillColor*: array[3, float]
+
+    TrackMatteType* = enum
+        tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
 
 proc newFile*(path: cstring): File {.importc: "new File".}
 proc open*(f: File, mode: cstring) {.importcpp.}
@@ -247,11 +254,13 @@ proc getSequenceFilesFromSource*(source: File): seq[File] =
     var endIndex = parseInt(matches[3]);
 
     for (var i = 0; i < `allFilesInDir`.length; ++i) {
-          var fMatches = `allFilesInDir`[i].name.match(/([^\d]*)(\d+)(.*)/);
-          var index = parseInt(fMatches[2]);
-          if (matches[1] == fMatches[1] && matches[matches.length - 1] == fMatches[fMatches.length - 1] && index >= startIndex && index <= endIndex) {
-                `result`.push(getResourceNameFromSourceFile(`allFilesInDir`[i]));
-          }
+        var fMatches = `allFilesInDir`[i].name.match(/([^\d]*)(\d+)(.*)/);
+        var index = parseInt(fMatches[2]);
+        if (matches[1] == fMatches[1] &&
+                matches[matches.length - 1] == fMatches[fMatches.length - 1] &&
+                index >= startIndex && index <= endIndex) {
+            `result`.push(getResourceNameFromSourceFile(`allFilesInDir`[i]));
+        }
     }
     """.}
 
@@ -264,5 +273,15 @@ proc justification*(td: TextDocument): TextJustification =
     }
     """.}
 
+proc trackMatteType*(layer: Layer): TrackMatteType =
+    {.emit: """
+    switch(`layer`.trackMatteType) {
+        case TrackMatteType.NO_TRACK_MATTE: `result` = 0; break;
+        case TrackMatteType.ALPHA: `result` = 1; break;
+        case TrackMatteType.ALPHA_INVERTED: `result` = 2; break;
+        case TrackMatteType.LUMA: `result` = 3; break;
+        case TrackMatteType.LUMA_INVERTED: `result` = 4; break;
+    }
+    """.}
 
 var app* {.importc, nodecl.}: Application

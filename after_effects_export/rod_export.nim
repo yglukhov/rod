@@ -1,4 +1,4 @@
-import typetraits, tables
+import typetraits, tables, dom
 import after_effects
 import times
 import json
@@ -46,12 +46,12 @@ let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox"]
 
 proc getResourceNameFromSourceFile(file: after_effects.File): string {.exportc.} =
     const footageToken = "(Footage)/"
-    let p = $file.path
-    var n = p.find(footageToken)
+    let p = $decodeURIComponent(file.path)
+    let n = p.find(footageToken)
     var path = ""
     if n != -1:
         path = p.substr(n + footageToken.len) & "/"
-    result = path & $file.name
+    result = path & $decodeURIComponent(file.name)
 
 proc getSequenceFileNamesFromSource(f: after_effects.File): seq[string] =
     result = newSeq[string]()
@@ -123,9 +123,20 @@ proc requiresAuxParent(layer: Layer): bool =
     if ap.value != newVector3(0, 0, 0):
         result = true
 
+var layerNames = initTable[int, string]()
+
 proc mangledName(layer: Layer): string =
-    # TODO: Complete
-    result = $layer.name
+    result = layerNames.getOrDefault(layer.index)
+    if result.len == 0:
+        if layer.isNameSet:
+            result = $layer.name
+            for v in values(layerNames):
+                if result == v:
+                    result &= "$" & $layer.index
+                    break
+        else:
+            result = "$" & $layer.index
+        layerNames[layer.index] = result
 
 proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
 
@@ -308,12 +319,15 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
                 if not pr.isSeparationLeader or not pr.dimensionsSeparated:
                     res.add(pr)
 
+proc belongsToAux(p: AbstractProperty): bool =
+    p.name == "Scale" or p.name == "Rotation" or p.name == "Position"
+
 proc getLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var props = newSeq[AbstractProperty]()
     getAnimatableProperties(layer, props)
     for pr in props:
         var anim = getPropertyAnimation(pr, marker)
-        let layerName = if (pr.name == "Scale" or pr.name == "Rotation") and layer.requiresAuxParent:
+        let layerName = if pr.belongsToAux and layer.requiresAuxParent:
                 layer.auxLayerName
             else:
                 layer.mangledName
@@ -334,6 +348,8 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
             result[m.animation] = animations;
 
 proc serializeComposition(composition: Composition): JsonNode =
+    layerNames = initTable[int, string]()
+
     let rootLayer = composition.layer("root")
     if not rootLayer.isNil:
         result = serializeLayer(rootLayer)
