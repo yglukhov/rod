@@ -116,19 +116,25 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         result["Text"] = txt
 
 proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
-    result = layer.property("Anchor Point", Vector2).isTimeVarying and layer.name != "root"
+    result = layer.property("Anchor Point", Vector3).isTimeVarying and layer.name != "root"
 
-proc layerRequiresAuxParent(layer: Layer): bool =
-    let ap = layer.property("Anchor Point", Vector2)
-    if ap.value != newVector2(0, 0):
+proc requiresAuxParent(layer: Layer): bool =
+    let ap = layer.property("Anchor Point", Vector3)
+    if ap.value != newVector3(0, 0, 0):
         result = true
+
+proc mangledName(layer: Layer): string =
+    # TODO: Complete
+    result = $layer.name
+
+proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
 
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
 
     logi ("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
 
-    result["name"] = % $layer.name
+    result["name"] = % layer.mangledName
     result["translation"] = % layer.property("Position", Vector3).valueAtTime(0)
     var scale = layer.property("Scale", Vector3).valueAtTime(0)
     if scale != newVector3(100, 100, 100):
@@ -152,6 +158,24 @@ proc serializeLayer(layer: Layer): JsonNode =
 
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
+
+    if layer.requiresAuxParent:
+        logi "Creating aux parent"
+        var auxNode = newJObject()
+        auxNode["name"] = % layer.auxLayerName
+        let pos = layer.property("Position", Vector3).valueAtTime(0)
+        auxNode["translation"] = % pos
+        if not result["scale"].isNil:
+            auxNode["scale"] = result["scale"]
+            result.delete("scale")
+
+        if not result["rotation"].isNil:
+            auxNode["rotation"] = result["rotation"]
+            result.delete("rotation")
+
+        result["translation"] = % (- layer.property("Anchor Point", Vector3).valueAtTime(0))
+        auxNode["children"] = % [result]
+        result = auxNode
 
 type Marker = object
     time*, duration*: float
@@ -289,7 +313,11 @@ proc getLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) 
     getAnimatableProperties(layer, props)
     for pr in props:
         var anim = getPropertyAnimation(pr, marker)
-        var fullyQualifiedPropName = $layer.name & "." & mapPropertyName($pr.name)
+        let layerName = if (pr.name == "Scale" or pr.name == "Rotation") and layer.requiresAuxParent:
+                layer.auxLayerName
+            else:
+                layer.mangledName
+        var fullyQualifiedPropName = layerName & "." & mapPropertyName($pr.name)
         #logi("PROP: ", fullyQualifiedPropName)
         result[fullyQualifiedPropName] = anim
 
