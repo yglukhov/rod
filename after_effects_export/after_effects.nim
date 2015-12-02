@@ -1,3 +1,4 @@
+import strutils
 
 type
     Application* = ref ApplicationObj
@@ -167,6 +168,7 @@ proc propertyValueType*(p: AbstractProperty): PropertyValueType =
 
 template valueTypeFromType(t: typedesc[array[2, float32]]): expr = [pvt2d, pvt2dSpatial]
 template valueTypeFromType(t: typedesc[array[3, float32]]): expr = [pvt3d, pvt3dSpatial]
+template valueTypeFromType(t: typedesc[array[4, float32]]): expr = [pvtColor]
 template valueTypeFromType(t: typedesc[float32]): expr = [pvt1d]
 template valueTypeFromType(t: typedesc[float]): expr = [pvt1d]
 template valueTypeFromType(t: typedesc[cstring]): expr = [pvt1d]
@@ -241,28 +243,36 @@ proc jsObjectType*(y): string =
     assert(protoName.startsWith(start))
     result = protoName.substr(start.len, protoName.len - 2)
 
-proc getSequenceFilesFromSource*(source: File): seq[File] =
+type
+    JSRegExp = ref JSRegExpObj
+    JSRegExpObj {.importc.} = object
+
+proc newRegex*(pattern, flags: cstring): JSRegExp {.importc: "new RegExp"}
+proc newRegex*(pattern: cstring): JSRegExp {.importc: "new RegExp"}
+proc match*(str: cstring, reg: JSRegExp): seq[cstring] {.importcpp.}
+
+proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
     result = newSeq[File]()
-    {.emit: """
-    var allFilesInDir = newFolder(`source`.path).getFiles()
-    var pattern = /(.*)\[(\d+)-(\d+)\](.*)/
 
-    var matches = `source`.name.match(pattern)
-    if (matches === null) return null;
+    var allFilesInDir = newFolder(source.file.path).getFiles()
+    var pattern = newRegex("""(.*)\[(\d+)-(\d+)\](.*)""")
 
-    var startIndex = parseInt(matches[2]);
-    var endIndex = parseInt(matches[3]);
+    var matches = source.name.match(pattern)
+    if matches.isNil:
+        return nil
 
-    for (var i = 0; i < `allFilesInDir`.length; ++i) {
-        var fMatches = `allFilesInDir`[i].name.match(/([^\d]*)(\d+)(.*)/);
-        var index = parseInt(fMatches[2]);
-        if (matches[1] == fMatches[1] &&
-                matches[matches.length - 1] == fMatches[fMatches.length - 1] &&
-                index >= startIndex && index <= endIndex) {
-            `result`.push(getResourceNameFromSourceFile(`allFilesInDir`[i]));
-        }
-    }
-    """.}
+    var startIndex = parseInt($matches[2])
+    var endIndex = parseInt($matches[3])
+
+    var pattern2 = newRegex("""([^\d]*)(\d+)(.*)""")
+
+    for i in allFilesInDir:
+        var fMatches = i.name.match(pattern2)
+        var index = parseInt($fMatches[2])
+        if (matches[1] == fMatches[1] and
+                matches[^1] == fMatches[^1] and
+                index >= startIndex and index <= endIndex):
+            result.add(i)
 
 proc justification*(td: TextDocument): TextJustification =
     {.emit: """

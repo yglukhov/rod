@@ -7,6 +7,8 @@ import strutils
 import nimx.matrixes
 import rod.quaternion
 
+type File = after_effects.File
+
 proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item]): seq[t] =
     for i in collection:
         if i.typeName == t.name:
@@ -42,9 +44,9 @@ var propertyNameMap = {
     "Output Black": "outBlack"
 }.toTable()
 
-let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox"]
+let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
 
-proc getResourceNameFromSourceFile(file: after_effects.File): string {.exportc.} =
+proc getResourceNameFromSourceFile(file: File): string {.exportc.} =
     const footageToken = "(Footage)/"
     let p = $decodeURIComponent(file.path)
     let n = p.find(footageToken)
@@ -53,7 +55,7 @@ proc getResourceNameFromSourceFile(file: after_effects.File): string {.exportc.}
         path = p.substr(n + footageToken.len) & "/"
     result = path & $decodeURIComponent(file.name)
 
-proc getSequenceFileNamesFromSource(f: after_effects.File): seq[string] =
+proc getSequenceFileNamesFromSource(f: FootageItem): seq[string] =
     result = newSeq[string]()
     for c in getSequenceFilesFromSource(f):
         result.add(getResourceNameFromSourceFile(c))
@@ -71,7 +73,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
             if not footageSource.file.isNil:
                 var sprite = newJObject()
                 if footageSource.duration > 0:
-                    sprite["fileNames"] = % getSequenceFileNamesFromSource(footageSource.file)
+                    sprite["fileNames"] = % getSequenceFileNamesFromSource(footageSource)
                 else:
                     sprite["fileNames"] = % [getResourceNameFromSourceFile(footageSource.file)]
 
@@ -100,6 +102,16 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
             lvl["outWhite"] = % levels.property("Output White", float).valueAtTime(0, false)
             lvl["outBlack"] = % levels.property("Output Black", float).valueAtTime(0, false)
             result["ChannelLevels"] = lvl
+
+        let numbers = effects.propertyGroup("Numbers")
+        if not numbers.isNil:
+            var txt = newJObject()
+            var color = numbers.property("Fill Color", Vector4).valueAtTime(0)
+            color[3] = layer.property("Opacity", float).valueAtTime(0) / 100
+            txt["color"] = %color
+            txt["fontSize"] = % numbers.property("Size", float).valueAtTime(0)
+            result["Text"] = txt
+            result.delete("Solid")
 
     var text = layer.propertyGroup("Text")
     if not text.isNil:
@@ -161,7 +173,8 @@ proc serializeLayer(layer: Layer): JsonNode =
             if shouldSerializeLayer(child):
                 chres.add(serializeLayer(child))
 
-        chres.elems.reverse()
+        if chres.len > 0:
+            chres.elems.reverse()
         result["children"] = chres
 
     if not layer.source.isNil and layer.source.typeName == "Composition":
