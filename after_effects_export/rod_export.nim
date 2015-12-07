@@ -131,9 +131,10 @@ proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
     result = layer.property("Anchor Point", Vector3).isTimeVarying and layer.name != "root"
 
 proc requiresAuxParent(layer: Layer): bool =
-    let ap = layer.property("Anchor Point", Vector3)
-    if ap.value != newVector3(0, 0, 0):
-        result = true
+    if layer.name != "root":
+        let ap = layer.property("Anchor Point", Vector3)
+        if ap.value != newVector3(0, 0, 0):
+            result = true
 
 var layerNames = initTable[int, string]()
 
@@ -184,7 +185,7 @@ proc serializeLayer(layer: Layer): JsonNode =
     if components.len > 0: result["components"] = components
 
     if layer.requiresAuxParent:
-        logi "Creating aux parent"
+        logi "Creating aux parent for: ", layer.mangledName
         var auxNode = newJObject()
         auxNode["name"] = % layer.auxLayerName
         let pos = layer.property("Position", Vector3).valueAtTime(0)
