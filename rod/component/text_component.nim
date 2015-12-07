@@ -55,6 +55,8 @@ method draw*(t: Text) =
             else:
                 p.x -= textSize.width
 
+        p.y -= t.font.size
+
         c.drawText(t.font, p, t.text)
         t.font.horizontalSpacing = hs
 
