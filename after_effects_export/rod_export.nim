@@ -141,14 +141,11 @@ var layerNames = initTable[int, string]()
 proc mangledName(layer: Layer): string =
     result = layerNames.getOrDefault(layer.index)
     if result.len == 0:
-        if layer.isNameSet:
-            result = $layer.name
-            for v in values(layerNames):
-                if result == v:
-                    result &= "$" & $layer.index
-                    break
-        else:
-            result = "$" & $layer.index
+        result = $layer.name
+        for v in values(layerNames):
+            if result == v:
+                result &= "$" & $layer.index
+                break
         layerNames[layer.index] = result
 
 proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
