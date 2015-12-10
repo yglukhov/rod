@@ -11,6 +11,7 @@ import node
 import component
 import quaternion
 import property_visitor
+import numeric_text_field
 
 type InspectorView* = ref object of PanelView
     #node: Node3D
@@ -41,7 +42,7 @@ proc newCoordPropertyView(y: Coord, propName: string, setter: proc(s: Coord), ge
     v.text = propName & ":"
     result.addSubview(v)
     var x = 70.Coord
-    let textField = newTextField(newRect(x, 0, result.bounds.width - x, result.bounds.height))
+    let textField = newNumericTextField(newRect(x, 0, result.bounds.width - x, result.bounds.height))
     textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     textField.text = formatFloat(getter(), ffDecimal, 3)
     textField.onAction do():
@@ -77,7 +78,7 @@ proc newColorPropertyView(y: Coord, propName: string, setter: proc(s: Color), ge
     template toVector(c: Color): Vector4 = newVector4(c.r, c.g, c.b, c.a)
 
     for i in 0 ..< vecLen:
-        let textField = newTextField(newRect(x, 0, width, result.bounds.height))
+        let textField = newNumericTextField(newRect(x, 0, width, result.bounds.height))
         x += width
         if i == vecLen - 1:
             textField.autoresizingMask = {afFlexibleMaxX, afFlexibleMaxY}
@@ -106,7 +107,7 @@ proc newVecPropertyView[T](y: Coord, propName: string, setter: proc(s: T), gette
         setter(val)
 
     for i in 0 ..< vecLen:
-        let textField = newTextField(newRect(x, 0, width, result.bounds.height))
+        let textField = newNumericTextField(newRect(x, 0, width, result.bounds.height))
         x += width
         if i == vecLen - 1:
             textField.autoresizingMask = {afFlexibleMaxX, afFlexibleMaxY}
