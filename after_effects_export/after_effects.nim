@@ -4,6 +4,10 @@ type
     Application* = ref ApplicationObj
     ApplicationObj {.importc.} = object of RootObj
         project*: Project
+        settings*: Settings
+
+    Settings* = ref SettingsObj
+    SettingsObj {.importc.} = object of RootObj
 
     Project* = ref ProjectObj
     ProjectObj {.importc.} = object of RootObj
@@ -293,5 +297,9 @@ proc trackMatteType*(layer: Layer): TrackMatteType =
         case TrackMatteType.LUMA_INVERTED: `result` = 4; break;
     }
     """.}
+
+proc getSetting*(s: Settings, sectionName, keyName: cstring): cstring {.importcpp.}
+proc saveSetting*(s: Settings, sectionName, keyName, value: cstring) {.importcpp.}
+proc haveSetting*(s: Settings, sectionName, keyName: cstring): bool {.importcpp.}
 
 var app* {.importc, nodecl.}: Application
