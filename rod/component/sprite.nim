@@ -20,7 +20,7 @@ method init(s: Sprite) =
     s.alpha = 1.0
 
 proc image*(s: Sprite): Image =
-    if not s.images.isNil and s.images.len > 0:
+    if not s.images.isNil and s.images.len > s.currentFrame:
         result = s.images[s.currentFrame]
 
 proc `image=`*(s: Sprite, i: Image) =
