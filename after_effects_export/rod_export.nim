@@ -238,13 +238,19 @@ proc parseMarkerComment(comment: string, res: var Marker) =
         logi "ERROR: WRONG MARKER COMMENT: ", comment
 
 proc getAnimationMarkers(comp: Composition): seq[Marker] =
-    result = getMarkers(comp)
-    for i in 0 ..< result.len - 1:
-        parseMarkerComment(result[i].comment, result[i])
-        result[i].duration = result[i + 1].time - result[i].time
+    var markers = getMarkers(comp)
+    result = newSeq[Marker]()
+    for i in 0 ..< markers.len:
+        parseMarkerComment(markers[i].comment, markers[i])
+        if markers[i].animation.len == 0:
+            logi "WARNING: Marker ignored: ", markers[i].comment
+        else:
+            result.add(markers[i])
 
     if result.len > 0:
-        parseMarkerComment(result[^1].comment, result[^1])
+        for i in 0 ..< result.len - 1:
+            result[i].duration = result[i + 1].time - result[i].time
+
         result[^1].duration = comp.duration - result[^1].time
 
 proc jsonPropertyAccessor(p: AbstractProperty): proc(t: float): JsonNode =
@@ -454,12 +460,18 @@ function buildUI(contextObj) {
 
   var filePath = topGroup.add("statictext");
   filePath.alignment = ["fill", "fill"];
-  filePath.text = "Output: (not specified)";
 
   var exportButton = topGroup.add("button", undefined,
     "Export selected compositions");
   exportButton.alignment = ["right", "center"];
   exportButton.enabled = false;
+
+  if (app.settings.haveSetting("rodExport", "outputPath")) {
+    exportButton.enabled = true;
+    filePath.text = app.settings.getSetting("rodExport", "outputPath");
+  } else {
+    filePath.text = "Output: (not specified)";
+  }
 
   var resultText = mainWindow.add(
     "edittext{alignment:['fill','fill'], properties: { multiline:true } }");
@@ -470,6 +482,7 @@ function buildUI(contextObj) {
     if (outputFile) {
       exportButton.enabled = true;
       filePath.text = outputFile.absoluteURI;
+      app.settings.saveSetting("rodExport", "outputPath", outputFile.absoluteURI);
     } else {
       exportButton.enabled = false;
     }
