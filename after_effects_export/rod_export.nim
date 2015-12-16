@@ -234,8 +234,6 @@ proc parseMarkerComment(comment: string, res: var Marker) =
             of "animation": res.animation = v
             of "loops": res.loops = parseInt(v)
             else: logi "Unknown marker key: ", k
-    if res.animation.len == 0:
-        logi "ERROR: WRONG MARKER COMMENT: ", comment
 
 proc getAnimationMarkers(comp: Composition): seq[Marker] =
     var markers = getMarkers(comp)
@@ -324,16 +322,17 @@ proc mapPropertyName(name: string): string =
     if result.len == 0:
         result = name
 
-proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProperty]) =
+proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProperty], name: string = "") =
     for i in 0 ..< fromObj.numProperties:
         let p = fromObj.property(i)
+        let fullyQualifiedPropName = name & "." & $p.name
         if p.isPropertyGroup:
-            getAnimatableProperties(p.toPropertyGroup(), res)
+            getAnimatableProperties(p.toPropertyGroup(), res, fullyQualifiedPropName)
         else:
             let pr = p.toAbstractProperty()
             if pr.isTimeVarying and $pr.name notin bannedPropertyNames:
-                logi "Animatable prop: ", pr.name
                 if not pr.isSeparationLeader or not pr.dimensionsSeparated:
+                    logi "Animatable prop: ", fullyQualifiedPropName
                     res.add(pr)
 
 proc belongsToAux(p: AbstractProperty): bool =
@@ -349,7 +348,6 @@ proc getLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) 
             else:
                 layer.mangledName
         var fullyQualifiedPropName = layerName & "." & mapPropertyName($pr.name)
-        #logi("PROP: ", fullyQualifiedPropName)
         result[fullyQualifiedPropName] = anim
 
 proc serializeCompositionAnimations(composition: Composition): JsonNode =
@@ -439,8 +437,6 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
 {.emit: """
 
 function buildUI(contextObj) {
-  var debug = false;
-
   var mainWindow = null;
   if (contextObj instanceof Panel) {
     mainWindow = contextObj;
@@ -492,12 +488,6 @@ function buildUI(contextObj) {
     `logTextField`[0].text = "";
     exportSelectedCompositions(filePath.text);
   };
-
-  if (debug) {
-    filePath.text = "/Users/yglukhov/Projects/falcon/res/compositions";
-    exportButton.enabled = true;
-    exportButton.onClick();
-  }
 
   mainWindow.addEventListener("resize", function(e) {
     this.layout.resize();
