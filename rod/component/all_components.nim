@@ -3,4 +3,4 @@
 
 import camera, channel_levels, mesh_component,
     overlay, particle_emitter, solid,
-    sprite, text_component
+    sprite, text_component, light

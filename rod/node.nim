@@ -15,6 +15,8 @@ import nimx.view
 import quaternion
 import property_visitor
 
+# import rod.component.light
+
 type
     Node3D* = ref object
         translation*: Vector3
@@ -49,6 +51,10 @@ type
         mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
         mScreenFrameBuffer*: GLuint
         tempFramebuffers*: seq[SelfContainedImage]
+        # passID
+        # renderPath
+        # observ
+        light*: Component
 
 type Node2D* = Node3D
 type Node* = Node3D

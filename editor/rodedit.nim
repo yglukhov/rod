@@ -7,6 +7,12 @@ import rod.node
 
 import rod.component.solid
 
+import rod.component.mesh_component
+import rod.component.material
+import rod.component.light
+import rod.component
+import nimx.image
+
 when defined js:
     import nimx.js_canvas_window
     type PlatformWindow = JSCanvasWindow
@@ -42,16 +48,40 @@ proc startApplication() =
     let camera = cameraNode.component(Camera)
     cameraNode.translation.z = 1
 
-    let greenNode = editView.viewport.rootNode.newChild("greenSolid")
-    let greenSolid = greenNode.component(Solid)
-    greenSolid.size = newSize(0.1, 0.1)
-    greenSolid.color = newColor(0, 1, 0)
 
-    let redNode = greenNode.newChild("redSolid")
-    let redSolid = redNode.component(Solid)
-    redSolid.size = newSize(0.1, 0.1)
-    redSolid.color = newColor(1, 0, 0)
-    redNode.translation = newVector3(0.05, 0.05)
+    let light = editView.viewport.rootNode.newChild("point_light")
+    light.translation = newVector3(20,10,-60)
+    # light.scale = newVector3(1.0,1.0,0.3)
+    let lightMesh = light.component(MeshComponent)
+    lightMesh.loadMeshComponentWithResource("cube.obj")
+    lightMesh.material.setAmbientColor(0.9, 0.9, 0.0)
+    lightMesh.material.isWireframe = true
+    lightMesh.material.removeDiffuseColor()
+    lightMesh.material.removeSpecularColor()
+    lightMesh.material.removeShininess()
+
+    let lightSource = light.component(LightSource)
+    editView.viewport.light = cast[Component](lightSource)
+    
+    let mapleTree = editView.viewport.rootNode.newChild("maple_tree")
+    mapleTree.translation = newVector3(-5,-10,-80)
+    let meshTree = mapleTree.component(MeshComponent)
+    meshTree.loadMeshComponentWithResource("tree_maple.obj")
+    meshTree.material.albedoTexture = imageWithResource("tree_maple_color.png")
+    meshTree.material.setDiffuseColor(0.5, 0.5, 0.5)
+    meshTree.material.removeSpecularColor()
+    meshTree.applyLight()
+
+    let baloon = editView.viewport.rootNode.newChild("baloon")
+    baloon.translation = newVector3(0, 0, -70)
+    baloon.scale = newVector3(0.1, 0.1, 0.1)
+    let meshBaloon = baloon.component(MeshComponent)
+    meshBaloon.loadMeshComponentWithResource("ball.obj")
+    meshBaloon.material.setAmbientColor(0.4, 0.1, 0.1)
+    meshBaloon.material.setDiffuseColor(0.8, 0.1, 0.1)
+    meshBaloon.material.setSpecularColor(0.9, 0.9, 0.9)
+    meshBaloon.applyLight()
+
 
     mainWindow.addSubview(editView)
 
