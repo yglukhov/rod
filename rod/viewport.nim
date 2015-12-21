@@ -1,6 +1,3 @@
-import node
-import component
-import component.camera
 import nimx.context
 import nimx.types
 import nimx.image
@@ -8,6 +5,11 @@ import nimx.render_to_image
 import nimx.portable_gl
 import nimx.animation
 import nimx.window
+
+import tables
+import rod_types
+import node
+import component.camera
 
 import ray
 export Viewport
@@ -142,5 +144,19 @@ proc swapCompositingBuffers*(v: Viewport) =
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 
 proc addAnimation*(v: Viewport, a: Animation) = v.view.window.addAnimation(a)
+
+proc addLightSource*(v: Viewport, l: LightSource) =
+    if v.lightSources.isNil():
+        v.lightSources = newTable[string, LightSource]()
+    if v.lightSources.len() < rod_types.maxLightsCount:
+        v.lightSources[l.node.name] = l
+    else:
+        echo "Count of light sources is limited. Current count equals " & $rod_types.maxLightsCount
+
+proc removeLightSource*(v: Viewport, l: LightSource) = 
+    if v.lightSources.isNil() or v.lightSources.len() <= 0:
+        echo "Current light sources count equals 0."
+    else:
+        v.lightSources.del(l.node.name)
 
 import component.all_components

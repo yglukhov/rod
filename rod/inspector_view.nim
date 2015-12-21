@@ -12,6 +12,7 @@ import component
 import quaternion
 import property_visitor
 import numeric_text_field
+import rod_types
 
 type InspectorView* = ref object of PanelView
     #node: Node3D

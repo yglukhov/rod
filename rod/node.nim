@@ -15,43 +15,7 @@ import nimx.view
 import quaternion
 import property_visitor
 
-type
-    Node3D* = ref object
-        translation*: Vector3
-        rotation*: Quaternion
-        scale*: Vector3
-        components*: TableRef[string, Component]
-        children*: seq[Node3D]
-        parent*: Node3D
-        name*: string
-        animations*: TableRef[string, Animation]
-        mViewport*: Viewport
-
-    Component* = ref object of RootObj
-        node*: Node3D
-
-    CameraProjection* = enum
-        cpOrtho, # Auto
-        cpPerspective, # Auto
-        cpManual
-
-    Camera* = ref object of Component
-        projectionMode*: CameraProjection
-        zNear*, zFar*: Coord
-        mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
-
-    Viewport* = ref object
-        mCamera*: Camera
-        mRootNode*: Node3D
-        view*: View
-        numberOfNodesWithBackComposition*: int
-        numberOfNodesWithBackCompositionInCurrentFrame*: int
-        mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
-        mScreenFrameBuffer*: GLuint
-        tempFramebuffers*: seq[SelfContainedImage]
-
-type Node2D* = Node3D
-type Node* = Node3D
+import rod_types
 
 proc viewport*(n: Node2D): Viewport = n.mViewport
 

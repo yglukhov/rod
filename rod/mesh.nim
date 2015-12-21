@@ -1,4 +1,3 @@
-
 import nimx.image
 import nimx.resource
 import nimx.context
@@ -20,11 +19,8 @@ type Attr = enum
 const vertexShaderDefault* = """
 attribute vec4 aPosition;
 attribute vec2 aTexCoord;
-
 uniform mat4 modelViewProjectionMatrix;
-
 varying vec2 vTexCoord;
-
 void main()
 {
     vTexCoord = aTexCoord;
@@ -37,13 +33,11 @@ const fragmentShaderDefault* = """
 #extension GL_OES_standard_derivatives : enable
 precision mediump float;
 #endif
-
 uniform sampler2D texUnit;
 varying vec2 vTexCoord;
 uniform float uAlpha;
 uniform float uRed;
 uniform vec4 uImageTexCoords;
-
 void main() {
     gl_FragColor = texture2D(texUnit, uImageTexCoords.xy + (uImageTexCoords.zw - uImageTexCoords.xy) * vTexCoord);
     gl_FragColor.a *= uAlpha;
