@@ -6,6 +6,7 @@ import rod.quaternion
 
 import rod.node
 import rod.component
+import rod.rod_types
 
 import nimx.matrixes
 import nimx.animation

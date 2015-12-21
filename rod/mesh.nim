@@ -15,7 +15,6 @@ import streams
 type Attr = enum
     aPosition
     aTexCoord
-    aNormal
 
 const vertexShaderDefault* = """
 attribute vec4 aPosition;
@@ -59,34 +58,20 @@ type Mesh* = ref object of RootObj
     vertexShader*: string
     fragmentShader*: string
     shader*: GLuint
-    numOfCoordPerVert: GLint
-    numOfCoordPerNormal: GLint
-    numOfCoordPerTexCoord: GLint
+
+const componentsCount = 5
 
 proc assignShaders*(m: Mesh, vertexShader: string = "", fragmentShader: string = "") =
     m.vertexShader = if vertexShader != "": vertexShader else: vertexShaderDefault
     m.fragmentShader = if fragmentShader != "": fragmentShader else: fragmentShaderDefault
 
-proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ti, ni: int): GLushort =
-    var attributesPerVertex: int = 0
-
+proc mergeIndexes(vertexData, texCoordData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ti: int): GLushort =
     vertexAttrData.add(vertexData[vi * 3 + 0])
     vertexAttrData.add(vertexData[vi * 3 + 1])
     vertexAttrData.add(vertexData[vi * 3 + 2])
-    attributesPerVertex += 3
-
-    if texCoordData.len > 0 and ti != -1:
-        vertexAttrData.add(texCoordData[ti * 2 + 0])
-        vertexAttrData.add(texCoordData[ti * 2 + 1])
-        attributesPerVertex += 2
-
-    if normalData.len > 0 and ni != -1:
-        vertexAttrData.add(normalData[ni * 3 + 0])
-        vertexAttrData.add(normalData[ni * 3 + 1])
-        vertexAttrData.add(normalData[ni * 3 + 2])
-        attributesPerVertex += 3
-    
-    result = GLushort(vertexAttrData.len / attributesPerVertex - 1)
+    vertexAttrData.add(texCoordData[ti * 2 + 0])
+    vertexAttrData.add(texCoordData[ti * 2 + 1])
+    result = GLushort(vertexAttrData.len / 5 - 1)
 
 proc newMeshWithResource*(resourceName: string): Mesh =
     result.new()
@@ -98,7 +83,6 @@ proc newMeshWithResource*(resourceName: string): Mesh =
             let loadFunc = proc() =
                 var loader: ObjLoader
                 var vertexData = newSeq[GLfloat]()
-                var normalsData = newSeq[GLfloat]()
                 var texCoordData = newSeq[GLfloat]()
                 var vertexAttrData = newSeq[GLfloat]()
                 var indexData = newSeq[GLushort]()
@@ -111,32 +95,17 @@ proc newMeshWithResource*(resourceName: string): Mesh =
                     texCoordData.add(u)
                     texCoordData.add(1.0 - v)
 
-                template addNormal(x, y, z: float) = discard
-
                 template uvIndex(t, v: int): int =
                     ## If texture index is not assigned, fallback to vertex index
                     if t == 0: (v - 1) else: (t - 1)
 
                 template addFace(vi0, vi1, vi2, ti0, ti1, ti2, ni0, ni1, ni2: int) =
-                    indexData.add(mergeIndexes(vertexData, texCoordData, normalsData, vertexAttrData, vi0 - 1, uvIndex(ti0, vi0), ni0-1))
-                    indexData.add(mergeIndexes(vertexData, texCoordData, normalsData, vertexAttrData, vi1 - 1, uvIndex(ti1, vi1), ni1-1))
-                    indexData.add(mergeIndexes(vertexData, texCoordData, normalsData, vertexAttrData, vi2 - 1, uvIndex(ti2, vi2), ni2-1))
+                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi0 - 1, uvIndex(ti0, vi0)))
+                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi1 - 1, uvIndex(ti1, vi1)))
+                    indexData.add(mergeIndexes(vertexData, texCoordData, vertexAttrData, vi2 - 1, uvIndex(ti2, vi2)))
 
-                loader.loadMeshData(s, addVertex, addTexCoord, addNormal, addFace)
+                loader.loadMeshData(s, addVertex, addTexCoord, addFace)
                 s.close()
-
-                m.numOfCoordPerVert = 0
-                m.numOfCoordPerTexCoord = 0
-                m.numOfCoordPerNormal = 0
-
-                if vertexData.len() != 0:
-                    m.numOfCoordPerVert = 3
-                
-                if texCoordData.len() != 0:
-                    m.numOfCoordPerTexCoord = 2
-
-                if normalsData.len() != 0:
-                    m.numOfCoordPerNormal = 3
 
                 let gl = currentContext().gl
                 m.indexBuffer = gl.createBuffer()
@@ -158,10 +127,6 @@ proc newMeshWithQuad*(v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point): Mesh =
     result.assignShaders() # Assign default shaders for mesh
     let m = result
     result.loadFunc = proc() =
-        m.numOfCoordPerVert = 3
-        m.numOfCoordPerTexCoord = 2
-        m.numOfCoordPerNormal = 0
-
         let gl = currentContext().gl
         let vertexData = [
             v1[0], v1[1], v1[2], t1.x, t1.y,
@@ -205,23 +170,10 @@ proc draw*(m: Mesh) =
 
     gl.useProgram(m.shader)
     gl.bindBuffer(gl.ARRAY_BUFFER, m.vertexBuffer)
-    
-
-    let stride = (m.numOfCoordPerVert + m.numOfCoordPerTexCoord + m.numOfCoordPerNormal) * sizeof(GLfloat)
-    var ofset: int = 0
-
     gl.enableVertexAttribArray(aPosition.GLuint)
-    gl.vertexAttribPointer(aPosition.GLuint, m.numOfCoordPerVert, gl.FLOAT, false, stride.GLsizei , ofset)
-
-    if m.numOfCoordPerTexCoord != 0:
-        ofset += m.numOfCoordPerVert * sizeof(GLfloat)
-        gl.enableVertexAttribArray(aTexCoord.GLuint)
-        gl.vertexAttribPointer(aTexCoord.GLuint, m.numOfCoordPerTexCoord, gl.FLOAT, false, stride.GLsizei, ofset)
-
-    if m.numOfCoordPerNormal != 0:
-        ofset += m.numOfCoordPerTexCoord * sizeof(GLfloat)
-        gl.enableVertexAttribArray(aNormal.GLuint)
-        gl.vertexAttribPointer(aNormal.GLuint, m.numOfCoordPerNormal, gl.FLOAT, false, stride.GLsizei, ofset)
+    gl.vertexAttribPointer(aPosition.GLuint, 3, gl.FLOAT, false, 5 * sizeof(GLfloat), 0)
+    gl.enableVertexAttribArray(aTexCoord.GLuint)
+    gl.vertexAttribPointer(aTexCoord.GLuint, 2, gl.FLOAT, false, 5 * sizeof(GLfloat), 3 * sizeof(GLfloat))
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
     c.setTransformUniform(m.shader)

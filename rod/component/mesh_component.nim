@@ -31,10 +31,7 @@ method init*(m: MeshComponent) =
     m.material = newDefaultMaterial()
     procCall m.Component.init()
 
-proc applyLight*(m: MeshComponent) = 
-    m.material.light = cast[LightSource](m.node.mViewport.light)
-
-proc setInstansedVBOAttributes*(m: MeshComponent, indBuffer, vertBuffer: GLuint, numOfIndices: GLsizei, vInfo: VertexDataInfo) = 
+proc setInstancedVBOAttributes*(m: MeshComponent, indBuffer, vertBuffer: GLuint, numOfIndices: GLsizei, vInfo: VertexDataInfo) = 
     m.indexBuffer = indBuffer
     m.vertexBuffer = vertBuffer
     m.numberOfIndices = numOfIndices
@@ -117,10 +114,6 @@ proc loadMeshComponentWithResource*(m: MeshComponent, resourceName: string) =
     m.loadFunc = proc() =
         m.loadMeshComponent(resourceName)
 
-proc newMeshComponentWithResource*(resourceName: string): MeshComponent =
-    result.new()
-    result.loadMeshComponentWithResource(resourceName)
-
 proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) = 
     let gl = currentContext().gl
     let vertexData = [
@@ -146,10 +139,6 @@ proc meshComponentWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t
     m.loadFunc = proc() =
         m.loadMeshQuad(v1, v2, v3, v4, t1, t2, t3, t4)
 
-proc newMeshComponentWithQuad*(v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point): MeshComponent =
-    result.new()
-    result.meshComponentWithQuad(v1, v2, v3, v4, t1, t2, t3, t4)
-
 proc load(mc: MeshComponent) =
     if not mc.loadFunc.isNil:
         mc.loadFunc()
@@ -171,7 +160,7 @@ method draw*(m: MeshComponent) =
     
     m.material.updateTransformSetup(m.node.translation, m.node.rotation, m.node.scale)
 
-    m.material.updateSetup()
+    m.material.updateSetup(m.node.mViewport)
 
     gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
 

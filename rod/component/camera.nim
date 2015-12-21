@@ -3,7 +3,7 @@ import nimx.types
 import nimx.context
 
 import rod.component
-import rod.node
+import rod.rod_types
 import rod.property_visitor
 
 export CameraProjection

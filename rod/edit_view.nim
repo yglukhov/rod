@@ -6,6 +6,7 @@ import node
 import panel_view
 import outline_view
 import inspector_view
+import rod_types
 
 import nimx.text_field
 import nimx.table_view_cell

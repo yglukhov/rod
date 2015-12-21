@@ -6,6 +6,7 @@ import nimx.types
 
 import node
 import property_visitor
+import rod_types
 
 export Component
 
