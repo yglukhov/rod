@@ -49,8 +49,8 @@ proc startApplication() =
     cameraNode.translation.z = 1
 
 
-    let light = editView.viewport.rootNode.newChild("point_light")
-    light.translation = newVector3(20,10,-60)
+    let light = editView.viewport.rootNode.newChild("point_light_1")
+    light.translation = newVector3(0,0,-800)
     let lightMesh = light.component(MeshComponent)
     lightMesh.loadMeshComponentWithResource("cube.obj")
     lightMesh.material.setAmbientColor(0.9, 0.9, 0.0)
@@ -61,8 +61,8 @@ proc startApplication() =
     lightMesh.material.isLightReceiver = false
     let lightSource = light.component(LightSource)
 
-    let light2 = editView.viewport.rootNode.newChild("point_light2")
-    light2.translation = newVector3(-20,10,-60)
+    let light2 = editView.viewport.rootNode.newChild("point_light_2")
+    light2.translation = newVector3(60,60,10)
     let lightMesh2 = light2.component(MeshComponent)
     lightMesh2.loadMeshComponentWithResource("cube.obj")
     lightMesh2.material.setAmbientColor(0.9, 0.9, 0.0)

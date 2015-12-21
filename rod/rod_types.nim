@@ -55,8 +55,6 @@ type
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
 
     LightSource* = ref object of Component
-        lightPosition*: Vector4 
-        
         lightAmbient*: float32
         lightDiffuse*: float32
         lightSpecular*: float32
