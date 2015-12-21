@@ -1,6 +1,6 @@
 import nimx.portable_gl
 
-type VertexDataInfo* = ref object of RootObj
+type VertexDataInfo* = object
     numOfCoordPerVert*: GLint
     numOfCoordPerNormal*: GLint
     numOfCoordPerTexCoord*: GLint
@@ -8,11 +8,7 @@ type VertexDataInfo* = ref object of RootObj
     numOfCoordPerTangent*: GLint
     stride*: int
 
-proc newVertexInfoWithZeroParams*(): VertexDataInfo = 
-    result.new()
-
 proc newVertexInfoWithVertexData*(vertexDataLen = 0, texCoordDataLen = 0, normalDataLen = 0, binormalDataLen = 0, tangentDataLen: int = 0): VertexDataInfo = 
-    result.new()
     if vertexDataLen != 0:
         result.numOfCoordPerVert = 3
     if texCoordDataLen != 0:
