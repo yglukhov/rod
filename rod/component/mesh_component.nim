@@ -31,7 +31,7 @@ method init*(m: MeshComponent) =
     m.material = newDefaultMaterial()
     procCall m.Component.init()
 
-proc setInstancedVBOAttributes*(m: MeshComponent, indBuffer, vertBuffer: GLuint, numOfIndices: GLsizei, vInfo: VertexDataInfo) = 
+proc setInstancedVBOAttributes*(m: MeshComponent, indBuffer, vertBuffer: GLuint, numOfIndices: GLsizei, vInfo: VertexDataInfo) =
     m.indexBuffer = indBuffer
     m.vertexBuffer = vertBuffer
     m.numberOfIndices = numOfIndices
@@ -55,10 +55,10 @@ proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vert
         vertexAttrData.add(normalData[ni * 3 + 1])
         vertexAttrData.add(normalData[ni * 3 + 2])
         attributesPerVertex += 3
-    
+
     result = GLushort(vertexAttrData.len / attributesPerVertex - 1)
 
-proc loadMeshComponent(m: MeshComponent, resourceName: string) = 
+proc loadMeshComponent(m: MeshComponent, resourceName: string) =
     loadResourceAsync resourceName, proc(s: Stream) =
         let loadFunc = proc() =
             var loader: ObjLoader
@@ -94,7 +94,7 @@ proc loadMeshComponent(m: MeshComponent, resourceName: string) =
             s.close()
 
             #TODO add binormal tangent
-            m.vertInfo = newVertexInfoWithVertexData(vertexData.len(), texCoordData.len(), normalData.len())
+            m.vertInfo = newVertexInfoWithVertexData(vertexData.len, texCoordData.len, normalData.len)
 
             let gl = currentContext().gl
             m.indexBuffer = gl.createBuffer()
@@ -110,11 +110,14 @@ proc loadMeshComponent(m: MeshComponent, resourceName: string) =
         else:
             loadFunc()
 
-proc loadMeshComponentWithResource*(m: MeshComponent, resourceName: string) =
+proc loadWithResource*(m: MeshComponent, resourceName: string) =
     m.loadFunc = proc() =
         m.loadMeshComponent(resourceName)
 
-proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) = 
+template loadMeshComponentWithResource*(m: MeshComponent, resourceName: string) {.deprecated.} =
+    m.loadWithResource(resourceName)
+
+proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
     let gl = currentContext().gl
     let vertexData = [
         v1[0], v1[1], v1[2], t1.x, t1.y,
@@ -135,9 +138,14 @@ proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Poi
     gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
     m.numberOfIndices = indexData.len.GLsizei
 
-proc meshComponentWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
+
+
+proc loadWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
     m.loadFunc = proc() =
         m.loadMeshQuad(v1, v2, v3, v4, t1, t2, t3, t4)
+
+template meshComponentWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) {.deprecated.} =
+    m.loadWithQuad(v1, v2, v3, v4, t1, t2, t3, t4)
 
 proc load(mc: MeshComponent) =
     if not mc.loadFunc.isNil:
@@ -157,7 +165,7 @@ method draw*(m: MeshComponent) =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
 
     m.material.updateVertexAttributesSetup(m.vertInfo)
-    
+
     m.material.updateTransformSetup(m.node.translation, m.node.rotation, m.node.scale)
 
     m.material.updateSetup(m.node.mViewport)

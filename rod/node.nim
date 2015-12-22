@@ -16,6 +16,7 @@ import quaternion
 import property_visitor
 
 import rod_types
+export Node
 
 proc viewport*(n: Node2D): Viewport = n.mViewport
 
@@ -72,8 +73,9 @@ proc removeComponent*(n: Node2D, name: string) =
 proc removeComponent*(n: Node2D, T: typedesc[Component]) = n.removeComponent(T.name)
 
 proc update(n: Node2D) =
-    for k, v in n.components:
-        v.update()
+    if not n.components.isNil:
+        for k, v in n.components:
+            v.update()
 
 proc recursiveUpdate*(n: Node2D) =
     n.update()
@@ -96,7 +98,7 @@ proc recursiveDraw*(n: Node2D) =
     c.withTransform tr:
         var hasPosteffectComponent = false
         if not n.components.isNil:
-            for k, v in n.components:
+            for v in values(n.components):
                 v.draw()
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
         if not hasPosteffectComponent:

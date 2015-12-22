@@ -52,7 +52,7 @@ proc startApplication() =
     let light = editView.viewport.rootNode.newChild("point_light_1")
     light.translation = newVector3(0,0,-800)
     let lightMesh = light.component(MeshComponent)
-    lightMesh.loadMeshComponentWithResource("cube.obj")
+    lightMesh.loadWithResource("cube.obj")
     lightMesh.material.setAmbientColor(0.9, 0.9, 0.0)
     lightMesh.material.isWireframe = true
     lightMesh.material.removeDiffuseColor()
@@ -64,7 +64,7 @@ proc startApplication() =
     let light2 = editView.viewport.rootNode.newChild("point_light_2")
     light2.translation = newVector3(60,60,10)
     let lightMesh2 = light2.component(MeshComponent)
-    lightMesh2.loadMeshComponentWithResource("cube.obj")
+    lightMesh2.loadWithResource("cube.obj")
     lightMesh2.material.setAmbientColor(0.9, 0.9, 0.0)
     lightMesh2.material.isWireframe = true
     lightMesh2.material.removeDiffuseColor()
@@ -73,11 +73,11 @@ proc startApplication() =
     lightMesh2.material.isLightReceiver = false
     let lightSource2 = light2.component(LightSource)
 
-    
+
     let mapleTree = editView.viewport.rootNode.newChild("maple_tree")
     mapleTree.translation = newVector3(-5,-10,-80)
     let meshTree = mapleTree.component(MeshComponent)
-    meshTree.loadMeshComponentWithResource("tree_maple.obj")
+    meshTree.loadWithResource("tree_maple.obj")
     meshTree.material.albedoTexture = imageWithResource("tree_maple_color.png")
     meshTree.material.setDiffuseColor(0.5, 0.5, 0.5)
     meshTree.material.removeSpecularColor()
@@ -86,7 +86,7 @@ proc startApplication() =
     baloon.translation = newVector3(0, 0, -70)
     baloon.scale = newVector3(0.1, 0.1, 0.1)
     let meshBaloon = baloon.component(MeshComponent)
-    meshBaloon.loadMeshComponentWithResource("ball.obj")
+    meshBaloon.loadWithResource("ball.obj")
     meshBaloon.material.setAmbientColor(0.4, 0.1, 0.1)
     meshBaloon.material.setDiffuseColor(0.8, 0.1, 0.1)
     meshBaloon.material.setSpecularColor(0.9, 0.9, 0.9)

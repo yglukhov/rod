@@ -38,7 +38,7 @@ proc startApplication() =
     editView.viewport.new()
     editView.viewport.view = editView
     editView.viewport.rootNode = newNode()
-    let c = newNodeWithCompositionName("TEST4")
+    let c = newNodeWithCompositionName("BONUS GAME ANIMATION")
     editView.viewport.rootNode.addChild(c)
     let cameraNode = editView.viewport.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)

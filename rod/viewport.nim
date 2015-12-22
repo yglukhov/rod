@@ -145,18 +145,18 @@ proc swapCompositingBuffers*(v: Viewport) =
 
 proc addAnimation*(v: Viewport, a: Animation) = v.view.window.addAnimation(a)
 
-proc addLightSource*(v: Viewport, l: LightSource) =
+proc addLightSource*(v: Viewport, ls: LightSource) =
     if v.lightSources.isNil():
         v.lightSources = newTable[string, LightSource]()
     if v.lightSources.len() < rod_types.maxLightsCount:
-        v.lightSources[l.node.name] = l
+        v.lightSources[ls.node.name] = ls
     else:
         echo "Count of light sources is limited. Current count equals " & $rod_types.maxLightsCount
 
-proc removeLightSource*(v: Viewport, l: LightSource) = 
+proc removeLightSource*(v: Viewport, ls: LightSource) =
     if v.lightSources.isNil() or v.lightSources.len() <= 0:
         echo "Current light sources count equals 0."
     else:
-        v.lightSources.del(l.node.name)
+        v.lightSources.del(ls.node.name)
 
 import component.all_components

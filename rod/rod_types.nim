@@ -24,7 +24,7 @@ type
         mViewport*: Viewport
 
     Node2D* = Node3D
-    
+
     Node* = Node3D
 
     Component* = ref object of RootObj
@@ -55,14 +55,14 @@ type
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
 
     LightSource* = ref object of Component
-        lightAmbient*: float32
-        lightDiffuse*: float32
-        lightSpecular*: float32
-        lightConstant*: float32
-        lightLinear*: float32
-        lightQuadratic*: float32
-        lightAttenuation*: float32
-        
+        mLightAmbient*: float32
+        mLightDiffuse*: float32
+        mLightSpecular*: float32
+        mLightConstant*: float32
+        mLightLinear*: float32
+        mLightQuadratic*: float32
+        mLightAttenuation*: float32
+
         lightPosInited*: bool
         lightAmbientInited*: bool
         lightDiffuseInited*: bool
@@ -71,5 +71,3 @@ type
         lightLinearInited*: bool
         lightQuadraticInited*: bool
         lightAttenuationInited*: bool
-
-    

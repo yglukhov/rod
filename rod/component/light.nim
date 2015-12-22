@@ -7,56 +7,49 @@ import rod.viewport
 
 export LightSource
 
-proc `lightAmbient=`*(l: LightSource, val: Coord) = 
-    l.lightAmbient = val
-    l.lightAmbientInited = true
-proc `lightDiffuse=`*(l: LightSource, val: Coord) = 
-    l.lightDiffuse = val
-    l.lightDiffuseInited = true
-proc `lightSpecular=`*(l: LightSource, val: Coord) = 
-    l.lightSpecular = val
-    l.lightSpecularInited = true
-proc `lightConstant=`*(l: LightSource, val: Coord) = 
-    l.lightConstant = val
-    l.lightConstantInited = true
-proc `lightLinear=`*(l: LightSource, val: Coord) = 
-    l.lightLinear = val
-    l.lightLinearInited = true
-proc `lightQuadratic=`*(l: LightSource, val: Coord) = 
-    l.lightQuadratic = val
-    l.lightQuadraticInited = true
-proc `lightAttenuation=`*(l: LightSource, val: Coord) = 
-    l.lightAttenuation = val
-    l.lightAttenuationInited = true
+proc `lightAmbient=`*(ls: LightSource, val: Coord) =
+    ls.mLightAmbient = val
+    ls.lightAmbientInited = true
+proc `lightDiffuse=`*(ls: LightSource, val: Coord) =
+    ls.mLightDiffuse = val
+    ls.lightDiffuseInited = true
+proc `lightSpecular=`*(ls: LightSource, val: Coord) =
+    ls.mLightSpecular = val
+    ls.lightSpecularInited = true
+proc `lightConstant=`*(ls: LightSource, val: Coord) =
+    ls.mLightConstant = val
+    ls.lightConstantInited = true
+proc `lightLinear=`*(ls: LightSource, val: Coord) =
+    ls.mLightLinear = val
+    ls.lightLinearInited = true
+proc `lightQuadratic=`*(ls: LightSource, val: Coord) =
+    ls.mLightQuadratic = val
+    ls.lightQuadraticInited = true
+proc `lightAttenuation=`*(ls: LightSource, val: Coord) =
+    ls.mLightAttenuation = val
+    ls.lightAttenuationInited = true
 
-template lightAmbient*(l: LightSource): Coord = 
-    result = l.lightAmbient
-template lightDiffuse*(l: LightSource): Coord = 
-    result = l.lightDiffuse
-template lightSpecular*(l: LightSource): Coord = 
-    result = l.lightSpecular
-template lightConstant*(l: LightSource): Coord = 
-    result = l.lightConstant
-template lightLinear*(l: LightSource): Coord = 
-    result = l.lightLinear
-template lightQuadratic*(l: LightSource): Coord = 
-    result = l.lightQuadratic
-template lightAttenuation*(l: LightSource): Coord = 
-    result = l.lightAttenuation
+template lightAmbient*(ls: LightSource): Coord = ls.mLightAmbient
+template lightDiffuse*(ls: LightSource): Coord = ls.mLightDiffuse
+template lightSpecular*(ls: LightSource): Coord = ls.mLightSpecular
+template lightConstant*(ls: LightSource): Coord = ls.mLightConstant
+template lightLinear*(ls: LightSource): Coord = ls.mLightLinear
+template lightQuadratic*(ls: LightSource): Coord = ls.mLightQuadratic
+template lightAttenuation*(ls: LightSource): Coord = ls.mLightAttenuation
 
-proc setDefaultLightSource*(l: LightSource) = 
-    l.lightAmbient = 0.7
-    l.lightDiffuse = 0.8
-    l.lightSpecular = 0.9
-    l.lightConstant = 1.0
-    l.lightLinear = 0.000014
-    l.lightQuadratic = 0.00000007
-    l.lightAttenuationInited = false
+proc setDefaultLightSource*(ls: LightSource) =
+    ls.lightAmbient = 0.7
+    ls.lightDiffuse = 0.8
+    ls.lightSpecular = 0.9
+    ls.lightConstant = 1.0
+    ls.lightLinear = 0.000014
+    ls.lightQuadratic = 0.00000007
+    ls.lightAttenuationInited = false
 
-method componentNodeWasAddedToViewport*(l: LightSource) = 
-    l.node.mViewport.addLightSource(l)
+method componentNodeWasAddedToViewport*(ls: LightSource) =
+    ls.node.mViewport.addLightSource(ls)
 
-method componentNodeWillBeRemovedFromViewport*(l: LightSource) =
-    l.node.mViewport.removeLightSource(l)
+method componentNodeWillBeRemovedFromViewport*(ls: LightSource) =
+    ls.node.mViewport.removeLightSource(ls)
 
 registerComponent[LightSource]()
