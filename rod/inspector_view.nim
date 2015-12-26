@@ -3,6 +3,7 @@ import nimx.view
 import nimx.text_field
 import nimx.button
 import nimx.matrixes
+import variant
 
 export view
 
@@ -170,13 +171,19 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                 visitor.requireSetter = true
                 visitor.requireGetter = true
                 visitor.commit = proc() =
-                    case visitor.kind
-                    of pkCoord: pv = newCoordPropertyView(y, visitor.name, visitor.tcoord.setter, visitor.tcoord.getter)
-                    of pkVec2: pv = newVecPropertyView(y, visitor.name, visitor.tvec2.setter, visitor.tvec2.getter)
-                    of pkVec3: pv = newVecPropertyView(y, visitor.name, visitor.tvec3.setter, visitor.tvec3.getter)
-                    of pkVec4: pv = newVecPropertyView(y, visitor.name, visitor.tvec4.setter, visitor.tvec4.getter)
-                    of pkColor: pv = newColorPropertyView(y, visitor.name, visitor.tcolor.setter, visitor.tcolor.getter)
-                    else: pv = newUnknownPropertyView(y, visitor.name)
+                    match visitor.setterAndGetter:
+                        like SetterAndGetter[Coord] as sng:
+                            pv = newCoordPropertyView(y, visitor.name, sng.setter, sng.getter)
+                        like SetterAndGetter[Vector2] as sng:
+                            pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
+                        like SetterAndGetter[Vector3] as sng:
+                            pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
+                        like SetterAndGetter[Vector4] as sng:
+                            pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
+                        like SetterAndGetter[Color] as sng:
+                            pv = newColorPropertyView(y, visitor.name, sng.setter, sng.getter)
+                        like:
+                            pv = newUnknownPropertyView(y, visitor.name)
                     y += pv.frame.height
                     propView.addSubview(pv)
                 v.visitProperties(visitor)

@@ -9,49 +9,9 @@ import nimx.view_event_handling
 
 import typetraits
 import math
+import variant
 
 # Quick and dirty implementation of outline view
-
-type TypeId = string
-template getTypeId(T: typedesc): TypeId = name(T)
-
-type Variant* = object
-    tn: TypeId
-    val {.exportc.}: pointer
-
-proc needsCopy[T](): bool {.compileTime.} =
-    when T is ref | ptr | SomeInteger:
-        return false
-    else:
-        return true
-
-proc newVariant*[T](val: T): Variant =
-    result.tn = getTypeId(T)
-    when defined(js):
-        {.emit: """
-        `result`.val = `val`;
-        """.}
-    else:
-        when needsCopy[T]():
-            let pt = T.new()
-            pt[] = val
-            result.val = cast[pointer](pt)
-        else:
-            result.val = cast[pointer](val)
-
-proc get*[T](v: Variant): T =
-    doAssert(getTypeId(T) == v.tn, "Wrong variant type: " & $(if v.tn.isNil: "nil" else: v.tn))
-    when defined(js):
-        {.emit: """
-        `result` = `v`.val;
-        """.}
-    else:
-        when needsCopy[T]():
-            result = cast[ref T](v.val)[]
-        else:
-            result = cast[T](v.val)
-
-template empty*(v: Variant): bool = v.tn.isNil
 
 type ItemNode = ref object
     expanded: bool

@@ -9,3 +9,4 @@ license       = "MIT"
 [Deps]
 Requires: "nimx"
 Requires: "https://github.com/SSPKrolik/nimasset"
+Requires: "variant"

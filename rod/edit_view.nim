@@ -11,6 +11,8 @@ import rod_types
 import nimx.text_field
 import nimx.table_view_cell
 
+import variant
+
 type Editor* = ref object
     rootNode*: Node3D
     eventCatchingView*: View
@@ -28,7 +30,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         if indexPath.len == 0:
             return 1
         else:
-            let n = get[Node3D](item)
+            let n = item.get(Node3D)
             if n.children.isNil:
                 return 0
             else:
@@ -38,20 +40,20 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         if indexPath.len == 1:
             return newVariant(e.rootNode)
         else:
-            return newVariant(get[Node3D](item).children[indexPath[^1]])
+            return newVariant(item.get(Node3D).children[indexPath[^1]])
 
     outlineView.createCell = proc(): TableViewCell =
         result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
 
     outlineView.configureCell = proc (cell: TableViewCell, indexPath: openarray[int]) =
-        let n = get[Node3D](outlineView.itemAtIndexPath(indexPath))
+        let n = outlineView.itemAtIndexPath(indexPath).get(Node3D)
         let textField = TextField(cell.subviews[0])
         textField.text = if n.name.isNil: "(nil)" else: n.name
 
     outlineView.onSelectionChanged = proc() =
         let ip = outlineView.selectedIndexPath
         let n = if ip.len > 0:
-                get[Node3D](outlineView.itemAtIndexPath(ip))
+                outlineView.itemAtIndexPath(ip).get(Node3D)
             else:
                 nil
         inspector.inspectedNode = n
@@ -63,7 +65,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     createNodeButton.title = "+"
     createNodeButton.onAction do():
-        let n = get[Node3D](outlineView.itemAtIndexPath(outlineView.selectedIndexPath))
+        let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
         discard n.newChild("New Node")
         outlineView.reloadData()
     result.addSubview(createNodeButton)
@@ -72,7 +74,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     deleteNodeButton.title = "-"
     deleteNodeButton.onAction do():
-        let n = get[Node3D](outlineView.itemAtIndexPath(outlineView.selectedIndexPath))
+        let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
         n.removeFromParent()
         outlineView.reloadData()
     result.addSubview(deleteNodeButton)
