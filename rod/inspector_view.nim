@@ -171,19 +171,19 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                 visitor.requireSetter = true
                 visitor.requireGetter = true
                 visitor.commit = proc() =
-                    match visitor.setterAndGetter:
-                        like SetterAndGetter[Coord] as sng:
-                            pv = newCoordPropertyView(y, visitor.name, sng.setter, sng.getter)
-                        like SetterAndGetter[Vector2] as sng:
-                            pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
-                        like SetterAndGetter[Vector3] as sng:
-                            pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
-                        like SetterAndGetter[Vector4] as sng:
-                            pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
-                        like SetterAndGetter[Color] as sng:
-                            pv = newColorPropertyView(y, visitor.name, sng.setter, sng.getter)
-                        like:
-                            pv = newUnknownPropertyView(y, visitor.name)
+                    variantMatch case visitor.setterAndGetter as sng
+                    of SetterAndGetter[Coord]:
+                        pv = newCoordPropertyView(y, visitor.name, sng.setter, sng.getter)
+                    of SetterAndGetter[Vector2]:
+                        pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
+                    of SetterAndGetter[Vector3]:
+                        pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
+                    of SetterAndGetter[Vector4]:
+                        pv = newVecPropertyView(y, visitor.name, sng.setter, sng.getter)
+                    of SetterAndGetter[Color]:
+                        pv = newColorPropertyView(y, visitor.name, sng.setter, sng.getter)
+                    else:
+                        pv = newUnknownPropertyView(y, visitor.name)
                     y += pv.frame.height
                     propView.addSubview(pv)
                 v.visitProperties(visitor)
