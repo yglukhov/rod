@@ -36,24 +36,24 @@ template bounds*(v: Viewport): Rect = v.view.bounds
 
 template viewMatrix(v: Viewport): Matrix4 = v.mCamera.node.worldTransform.inversed
 
-proc prepareFramebuffer(v: Viewport, i: var SelfContainedImage) =
-    let vp = currentContext().gl.getViewport()
-    let size = newSize(vp[2].Coord, vp[3].Coord)
+proc prepareFramebuffer(v: Viewport, i: var SelfContainedImage, sz: Size) =
     if i.isNil:
         echo "Creating buffer"
-        i = imageWithSize(size)
-    elif i.size != size:
+        i = imageWithSize(sz)
+    elif i.size != sz:
         echo "Recreating buffer"
-        i = imageWithSize(size)
+        i = imageWithSize(sz)
 
 proc prepareFramebuffers(v: Viewport) =
     v.numberOfNodesWithBackCompositionInCurrentFrame = v.numberOfNodesWithBackComposition
     if v.numberOfNodesWithBackComposition > 0:
-        v.prepareFramebuffer(v.mActiveFrameBuffer)
-        v.prepareFramebuffer(v.mBackupFrameBuffer)
         let gl = currentContext().gl
+        let vp = gl.getViewport()
+        let sz = newSize(vp[2].Coord, vp[3].Coord)
+        v.prepareFramebuffer(v.mActiveFrameBuffer, sz)
+        v.prepareFramebuffer(v.mBackupFrameBuffer, sz)
         v.mScreenFramebuffer = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
-        bindFramebuffer(gl, v.mActiveFrameBuffer)
+        gl.bindFramebuffer(v.mActiveFrameBuffer)
 
 proc getViewMatrix*(v: Viewport): Matrix4 =
     let cam = v.camera
