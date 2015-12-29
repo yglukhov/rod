@@ -225,11 +225,11 @@ vec3 computePointLight(vec3 normal, vec3 pos, vec3 lPos,
         #endif
     diffuse *= max(dot(normal, L), 0.0);
 
-    #ifdef WITH_FALLOF_SAMPLER
-        vec2 longitudeLatitude = vec2((atan(normal.y, normal.x) / 3.1415926 + 1.0) * 0.5, (asin(normal.z) / 3.1415926 + 0.5));
-        vec3 fallof = texture2D(uMaterialFallof, uFallofUnitCoords.xy + (uFallofUnitCoords.zw - uFallofUnitCoords.xy) * longitudeLatitude).xyz;    
-        diffuse += fallof;
-    #endif
+    //#ifdef WITH_FALLOF_SAMPLER
+    //    vec2 longitudeLatitude = vec2((atan(normal.y, normal.x) / 3.1415926 + 1.0) * 0.5, (asin(normal.z) / 3.1415926 + 0.5));
+    //    vec3 fallof = texture2D(uMaterialFallof, longitudeLatitude).xyz;    
+    //    diffuse += fallof;
+    //#endif
 
     vec3 specular = vec3(0.0, 0.0, 0.0);
         #ifdef WITH_MATERIAL_SPECULAR
