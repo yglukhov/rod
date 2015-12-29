@@ -14,6 +14,7 @@ varying vec3 vNormal;
 varying vec3 vBinormal;
 varying vec3 vTangent;
 varying vec2 vTexCoord;
+varying vec2 vReflCoord;
 
 void main() {
 #ifdef WITH_V_POSITION
@@ -31,6 +32,12 @@ void main() {
 #ifdef WITH_V_TEXCOORD
     vTexCoord = aTexCoord;
 #endif
+#ifdef WITH_REFLECTION_SAMPLER
+    vec3 r = -reflect( vPosition.xyz, vNormal.xyz );
+    float m = 2.0 * sqrt( r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0) );
+    vReflCoord= vec2(r.x/m + 0.5, r.y/m + 0.5);
+#endif
+
     gl_Position = modelViewProjectionMatrix * vec4(aPosition.xyz, 1.0);
 }
 """
@@ -50,6 +57,10 @@ uniform sampler2D bumpMapUnit;
 uniform vec4 uBumpUnitCoords;
 uniform sampler2D normalMapUnit;
 uniform vec4 uNormalUnitCoords;
+uniform sampler2D reflectMapUnit;
+uniform vec4 uReflectUnitCoords;
+uniform sampler2D uMaterialFallof;
+uniform vec4 uFallofUnitCoords;
 
 uniform vec4 uMaterialAmbient;
 uniform vec4 uMaterialDiffuse;
@@ -133,6 +144,7 @@ varying vec3 vNormal;
 varying vec3 vBinormal;
 varying vec3 vTangent;
 varying vec2 vTexCoord;
+varying vec2 vReflCoord;
 
 mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
     vec3 dp1 = dFdx( p );
@@ -170,7 +182,7 @@ vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ){
 
 vec3 computePointLight(vec3 normal, vec3 pos, vec3 lPos,
                         float lAmb, float lDif, float lSpec, float lConst, float lLin, float lQuad, float lAtt, 
-                        vec3 mAmb, vec3 mDif, vec3 mSpec, float mShin) {
+                        vec3 mDif, vec3 mSpec, float mShin) {
     
     vec3 bivector = lPos - pos;
 
@@ -201,8 +213,6 @@ vec3 computePointLight(vec3 normal, vec3 pos, vec3 lPos,
     vec3 E = normalize(-pos);
     vec3 R = normalize(-reflect(L, normal));
 
-    vec3 ambient = mAmb * lAmb;
-
     vec3 diffuse = vec3(0.0, 0.0, 0.0);
         #ifdef WITH_MATERIAL_DIFFUSE
            diffuse += mDif;
@@ -215,6 +225,11 @@ vec3 computePointLight(vec3 normal, vec3 pos, vec3 lPos,
         #endif
     diffuse *= max(dot(normal, L), 0.0);
 
+    #ifdef WITH_FALLOF_SAMPLER
+        vec2 longitudeLatitude = vec2((atan(normal.y, normal.x) / 3.1415926 + 1.0) * 0.5, (asin(normal.z) / 3.1415926 + 0.5));
+        vec3 fallof = texture2D(uMaterialFallof, uFallofUnitCoords.xy + (uFallofUnitCoords.zw - uFallofUnitCoords.xy) * longitudeLatitude).xyz;    
+        diffuse += fallof;
+    #endif
 
     vec3 specular = vec3(0.0, 0.0, 0.0);
         #ifdef WITH_MATERIAL_SPECULAR
@@ -235,7 +250,7 @@ vec3 computePointLight(vec3 normal, vec3 pos, vec3 lPos,
     diffuse = clamp(diffuse, 0.0, 1.0);
     specular = clamp(specular, 0.0, 1.0);
 
-    return (ambient + diffuse + specular);
+    return (diffuse + specular);
 }
 
 vec4 computeTexel() {
@@ -265,7 +280,7 @@ vec4 computeTexel() {
                 vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
                 vec3 normal = vec4(texture2D(normalMapUnit, normalTexcoord)).xyz * 255.0/127.0 - 128.0/127.0;
 
-                #ifdef WITH_TBN_FROM_NORMALSs
+                #ifdef WITH_TBN_FROM_NORMALS
                     normal = perturb_normal(normal, vPosition,  normalTexcoord);
                 #endif
             #endif
@@ -274,42 +289,42 @@ vec4 computeTexel() {
             #ifdef WITH_LIGHT_0
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition0.xyz, 
                                             uLightAmbient0, uLightDiffuse0, uLightSpecular0, uLightConstant0, uLightLinear0, uLightQuadratic0, uAttenuation0, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
             #ifdef WITH_LIGHT_1
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition1.xyz, 
                                             uLightAmbient1, uLightDiffuse1, uLightSpecular1, uLightConstant1, uLightLinear1, uLightQuadratic1, uAttenuation1, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
             #ifdef WITH_LIGHT_2
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition2.xyz, 
                                             uLightAmbient2, uLightDiffuse2, uLightSpecular2, uLightConstant2, uLightLinear2, uLightQuadratic2, uAttenuation2, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
             #ifdef WITH_LIGHT_3
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition3.xyz, 
                                             uLightAmbient3, uLightDiffuse3, uLightSpecular3, uLightConstant3, uLightLinear3, uLightQuadratic3, uAttenuation3, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
             #ifdef WITH_LIGHT_4
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition4.xyz, 
                                             uLightAmbient4, uLightDiffuse4, uLightSpecular4, uLightConstant4, uLightLinear4, uLightQuadratic4, uAttenuation4, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
             #ifdef WITH_LIGHT_5
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition5.xyz, 
                                             uLightAmbient5, uLightDiffuse5, uLightSpecular5, uLightConstant5, uLightLinear5, uLightQuadratic5, uAttenuation5, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
             #ifdef WITH_LIGHT_6
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition6.xyz, 
                                             uLightAmbient6, uLightDiffuse6, uLightSpecular6, uLightConstant6, uLightLinear6, uLightQuadratic6, uAttenuation6, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
             #ifdef WITH_LIGHT_7
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition7.xyz, 
                                             uLightAmbient7, uLightDiffuse7, uLightSpecular7, uLightConstant7, uLightLinear7, uLightQuadratic7, uAttenuation7, 
-                                            ambient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
+                                            uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), ambient.w);
             #endif
         #endif
     #endif
@@ -319,5 +334,9 @@ vec4 computeTexel() {
 
 void main() {
     gl_FragColor = computeTexel();
+
+    #ifdef WITH_REFLECTION_SAMPLER
+        gl_FragColor = mix(gl_FragColor, texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord) , 0.35);
+    #endif
 }
 """
