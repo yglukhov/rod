@@ -359,11 +359,11 @@ proc setupMaterialAttributes(m: Material) =
 proc setupLightAttributes(m: Material, v: Viewport) =
     var lightsCount = 0
 
-    if v.lightSources.len != 0:
+    if not v.lightSources.isNil and v.lightSources.len != 0:
         let c = currentContext()
         let gl = c.gl
 
-        for l in values v.lightSources:
+        for ls in values v.lightSources:
             if m.shader == 0: 
                 m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
             else:
