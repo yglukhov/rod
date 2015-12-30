@@ -409,7 +409,7 @@ proc setupLightAttributes(m: Material, v: Viewport) =
     if m.currentLightSourcesCount != lightsCount:
         m.shaderNeedUpdate()
 
-        while (lightsCount != m.currentLightSourcesCount):
+        while lightsCount != m.currentLightSourcesCount:
             if m.currentLightSourcesCount < lightsCount:
                 m.shaderMacroFlags.incl(ShaderMacro(int(WITH_LIGHT_0) + m.currentLightSourcesCount))
                 inc(m.currentLightSourcesCount)
