@@ -32,9 +32,9 @@ proc newQuaternion*(angle: Coord, axis: Vector3): Quaternion =
     result.y = normAxis.y * sinAngle
     result.z = normAxis.z * sinAngle
 
-template aroundX(x: Coord): Quaternion = newQuaternion(x, newVector3(1, 0, 0))
-template aroundY(y: Coord): Quaternion = newQuaternion(y, newVector3(0, 1, 0))
-template aroundZ(z: Coord): Quaternion = newQuaternion(z, newVector3(0, 0, 1))
+template aroundX*(x: Coord): Quaternion = newQuaternion(x, newVector3(1, 0, 0))
+template aroundY*(y: Coord): Quaternion = newQuaternion(y, newVector3(0, 1, 0))
+template aroundZ*(z: Coord): Quaternion = newQuaternion(z, newVector3(0, 0, 1))
 
 proc newQuaternion*(x, y, z: Coord): Quaternion =
     # Order of rotations: Z first, then X, then Y (mimics typical FPS camera with gimbal lock at top/bottom)

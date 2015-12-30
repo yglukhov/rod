@@ -14,7 +14,6 @@ varying vec3 vNormal;
 varying vec3 vBinormal;
 varying vec3 vTangent;
 varying vec2 vTexCoord;
-varying vec2 vReflCoord;
 
 void main() {
 #ifdef WITH_V_POSITION
@@ -32,11 +31,7 @@ void main() {
 #ifdef WITH_V_TEXCOORD
     vTexCoord = aTexCoord;
 #endif
-#ifdef WITH_REFLECTION_SAMPLER
-    vec3 r = -reflect( vPosition.xyz, vNormal.xyz );
-    float m = 2.0 * sqrt( r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0) );
-    vReflCoord= vec2(r.x/m + 0.5, r.y/m + 0.5);
-#endif
+
 
     gl_Position = modelViewProjectionMatrix * vec4(aPosition.xyz, 1.0);
 }
@@ -144,7 +139,6 @@ varying vec3 vNormal;
 varying vec3 vBinormal;
 varying vec3 vTangent;
 varying vec2 vTexCoord;
-varying vec2 vReflCoord;
 
 mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
     vec3 dp1 = dFdx( p );
@@ -164,6 +158,7 @@ mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
 
 #ifdef WITH_NORMAL_SAMPLER
 #define WITH_NORMALMAP_UNSIGNED
+
 vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ){
     vec3 map = texture2D(normalMapUnit, texcoord).xyz;
 #ifdef WITH_NORMALMAP_UNSIGNED
@@ -225,11 +220,11 @@ vec3 computePointLight(vec3 normal, vec3 pos, vec3 lPos,
         #endif
     diffuse *= max(dot(normal, L), 0.0);
 
-    #ifdef WITH_FALLOF_SAMPLER
-        vec2 longitudeLatitude = vec2((atan(normal.y, normal.x) / 3.1415926 + 1.0) * 0.5, (asin(normal.z) / 3.1415926 + 0.5));
-        vec3 fallof = texture2D(uMaterialFallof, uFallofUnitCoords.xy + (uFallofUnitCoords.zw - uFallofUnitCoords.xy) * longitudeLatitude).xyz;    
-        diffuse += fallof;
-    #endif
+    //#ifdef WITH_FALLOF_SAMPLER
+    //    vec2 longitudeLatitude = vec2((atan(normal.y, normal.x) / 3.1415926 + 1.0) * 0.5, (asin(normal.z) / 3.1415926 + 0.5));
+    //    vec3 fallof = texture2D(uMaterialFallof, longitudeLatitude).xyz;    
+    //    diffuse += fallof;
+    //#endif
 
     vec3 specular = vec3(0.0, 0.0, 0.0);
         #ifdef WITH_MATERIAL_SPECULAR
@@ -285,6 +280,7 @@ vec4 computeTexel() {
                 #endif
             #endif
         #endif
+
         #ifdef WITH_LIGHT_POSITION
             #ifdef WITH_LIGHT_0
             texel += vec4(computePointLight(normal, vPosition.xyz, uLightPosition0.xyz, 
@@ -329,14 +325,19 @@ vec4 computeTexel() {
         #endif
     #endif
 
-    return texel;
+
+    #ifdef WITH_REFLECTION_SAMPLER
+        vec3 r = -reflect( vPosition.xyz, normal.xyz );
+        float m = 2.0 * sqrt( r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0) );
+        vec2 vReflCoord= vec2(r.x/m + 0.5, r.y/m + 0.5);
+
+        return mix(texel, texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord) , 0.35);
+    #else
+        return texel;
+    #endif
 }
 
 void main() {
     gl_FragColor = computeTexel();
-
-    #ifdef WITH_REFLECTION_SAMPLER
-        gl_FragColor = mix(gl_FragColor, texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord) , 0.35);
-    #endif
 }
 """
