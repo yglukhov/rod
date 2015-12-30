@@ -265,69 +265,76 @@ proc setupSamplerAttributes(m: Material) =
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_AMBIENT_SAMPLER)
         else:
-            gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.albedoTexture, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uTexUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "texUnit"), textureIndex)
-            inc textureIndex
+            if m.albedoTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.albedoTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uTexUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "texUnit"), textureIndex)
+                inc textureIndex
     if not m.glossTexture.isNil:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_GLOSS_SAMPLER)
         else:
-            gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.glossTexture, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uGlossUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "glossMapUnit"), textureIndex)
-            inc textureIndex
+            if m.glossTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.glossTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uGlossUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "glossMapUnit"), textureIndex)
+                inc textureIndex
     if not m.specularTexture.isNil:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_SPECULAR_SAMPLER)
         else:
-            gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.specularTexture, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uSpecularUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "specularMapUnit"), textureIndex)
-            inc textureIndex
+            if m.specularTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.specularTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uSpecularUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "specularMapUnit"), textureIndex)
+                inc textureIndex
     if not m.normalTexture.isNil:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_NORMAL_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
-            gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.normalTexture, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uNormalUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "normalMapUnit"), textureIndex)
-            inc textureIndex
+            if m.normalTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.normalTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uNormalUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "normalMapUnit"), textureIndex)
+                inc textureIndex
     if not m.bumpTexture.isNil:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_BUMP_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
-            gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.bumpTexture, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uBumpUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "bumpMapUnit"), textureIndex)
-            inc textureIndex
+            if m.bumpTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.bumpTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uBumpUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "bumpMapUnit"), textureIndex)
+                inc textureIndex
     if not m.reflectionTexture.isNil:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_REFLECTION_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
-            gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.reflectionTexture, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uReflectUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "reflectMapUnit"), textureIndex)
-            inc textureIndex
-    if not m.reflectionTexture.isNil:
+            if m.reflectionTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.reflectionTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uReflectUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "reflectMapUnit"), textureIndex)
+                inc textureIndex
+    if not m.fallofTexture.isNil:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_FALLOF_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
-            gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.fallofTexture, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uFallofUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "uMaterialFallof"), textureIndex)
-            inc textureIndex
+            if m.fallofTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.fallofTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uFallofUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "uMaterialFallof"), textureIndex)
+                inc textureIndex
 
 proc setupMaterialAttributes(m: Material) =
     if not m.color.isNil:
