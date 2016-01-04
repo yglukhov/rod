@@ -18,6 +18,9 @@ method deserialize*(s: Solid, j: JsonNode) =
     var v = j["color"]
     if not v.isNil:
         s.color = newColor(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
+    v = j["alpha"] # Deprecated.
+    if not v.isNil:
+        s.node.alpha = v.getFNum(1.0)
 
     v = j["size"]
     if not v.isNil:
