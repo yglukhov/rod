@@ -1,5 +1,5 @@
 import typetraits
-import tables
+import tables, sequtils
 import json
 
 import nimx.types
@@ -13,6 +13,8 @@ export Component
 method init*(c: Component) {.base.} = discard
 
 var componentRegistry = initTable[string, proc(): Component]()
+
+proc registeredComponents*(): seq[string] = toSeq(keys(componentRegistry))
 
 proc registerComponent*[T]() =
     componentRegistry.add T.name, proc(): Component =

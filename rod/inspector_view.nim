@@ -3,6 +3,7 @@ import nimx.view
 import nimx.text_field
 import nimx.button
 import nimx.matrixes
+import nimx.menu
 import variant
 
 export view
@@ -125,18 +126,8 @@ proc newUnknownPropertyView(y: Coord, name: string): View =
     v.text = name & " - unknown property"
     result.addSubview(v)
 
-proc newSectionTitle(y: Coord, name: string): View =
-    result = View.new(newRect(0, y, 200, 17))
-    let v = newLabel(newRect(5, 0, 100, 15))
-    v.text = name
-    result.addSubview(v)
-
-    let removeButton = newButton(newRect(result.bounds.width - 20, 0, 20, 17))
-    removeButton.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
-    removeButton.title = "-"
-    removeButton.onAction do():
-        discard
-    result.addSubview(removeButton)
+proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string): View
+proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): View
 
 proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
     #i.node = n
@@ -165,7 +156,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
 
         if not n.components.isNil:
             for k, v in n.components:
-                pv = newSectionTitle(y, k)
+                pv = newSectionTitle(y, i, n, k)
                 y += pv.frame.height
                 propView.addSubview(pv)
 
@@ -191,7 +182,46 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                     propView.addSubview(pv)
                 v.visitProperties(visitor)
 
+        pv = createNewComponentButton(y, i, n)
+        y += pv.frame.height
+        propView.addSubview(pv)
+
         var fs = propView.frame.size
         fs.height = y
         propView.setFrameSize(fs)
         i.addSubview(propView)
+
+proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string): View =
+    result = View.new(newRect(0, y, 200, 17))
+    let v = newLabel(newRect(5, 0, 100, 15))
+    v.text = name
+    result.addSubview(v)
+
+    let removeButton = newButton(newRect(result.bounds.width - 20, 0, 20, 17))
+    removeButton.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
+    removeButton.title = "-"
+    removeButton.onAction do():
+        n.removeComponent(name)
+        inspector.inspectedNode = n
+    result.addSubview(removeButton)
+
+proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): View =
+    let b = Button.new(newRect(0, y, 120, 20))
+    b.title = "New component"
+    b.onAction do():
+        var menu : Menu
+        menu.new()
+        var items = newSeq[MenuItem]()
+        for i, c in registeredComponents():
+            let menuItem = newMenuItem(c)
+            let pWorkaroundForJS = proc(i: int): proc() =
+                result = proc() =
+                    discard n.component(menuItem.title)
+                    inspector.inspectedNode = n
+
+            menuItem.action = pWorkaroundForJS(i)
+            items.add(menuItem)
+
+        menu.items = items
+        menu.popupAtPoint(b, newPoint(0, b.bounds.height))
+    result = b
