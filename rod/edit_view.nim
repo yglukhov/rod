@@ -65,9 +65,18 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     createNodeButton.title = "+"
     createNodeButton.onAction do():
-        let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+        var sip = outlineView.selectedIndexPath
+        var n = e.rootNode
+        if sip.len == 0:
+            sip.add(0)
+        else:
+            n = outlineView.itemAtIndexPath(sip).get(Node3D)
+
+        outlineView.expandRow(sip)
         discard n.newChild("New Node")
+        sip.add(n.children.len - 1)
         outlineView.reloadData()
+        outlineView.selectItemAtIndexPath(sip)
     result.addSubview(createNodeButton)
 
     let deleteNodeButton = Button.new(newRect(24, result.bounds.height - 20, 20, 20))
