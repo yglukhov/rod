@@ -21,7 +21,7 @@ type
         parent*: Node3D
         name*: string
         animations*: TableRef[string, Animation]
-        mViewport*: Viewport
+        mSceneView*: SceneView
 
     Node2D* = Node3D
 
@@ -30,10 +30,10 @@ type
     Component* = ref object of RootObj
         node*: Node3D
 
-    Viewport* = ref object
+    SceneView* = ref object of View
         mCamera*: Camera
         mRootNode*: Node3D
-        view*: View
+        #view*: View
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int
         mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
@@ -43,6 +43,8 @@ type
         # renderPath
         # observ
         lightSources*: TableRef[string, LightSource]
+
+    Viewport* {.deprecated.} = SceneView
 
     CameraProjection* = enum
         cpOrtho, # Auto

@@ -12,6 +12,7 @@ import strutils
 import rod.component.material
 import rod.component.light
 import rod.vertex_data_info
+import rod.node
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
@@ -168,7 +169,7 @@ method draw*(m: MeshComponent) =
 
     m.material.updateTransformSetup(m.node.translation, m.node.rotation, m.node.scale)
 
-    m.material.updateSetup(m.node.mViewport)
+    m.material.updateSetup(m.node.sceneView)
 
     gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
 

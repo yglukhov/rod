@@ -13,30 +13,29 @@ import component.camera
 
 import ray
 export Viewport
+export SceneView
 
-proc `camera=`*(v: Viewport, c: Camera) =
+proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
 
-template rootNode*(v: Viewport): Node2D = v.mRootNode
+template rootNode*(v: SceneView): Node2D = v.mRootNode
 
-proc `rootNode=`*(v: Viewport, n: Node2D) =
+proc `rootNode=`*(v: SceneView, n: Node2D) =
     if not v.mRootNode.isNil:
-        v.mRootNode.nodeWillBeRemovedFromViewport()
+        v.mRootNode.nodeWillBeRemovedFromSceneView()
     v.mRootNode = n
-    n.nodeWasAddedToViewport(v)
+    n.nodeWasAddedToSceneView(v)
 
-proc camera*(v: Viewport): Camera =
+proc camera*(v: SceneView): Camera =
     if v.mCamera.isNil:
         let nodeWithCamera = v.rootNode.findNode(proc (n: Node2D): bool = not n.componentIfAvailable(Camera).isNil)
         if not nodeWithCamera.isNil:
             v.mCamera = nodeWithCamera.componentIfAvailable(Camera)
     result = v.mCamera
 
-template bounds*(v: Viewport): Rect = v.view.bounds
+template viewMatrix(v: SceneView): Matrix4 = v.mCamera.node.worldTransform.inversed
 
-template viewMatrix(v: Viewport): Matrix4 = v.mCamera.node.worldTransform.inversed
-
-proc prepareFramebuffer(v: Viewport, i: var SelfContainedImage, sz: Size) =
+proc prepareFramebuffer(v: SceneView, i: var SelfContainedImage, sz: Size) =
     if i.isNil:
         echo "Creating buffer"
         i = imageWithSize(sz)
@@ -44,7 +43,7 @@ proc prepareFramebuffer(v: Viewport, i: var SelfContainedImage, sz: Size) =
         echo "Recreating buffer"
         i = imageWithSize(sz)
 
-proc prepareFramebuffers(v: Viewport) =
+proc prepareFramebuffers(v: SceneView) =
     v.numberOfNodesWithBackCompositionInCurrentFrame = v.numberOfNodesWithBackComposition
     if v.numberOfNodesWithBackComposition > 0:
         let gl = currentContext().gl
@@ -55,7 +54,7 @@ proc prepareFramebuffers(v: Viewport) =
         v.mScreenFramebuffer = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
         gl.bindFramebuffer(v.mActiveFrameBuffer)
 
-proc getViewMatrix*(v: Viewport): Matrix4 =
+proc getViewMatrix*(v: SceneView): Matrix4 =
     let cam = v.camera
     doAssert(not cam.isNil)
     var viewTransform = v.viewMatrix
@@ -63,7 +62,7 @@ proc getViewMatrix*(v: Viewport): Matrix4 =
     cam.getProjectionMatrix(v.bounds, projTransform)
     result = projTransform * viewTransform
 
-proc draw*(v: Viewport) =
+method draw*(v: SceneView, r: Rect) =
     if v.rootNode.isNil: return
 
     let c = currentContext()
@@ -72,7 +71,7 @@ proc draw*(v: Viewport) =
     c.withTransform v.getViewMatrix():
         v.rootNode.recursiveDraw()
 
-proc rayWithScreenCoords*(v: Viewport, coords: Point): Ray =
+proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     result.origin = v.camera.node.translation
     let x = (2.0 * coords.x) / v.bounds.width - 1.0
     let y = 1.0 - (2.0 * coords.y) / v.bounds.height
@@ -94,7 +93,7 @@ proc rayWithScreenCoords*(v: Viewport, coords: Point): Ray =
 
 import opengl
 
-proc aquireTempFramebuffer*(v: Viewport): SelfContainedImage =
+proc aquireTempFramebuffer*(v: SceneView): SelfContainedImage =
     let vp = currentContext().gl.getViewport()
     let size = newSize(vp[2].Coord, vp[3].Coord)
 
@@ -108,12 +107,12 @@ proc aquireTempFramebuffer*(v: Viewport): SelfContainedImage =
         echo "CREATING TEMP BUFFER"
         result = imageWithSize(size)
 
-proc releaseTempFramebuffer*(v: Viewport, fb: SelfContainedImage) =
+proc releaseTempFramebuffer*(v: SceneView, fb: SelfContainedImage) =
     if v.tempFramebuffers.isNil:
         v.tempFramebuffers = newSeq[SelfContainedImage]()
     v.tempFramebuffers.add(fb)
 
-proc swapCompositingBuffers*(v: Viewport) =
+proc swapCompositingBuffers*(v: SceneView) =
     assert(v.numberOfNodesWithBackCompositionInCurrentFrame > 0)
     dec v.numberOfNodesWithBackCompositionInCurrentFrame
     let boundsSize = v.bounds.size
@@ -143,9 +142,9 @@ proc swapCompositingBuffers*(v: Viewport) =
 
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 
-proc addAnimation*(v: Viewport, a: Animation) = v.view.window.addAnimation(a)
+proc addAnimation*(v: SceneView, a: Animation) = v.window.addAnimation(a)
 
-proc addLightSource*(v: Viewport, ls: LightSource) =
+proc addLightSource*(v: SceneView, ls: LightSource) =
     if v.lightSources.isNil():
         v.lightSources = newTable[string, LightSource]()
     if v.lightSources.len() < rod_types.maxLightsCount:
@@ -153,7 +152,7 @@ proc addLightSource*(v: Viewport, ls: LightSource) =
     else:
         echo "Count of light sources is limited. Current count equals " & $rod_types.maxLightsCount
 
-proc removeLightSource*(v: Viewport, ls: LightSource) =
+proc removeLightSource*(v: SceneView, ls: LightSource) =
     if v.lightSources.isNil() or v.lightSources.len() <= 0:
         echo "Current light sources count equals 0."
     else:

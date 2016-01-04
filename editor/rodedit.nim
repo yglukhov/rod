@@ -21,11 +21,7 @@ import nimx.autotest
 
 const isMobile = defined(ios) or defined(android)
 
-type EditView = ref object of View
-    viewport: Viewport
-
-method draw*(ev: EditView, r: Rect) =
-    ev.viewport.draw()
+type EditView = ref object of SceneView
 
 proc runAutoTestsIfNeeded() =
     uiTest generalUITest:
@@ -47,14 +43,12 @@ proc startApplication() =
 
     let editView = EditView.new(mainWindow.bounds)
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    editView.viewport.new()
-    editView.viewport.view = editView
-    editView.viewport.rootNode = newNode("(root)")
-    let cameraNode = editView.viewport.rootNode.newChild("camera")
+    editView.rootNode = newNode("(root)")
+    let cameraNode = editView.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
     cameraNode.translation.z = 1
 
-    let light = editView.viewport.rootNode.newChild("point_light")
+    let light = editView.rootNode.newChild("point_light")
     light.translation = newVector3(-600,200,0)
     let lightMesh = light.component(MeshComponent)
     lightMesh.loadWithResource("cube.obj")
@@ -70,7 +64,7 @@ proc startApplication() =
     lightSource.lightDiffuse = 0.5
     lightSource.lightSpecular = 0.7
 
-    # let light2 = editView.viewport.rootNode.newChild("point_light2")
+    # let light2 = editView.rootNode.newChild("point_light2")
     # light2.translation = newVector3(-20,10,-60)
     # let lightMesh2 = light2.component(MeshComponent)
     # lightMesh2.loadMeshComponentWithResource("cube.obj")
@@ -84,7 +78,7 @@ proc startApplication() =
     # lightSource2.setDefaultLightSource()
 
 
-    # let mapleTree = editView.viewport.rootNode.newChild("maple_tree")
+    # let mapleTree = editView.rootNode.newChild("maple_tree")
     # mapleTree.translation = newVector3(-5,-10,-80)
     # let meshTree = mapleTree.component(MeshComponent)
     # meshTree.loadMeshComponentWithResource("tree_maple.obj")
@@ -92,7 +86,7 @@ proc startApplication() =
     # meshTree.material.setDiffuseColor(0.5, 0.5, 0.5)
     # meshTree.material.removeSpecularColor()
 
-    # let baloon = editView.viewport.rootNode.newChild("baloon")
+    # let baloon = editView.rootNode.newChild("baloon")
     # baloon.translation = newVector3(0, 0, -70)
     # baloon.scale = newVector3(0.1, 0.1, 0.1)
     # let meshBaloon = baloon.component(MeshComponent)
@@ -101,11 +95,11 @@ proc startApplication() =
     # meshBaloon.material.setDiffuseColor(0.8, 0.1, 0.1)
     # meshBaloon.material.setSpecularColor(0.9, 0.9, 0.9)
 
-    # let composition = editView.viewport.rootNode.newChild("composition")
+    # let composition = editView.rootNode.newChild("composition")
     # composition.loadScene("collada/balloons_test.dae")
 
     discard """
-    let baloon = editView.viewport.rootNode.newChild("baloon")
+    let baloon = editView.rootNode.newChild("baloon")
     let anim = newAnimation()
     let toVal = 360.0
     anim.animate val in 0.0..toVal:
@@ -124,7 +118,7 @@ proc startApplication() =
     meshBaloon.material.reflectionTexture = imageWithResource("star/sky_midafternoon.jpg")
     # meshBaloon.material.fallofTexture = imageWithResource("star/balloon_star_falloff.png")
 
-    let baloon2 = editView.viewport.rootNode.newChild("baloon2")
+    let baloon2 = editView.rootNode.newChild("baloon2")
     let anim2 = newAnimation()
     let toVal2 = 0.0
     anim2.animate val in -360.0..toVal2:
@@ -141,7 +135,7 @@ proc startApplication() =
     meshBaloon2.material.reflectionTexture = imageWithResource("star/sky_midafternoon.jpg")
 
 
-    let baloon3 = editView.viewport.rootNode.newChild("baloon3")
+    let baloon3 = editView.rootNode.newChild("baloon3")
     baloon3.translation = newVector3(0, 0, -50)
     baloon3.scale = newVector3(0.8, 0.8, 0.8)
     let meshBaloon3 = baloon3.component(MeshComponent)
@@ -151,7 +145,7 @@ proc startApplication() =
     meshBaloon3.material.setSpecularColor(2.7, 2.7, 2.7)
     meshBaloon3.material.reflectionTexture = imageWithResource("star/sky_midafternoon.jpg")
 
-    let baloon4 = editView.viewport.rootNode.newChild("baloon4")
+    let baloon4 = editView.rootNode.newChild("baloon4")
     baloon4.translation = newVector3(0, -14, -50)
     baloon4.scale = newVector3(0.8, 0.8, 0.8)
     baloon4.rotation = aroundY(90.0)
@@ -168,7 +162,7 @@ proc startApplication() =
 
     mainWindow.addSubview(editView)
 
-    discard startEditingNodeInView(editView.viewport.rootNode, editView)
+    discard startEditingNodeInView(editView.rootNode, editView)
 
     runAutoTestsIfNeeded()
 
