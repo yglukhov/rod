@@ -5,6 +5,7 @@ import rod.rod_types
 import rod.component
 import rod.viewport
 import rod.node
+import rod.property_visitor
 
 export LightSource
 
@@ -52,5 +53,13 @@ method componentNodeWasAddedToSceneView*(ls: LightSource) =
 
 method componentNodeWillBeRemovedFromSceneView(ls: LightSource) =
     ls.node.sceneView.removeLightSource(ls)
+
+method visitProperties*(ls: LightSource, p: var PropertyVisitor) =
+    p.visitProperty("ambient", ls.lightAmbient)
+    p.visitProperty("diffuse", ls.lightDiffuse)
+    p.visitProperty("specular", ls.lightSpecular)
+    p.visitProperty("constant", ls.lightConstant)
+    p.visitProperty("linear", ls.lightLinear)
+    p.visitProperty("quadratic", ls.lightQuadratic)
 
 registerComponent[LightSource]()

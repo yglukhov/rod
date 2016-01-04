@@ -8,6 +8,7 @@ import rod.node
 import rod.viewport
 
 import rod.component
+import rod.property_visitor
 
 type ChannelLevels* = ref object of Component
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: ColorComponent
@@ -38,6 +39,13 @@ void compose() {
 template areValuesNormal(c: ChannelLevels): bool =
     c.inWhite == 1 and c.inBlack == 0 and
         c.inGamma == 1 and c.outWhite == 1 and c.outBlack == 0
+
+method init*(c: ChannelLevels) =
+    c.inWhite = 1
+    c.inBlack = 0
+    c.inGamma = 1
+    c.outWhite = 1
+    c.outBlack = 0
 
 method deserialize*(c: ChannelLevels, j: JsonNode) =
     c.inWhite = j["inWhite"].getFNum()
@@ -92,5 +100,12 @@ method animatableProperty1*(s: ChannelLevels, name: string): proc (v: Coord) =
     of "outBlack": result = proc (v: Coord) =
         s.outBlack = v
     else: result = nil
+
+method visitProperties*(c: ChannelLevels, p: var PropertyVisitor) =
+    p.visitProperty("inWhite", c.inWhite)
+    p.visitProperty("inBlack", c.inBlack)
+    p.visitProperty("inGamma", c.inGamma)
+    p.visitProperty("outWhite", c.outWhite)
+    p.visitProperty("outBlack", c.outBlack)
 
 registerComponent[ChannelLevels]()

@@ -8,17 +8,27 @@ import nimx.button
 
 import rod.property_editors.propedit_registry
 import rod.numeric_text_field
+import rod.node
+import rod.viewport
 
 when defined(js):
     import dom
 else:
     import native_dialogs
 
-proc newCoordPropertyView(setter: proc(s: Coord), getter: proc(): Coord): View =
+template toStr(v: SomeReal): string = formatFloat(v, ffDecimal, 2)
+template toStr(v: SomeInteger): string = $v
+
+template fromStr(v: string, t: var SomeReal) = t = v.parseFloat()
+template fromStr(v: string, t: var SomeInteger) = t = v.parseInt()
+
+proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
     let tf = newNumericTextField(newRect(0, 0, 300, 20))
-    tf.text = formatFloat(getter(), ffDecimal, 2)
+    tf.text = toStr(getter())
     tf.onAction do():
-        setter(tf.text.parseFloat())
+        var v: T
+        fromStr(tf.text, v)
+        setter(v)
     result = tf
 
 proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): View =
@@ -117,8 +127,22 @@ proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): View =
                 setter(imageWithContentsOfFile(path))
     result = b
 
+proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): View =
+    let textField = newTextField(newRect(0, 0, 200, 17))
+    let n = getter()
+    if n.isNil or n.name.isNil:
+        textField.text = "nil"
+    else:
+        textField.text = n.name
+    textField.onAction do():
+        setter(editedNode.sceneView.rootNode.findNode(textField.text))
+    result = textField
+
+
 registerPropertyEditor(newTextPropertyView)
-registerPropertyEditor(newCoordPropertyView)
+registerPropertyEditor(newScalarPropertyView[Coord])
+registerPropertyEditor(newScalarPropertyView[float])
+registerPropertyEditor(newScalarPropertyView[int])
 registerPropertyEditor(newVecPropertyView[Vector2])
 registerPropertyEditor(newVecPropertyView[Vector3])
 registerPropertyEditor(newVecPropertyView[Vector4])
@@ -126,3 +150,4 @@ registerPropertyEditor(newColorPropertyView)
 registerPropertyEditor(newSizePropertyView)
 registerPropertyEditor(newPointPropertyView)
 registerPropertyEditor(newImagePropertyView)
+registerPropertyEditor(newNodePropertyView)

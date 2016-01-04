@@ -43,7 +43,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.requireSetter = true
         visitor.requireGetter = true
         visitor.commit = proc() =
-            pv = propertyEditorForProperty(visitor.name, visitor.setterAndGetter)
+            pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter)
             pv.setFrameOrigin(newPoint(0, y))
             y += pv.frame.height
             propView.addSubview(pv)
