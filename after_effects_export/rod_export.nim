@@ -76,9 +76,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                     sprite["fileNames"] = % getSequenceFileNamesFromSource(footageSource)
                 else:
                     sprite["fileNames"] = % [getResourceNameFromSourceFile(footageSource.file)]
-
-                var opacity = layer.property("Opacity", float).valueAtTime(0)
-                if opacity != 100: sprite["alpha"] = %(opacity / 100.0)
                 result["Sprite"] = sprite
             elif ($source.name).find("Null") != 0 and
                     not footageSource.mainSource.isNil and
@@ -87,8 +84,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                 let solidSource = SolidSource(footageSource.mainSource)
                 solid["color"] = %* solidSource.color
                 solid["size"] = % [source.width, source.height]
-                var opacity = layer.property("Opacity", float).valueAtTime(0)
-                if opacity != 100: solid["alpha"] = %(opacity / 100.0)
                 result["Solid"] = solid
 
     let effects = layer.propertyGroup("Effects")
@@ -107,7 +102,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         if not numbers.isNil:
             var txt = newJObject()
             var color = numbers.property("Fill Color", Vector4).valueAtTime(0)
-            color[3] = layer.property("Opacity", float).valueAtTime(0) / 100
             txt["color"] = %color
             txt["fontSize"] = % numbers.property("Size", float).valueAtTime(0)
             result["Text"] = txt
@@ -120,7 +114,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         txt["text"] = % $textDoc.text
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
-        txt["color"].add(%(layer.property("Opacity", float).valueAtTime(0) / 100))
         case textDoc.justification
         of tjLeft: txt["justification"] = %"left"
         of tjRight: txt["justification"] = %"right"
@@ -164,6 +157,11 @@ proc serializeLayer(layer: Layer): JsonNode =
     var rotation = layer.property("Rotation", float32).valueAtTime(0, false);
     if (rotation != 0):
         result["rotation"] = % quaternionWithZRotation(rotation)
+
+    let opacity = layer.property("Opacity", float).valueAtTime(0)
+    if opacity != 100:
+        result["alpha"] = % (opacity / 100.0)
+
     var children = layer.children
     if children.len > 0:
         var chres = newJArray()

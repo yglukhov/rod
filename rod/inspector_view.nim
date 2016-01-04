@@ -159,6 +159,9 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         pv = newVecPropertyView(y, "rotation", proc(s: Vector3) = n.rotation = newQuaternionFromEulerZXY(s[0], s[1], s[2]), proc(): Vector3 = n.rotation.eulerAngles())
         y += pv.frame.height
         propView.addSubview(pv)
+        pv = newCoordPropertyView(y, "alpha", proc(a: Coord) = n.alpha = a, proc(): Coord = n.alpha)
+        y += pv.frame.height
+        propView.addSubview(pv)
 
         if not n.components.isNil:
             for k, v in n.components:

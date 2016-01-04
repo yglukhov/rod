@@ -22,6 +22,7 @@ type
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
+        alpha*: Coord
 
     Node2D* = Node3D
 

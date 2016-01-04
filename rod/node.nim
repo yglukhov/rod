@@ -28,6 +28,7 @@ proc newNode*(name: string = nil): Node =
     result.rotation = newQuaternion()
     result.children = @[]
     result.name = name
+    result.alpha = 1.0
 
 proc createComponentForNode(n: Node2D, name: string): Component =
     result = createComponent(name)
@@ -92,8 +93,11 @@ proc transform*(n: Node2D): Matrix4 =
     n.getTransform(result)
 
 proc recursiveDraw*(n: Node2D) =
+    if n.alpha < 0.0000001: return
     let c = currentContext()
     var tr = c.transform
+    let oldAlpha = c.alpha
+    c.alpha *= n.alpha
     n.getTransform(tr)
     c.withTransform tr:
         var hasPosteffectComponent = false
@@ -103,6 +107,7 @@ proc recursiveDraw*(n: Node2D) =
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
         if not hasPosteffectComponent:
             for c in n.children: c.recursiveDraw()
+    c.alpha = oldAlpha
 
 proc nodeWillBeRemovedFromSceneView*(n: Node2D) =
     if not n.components.isNil:
@@ -170,6 +175,7 @@ proc visitProperties*(n: Node3D, p: var PropertyVisitor) =
     p.visitProperty("translation", n.translation)
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
+    p.visitProperty("alpha", n.alpha)
 
 proc visitComponentProperties*(n: Node3D, p: var PropertyVisitor) =
     if not n.components.isNil:
@@ -186,6 +192,7 @@ proc animatableProperty1*(n: Node2D, name: string): proc (val: Coord) =
     of "sX": result = proc (val: Coord) = n.scale.x = val
     of "sY": result = proc (val: Coord) = n.scale.y = val
     of "sZ": result = proc (val: Coord) = n.scale.z = val
+    of "alpha": result = proc (val: Coord) = n.alpha = val
     else:
         if not n.components.isNil:
             for k, v in n.components:
@@ -274,6 +281,9 @@ proc deserialize*(n: Node, j: JsonNode) =
     v = j["rotation"]
     if not v.isNil:
         n.rotation = newQuaternion(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
+    v = j["alpha"]
+    if not v.isNil:
+        n.alpha = v.getFNum()
     v = j["children"]
     if not v.isNil:
         for i in 0 ..< v.len:

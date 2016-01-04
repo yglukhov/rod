@@ -27,7 +27,7 @@ method deserialize*(t: Text, j: JsonNode) =
 
     v = j["color"]
     if not v.isNil:
-        t.color = newColor(v[0].getFnum(), v[1].getFnum(), v[2].getFnum(), v[3].getFnum())
+        t.color = newColor(v[0].getFnum(), v[1].getFnum(), v[2].getFnum())
 
     v = j["fontSize"]
     if not v.isNil:
@@ -62,8 +62,6 @@ method draw*(t: Text) =
 
 method animatableProperty1*(t: Text, name: string): proc (v: Coord) =
     case name
-    of "alpha": result = proc (v: Coord) =
-        t.color.a = v
     of "Tracking Amount": result = proc (v: Coord) =
         t.trackingAmount = v
     else: result = nil
