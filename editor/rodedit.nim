@@ -168,7 +168,7 @@ proc startApplication() =
 
 when defined js:
     import dom
-    window.onload = proc (e: ref TEvent) =
+    dom.window.onload = proc (e: Event) =
         startApplication()
 else:
     try:
