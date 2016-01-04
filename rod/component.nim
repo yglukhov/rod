@@ -30,8 +30,8 @@ proc createComponent*[T](): T = createComponent(T.name).T
 
 method draw*(c: Component) {.base.} = discard
 method update*(c: Component) {.base.} = discard
-method componentNodeWasAddedToViewport*(c: Component) {.base.} = discard
-method componentNodeWillBeRemovedFromViewport*(c: Component) {.base.} = discard
+method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
+method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
 method isPosteffectComponent*(c: Component): bool {.base.} = false
 
 method animatableProperty1*(c: Component, name: string) : (proc (v: Coord)) {.base.} = discard
@@ -64,8 +64,8 @@ method draw*(c: DrawProcComponent) =
 
 type OverlayComponent* = ref object of Component
 
-method componentNodeWasAddedToViewport*(c: OverlayComponent) =
-    inc c.node.viewport.numberOfNodesWithBackComposition
+method componentNodeWasAddedToSceneView*(c: OverlayComponent) =
+    inc c.node.sceneView.numberOfNodesWithBackComposition
 
-method componentNodeWillBeRemovedFromViewport*(c: OverlayComponent) =
-    dec c.node.viewport.numberOfNodesWithBackComposition
+method componentNodeWillBeRemovedFromSceneView*(c: OverlayComponent) =
+    dec c.node.sceneView.numberOfNodesWithBackComposition

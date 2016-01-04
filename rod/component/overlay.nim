@@ -26,7 +26,7 @@ void compose() {
 """
 
 method draw*(o: Overlay) =
-    let vp = o.node.viewport
+    let vp = o.node.sceneView
     let tmpBuf = vp.aquireTempFramebuffer()
 
     let c = currentContext()

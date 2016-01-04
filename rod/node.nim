@@ -18,7 +18,7 @@ import property_visitor
 import rod_types
 export Node
 
-proc viewport*(n: Node2D): Viewport = n.mViewport
+proc sceneView*(n: Node2D): SceneView = n.mSceneView
 
 import rod.component
 
@@ -32,8 +32,8 @@ proc newNode*(name: string = nil): Node =
 proc createComponentForNode(n: Node2D, name: string): Component =
     result = createComponent(name)
     result.node = n
-    if not n.mViewport.isNil:
-        result.componentNodeWasAddedToViewport()
+    if not n.mSceneView.isNil:
+        result.componentNodeWasAddedToSceneView()
 
 proc component*(n: Node2D, name: string): Component =
     if n.components.isNil:
@@ -67,7 +67,7 @@ proc removeComponent*(n: Node2D, name: string) =
     if not n.components.isNil:
         let c = n.components.getOrDefault(name)
         if not c.isNil:
-            c.componentNodeWillBeRemovedFromViewport()
+            c.componentNodeWillBeRemovedFromSceneView()
             n.components.del(name)
 
 proc removeComponent*(n: Node2D, T: typedesc[Component]) = n.removeComponent(T.name)
@@ -104,19 +104,19 @@ proc recursiveDraw*(n: Node2D) =
         if not hasPosteffectComponent:
             for c in n.children: c.recursiveDraw()
 
-proc nodeWillBeRemovedFromViewport*(n: Node2D) =
+proc nodeWillBeRemovedFromSceneView*(n: Node2D) =
     if not n.components.isNil:
-        for c in n.components.values: c.componentNodeWillBeRemovedFromViewport()
+        for c in n.components.values: c.componentNodeWillBeRemovedFromSceneView()
     if not n.children.isNil:
-        for c in n.children: c.nodeWillBeRemovedFromViewport()
-    n.mViewport = nil
+        for c in n.children: c.nodeWillBeRemovedFromSceneView()
+    n.mSceneView = nil
 
-proc nodeWasAddedToViewport*(n: Node2D, v: Viewport) =
-    n.mViewport = v
+proc nodeWasAddedToSceneView*(n: Node2D, v: SceneView) =
+    n.mSceneView = v
     if not n.components.isNil:
-        for c in n.components.values: c.componentNodeWasAddedToViewport()
+        for c in n.components.values: c.componentNodeWasAddedToSceneView()
     if not n.children.isNil:
-        for c in n.children: c.nodeWasAddedToViewport(v)
+        for c in n.children: c.nodeWasAddedToSceneView(v)
 
 proc removeChild(n, child: Node2D) =
     for i, c in n.children:
@@ -126,15 +126,15 @@ proc removeChild(n, child: Node2D) =
 
 proc removeAllChildren*(n: Node2D) =
     for c in n.children:
-        if not c.mViewport.isNil:
-            c.nodeWillBeRemovedFromViewport()
+        if not c.mSceneView.isNil:
+            c.nodeWillBeRemovedFromSceneView()
         c.parent = nil
     n.children.setLen(0)
 
 proc removeFromParent*(n: Node2D) =
     if not n.parent.isNil:
-        if not n.mViewport.isNil:
-            n.nodeWillBeRemovedFromViewport()
+        if not n.mSceneView.isNil:
+            n.nodeWillBeRemovedFromSceneView()
 
         n.parent.removeChild(n)
         n.parent = nil
@@ -143,8 +143,8 @@ proc addChild*(n, c: Node2D) =
     c.removeFromParent()
     n.children.safeAdd(c)
     c.parent = n
-    if not n.mViewport.isNil:
-        c.nodeWasAddedToViewport(n.mViewport)
+    if not n.mSceneView.isNil:
+        c.nodeWasAddedToSceneView(n.mSceneView)
 
 proc newChild*(n: Node2D, childName: string = nil): Node2D =
     result = newNode(childName)

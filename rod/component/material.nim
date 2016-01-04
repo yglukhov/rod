@@ -363,7 +363,7 @@ proc setupMaterialAttributes(m: Material) =
             else:
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialShininess"), m.color.shininess)
 
-proc setupLightAttributes(m: Material, v: Viewport) =
+proc setupLightAttributes(m: Material, v: SceneView) =
     var lightsCount = 0
 
     if not v.lightSources.isNil and v.lightSources.len != 0:
@@ -371,7 +371,7 @@ proc setupLightAttributes(m: Material, v: Viewport) =
         let gl = c.gl
 
         for ls in values v.lightSources:
-            if m.shader == 0: 
+            if m.shader == 0:
                 m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
             else:
                 let lightPosition = newVector4(ls.node.translation.x, ls.node.translation.y, ls.node.translation.z, 0.0)
@@ -409,7 +409,7 @@ proc setupLightAttributes(m: Material, v: Viewport) =
     if m.currentLightSourcesCount != lightsCount:
         m.shaderNeedUpdate()
 
-        while (lightsCount != m.currentLightSourcesCount):
+        while lightsCount != m.currentLightSourcesCount:
             if m.currentLightSourcesCount < lightsCount:
                 m.shaderMacroFlags.incl(ShaderMacro(int(WITH_LIGHT_0) + m.currentLightSourcesCount))
                 inc(m.currentLightSourcesCount)
@@ -478,7 +478,7 @@ proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: stri
 
 method initSetup*(m: Material) {.base.} = discard
 
-method updateSetup*(m: Material, v: Viewport) {.base.} =
+method updateSetup*(m: Material, v: SceneView) {.base.} =
     let c = currentContext()
     let gl = c.gl
 

@@ -4,6 +4,7 @@ import nimx.matrixes
 import rod.rod_types
 import rod.component
 import rod.viewport
+import rod.node
 
 export LightSource
 
@@ -46,10 +47,10 @@ proc setDefaultLightSource*(ls: LightSource) =
     ls.lightQuadratic = 0.00000007
     ls.lightAttenuationInited = false
 
-method componentNodeWasAddedToViewport*(ls: LightSource) =
-    ls.node.mViewport.addLightSource(ls)
+method componentNodeWasAddedToSceneView*(ls: LightSource) =
+    ls.node.sceneView.addLightSource(ls)
 
-method componentNodeWillBeRemovedFromViewport*(ls: LightSource) =
-    ls.node.mViewport.removeLightSource(ls)
+method componentNodeWillBeRemovedFromSceneView(ls: LightSource) =
+    ls.node.sceneView.removeLightSource(ls)
 
 registerComponent[LightSource]()

@@ -49,7 +49,7 @@ method deserialize*(c: ChannelLevels, j: JsonNode) =
 method draw*(cl: ChannelLevels) =
     if not cl.areValuesNormal():
         #echo "GAMMA: ", cl.inWhite, ", ", cl.inBlack, ", ", cl.inGamma, ", ", cl.outWhite, ", ", cl.outBlack
-        let vp = cl.node.viewport
+        let vp = cl.node.sceneView
         let c = currentContext()
         let gl = c.gl
         let oldBuf = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
