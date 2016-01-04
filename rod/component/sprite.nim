@@ -4,7 +4,10 @@ import nimx.context
 import nimx.image
 import nimx.animation
 import json
+
 import rod.node
+import rod.property_visitor
+
 #import image_blur
 
 type Sprite* = ref object of Component
@@ -79,5 +82,8 @@ method deserialize*(s: Sprite, j: JsonNode) =
 
     if s.images.len > 1:
         s.createFrameAnimation()
+
+method visitProperties*(t: Sprite, p: var PropertyVisitor) =
+    p.visitProperty("image", t.image)
 
 registerComponent[Sprite]()

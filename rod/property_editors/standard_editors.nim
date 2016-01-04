@@ -3,9 +3,16 @@ import strutils
 import nimx.view
 import nimx.text_field
 import nimx.matrixes
+import nimx.image
+import nimx.button
 
 import rod.property_editors.propedit_registry
 import rod.numeric_text_field
+
+when defined(js):
+    import dom
+else:
+    import native_dialogs
 
 proc newCoordPropertyView(setter: proc(s: Coord), getter: proc(): Coord): View =
     let tf = newNumericTextField(newRect(0, 0, 300, 20))
@@ -98,6 +105,18 @@ proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): View =
             result = newVector2(s.x, s.y)
             )
 
+proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): View =
+    let b = Button.new(newRect(0, 0, 200, 17))
+    b.title = "Open image..."
+    b.onAction do():
+        when defined(js):
+            alert("Files can be opened only in native editor version")
+        else:
+            let path = callDialogFileOpen("Select Image")
+            if not path.isNil:
+                setter(imageWithContentsOfFile(path))
+    result = b
+
 registerPropertyEditor(newTextPropertyView)
 registerPropertyEditor(newCoordPropertyView)
 registerPropertyEditor(newVecPropertyView[Vector2])
@@ -106,3 +125,4 @@ registerPropertyEditor(newVecPropertyView[Vector4])
 registerPropertyEditor(newColorPropertyView)
 registerPropertyEditor(newSizePropertyView)
 registerPropertyEditor(newPointPropertyView)
+registerPropertyEditor(newImagePropertyView)
