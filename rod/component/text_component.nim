@@ -1,8 +1,10 @@
 import json
-import rod.component
 import nimx.types
 import nimx.font
 import nimx.context
+
+import rod.component
+import rod.property_visitor
 
 type TextJustification* = enum
     tjLeft
@@ -67,5 +69,9 @@ method animatableProperty1*(t: Text, name: string): proc (v: Coord) =
     of "Tracking Amount": result = proc (v: Coord) =
         t.trackingAmount = v
     else: result = nil
+
+method visitProperties*(t: Text, p: var PropertyVisitor) =
+    p.visitProperty("text", t.text)
+    p.visitProperty("color", t.color)
 
 registerComponent[Text]()

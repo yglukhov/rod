@@ -35,6 +35,7 @@ method draw*(s: Solid) =
     c.drawRect(r)
 
 method visitProperties*(c: Solid, p: var PropertyVisitor) =
+    p.visitProperty("size", c.size)
     p.visitProperty("color", c.color)
 
 registerComponent[Solid]()

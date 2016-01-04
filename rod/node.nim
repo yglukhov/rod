@@ -172,17 +172,11 @@ proc childNamed*(n: Node2D, name: string): Node2D =
         if c.name == name: return c
 
 proc visitProperties*(n: Node3D, p: var PropertyVisitor) =
+    p.visitProperty("name", n.name)
     p.visitProperty("translation", n.translation)
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
     p.visitProperty("alpha", n.alpha)
-
-proc visitComponentProperties*(n: Node3D, p: var PropertyVisitor) =
-    if not n.components.isNil:
-        for k, v in n.components:
-            p.pushQualifier(k)
-            v.visitProperties(p)
-            p.popQualifier()
 
 proc animatableProperty1*(n: Node2D, name: string): proc (val: Coord) =
     case name
