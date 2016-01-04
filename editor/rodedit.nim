@@ -14,15 +14,10 @@ import rod.component.mesh_component
 import rod.component.material
 import rod.component.light
 import rod.component
-import rod.scene_composition
+#import rod.scene_composition
 import nimx.image
-
-when defined js:
-    import nimx.js_canvas_window
-    type PlatformWindow = JSCanvasWindow
-else:
-    import nimx.sdl_window
-    type PlatformWindow = SdlWindow
+import nimx.window
+import nimx.autotest
 
 const isMobile = defined(ios) or defined(android)
 
@@ -32,14 +27,21 @@ type EditView = ref object of View
 method draw*(ev: EditView, r: Rect) =
     ev.viewport.draw()
 
-proc startApplication() =
-    var mainWindow : PlatformWindow
-    mainWindow.new()
+proc runAutoTestsIfNeeded() =
+    uiTest generalUITest:
+        discard
+        when not defined(js):
+            quit()
 
+    registerTest(generalUITest)
+    when defined(runAutoTests):
+        startRegisteredTests()
+
+proc startApplication() =
     when isMobile:
-        mainWindow.initFullscreen()
+        var mainWindow = newFullscreenWindow()
     else:
-        mainWindow.init(newRect(40, 40, 1200, 600))
+        var mainWindow = newWindow(newRect(40, 40, 1200, 600))
 
     mainWindow.title = "Rod"
 
@@ -81,7 +83,7 @@ proc startApplication() =
     # let lightSource2 = light2.component(LightSource)
     # lightSource2.setDefaultLightSource()
 
-    
+
     # let mapleTree = editView.viewport.rootNode.newChild("maple_tree")
     # mapleTree.translation = newVector3(-5,-10,-80)
     # let meshTree = mapleTree.component(MeshComponent)
@@ -102,6 +104,7 @@ proc startApplication() =
     # let composition = editView.viewport.rootNode.newChild("composition")
     # composition.loadScene("collada/balloons_test.dae")
 
+    discard """
     let baloon = editView.viewport.rootNode.newChild("baloon")
     let anim = newAnimation()
     let toVal = 360.0
@@ -159,18 +162,20 @@ proc startApplication() =
     meshBaloon4.material.setSpecularColor(2.7, 2.7, 2.7)
     meshBaloon4.material.reflectionTexture = imageWithResource("star/sky_midafternoon.jpg")
 
-
-    mainWindow.addSubview(editView)
     mainWindow.addAnimation(anim)
     mainWindow.addAnimation(anim2)
+    """
+
+    mainWindow.addSubview(editView)
 
     discard startEditingNodeInView(editView.viewport.rootNode, editView)
+
+    runAutoTestsIfNeeded()
 
 when defined js:
     import dom
     window.onload = proc (e: ref TEvent) =
         startApplication()
-        startAnimation()
 else:
     try:
         startApplication()
