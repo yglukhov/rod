@@ -338,9 +338,7 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
 proc belongsToAux(p: AbstractProperty): bool =
     p.name == "Scale" or p.name == "Rotation" or p.name == "Position"
 
-proc getLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
-    var props = newSeq[AbstractProperty]()
-    getAnimatableProperties(layer, props)
+proc getLayerAnimationForMarker(layer: Layer, marker: Marker, props: openarray[AbstractProperty], result: JsonNode) =
     for pr in props:
         var anim = getPropertyAnimation(pr, marker)
         let layerName = if pr.belongsToAux and layer.requiresAuxParent:
@@ -353,14 +351,23 @@ proc getLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) 
 proc serializeCompositionAnimations(composition: Composition): JsonNode =
     var animationMarkers = getAnimationMarkers(composition)
     result = newJObject()
+
+    var layerAnimatebleProps = newSeq[seq[AbstractProperty]]()
+
     for m in animationMarkers:
         var animations = newJObject()
-        logi("Exporting animation: ", m.animation);
+        logi("Exporting animation: ", m.animation, ": ", epochTime())
+        var i = 0
         for layer in composition.layers:
             if shouldSerializeLayer(layer):
-                getLayerAnimationForMarker(layer, m, animations)
+                if layerAnimatebleProps.len <= i:
+                    var props = newSeq[AbstractProperty]()
+                    getAnimatableProperties(layer, props)
+                    layerAnimatebleProps.add(props)
+                getLayerAnimationForMarker(layer, m, layerAnimatebleProps[i], animations)
+                inc i
         if animations.len > 0:
-            result[m.animation] = animations;
+            result[m.animation] = animations
 
 proc serializeComposition(composition: Composition): JsonNode =
     layerNames = initTable[int, string]()
