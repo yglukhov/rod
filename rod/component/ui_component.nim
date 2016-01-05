@@ -63,8 +63,9 @@ proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event): bool =
             except:
                 discard
             if ok:
-                e.localPosition = newPoint(res.x, res.y)
-                result = c.mView.subviews[0].recursiveHandleMouseEvent(e)
+                let v = c.mView.subviews[0]
+                e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
+                result = v.recursiveHandleMouseEvent(e)
 
 proc sceneViewWillMoveToWindow*(c: UIComponent, w: Window) =
     if not c.mView.isNil:
