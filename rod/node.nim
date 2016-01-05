@@ -234,7 +234,7 @@ proc worldPos(n: Node): Vector3 =
     var parent = n.parent
 
     while not parent.isNil:
-        result += parent.translation
+        result += localToWorld(parent, newVector3())
         parent = parent.parent
 
     return result
@@ -244,7 +244,7 @@ proc `worldPos=`(n: Node, p: Vector3) =
     var parent = n.parent
 
     while not parent.isNil:
-        tr -= parent.translation
+        tr -= localToWorld(parent, newVector3())
         parent = parent.parent
     n.translation = tr
 
