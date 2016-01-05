@@ -19,7 +19,7 @@ type Editor* = ref object
     treeView*: View
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
-    result = PanelView.new(newRect(0, 0, 200, 500))
+    result = PanelView.new(newRect(0, 0, 200, 700))
     let title = newLabel(newRect(2, 2, 100, 15))
     title.text = "Tree view"
     result.addSubview(title)
@@ -92,7 +92,7 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
 
-    let inspectorView = InspectorView.new(newRect(200, 0, 200, 500))
+    let inspectorView = InspectorView.new(newRect(200, 0, 200, 700))
     result.treeView = newTreeView(result, inspectorView)
     v.window.addSubview(result.treeView)
     v.window.addSubview(inspectorView)
