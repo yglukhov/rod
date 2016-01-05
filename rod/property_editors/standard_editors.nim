@@ -16,6 +16,8 @@ when defined(js):
 else:
     import native_dialogs
 
+type Node = node.Node
+
 template toStr(v: SomeReal): string = formatFloat(v, ffDecimal, 2)
 template toStr(v: SomeInteger): string = $v
 
