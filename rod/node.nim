@@ -230,23 +230,10 @@ proc worldToLocal*(n: Node, p: Vector3): Vector3 =
     n.worldTransform.inversed() * p
 
 proc worldPos(n: Node): Vector3 =
-    result= n.translation
-    var parent = n.parent
-
-    while not parent.isNil:
-        result += localToWorld(parent, newVector3())
-        parent = parent.parent
-
-    return result
+    result = n.localToWorld(newVector3())
 
 proc `worldPos=`(n: Node, p: Vector3) =
-    var tr = p
-    var parent = n.parent
-
-    while not parent.isNil:
-        tr -= localToWorld(parent, newVector3())
-        parent = parent.parent
-    n.translation = tr
+    n.translation = n.parent.worldToLocal(p)
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
