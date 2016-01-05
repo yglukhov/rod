@@ -5,6 +5,7 @@ import nimx.render_to_image
 import nimx.portable_gl
 import nimx.animation
 import nimx.window
+import nimx.view_event_handling
 
 import tables
 import rod_types
@@ -157,5 +158,19 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
         echo "Current light sources count equals 0."
     else:
         v.lightSources.del(ls.node.name)
+
+import component.ui_component
+
+method handleMouseEvent*(v: SceneView, e: var Event): bool =
+    result = procCall v.View.handleMouseEvent(e)
+    if not result and v.uiComponents.len > 0:
+        let r = v.rayWithScreenCoords(e.localPosition)
+        for c in v.uiComponents:
+            discard c.handleMouseEvent(r, e)
+
+method viewWillMoveToWindow*(v: SceneView, w: Window) =
+    procCall v.View.viewWillMoveToWindow(w)
+    for c in v.uiComponents:
+        c.sceneViewWillMoveToWindow(w)
 
 import component.all_components

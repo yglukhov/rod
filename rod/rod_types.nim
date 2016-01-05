@@ -44,6 +44,7 @@ type
         # renderPath
         # observ
         lightSources*: TableRef[string, LightSource]
+        uiComponents*: seq[UIComponent]
 
     Viewport* {.deprecated.} = SceneView
 
@@ -56,6 +57,9 @@ type
         projectionMode*: CameraProjection
         zNear*, zFar*: Coord
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
+
+    UIComponent* = ref object of Component
+        mView*: View
 
     LightSource* = ref object of Component
         mLightAmbient*: float32
