@@ -325,7 +325,8 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
         let p = fromObj.property(i)
         let fullyQualifiedPropName = name & "." & $p.name
         if p.isPropertyGroup:
-            getAnimatableProperties(p.toPropertyGroup(), res, fullyQualifiedPropName)
+            if p.name != "Layer Styles":
+                getAnimatableProperties(p.toPropertyGroup(), res, fullyQualifiedPropName)
         else:
             let pr = p.toAbstractProperty()
             if pr.isTimeVarying and $pr.name notin bannedPropertyNames:
@@ -334,7 +335,8 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
                     res.add(pr)
 
 proc belongsToAux(p: AbstractProperty): bool =
-    p.name == "Scale" or p.name == "Rotation" or p.name == "Position"
+    for i in ["Scale".cstring, "Rotation", "Position", "X Position", "Y Position"]:
+        if p.name == i: return true
 
 proc getLayerAnimationForMarker(layer: Layer, marker: Marker, props: openarray[AbstractProperty], result: JsonNode) =
     for pr in props:
