@@ -53,9 +53,15 @@ proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event): bool =
         let worldNormal = c.node.localToWorld(newVector3(0, 0, 1))
         var res : Vector3
         if r.intersectWithPlane(worldNormal, worldPointOnPlane, res):
-            res = c.node.worldToLocal(res)
-            e.localPosition = newPoint(res.x, res.y)
-            result = c.mView.subviews[0].recursiveHandleMouseEvent(e)
+            var ok = false
+            try:
+                res = c.node.worldToLocal(res)
+                ok = true
+            except:
+                discard
+            if ok:
+                e.localPosition = newPoint(res.x, res.y)
+                result = c.mView.subviews[0].recursiveHandleMouseEvent(e)
 
 proc sceneViewWillMoveToWindow*(c: UIComponent, w: Window) =
     if not c.mView.isNil:
