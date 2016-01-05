@@ -229,6 +229,12 @@ proc localToWorld*(n: Node, p: Vector3): Vector3 =
 proc worldToLocal*(n: Node, p: Vector3): Vector3 =
     n.worldTransform.inversed() * p
 
+proc tryWorldToLocal*(n: Node, p: Vector3, res: var Vector3): bool =
+    var m : Matrix4
+    if n.worldTransform.tryInverse(m):
+        res = m * p
+        result = true
+
 proc worldPos(n: Node): Vector3 =
     result = n.localToWorld(newVector3())
 

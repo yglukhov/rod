@@ -56,13 +56,7 @@ proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event): bool =
     if not c.mView.isNil:
         var res : Vector3
         if r.intersectsWithUINode(c.node, res):
-            var ok = false
-            try:
-                res = c.node.worldToLocal(res)
-                ok = true
-            except:
-                discard
-            if ok:
+            if c.node.tryWorldToLocal(res, res):
                 let v = c.mView.subviews[0]
                 e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
                 result = v.recursiveHandleMouseEvent(e)
