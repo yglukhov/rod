@@ -14,16 +14,21 @@ export UIComponent
 type UICompView = ref object of View
     node: Node
 
+proc intersectsWithUINode(r: Ray, n: Node, res: var Vector3): bool =
+    let worldPointOnPlane = n.localToWorld(newVector3())
+    var worldNormal = n.localToWorld(newVector3(0, 0, 1))
+    worldNormal -= worldPointOnPlane
+    worldNormal.normalize()
+    r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
+
 method convertPointToParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
     logi "WARNING: UICompView.convertPointToParent not implemented"
 
 method convertPointFromParent*(v: UICompView, p: Point): Point =
-    let worldPointOnPlane = v.node.localToWorld(newVector3())
-    let worldNormal = v.node.localToWorld(newVector3(0, 0, 1))
     let r = v.node.sceneView.rayWithScreenCoords(p)
     var res : Vector3
-    if r.intersectWithPlane(worldNormal, worldPointOnPlane, res):
+    if r.intersectsWithUINode(v.node, res):
         res = v.node.worldToLocal(res)
         result = newPoint(res.x, res.y)
     else:
@@ -49,10 +54,8 @@ proc moveToWindow(v: View, w: Window) =
 
 proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event): bool =
     if not c.mView.isNil:
-        let worldPointOnPlane = c.node.localToWorld(newVector3())
-        let worldNormal = c.node.localToWorld(newVector3(0, 0, 1))
         var res : Vector3
-        if r.intersectWithPlane(worldNormal, worldPointOnPlane, res):
+        if r.intersectsWithUINode(c.node, res):
             var ok = false
             try:
                 res = c.node.worldToLocal(res)
