@@ -143,6 +143,13 @@ proc mangledName(layer: Layer): string =
 
 proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
 
+proc exportPath(c: Item): string =
+    result = c.projectPath
+    if result == "/":
+        result = "compositions"
+    else:
+        result = result[1 .. ^1]
+
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
 
@@ -174,7 +181,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         result["children"] = chres
 
     if not layer.source.isNil and layer.source.jsObjectType == "CompItem":
-        result["compositionRef"] = % $layer.source.name
+        result["compositionRef"] = % (layer.source.exportPath & "/" & $layer.source.name)
 
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
@@ -428,7 +435,10 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     let compositions = getSelectedCompositions()
     let folderPath = $exportFolderPath
     for c in compositions:
-        let filePath = folderPath & "/" & $c.name & ".json"
+        let compExportPath = folderPath & "/" & c.exportPath
+        if not newFolder(compExportPath).create():
+            logi "ERROR: Could not create filder ", compExportPath
+        let filePath = compExportPath & "/" & $c.name & ".json"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
         file.openForWriting()

@@ -271,7 +271,10 @@ proc newNodeFromJson*(j: JsonNode): Node
 proc deserialize*(n: Node, j: JsonNode)
 
 proc loadComposition*(n: Node, compositionName: string) =
-    loadJsonResourceAsync "compositions/" & compositionName & ".json", proc(j: JsonNode) =
+    var path = compositionName
+    if compositionName.find("/") == -1:
+        path = "compositions/" & compositionName
+    loadJsonResourceAsync path & ".json", proc(j: JsonNode) =
         n.deserialize(j)
 
 import ae_animation

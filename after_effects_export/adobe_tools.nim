@@ -10,6 +10,7 @@ type
     FolderObj {.importc.} = object of RootObj
         name*: cstring
         exists*: bool
+        parent*: Folder
 
 proc newFile*(path: cstring): File {.importc: "new File".}
 proc open*(f: File, mode: cstring) {.importcpp.}
