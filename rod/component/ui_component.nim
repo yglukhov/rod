@@ -26,13 +26,12 @@ method convertPointToParent*(v: UICompView, p: Point): Point =
     logi "WARNING: UICompView.convertPointToParent not implemented"
 
 method convertPointFromParent*(v: UICompView, p: Point): Point =
+    result = newPoint(-9999999, -9999999) # Some ridiculous value
     let r = v.node.sceneView.rayWithScreenCoords(p)
     var res : Vector3
     if r.intersectsWithUINode(v.node, res):
-        res = v.node.worldToLocal(res)
-        result = newPoint(res.x, res.y)
-    else:
-        result = newPoint(-9999999, -9999999) # Some ridiculous value
+        if v.node.tryWorldToLocal(res, res):
+            result = newPoint(res.x, res.y)
 
 method draw*(c: UIComponent) =
     if not c.mView.isNil:
