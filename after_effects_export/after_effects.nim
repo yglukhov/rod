@@ -290,5 +290,10 @@ proc haveSetting*(s: Settings, sectionName, keyName: cstring): bool {.importcpp.
 var app* {.importc, nodecl.}: Application
 
 proc projectPath*(i: Item): string =
-    if app.project.rootFolder == i.parentFolder: "/" & $i.name
-    else: projectPath(i.parentFolder) & "/" & $i.name
+    if app.project.rootFolder == i.parentFolder:
+        result = "/"
+    else:
+        result = projectPath(i.parentFolder)
+        if not result.endsWith("/"):
+            result &= "/"
+        result &= $i.parentFolder.name
