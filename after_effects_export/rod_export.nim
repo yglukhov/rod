@@ -1,4 +1,4 @@
-import typetraits, tables, dom
+import tables, dom
 import after_effects
 import times
 import json
@@ -9,13 +9,13 @@ import rod.quaternion
 
 type File = after_effects.File
 
-proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item]): seq[t] =
+proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item], typeName: string): seq[t] =
     for i in collection:
-        if i.typeName == t.name:
+        if i.jsObjectType == typeName:
             result.add(cast[t](i))
 
 proc getSelectedCompositions(): seq[Composition] {.exportc.} =
-    getObjectsWithTypeFromCollection(Composition, app.project.selection)
+    getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
 
 var logTextField: EditText
 
@@ -68,7 +68,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJObject()
     var source = layer.source
     if not source.isNil:
-        if source.typeName == "Footage":
+        if source.jsObjectType == "FootageItem":
             let footageSource = FootageItem(source)
             if not footageSource.file.isNil:
                 var sprite = newJObject()
@@ -173,7 +173,7 @@ proc serializeLayer(layer: Layer): JsonNode =
             chres.elems.reverse()
         result["children"] = chres
 
-    if not layer.source.isNil and layer.source.typeName == "Composition":
+    if not layer.source.isNil and layer.source.jsObjectType == "CompItem":
         result["compositionRef"] = % $layer.source.name
 
     var components = serializeLayerComponents(layer)

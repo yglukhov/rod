@@ -21,7 +21,7 @@ type
     Item* = ref ItemObj
     ItemObj {.importc.} = object of RootObj
         id*: int
-        typeName*: cstring
+        typeName*: cstring # Warning! This value is localized! Barely usable.
         selected*: bool
         name*: cstring
         comment*: cstring
