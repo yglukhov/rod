@@ -88,6 +88,14 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         outlineView.reloadData()
     result.addSubview(deleteNodeButton)
 
+    let refreshButton = Button.new(newRect(46, result.bounds.height - 20, 60, 20))
+    refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    refreshButton.title = "Refresh"
+    refreshButton.onAction do():
+        outlineView.reloadData()
+    result.addSubview(refreshButton)
+
+
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
