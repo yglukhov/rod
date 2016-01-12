@@ -1,4 +1,4 @@
-import tables, dom
+import tables, dom, math
 import after_effects
 import times
 import json
@@ -118,6 +118,17 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         of tjLeft: txt["justification"] = %"left"
         of tjRight: txt["justification"] = %"right"
         of tjCenter: txt["justification"] = %"center"
+
+        let shadow = layer.propertyGroup("Layer Styles").propertyGroup("Drop Shadow")
+        if not shadow.isNil:
+            let angle = shadow.property("Angle", float32).valueAtTime(0)
+            let distance = shadow.property("Distance", float32).valueAtTime(0)
+            let color = shadow.property("Color", Vector4).valueAtTime(0)
+            let alpha = shadow.property("Opacity", float32).valueAtTime(0) / 100
+            txt["shadowColor"] = %[color.x, color.y, color.z, alpha]
+            let radAngle = degToRad(angle + 180)
+            txt["shadowOff"] = %[distance * cos(radAngle), - distance * sin(radAngle)]
+
         result["Text"] = txt
 
 proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
