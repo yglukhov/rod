@@ -28,7 +28,7 @@ proc logi(args: varargs[string, `$`]) =
 
 proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
 
-template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
+template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(-zAngle, newVector3(0, 0, 1))
 
 var propertyNameMap = {
     "Rotation" : "rotation",
@@ -123,8 +123,11 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
 proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
     result = layer.property("Anchor Point", Vector3).isTimeVarying and layer.name != "root"
 
+proc layerIsCompositionRef(layer: Layer): bool =
+    not layer.source.isNil and layer.source.jsObjectType == "CompItem"
+
 proc requiresAuxParent(layer: Layer): bool =
-    if layer.name != "root":
+    if layer.name != "root" and not layer.layerIsCompositionRef():
         let ap = layer.property("Anchor Point", Vector3)
         if ap.value != newVector3(0, 0, 0):
             result = true
@@ -180,7 +183,7 @@ proc serializeLayer(layer: Layer): JsonNode =
             chres.elems.reverse()
         result["children"] = chres
 
-    if not layer.source.isNil and layer.source.jsObjectType == "CompItem":
+    if layer.layerIsCompositionRef():
         result["compositionRef"] = % (layer.source.exportPath & "/" & $layer.source.name)
 
     var components = serializeLayerComponents(layer)
