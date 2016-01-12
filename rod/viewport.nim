@@ -175,7 +175,8 @@ method handleMouseEvent*(v: SceneView, e: var Event): bool =
     if not result and v.uiComponents.len > 0:
         let r = v.rayWithScreenCoords(e.localPosition)
         for c in v.uiComponents:
-            discard c.handleMouseEvent(r, e)
+            result = c.handleMouseEvent(r, e)
+            if result: break
 
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
     procCall v.View.viewWillMoveToWindow(w)
