@@ -28,7 +28,7 @@ proc logi(args: varargs[string, `$`]) =
 
 proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
 
-template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
+template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(-zAngle, newVector3(0, 0, 1))
 
 var propertyNameMap = {
     "Rotation" : "rotation",
@@ -123,8 +123,11 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
 proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
     result = layer.property("Anchor Point", Vector3).isTimeVarying and layer.name != "root"
 
+proc layerIsCompositionRef(layer: Layer): bool =
+    not layer.source.isNil and layer.source.jsObjectType == "CompItem"
+
 proc requiresAuxParent(layer: Layer): bool =
-    if layer.name != "root":
+    if layer.name != "root" and not layer.layerIsCompositionRef():
         let ap = layer.property("Anchor Point", Vector3)
         if ap.value != newVector3(0, 0, 0):
             result = true
@@ -180,7 +183,7 @@ proc serializeLayer(layer: Layer): JsonNode =
             chres.elems.reverse()
         result["children"] = chres
 
-    if not layer.source.isNil and layer.source.jsObjectType == "CompItem":
+    if layer.layerIsCompositionRef():
         result["compositionRef"] = % (layer.source.exportPath & "/" & $layer.source.name)
 
     var components = serializeLayerComponents(layer)
@@ -209,6 +212,7 @@ type Marker = object
     comment*: string
     animation*: string
     loops*: int
+    animation_end*: string
 
 proc getMarkers(comp: Composition): seq[Marker] =
     result = newSeq[Marker]()
@@ -238,10 +242,23 @@ proc parseMarkerComment(comment: string, res: var Marker) =
             case k
             of "animation": res.animation = v
             of "loops": res.loops = parseInt(v)
+            of "animation_end": res.animation_end = v
             else: logi "Unknown marker key: ", k
+
+proc getAnimationEndMarkers(comp: Composition): seq[Marker] =
+    var markers = getMarkers(comp)
+
+    result = newSeq[Marker]()
+    for i in 0 ..< markers.len:
+        parseMarkerComment(markers[i].comment, markers[i])
+        if markers[i].animation_end.len > 0:
+            result.add(markers[i])
+
 
 proc getAnimationMarkers(comp: Composition): seq[Marker] =
     var markers = getMarkers(comp)
+    var end_markers = getAnimationEndMarkers(comp)
+
     result = newSeq[Marker]()
     for i in 0 ..< markers.len:
         parseMarkerComment(markers[i].comment, markers[i])
@@ -255,6 +272,14 @@ proc getAnimationMarkers(comp: Composition): seq[Marker] =
             result[i].duration = result[i + 1].time - result[i].time
 
         result[^1].duration = comp.duration - result[^1].time
+
+
+    for em in end_markers:
+        for i in 0 ..< result.len:
+            if em.animation_end == result[i].animation:
+                doAssert(em.time > result[i].time)
+                result[i].duration = em.time - result[i].time
+
 
 proc jsonPropertyAccessor(p: AbstractProperty): proc(t: float): JsonNode =
     case $p.name
@@ -398,6 +423,7 @@ proc serializeComposition(composition: Composition): JsonNode =
             result["children"] = children
 
     let animations = serializeCompositionAnimations(composition)
+
     if animations.len > 0:
         result["animations"] = animations
 

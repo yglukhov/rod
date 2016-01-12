@@ -16,6 +16,7 @@ import ray
 export Viewport
 export SceneView
 
+
 proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
 
@@ -63,6 +64,8 @@ proc getViewMatrix*(v: SceneView): Matrix4 =
     cam.getProjectionMatrix(v.bounds, projTransform)
     result = projTransform * viewTransform
 
+proc swapCompositingBuffers*(v: SceneView)
+
 method draw*(v: SceneView, r: Rect) =
     if v.rootNode.isNil: return
 
@@ -71,6 +74,12 @@ method draw*(v: SceneView, r: Rect) =
 
     c.withTransform v.getViewMatrix():
         v.rootNode.recursiveDraw()
+
+    if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
+        # When some compositing nodes are optimized away, we have
+        # to blit current backup buffer to the screen.
+        v.numberOfNodesWithBackCompositionInCurrentFrame = 1
+        v.swapCompositingBuffers()
 
 proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     result.origin = v.camera.node.translation
