@@ -401,16 +401,6 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
         if animations.len > 0:
             result[m.animation] = animations
 
-proc serializeCompositionAnimationsEnds(composition: Composition): JsonNode =
-    var animationEndMarkers = getAnimationEndMarkers(composition)
-    result = newJObject()
-    for m in animationEndMarkers:
-        var animations_end = newJObject()
-
-        animations_end["time"] = % $m.time
-        result[m.animation_end] = animations_end
-
-
 proc serializeComposition(composition: Composition): JsonNode =
     layerNames = initTable[int, string]()
 
@@ -432,13 +422,10 @@ proc serializeComposition(composition: Composition): JsonNode =
         if children.len > 0:
             result["children"] = children
 
-    let animationsEnds = serializeCompositionAnimationsEnds(composition)
     let animations = serializeCompositionAnimations(composition)
 
     if animations.len > 0:
         result["animations"] = animations
-    if animationsEnds.len > 0:
-        result["animations_ends"] = animationsEnds
 
 proc replacer(n: JsonNode): ref RootObj {.exportc.} =
     case n.kind
