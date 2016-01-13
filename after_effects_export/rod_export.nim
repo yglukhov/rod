@@ -131,17 +131,13 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
 
         result["Text"] = txt
 
-proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
-    result = layer.property("Anchor Point", Vector3).isTimeVarying and layer.name != "root"
-
 proc layerIsCompositionRef(layer: Layer): bool =
     not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
 proc requiresAuxParent(layer: Layer): bool =
-    if layer.name != "root" and not layer.layerIsCompositionRef():
-        let ap = layer.property("Anchor Point", Vector3)
-        if ap.value != newVector3(0, 0, 0):
-            result = true
+    let ap = layer.property("Anchor Point", Vector3)
+    if ap.value != newVector3(0, 0, 0):
+        result = true
 
 var layerNames = initTable[int, string]()
 
@@ -419,7 +415,7 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not rootLayer.isNil:
         result = serializeLayer(rootLayer)
         result["name"] = % $composition.name
-        result.delete("translation")
+        #result.delete("translation")
     else:
         result = % {
           "name": % $composition.name
