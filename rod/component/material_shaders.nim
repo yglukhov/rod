@@ -1,19 +1,9 @@
 const materialVertexShaderDefault* = """
-#ifdef WITH_V_POSITION
 attribute vec4 aPosition;
-#endif
-#ifdef WITH_V_NORMAL
 attribute vec4 aNormal;
-#endif
-#ifdef WITH_V_TANGENT
 attribute vec4 aTangent;
-#endif
-#ifdef WITH_V_BINORMAL
 attribute vec4 aBinormal;
-#endif
-#ifdef WITH_V_TEXCOORD
 attribute vec2 aTexCoord;
-#endif
 
 #ifdef WITH_V_POSITION
 varying vec3 vPosition;
