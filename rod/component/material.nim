@@ -7,6 +7,7 @@ import nimx.system_logger
 import nimx.matrixes
 
 import tables
+import streams
 import rod.node
 import rod.component.mesh_component
 import rod.component.material_shaders
@@ -39,6 +40,7 @@ type ShaderMacro = enum
     WITH_BUMP_SAMPLER
     WITH_FALLOF_SAMPLER
     WITH_MATERIAL_AMBIENT
+    WITH_MATERIAL_EMISSION
     WITH_MATERIAL_DIFFUSE
     WITH_MATERIAL_SPECULAR
     WITH_MATERIAL_SHININESS
@@ -57,29 +59,38 @@ type ShaderMacro = enum
     WITH_LIGHT_6
     WITH_LIGHT_7
     WITH_TBN_FROM_NORMALS
+    WITH_RIM_LIGHT
 
 type MaterialColor* = ref object of RootObj
     ambient: Vector4
+    emission: Vector4
     diffuse: Vector4
     specular: Vector4
     shininess: float32
+    reflectivity: float32
 
     ambientInited: bool
+    emissionInited: bool
     diffuseInited: bool
     specularInited: bool
     shininessInited: bool
+    reflectivityInited: bool
 
 proc newMaterialWithDefaultColor*(): MaterialColor =
     result.new()
-    result.ambient = newVector4(0.0, 0.0, 0.0, 1.0)
-    result.diffuse = newVector4(0.3, 0.3, 0.3, 1.0)
-    result.specular = newVector4(0.8, 0.8, 0.8, 1.0)
+    result.ambient = newVector4(0.0, 0.0, 0.0, 0.0)
+    result.emission = newVector4(0.0, 0.0, 0.0, 0.0)
+    result.diffuse = newVector4(0.3, 0.3, 0.3, 0.0)
+    result.specular = newVector4(0.8, 0.8, 0.8, 0.0)
     result.shininess = 10.0
+    result.reflectivity = 0.35
 
     result.ambientInited = true
+    result.emissionInited = true
     result.diffuseInited = true
     result.specularInited = true
     result.shininessInited = true
+    result.reflectivityInited = true
 
 type TransformInfo* = ref object of RootObj
     modelMatrix*: Matrix4
@@ -123,7 +134,7 @@ type Material* = ref object of RootObj
     normalTexture*: Image
     bumpTexture*: Image
     reflectionTexture*: Image
-    fallofTexture*: Image
+    falloffTexture*: Image
 
     color: MaterialColor
     transform: TransformInfo
@@ -136,6 +147,7 @@ type Material* = ref object of RootObj
     blendEnable*: bool
     depthEnable*: bool
     isWireframe*: bool
+    bEnableBackfaceCulling*: bool
 
     currentLightSourcesCount: int
 
@@ -161,6 +173,21 @@ proc setAmbientColor*(m: Material, x, y, z, w: Coord) =
 proc removeAmbientColor*(m: Material) =
     m.color.ambientInited = false
     m.shaderMacroFlags.excl(WITH_MATERIAL_AMBIENT)
+    m.shaderNeedUpdate()
+
+proc setEmissionColor*(m: Material, x, y, z, w: Coord) =
+    m.color.emission = newVector4(x, y, z, w)
+    m.color.emissionInited = true
+    m.shaderNeedUpdate()
+
+proc setEmissionColor*(m: Material, x, y, z: Coord) =
+    m.color.emission = newVector4(x, y, z, 1.0)
+    m.color.emissionInited = true
+    m.shaderNeedUpdate()
+
+proc removeEmissionColor*(m: Material) =
+    m.color.emissionInited = false
+    m.shaderMacroFlags.excl(WITH_MATERIAL_EMISSION)
     m.shaderNeedUpdate()
 
 proc setDiffuseColor*(m: Material, x, y, z: Coord) =
@@ -203,14 +230,25 @@ proc removeShininess*(m: Material) =
     m.shaderMacroFlags.excl(WITH_MATERIAL_SHININESS)
     m.shaderNeedUpdate()
 
+proc setReflectivity*(m: Material, r: Coord) =
+    m.color.reflectivity = r
+    m.color.reflectivityInited = true
+    m.shaderNeedUpdate()
+
+proc removeReflectivity*(m: Material) =
+    m.color.reflectivityInited = false
+    # m.shaderMacroFlags.excl(WITH_MATERIAL_REFLECTIVITY)
+    m.shaderNeedUpdate()
+
 proc newDefaultMaterial*(): Material =
     result.new()
 
     result.currentLightSourcesCount = 0
-    result.blendEnable = false
+    result.blendEnable = true
     result.depthEnable = true
     result.isWireframe = false
     result.isLightReceiver = true
+    result.bEnableBackfaceCulling = true
 
     result.color = newMaterialWithDefaultColor()
     result.transform = newTransformInfoWithIdentity()
@@ -241,18 +279,19 @@ proc updateVertexAttributesSetup*(m: Material, vertInfo: VertexDataInfo) =
         gl.enableVertexAttribArray(aNormal.GLuint)
         gl.vertexAttribPointer(aNormal.GLuint, vertInfo.numOfCoordPerNormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerNormal * sizeof(GLfloat)
-    if vertInfo.numOfCoordPerBinormal != 0:
-        if m.shader == 0:
-            m.shaderMacroFlags.incl(WITH_V_BINORMAL)
-        gl.enableVertexAttribArray(aBinormal.GLuint)
-        gl.vertexAttribPointer(aBinormal.GLuint, vertInfo.numOfCoordPerBinormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
-        offset += vertInfo.numOfCoordPerBinormal * sizeof(GLfloat)
     if vertInfo.numOfCoordPerTangent != 0:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_V_TANGENT)
         gl.enableVertexAttribArray(aTangent.GLuint)
         gl.vertexAttribPointer(aTangent.GLuint, vertInfo.numOfCoordPerTangent, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerTangent * sizeof(GLfloat)
+    if vertInfo.numOfCoordPerBinormal != 0:
+        if m.shader == 0:
+            m.shaderMacroFlags.incl(WITH_V_BINORMAL)
+        gl.enableVertexAttribArray(aBinormal.GLuint)
+        gl.vertexAttribPointer(aBinormal.GLuint, vertInfo.numOfCoordPerBinormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
+        offset += vertInfo.numOfCoordPerBinormal * sizeof(GLfloat)
+    
 
 proc setupSamplerAttributes(m: Material) =
     let c = currentContext()
@@ -323,17 +362,18 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.reflectionTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uReflectUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "reflectMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uReflectivity"), m.color.reflectivity)
                 inc textureIndex
-    if not m.fallofTexture.isNil:
+    if not m.falloffTexture.isNil:
         if m.shader == 0:
             m.shaderMacroFlags.incl(WITH_FALLOF_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
-            if m.fallofTexture.isLoaded:
+            if m.falloffTexture.isLoaded:
                 gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
-                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.fallofTexture, gl, theQuad))
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.falloffTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uFallofUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "uMaterialFallof"), textureIndex)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "falloffMapUnit"), textureIndex)
                 inc textureIndex
 
 proc setupMaterialAttributes(m: Material) =
@@ -346,7 +386,11 @@ proc setupMaterialAttributes(m: Material) =
                 m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
             else:
                 c.setColorUniform(m.shader, "uMaterialAmbient", newColor(m.color.ambient[0], m.color.ambient[1], m.color.ambient[2], m.color.ambient[3]))
-
+        if m.color.emissionInited:
+            if m.shader == 0:
+                m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
+            else:
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialEmission"), m.color.emission)
         if m.color.diffuseInited:
             if m.shader == 0:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
@@ -429,6 +473,10 @@ proc setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
     if m.shader == 0:
         m.shaderMacroFlags.incl(WITH_TBN_FROM_NORMALS)
 
+proc setupRIMLightTechnique*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
+
 proc updateTransformSetup*(m: Material, translation: Vector3, rotation: Quaternion, scale: Vector3) =
     m.transform.fromScaleRotationTranslation(scale, rotation, translation)
 
@@ -448,9 +496,13 @@ proc createShader(m: Material) =
 
     if m.vertexShader.len == 0:
         m.vertexShader = commonShaderDefines & materialVertexShaderDefault
+    else:
+        m.vertexShader = commonShaderDefines & m.vertexShader
 
     if m.fragmentShader.len == 0:
         m.fragmentShader = commonShaderDefines & materialFragmentShaderDefault
+    else:
+        m.fragmentShader = commonShaderDefines & m.fragmentShader
 
     m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord),
                                     (aNormal.GLuint, $aNormal), (aTangent.GLuint, $aTangent), (aBinormal.GLuint, $aBinormal)])
@@ -461,20 +513,21 @@ proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: stri
     m.fragmentShader = fragmentShader
     m.shaderNeedUpdate()
 
-# proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
-#     if vertexShader != "":
-#         loadResourceAsync vertexShader, proc(s: Stream) =
-#             m.vertexShader = s.readAll()
-#             s.close()
-#     else:
-#         m.vertexShader = vertexShaderDefault
+proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
+    if vertexShader != "":
+        loadResourceAsync vertexShader, proc(s: Stream) =
+            m.vertexShader = s.readAll()
+            s.close()
+    else:
+        m.vertexShader = materialVertexShaderDefault
 
-#     if fragmentShader != "":
-#         loadResourceAsync fragmentShader, proc(s: Stream) =
-#             m.fragmentShader = s.readAll()
-#             s.close()
-#     else:
-#         m.fragmentShader = fragmentShaderDefault
+    if fragmentShader != "":
+        loadResourceAsync fragmentShader, proc(s: Stream) =
+            m.fragmentShader = s.readAll()
+            s.close()
+    else:
+        m.fragmentShader = materialFragmentShaderDefault
+    m.shaderNeedUpdate()
 
 method initSetup*(m: Material) {.base.} = discard
 
@@ -489,6 +542,7 @@ method updateSetup*(m: Material, v: SceneView) {.base.} =
             m.setupLightAttributes(v)
         #TODO use techniques
         m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
+        m.setupRIMLightTechnique()
         m.createShader()
 
     gl.useProgram(m.shader)

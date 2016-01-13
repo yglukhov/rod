@@ -13,7 +13,7 @@ method onScroll*(v: NumericTextField, e: var Event): bool =
     var action = false
     try:
         var val = parseFloat(v.text)
-        val += e.offset.y * 0.1
+        val += e.offset.y * 1.0
         v.text = $val
         action = true
         v.setNeedsDisplay()

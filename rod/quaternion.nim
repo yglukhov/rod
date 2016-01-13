@@ -90,6 +90,28 @@ proc toMatrix4*(q: Quaternion): Matrix4 =
         2.0f*qx*qz - 2.0f*qy*qw, 2.0f*qy*qz + 2.0f*qx*qw, 1.0f - 2.0f*qx*qx - 2.0f*qy*qy, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f]
 
+proc fromMatrix4*(mat: Matrix4): Quaternion = 
+    var s, x, y, z, w: Coord
+    if mat[0] > mat[5] and mat[0] > mat[10]:
+        s = sqrt(1.0 + mat[0] - mat[5] - mat[10]) * 2.0
+        x = 0.25 * s
+        y = (mat[4] + mat[1]) / s
+        z = (mat[2] + mat[8]) / s
+        w = (mat[9] - mat[6]) / s
+    elif mat[5] > mat[10]:
+        s = sqrt(1.0 + mat[5] - mat[0] - mat[10]) * 2.0
+        x = (mat[4] + mat[1]) / s
+        y = 0.25 * s
+        z = (mat[9] + mat[6]) / s
+        w = (mat[2] - mat[8]) / s
+    else:
+        s = sqrt(1.0 + mat[10] - mat[0] - mat[5]) * 2.0
+        x = (mat[2] + mat[8]) / s
+        y = (mat[9] + mat[6]) / s
+        z = 0.25 * s
+        w = (mat[4] - mat[1]) / s
+    result = newQuaternion(x, y, z, w)
+
 proc lengthSquared*(q: Quaternion): Coord = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z
 
 proc isAround(lhs, rhs: Coord): bool =
