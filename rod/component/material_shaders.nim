@@ -1,19 +1,37 @@
 const materialVertexShaderDefault* = """
+#ifdef WITH_V_POSITION
 attribute vec4 aPosition;
-attribute vec2 aTexCoord;
+#endif
+#ifdef WITH_V_NORMAL
 attribute vec4 aNormal;
+#endif
+#ifdef WITH_V_TANGENT
 attribute vec4 aTangent;
+#endif
+#ifdef WITH_V_BINORMAL
 attribute vec4 aBinormal;
+#endif
+#ifdef WITH_V_TEXCOORD
+attribute vec2 aTexCoord;
+#endif
+
+#ifdef WITH_V_POSITION
+varying vec3 vPosition;
+#endif
+#ifdef WITH_V_NORMAL
+varying vec3 vNormal;
+#endif
+#ifdef WITH_V_TANGENT
+varying vec3 vTangent;
+varying vec3 vBinormal;
+#endif
+#ifdef WITH_V_TEXCOORD
+varying vec2 vTexCoord;
+#endif
 
 uniform mat4 modelViewProjectionMatrix;
 uniform mat4 modelMatrix;
 uniform mat3 normalMatrix;
-
-varying vec3 vPosition;
-varying vec3 vNormal;
-varying vec3 vTangent;
-varying vec3 vBinormal;
-varying vec2 vTexCoord;
 
 void main() {
 #ifdef WITH_V_POSITION
@@ -24,12 +42,12 @@ void main() {
 #endif
 #ifdef WITH_V_TANGENT
     vTangent = normalize(normalMatrix * aTangent.xyz);
-#endif
-#ifdef WITH_V_BINORMAL
-    vBinormal = normalize(normalMatrix * aBinormal.xyz);
-#else
-    vec3 bitangent = cross(vTangent.xyz, vNormal.xyz);
-    vBinormal = normalize(bitangent);
+    #ifdef WITH_V_BINORMAL
+        vBinormal = normalize(normalMatrix * aBinormal.xyz);
+    #else
+        vec3 bitangent = cross(vTangent.xyz, vNormal.xyz);
+        vBinormal = normalize(bitangent);
+    #endif
 #endif
 #ifdef WITH_V_TEXCOORD
     vTexCoord = aTexCoord;
@@ -43,28 +61,67 @@ const materialFragmentShaderDefault* = """
 precision mediump float;
 #endif
 
+#ifdef WITH_V_POSITION
+varying vec3 vPosition;
+#endif
+#ifdef WITH_V_NORMAL
+varying vec3 vNormal;
+#endif
+#ifdef WITH_V_TANGENT
+varying vec3 vTangent;
+varying vec3 vBinormal;
+#endif
+#ifdef WITH_V_TEXCOORD
+varying vec2 vTexCoord;
+#endif
+
+#ifdef WITH_MATERIAL_DIFFUSE
 uniform sampler2D texUnit;
 uniform vec4 uTexUnitCoords;
+#endif
+#ifdef WITH_GLOSS_SAMPLER
 uniform sampler2D glossMapUnit;
 uniform vec4 uGlossUnitCoords;
+#endif
+#ifdef WITH_SPECULAR_SAMPLER
 uniform sampler2D specularMapUnit;
 uniform vec4 uSpecularUnitCoords;
+#endif
+#ifdef WITH_BUMP_SAMPLER
 uniform sampler2D bumpMapUnit;
 uniform vec4 uBumpUnitCoords;
+#endif
+#ifdef WITH_NORMAL_SAMPLER
 uniform sampler2D normalMapUnit;
 uniform vec4 uNormalUnitCoords;
+#endif
+#ifdef WITH_REFLECTION_SAMPLER
 uniform sampler2D reflectMapUnit;
 uniform vec4 uReflectUnitCoords;
 uniform float uReflectivity;
+#endif
+#ifdef WITH_FALLOF_SAMPLER
 uniform sampler2D falloffMapUnit;
 uniform vec4 uFallofUnitCoords;
+#endif
 
+#ifdef WITH_MATERIAL_AMBIENT
 uniform vec4 uMaterialAmbient;
+#endif
+#ifdef WITH_MATERIAL_EMISSION
 uniform vec4 uMaterialEmission;
+#endif
+#ifdef WITH_MATERIAL_DIFFUSE
 uniform vec4 uMaterialDiffuse;
+#endif
+#ifdef WITH_MATERIAL_SPECULAR
 uniform vec4 uMaterialSpecular;
+#endif
+#ifdef WITH_MATERIAL_SHININESS
 uniform float uMaterialShininess;
+#endif
 
+#ifdef WITH_LIGHT_0
 uniform vec4 uLightPosition0;
 uniform float uLightAmbient0;
 uniform float uLightDiffuse0;
@@ -73,7 +130,8 @@ uniform float uLightConstant0;
 uniform float uLightLinear0;
 uniform float uLightQuadratic0;
 uniform float uAttenuation0;
-
+#endif
+#ifdef WITH_LIGHT_1
 uniform vec4 uLightPosition1;
 uniform float uLightAmbient1;
 uniform float uLightDiffuse1;
@@ -82,7 +140,8 @@ uniform float uLightConstant1;
 uniform float uLightLinear1;
 uniform float uLightQuadratic1;
 uniform float uAttenuation1;
-
+#endif
+#ifdef WITH_LIGHT_2
 uniform vec4 uLightPosition2;
 uniform float uLightAmbient2;
 uniform float uLightDiffuse2;
@@ -91,7 +150,8 @@ uniform float uLightConstant2;
 uniform float uLightLinear2;
 uniform float uLightQuadratic2;
 uniform float uAttenuation2;
-
+#endif
+#ifdef WITH_LIGHT_3
 uniform vec4 uLightPosition3;
 uniform float uLightAmbient3;
 uniform float uLightDiffuse3;
@@ -100,7 +160,8 @@ uniform float uLightConstant3;
 uniform float uLightLinear3;
 uniform float uLightQuadratic3;
 uniform float uAttenuation3;
-
+#endif
+#ifdef WITH_LIGHT_4
 uniform vec4 uLightPosition4;
 uniform float uLightAmbient4;
 uniform float uLightDiffuse4;
@@ -109,7 +170,8 @@ uniform float uLightConstant4;
 uniform float uLightLinear4;
 uniform float uLightQuadratic4;
 uniform float uAttenuation4;
-
+#endif
+#ifdef WITH_LIGHT_5
 uniform vec4 uLightPosition5;
 uniform float uLightAmbient5;
 uniform float uLightDiffuse5;
@@ -118,7 +180,8 @@ uniform float uLightConstant5;
 uniform float uLightLinear5;
 uniform float uLightQuadratic5;
 uniform float uAttenuation5;
-
+#endif
+#ifdef WITH_LIGHT_6
 uniform vec4 uLightPosition6;
 uniform float uLightAmbient6;
 uniform float uLightDiffuse6;
@@ -127,7 +190,8 @@ uniform float uLightConstant6;
 uniform float uLightLinear6;
 uniform float uLightQuadratic6;
 uniform float uAttenuation6;
-
+#endif
+#ifdef WITH_LIGHT_7
 uniform vec4 uLightPosition7;
 uniform float uLightAmbient7;
 uniform float uLightDiffuse7;
@@ -136,24 +200,24 @@ uniform float uLightConstant7;
 uniform float uLightLinear7;
 uniform float uLightQuadratic7;
 uniform float uAttenuation7;
-
-varying vec3 vPosition;
-varying vec3 vNormal;
-varying vec3 vTangent;
-varying vec3 vBinormal;
-varying vec2 vTexCoord;
+#endif
 
 mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
     vec3 dp1 = vec3(dFdx(p.x),dFdx(p.y),dFdx(p.z)); 
     vec3 dp2 = vec3(dFdy(p.x),dFdy(p.y),dFdy(p.z)); 
     vec2 duv1 = vec2(dFdx(uv.x),dFdx(uv.y)); 
     vec2 duv2 = vec2(dFdy(uv.x),dFdy(uv.y));
-
+#ifdef GL_ES
+    highp vec3 dp2perp = cross( dp2, N );
+    highp vec3 dp1perp = cross( N, dp1 );
+    highp vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+    highp vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+#else
     vec3 dp2perp = cross( dp2, N );
     vec3 dp1perp = cross( N, dp1 );
     vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
     vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
-
+#endif
     float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
     return mat3( T * invmax, B * invmax, N );
 }
@@ -212,18 +276,11 @@ vec3 computePointLight(vec3 texel, vec3 normal, vec3 pos, vec3 lPos,
     vec3 E = normalize(-pos);
     vec3 R = normalize(-reflect(L, normal));
 
-    float vdn = 1.0 - max(dot(E, normal), 0.0);
-    vec3 rim = vec3(smoothstep(0.5, 1.0, vdn));
-    texel += rim;
-
     vec3 ambient = texel;
-    #ifdef WITH_MATERIAL_AMBIENT
-       ambient += mAmb;
-    #endif
     #ifdef WITH_LIGHT_AMBIENT
         ambient *= lAmb;
     #endif
-
+    
     vec3 diffuse = texel;
     #ifdef WITH_MATERIAL_DIFFUSE
        diffuse += mDif;
@@ -261,15 +318,17 @@ vec3 computePointLight(vec3 texel, vec3 normal, vec3 pos, vec3 lPos,
         vec2 vReflCoord = vec2(r.x/m + 0.5, r.y/m + 0.5);
         vec3 reflectColor = texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord).xyz * uReflectivity;
 
-        float rampPercent = 0.10;
+        #ifdef WITH_FALLOF_SAMPLER
+            float rampPercent = 0.05;
 
-        vec2 rampTexCoord = uFallofUnitCoords.xy + (uFallofUnitCoords.zw - uFallofUnitCoords.xy);
-        float rampR = texture2D(falloffMapUnit, rampTexCoord * vec2((1.0-reflectColor.r+rampPercent), 0)).r;
-        float rampG = texture2D(falloffMapUnit, rampTexCoord * vec2((1.0-reflectColor.g+rampPercent), 0)).g;
-        float rampB = texture2D(falloffMapUnit, rampTexCoord * vec2((1.0-reflectColor.b+rampPercent), 0)).b;
+            vec2 rampTexCoord = uFallofUnitCoords.xy + (uFallofUnitCoords.zw - uFallofUnitCoords.xy);
+            float rampR = texture2D(falloffMapUnit, rampTexCoord * vec2((1.0-reflectColor.r+rampPercent), 0)).r;
+            float rampG = texture2D(falloffMapUnit, rampTexCoord * vec2((1.0-reflectColor.g+rampPercent), 0)).g;
+            float rampB = texture2D(falloffMapUnit, rampTexCoord * vec2((1.0-reflectColor.b+rampPercent), 0)).b;
 
-        reflectColor = vec3(rampR, rampG, rampB);
-
+            reflectColor = vec3(rampR, rampG, rampB);
+        #endif
+        
         texel += reflectColor;
     #endif
 
@@ -281,6 +340,10 @@ vec4 computeTexel() {
 
     #ifdef WITH_MATERIAL_EMISSION
         texel += uMaterialEmission;
+    #endif
+
+    #ifdef WITH_MATERIAL_AMBIENT
+       texel += uMaterialAmbient;
     #endif
 
     #ifdef WITH_AMBIENT_SAMPLER
@@ -305,12 +368,13 @@ vec4 computeTexel() {
                 #endif
             #endif
         #endif
-//        #ifdef WITH_REFLECTION_SAMPLER
-//           float intensity = dot(normal, normalize(-vPosition.xyz));
-//           vec2 vReflCrd = vec3(smoothstep(0.5, 1.0, intensity)).xy;
-//           vReflCrd = vec2(vReflCrd.x + 0.5, vReflCrd.y + 0.5);
-//           texel += texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCrd) * uReflectivity;
-//        #endif
+
+        #ifdef WITH_RIM_LIGHT
+            float vdn = 1.0 - max(dot(normalize(-vPosition), normal), 0.0);
+            vec3 rim = vec3(smoothstep(0.0, 1.0, vdn));
+            texel += rim;
+        #endif
+
         #ifdef WITH_LIGHT_POSITION
             #ifdef WITH_LIGHT_0
             texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition0.xyz, 

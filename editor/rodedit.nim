@@ -72,9 +72,9 @@ proc startApplication() =
     loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
         editView.rootNode.addChild(n)
 
-    mainWindow.addSubview(editView)
+        mainWindow.addSubview(editView)
 
-    discard startEditingNodeInView(editView.rootNode, editView)
+        discard startEditingNodeInView(editView.rootNode, editView)
 
     runAutoTestsIfNeeded()
 

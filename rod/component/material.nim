@@ -59,6 +59,7 @@ type ShaderMacro = enum
     WITH_LIGHT_6
     WITH_LIGHT_7
     WITH_TBN_FROM_NORMALS
+    WITH_RIM_LIGHT
 
 type MaterialColor* = ref object of RootObj
     ambient: Vector4
@@ -77,10 +78,10 @@ type MaterialColor* = ref object of RootObj
 
 proc newMaterialWithDefaultColor*(): MaterialColor =
     result.new()
-    result.ambient = newVector4(0.0, 1.0, 0.0, 1.0)
-    result.emission = newVector4(0.0, 0.0, 0.0, 1.0)
-    result.diffuse = newVector4(0.3, 0.3, 0.3, 1.0)
-    result.specular = newVector4(0.8, 0.8, 0.8, 1.0)
+    result.ambient = newVector4(0.0, 0.0, 0.0, 0.0)
+    result.emission = newVector4(0.0, 0.0, 0.0, 0.0)
+    result.diffuse = newVector4(0.3, 0.3, 0.3, 0.0)
+    result.specular = newVector4(0.8, 0.8, 0.8, 0.0)
     result.shininess = 10.0
     result.reflectivity = 0.35
 
@@ -146,6 +147,7 @@ type Material* = ref object of RootObj
     blendEnable*: bool
     depthEnable*: bool
     isWireframe*: bool
+    bEnableBackfaceCulling*: bool
 
     currentLightSourcesCount: int
 
@@ -246,6 +248,7 @@ proc newDefaultMaterial*(): Material =
     result.depthEnable = true
     result.isWireframe = false
     result.isLightReceiver = true
+    result.bEnableBackfaceCulling = true
 
     result.color = newMaterialWithDefaultColor()
     result.transform = newTransformInfoWithIdentity()
@@ -470,6 +473,10 @@ proc setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
     if m.shader == 0:
         m.shaderMacroFlags.incl(WITH_TBN_FROM_NORMALS)
 
+proc setupRIMLightTechnique*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
+
 proc updateTransformSetup*(m: Material, translation: Vector3, rotation: Quaternion, scale: Vector3) =
     m.transform.fromScaleRotationTranslation(scale, rotation, translation)
 
@@ -535,6 +542,7 @@ method updateSetup*(m: Material, v: SceneView) {.base.} =
             m.setupLightAttributes(v)
         #TODO use techniques
         m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
+        m.setupRIMLightTechnique()
         m.createShader()
 
     gl.useProgram(m.shader)

@@ -59,16 +59,21 @@ proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vert
 
     result = GLushort(vertexAttrData.len / attributesPerVertex - 1)
 
-proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[GLfloat]) = 
-    let gl = currentContext().gl
-    m.indexBuffer = gl.createBuffer()
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
+proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[GLfloat]) =
+    let loadFunc = proc() =
+        let gl = currentContext().gl
+        m.indexBuffer = gl.createBuffer()
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
 
-    m.vertexBuffer = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, m.vertexBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
-    m.numberOfIndices = indexData.len.GLsizei
+        m.vertexBuffer = gl.createBuffer()
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.vertexBuffer)
+        gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
+        m.numberOfIndices = indexData.len.GLsizei
+    if currentContext().isNil:
+        m.loadFunc = loadFunc
+    else:
+        loadFunc()
 
 proc loadMeshComponent(m: MeshComponent, resourceName: string) =
     loadResourceAsync resourceName, proc(s: Stream) =
@@ -142,8 +147,6 @@ proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Poi
     gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
     m.numberOfIndices = indexData.len.GLsizei
 
-
-
 proc loadWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
     m.loadFunc = proc() =
         m.loadMeshQuad(v1, v2, v3, v4, t1, t2, t3, t4)
@@ -174,12 +177,13 @@ method draw*(m: MeshComponent) =
 
     m.material.updateSetup(m.node.sceneView)
 
-    # gl.enable(gl.CULL_FACE)
-    # gl.cullFace(gl.BACK)
+    if m.material.bEnableBackfaceCulling:
+        gl.enable(gl.CULL_FACE)
+        gl.cullFace(gl.BACK)
 
     gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
 
-    # gl.disable(gl.CULL_FACE)
+    gl.disable(gl.CULL_FACE)
 
     when defined(js):
         {.emit: """
