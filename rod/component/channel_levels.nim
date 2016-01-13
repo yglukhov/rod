@@ -87,19 +87,6 @@ method draw*(cl: ChannelLevels) =
         vp.releaseTempFramebuffer(tmpBuf)
 
 method isPosteffectComponent*(c: ChannelLevels): bool = not c.areValuesNormal()
-method animatableProperty1*(s: ChannelLevels, name: string): proc (v: Coord) =
-    case name
-    of "inWhite": result = proc (v: Coord) =
-        s.inWhite = v
-    of "inBlack": result = proc (v: Coord) =
-        s.inBlack = v
-    of "inGamma": result = proc (v: Coord) =
-        s.inGamma = v
-    of "outWhite": result = proc (v: Coord) =
-        s.outWhite = v
-    of "outBlack": result = proc (v: Coord) =
-        s.outBlack = v
-    else: result = nil
 
 method visitProperties*(c: ChannelLevels, p: var PropertyVisitor) =
     p.visitProperty("inWhite", c.inWhite)

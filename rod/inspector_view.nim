@@ -42,6 +42,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.requireName = true
         visitor.requireSetter = true
         visitor.requireGetter = true
+        visitor.flags = { pfEditable }
         visitor.commit = proc() =
             pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter)
             pv.setFrameOrigin(newPoint(0, y))

@@ -171,49 +171,6 @@ proc childNamed*(n: Node, name: string): Node =
     for c in n.children:
         if c.name == name: return c
 
-proc animatableProperty1*(n: Node, name: string): proc (val: Coord) =
-    case name
-    of "tX": result = proc (val: Coord) = n.translation.x = val
-    of "tY": result = proc (val: Coord) = n.translation.y = val
-    of "tZ": result = proc (val: Coord) = n.translation.z = val
-    of "sX": result = proc (val: Coord) = n.scale.x = val
-    of "sY": result = proc (val: Coord) = n.scale.y = val
-    of "sZ": result = proc (val: Coord) = n.scale.z = val
-    of "alpha": result = proc (val: Coord) = n.alpha = val
-    else:
-        if not n.components.isNil:
-            for k, v in n.components:
-                result = v.animatableProperty1(name)
-                if not result.isNil: break
-
-    if result.isNil:
-        raise newException(Exception, "Property " & name & " not found in node " & $n.name)
-    doAssert(not result.isNil)
-
-proc animatableProperty2*(n: Node, name: string): proc (val: Vector2) =
-    case name
-    of "translation": result = proc (val: Vector2) =
-        n.translation.x = val.x
-        n.translation.y = val.y
-    of "scale": result = proc (val: Vector2) =
-        n.scale.x = val.x
-        n.scale.y = val.y
-    else: doAssert(false)
-
-proc animatableProperty3*(n: Node, name: string): proc (val: Vector3) =
-    case name
-    of "translation": result = proc (val: Vector3) =
-        n.translation = val
-    of "scale": result = proc (val: Vector3) =
-        n.scale = val
-    else: doAssert(false)
-
-proc animatableProperty4*(n: Node, name: string): proc (val: Vector4) =
-    case name
-    of "rotation": result = proc (val: Vector4) =
-        n.rotation = val
-    else: doAssert(false)
-
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 
 proc worldTransform*(n: Node): Matrix4 =
@@ -248,6 +205,13 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
     p.visitProperty("alpha", n.alpha)
+
+    p.visitProperty("tX", n.translation.x, { pfAnimatable })
+    p.visitProperty("tY", n.translation.y, { pfAnimatable })
+    p.visitProperty("tZ", n.translation.z, { pfAnimatable })
+    p.visitProperty("sX", n.scale.x, { pfAnimatable })
+    p.visitProperty("sY", n.scale.y, { pfAnimatable })
+    p.visitProperty("sZ", n.scale.z, { pfAnimatable })
 
 proc reparentTo*(n, newParent: Node) =
     # Change parent of a node preserving its world transform
