@@ -8,7 +8,7 @@ type VertexDataInfo* = object
     numOfCoordPerTangent*: GLint
     stride*: int
 
-proc newVertexInfoWithVertexData*(vertexDataLen = 0, texCoordDataLen = 0, normalDataLen = 0, binormalDataLen = 0, tangentDataLen: int = 0): VertexDataInfo = 
+proc newVertexInfoWithVertexData*(vertexDataLen = 0, texCoordDataLen = 0, normalDataLen = 0, tangentDataLen = 0, binormalDataLen: int = 0): VertexDataInfo = 
     if vertexDataLen != 0:
         result.numOfCoordPerVert = 3
     if texCoordDataLen != 0:

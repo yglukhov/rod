@@ -59,6 +59,17 @@ proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vert
 
     result = GLushort(vertexAttrData.len / attributesPerVertex - 1)
 
+proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[GLfloat]) = 
+    let gl = currentContext().gl
+    m.indexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
+
+    m.vertexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.vertexBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
+    m.numberOfIndices = indexData.len.GLsizei
+
 proc loadMeshComponent(m: MeshComponent, resourceName: string) =
     loadResourceAsync resourceName, proc(s: Stream) =
         let loadFunc = proc() =
@@ -97,15 +108,7 @@ proc loadMeshComponent(m: MeshComponent, resourceName: string) =
             #TODO add binormal tangent
             m.vertInfo = newVertexInfoWithVertexData(vertexData.len, texCoordData.len, normalData.len)
 
-            let gl = currentContext().gl
-            m.indexBuffer = gl.createBuffer()
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
-            gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
-
-            m.vertexBuffer = gl.createBuffer()
-            gl.bindBuffer(gl.ARRAY_BUFFER, m.vertexBuffer)
-            gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
-            m.numberOfIndices = indexData.len.GLsizei
+            m.createVBO(indexData, vertexAttrData)
         if currentContext().isNil:
             m.loadFunc = loadFunc
         else:
@@ -171,7 +174,12 @@ method draw*(m: MeshComponent) =
 
     m.material.updateSetup(m.node.sceneView)
 
+    # gl.enable(gl.CULL_FACE)
+    # gl.cullFace(gl.BACK)
+
     gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
+
+    # gl.disable(gl.CULL_FACE)
 
     when defined(js):
         {.emit: """
@@ -182,7 +190,7 @@ method draw*(m: MeshComponent) =
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
         gl.bindBuffer(gl.ARRAY_BUFFER, 0)
     when not defined(ios) and not defined(android) and not defined(js):
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
+        glPolygonMode(gl.FRONT_AND_BACK, GL_FILL)
 
     #TODO to default settings
     gl.disable(gl.DEPTH_TEST)
