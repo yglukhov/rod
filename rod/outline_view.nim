@@ -52,12 +52,15 @@ proc drawDisclosureTriangle(disclosed: bool, r: Rect) =
         setUniform("uAngle", if disclosed: Coord(PI / 2.0) else: Coord(0))
     discard
 
+template xOffsetBasedOnTempIndexPath(v: OutlineView): Coord =
+    Coord(3 + v.tempIndexPath.len * 3)
+
 proc drawNode(v: OutlineView, n: ItemNode, y: var Coord) =
     let c = currentContext()
     if n.cell.isNil:
         n.cell = v.createCell()
     n.cell.selected = v.tempIndexPath == v.selectedIndexPath
-    let indent = Coord(3 + v.tempIndexPath.len * 3)
+    let indent = v.xOffsetBasedOnTempIndexPath
     n.cell.setFrame(newRect(indent, y, v.bounds.width - indent, rowHeight))
     v.configureCell(n.cell, v.tempIndexPath)
     n.cell.drawWithinSuperview()
@@ -143,12 +146,16 @@ proc reloadData*(v: OutlineView) =
 template selectionChanged(v: OutlineView) =
     if not v.onSelectionChanged.isNil: v.onSelectionChanged()
 
+proc selectItemAtIndexPath*(v: OutlineView, ip: seq[int]) =
+    v.selectedIndexPath = ip
+    v.selectionChanged()
+
 method onMouseDown*(v: OutlineView, e: var Event): bool =
     result = true
     let pos = e.localPosition
     let i = v.itemAtPos(pos)
     if not i.isNil:
-        if pos.x < 10 and i.expandable:
+        if pos.x < v.xOffsetBasedOnTempIndexPath and i.expandable:
             i.expanded = not i.expanded
         elif v.tempIndexPath == v.selectedIndexPath:
             v.selectedIndexPath.setLen(0)

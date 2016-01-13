@@ -199,5 +199,6 @@ method draw*(m: MeshComponent) =
     #TODO to default settings
     gl.disable(gl.DEPTH_TEST)
     gl.activeTexture(gl.TEXTURE0)
+    gl.enable(gl.BLEND)
 
 registerComponent[MeshComponent]()

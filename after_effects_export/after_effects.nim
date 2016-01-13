@@ -1,4 +1,6 @@
 import strutils
+import adobe_tools
+export adobe_tools
 
 type
     Application* = ref ApplicationObj
@@ -12,13 +14,14 @@ type
     Project* = ref ProjectObj
     ProjectObj {.importc.} = object of RootObj
         selection*: seq[Item]
+        rootFolder*: FolderItem
 
     ColorLabel* = range[0 .. 16]
 
     Item* = ref ItemObj
     ItemObj {.importc.} = object of RootObj
         id*: int
-        typeName*: cstring
+        typeName*: cstring # Warning! This value is localized! Barely usable.
         selected*: bool
         name*: cstring
         comment*: cstring
@@ -43,15 +46,6 @@ type
 
     FolderItem* = ref FolderItemObj
     FolderItemObj {.importc.} = object of ItemObj
-
-    File* = ref FileObj
-    FileObj {.importc.} = object of RootObj
-        name*: cstring
-        path*: cstring
-
-    Folder* = ref FolderObj
-    FolderObj {.importc.} = object of RootObj
-        name*: cstring
 
     Layer* = ref LayerObj
     LayerObj {.importc.} = object of ItemObj
@@ -121,15 +115,6 @@ type
 
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
-
-proc newFile*(path: cstring): File {.importc: "new File".}
-proc open*(f: File, mode: cstring) {.importcpp.}
-template openForWriting*(f: File) = f.open("w")
-proc write*(f: File, content: cstring) {.importcpp.}
-proc close*(f: File) {.importcpp.}
-
-proc newFolder*(path: cstring): Folder {.importc: "new Folder".}
-proc getFiles*(f: Folder): seq[File] {.importcpp.}
 
 template `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
 template len*[T](c: Collection[T]): int = cast[seq[T]](c).len
@@ -303,3 +288,12 @@ proc saveSetting*(s: Settings, sectionName, keyName, value: cstring) {.importcpp
 proc haveSetting*(s: Settings, sectionName, keyName: cstring): bool {.importcpp.}
 
 var app* {.importc, nodecl.}: Application
+
+proc projectPath*(i: Item): string =
+    if app.project.rootFolder == i.parentFolder:
+        result = "/"
+    else:
+        result = projectPath(i.parentFolder)
+        if not result.endsWith("/"):
+            result &= "/"
+        result &= $i.parentFolder.name

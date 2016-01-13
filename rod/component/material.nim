@@ -385,7 +385,7 @@ proc setupMaterialAttributes(m: Material) =
             if m.shader == 0:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
             else:
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialAmbient"), m.color.ambient)
+                c.setColorUniform(m.shader, "uMaterialAmbient", newColor(m.color.ambient[0], m.color.ambient[1], m.color.ambient[2], m.color.ambient[3]))
         if m.color.emissionInited:
             if m.shader == 0:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)

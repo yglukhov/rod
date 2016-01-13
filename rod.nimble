@@ -6,9 +6,8 @@ description   = "New Nimble project for Nim"
 license       = "MIT"
 #bin           = "editor/rodedit"
 
-SkipDirs = "editor/android/com.mycompany.MyGame"
-
-#[Deps]
-#Requires: "nimx"
-#Requires: "https://github.com/SSPKrolik/nimasset"
-#Requires: "variant"
+[Deps]
+Requires: "nimx"
+Requires: "https://github.com/SSPKrolik/nimasset"
+Requires: "variant"
+Requires: "native_dialogs"

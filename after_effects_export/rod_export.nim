@@ -1,4 +1,4 @@
-import typetraits, tables, dom
+import tables, dom, math
 import after_effects
 import times
 import json
@@ -9,13 +9,13 @@ import rod.quaternion
 
 type File = after_effects.File
 
-proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item]): seq[t] =
+proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item], typeName: string): seq[t] =
     for i in collection:
-        if i.typeName == t.name:
+        if i.jsObjectType == typeName:
             result.add(cast[t](i))
 
 proc getSelectedCompositions(): seq[Composition] {.exportc.} =
-    getObjectsWithTypeFromCollection(Composition, app.project.selection)
+    getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
 
 var logTextField: EditText
 
@@ -28,7 +28,7 @@ proc logi(args: varargs[string, `$`]) =
 
 proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
 
-template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
+template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(-zAngle, newVector3(0, 0, 1))
 
 var propertyNameMap = {
     "Rotation" : "rotation",
@@ -68,7 +68,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJObject()
     var source = layer.source
     if not source.isNil:
-        if source.typeName == "Footage":
+        if source.jsObjectType == "FootageItem":
             let footageSource = FootageItem(source)
             if not footageSource.file.isNil:
                 var sprite = newJObject()
@@ -76,9 +76,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                     sprite["fileNames"] = % getSequenceFileNamesFromSource(footageSource)
                 else:
                     sprite["fileNames"] = % [getResourceNameFromSourceFile(footageSource.file)]
-
-                var opacity = layer.property("Opacity", float).valueAtTime(0)
-                if opacity != 100: sprite["alpha"] = %(opacity / 100.0)
                 result["Sprite"] = sprite
             elif ($source.name).find("Null") != 0 and
                     not footageSource.mainSource.isNil and
@@ -87,8 +84,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                 let solidSource = SolidSource(footageSource.mainSource)
                 solid["color"] = %* solidSource.color
                 solid["size"] = % [source.width, source.height]
-                var opacity = layer.property("Opacity", float).valueAtTime(0)
-                if opacity != 100: solid["alpha"] = %(opacity / 100.0)
                 result["Solid"] = solid
 
     let effects = layer.propertyGroup("Effects")
@@ -107,7 +102,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         if not numbers.isNil:
             var txt = newJObject()
             var color = numbers.property("Fill Color", Vector4).valueAtTime(0)
-            color[3] = layer.property("Opacity", float).valueAtTime(0) / 100
             txt["color"] = %color
             txt["fontSize"] = % numbers.property("Size", float).valueAtTime(0)
             result["Text"] = txt
@@ -120,21 +114,30 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         txt["text"] = % $textDoc.text
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
-        txt["color"].add(%(layer.property("Opacity", float).valueAtTime(0) / 100))
         case textDoc.justification
         of tjLeft: txt["justification"] = %"left"
         of tjRight: txt["justification"] = %"right"
         of tjCenter: txt["justification"] = %"center"
+
+        let shadow = layer.propertyGroup("Layer Styles").propertyGroup("Drop Shadow")
+        if not shadow.isNil:
+            let angle = shadow.property("Angle", float32).valueAtTime(0)
+            let distance = shadow.property("Distance", float32).valueAtTime(0)
+            let color = shadow.property("Color", Vector4).valueAtTime(0)
+            let alpha = shadow.property("Opacity", float32).valueAtTime(0) / 100
+            txt["shadowColor"] = %[color.x, color.y, color.z, alpha]
+            let radAngle = degToRad(angle + 180)
+            txt["shadowOff"] = %[distance * cos(radAngle), - distance * sin(radAngle)]
+
         result["Text"] = txt
 
-proc hasTimeVaryingAnchorPoint(layer: Layer): bool =
-    result = layer.property("Anchor Point", Vector3).isTimeVarying and layer.name != "root"
+proc layerIsCompositionRef(layer: Layer): bool =
+    not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
 proc requiresAuxParent(layer: Layer): bool =
-    if layer.name != "root":
-        let ap = layer.property("Anchor Point", Vector3)
-        if ap.value != newVector3(0, 0, 0):
-            result = true
+    let ap = layer.property("Anchor Point", Vector3)
+    if ap.value != newVector3(0, 0, 0):
+        result = true
 
 var layerNames = initTable[int, string]()
 
@@ -150,6 +153,13 @@ proc mangledName(layer: Layer): string =
 
 proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
 
+proc exportPath(c: Item): string =
+    result = c.projectPath
+    if result == "/":
+        result = "compositions"
+    else:
+        result = result[1 .. ^1]
+
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
 
@@ -164,6 +174,11 @@ proc serializeLayer(layer: Layer): JsonNode =
     var rotation = layer.property("Rotation", float32).valueAtTime(0, false);
     if (rotation != 0):
         result["rotation"] = % quaternionWithZRotation(rotation)
+
+    let opacity = layer.property("Opacity", float).valueAtTime(0)
+    if opacity != 100:
+        result["alpha"] = % (opacity / 100.0)
+
     var children = layer.children
     if children.len > 0:
         var chres = newJArray()
@@ -175,8 +190,8 @@ proc serializeLayer(layer: Layer): JsonNode =
             chres.elems.reverse()
         result["children"] = chres
 
-    if not layer.source.isNil and layer.source.typeName == "Composition":
-        result["compositionRef"] = % $layer.source.name
+    if layer.layerIsCompositionRef():
+        result["compositionRef"] = % (layer.source.exportPath & "/" & $layer.source.name)
 
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
@@ -204,6 +219,7 @@ type Marker = object
     comment*: string
     animation*: string
     loops*: int
+    animation_end*: string
 
 proc getMarkers(comp: Composition): seq[Marker] =
     result = newSeq[Marker]()
@@ -233,10 +249,23 @@ proc parseMarkerComment(comment: string, res: var Marker) =
             case k
             of "animation": res.animation = v
             of "loops": res.loops = parseInt(v)
+            of "animation_end": res.animation_end = v
             else: logi "Unknown marker key: ", k
+
+proc getAnimationEndMarkers(comp: Composition): seq[Marker] =
+    var markers = getMarkers(comp)
+
+    result = newSeq[Marker]()
+    for i in 0 ..< markers.len:
+        parseMarkerComment(markers[i].comment, markers[i])
+        if markers[i].animation_end.len > 0:
+            result.add(markers[i])
+
 
 proc getAnimationMarkers(comp: Composition): seq[Marker] =
     var markers = getMarkers(comp)
+    var end_markers = getAnimationEndMarkers(comp)
+
     result = newSeq[Marker]()
     for i in 0 ..< markers.len:
         parseMarkerComment(markers[i].comment, markers[i])
@@ -250,6 +279,14 @@ proc getAnimationMarkers(comp: Composition): seq[Marker] =
             result[i].duration = result[i + 1].time - result[i].time
 
         result[^1].duration = comp.duration - result[^1].time
+
+
+    for em in end_markers:
+        for i in 0 ..< result.len:
+            if em.animation_end == result[i].animation:
+                doAssert(em.time > result[i].time)
+                result[i].duration = em.time - result[i].time
+
 
 proc jsonPropertyAccessor(p: AbstractProperty): proc(t: float): JsonNode =
     case $p.name
@@ -327,7 +364,8 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
         let p = fromObj.property(i)
         let fullyQualifiedPropName = name & "." & $p.name
         if p.isPropertyGroup:
-            getAnimatableProperties(p.toPropertyGroup(), res, fullyQualifiedPropName)
+            if p.name != "Layer Styles":
+                getAnimatableProperties(p.toPropertyGroup(), res, fullyQualifiedPropName)
         else:
             let pr = p.toAbstractProperty()
             if pr.isTimeVarying and $pr.name notin bannedPropertyNames:
@@ -336,7 +374,8 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
                     res.add(pr)
 
 proc belongsToAux(p: AbstractProperty): bool =
-    p.name == "Scale" or p.name == "Rotation" or p.name == "Position"
+    for i in ["Scale".cstring, "Rotation", "Position", "X Position", "Y Position"]:
+        if p.name == i: return true
 
 proc getLayerAnimationForMarker(layer: Layer, marker: Marker, props: openarray[AbstractProperty], result: JsonNode) =
     for pr in props:
@@ -376,7 +415,7 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not rootLayer.isNil:
         result = serializeLayer(rootLayer)
         result["name"] = % $composition.name
-        result.delete("translation")
+        #result.delete("translation")
     else:
         result = % {
           "name": % $composition.name
@@ -391,6 +430,7 @@ proc serializeComposition(composition: Composition): JsonNode =
             result["children"] = children
 
     let animations = serializeCompositionAnimations(composition)
+
     if animations.len > 0:
         result["animations"] = animations
 
@@ -428,7 +468,10 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     let compositions = getSelectedCompositions()
     let folderPath = $exportFolderPath
     for c in compositions:
-        let filePath = folderPath & "/" & $c.name & ".json"
+        let compExportPath = folderPath & "/" & c.exportPath
+        if not newFolder(compExportPath).create():
+            logi "ERROR: Could not create filder ", compExportPath
+        let filePath = compExportPath & "/" & $c.name & ".json"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
         file.openForWriting()

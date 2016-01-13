@@ -5,6 +5,7 @@ import nimx.render_to_image
 import nimx.portable_gl
 import nimx.animation
 import nimx.window
+import nimx.view_event_handling
 
 import tables
 import rod_types
@@ -14,6 +15,7 @@ import component.camera
 import ray
 export Viewport
 export SceneView
+
 
 proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
@@ -62,6 +64,8 @@ proc getViewMatrix*(v: SceneView): Matrix4 =
     cam.getProjectionMatrix(v.bounds, projTransform)
     result = projTransform * viewTransform
 
+proc swapCompositingBuffers*(v: SceneView)
+
 method draw*(v: SceneView, r: Rect) =
     if v.rootNode.isNil: return
 
@@ -70,6 +74,12 @@ method draw*(v: SceneView, r: Rect) =
 
     c.withTransform v.getViewMatrix():
         v.rootNode.recursiveDraw()
+
+    if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
+        # When some compositing nodes are optimized away, we have
+        # to blit current backup buffer to the screen.
+        v.numberOfNodesWithBackCompositionInCurrentFrame = 1
+        v.swapCompositingBuffers()
 
 proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     result.origin = v.camera.node.translation
@@ -157,5 +167,20 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
         echo "Current light sources count equals 0."
     else:
         v.lightSources.del(ls.node.name)
+
+import component.ui_component
+
+method handleMouseEvent*(v: SceneView, e: var Event): bool =
+    result = procCall v.View.handleMouseEvent(e)
+    if not result and v.uiComponents.len > 0:
+        let r = v.rayWithScreenCoords(e.localPosition)
+        for c in v.uiComponents:
+            result = c.handleMouseEvent(r, e)
+            if result: break
+
+method viewWillMoveToWindow*(v: SceneView, w: Window) =
+    procCall v.View.viewWillMoveToWindow(w)
+    for c in v.uiComponents:
+        c.sceneViewWillMoveToWindow(w)
 
 import component.all_components

@@ -4,20 +4,18 @@ import nimx.context
 import nimx.image
 import nimx.animation
 import json
+
 import rod.node
+import rod.property_visitor
+
 #import image_blur
 
 type Sprite* = ref object of Component
     offset*: Point
     images*: seq[Image]
     currentFrame*: int
-    alpha*: ColorComponent
     motionBlurRadius*: float
     prevRootOffset: Vector3
-
-method init(s: Sprite) =
-    procCall s.Component.init()
-    s.alpha = 1.0
 
 proc image*(s: Sprite): Image =
     if not s.images.isNil and s.images.len > s.currentFrame:
@@ -32,7 +30,6 @@ proc `image=`*(s: Sprite, i: Image) =
     s.currentFrame = 0
 
 method draw*(s: Sprite) =
-    if s.alpha < 0.00001: return
     let c = currentContext()
     var r: Rect
     r.origin = s.offset
@@ -59,13 +56,7 @@ method draw*(s: Sprite) =
     """
     if not i.isNil:
         r.size = i.size
-        c.drawImage(i, r, zeroRect, s.alpha)
-
-method animatableProperty1*(s: Sprite, name: string): proc (v: Coord) =
-    case name
-    of "alpha": result = proc (v: Coord) =
-        s.alpha = v
-    else: result = nil
+        c.drawImage(i, r, zeroRect)
 
 proc createFrameAnimation(s: Sprite) =
     let a = newAnimation()
@@ -77,9 +68,9 @@ proc createFrameAnimation(s: Sprite) =
     s.node.registerAnimation("sprite", a)
 
 method deserialize*(s: Sprite, j: JsonNode) =
-    var v = j["alpha"]
+    var v = j["alpha"] # Deprecated
     if not v.isNil:
-        s.alpha = v.getFNum(1.0)
+        s.node.alpha = v.getFNum(1.0)
 
     v = j["fileNames"]
     if v.isNil:
@@ -91,5 +82,8 @@ method deserialize*(s: Sprite, j: JsonNode) =
 
     if s.images.len > 1:
         s.createFrameAnimation()
+
+method visitProperties*(t: Sprite, p: var PropertyVisitor) =
+    p.visitProperty("image", t.image)
 
 registerComponent[Sprite]()

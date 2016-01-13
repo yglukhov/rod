@@ -19,7 +19,7 @@ type Editor* = ref object
     treeView*: View
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
-    result = PanelView.new(newRect(0, 0, 200, 500))
+    result = PanelView.new(newRect(0, 0, 200, 700))
     let title = newLabel(newRect(2, 2, 100, 15))
     title.text = "Tree view"
     result.addSubview(title)
@@ -65,9 +65,18 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     createNodeButton.title = "+"
     createNodeButton.onAction do():
-        let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+        var sip = outlineView.selectedIndexPath
+        var n = e.rootNode
+        if sip.len == 0:
+            sip.add(0)
+        else:
+            n = outlineView.itemAtIndexPath(sip).get(Node3D)
+
+        outlineView.expandRow(sip)
         discard n.newChild("New Node")
+        sip.add(n.children.len - 1)
         outlineView.reloadData()
+        outlineView.selectItemAtIndexPath(sip)
     result.addSubview(createNodeButton)
 
     let deleteNodeButton = Button.new(newRect(24, result.bounds.height - 20, 20, 20))
@@ -79,11 +88,19 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         outlineView.reloadData()
     result.addSubview(deleteNodeButton)
 
+    let refreshButton = Button.new(newRect(46, result.bounds.height - 20, 60, 20))
+    refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    refreshButton.title = "Refresh"
+    refreshButton.onAction do():
+        outlineView.reloadData()
+    result.addSubview(refreshButton)
+
+
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
 
-    let inspectorView = InspectorView.new(newRect(200, 0, 200, 500))
+    let inspectorView = InspectorView.new(newRect(200, 0, 200, 700))
     result.treeView = newTreeView(result, inspectorView)
     v.window.addSubview(result.treeView)
     v.window.addSubview(inspectorView)

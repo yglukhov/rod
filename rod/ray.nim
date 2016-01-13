@@ -12,7 +12,6 @@ proc intersectWithPlane*(r: Ray, planeNormal: Vector3, dist: Coord, output: var 
         if t < 0:
             return false
         output = r.origin + r.direction * t
-        echo output
         return true
     elif dot(planeNormal, r.origin) + dist == 0:
         output = r.origin

@@ -7,6 +7,7 @@ import rod.quaternion
 import rod.node
 import rod.component
 import rod.rod_types
+import rod.property_visitor
 
 import nimx.matrixes
 import nimx.animation
@@ -76,6 +77,7 @@ template drawParticle(p: ParticleEmitter, part: ParticleData) =
     proto.recursiveDraw()
 
 method draw*(p: ParticleEmitter) =
+    if p.particlePrototype.isNil: return
     if p.particles.isNil:
         p.particles = newSeq[ParticleData](p.numberOfParticles)
     elif p.particles.len != p.numberOfParticles:
@@ -107,6 +109,13 @@ method draw*(p: ParticleEmitter) =
                 c.drawEllipseInRect(newRect(p.particles[i].coord.x - 10, p.particles[i].coord.y - 10, 20, 20))
 
     p.lastDrawTime = curTime
+
+method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
+    p.visitProperty("lifetime", pe.lifetime)
+    p.visitProperty("birthRate", pe.birthRate)
+    p.visitProperty("particlePrototype", pe.particlePrototype)
+    p.visitProperty("numberOfParticles", pe.numberOfParticles)
+    p.visitProperty("gravity", pe.gravity)
 
 registerComponent[ParticleEmitter]()
 registerComponent[Particle]()

@@ -9,6 +9,7 @@ proc newNumericTextField*(r: Rect): NumericTextField =
     result.init(r)
 
 method onScroll*(v: NumericTextField, e: var Event): bool =
+    result = true
     var action = false
     try:
         var val = parseFloat(v.text)
