@@ -193,9 +193,9 @@ uniform float uAttenuation7;
 #endif
 
 mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
-    vec3 dp1 = vec3(dFdx(p.x),dFdx(p.y),dFdx(p.z)); 
-    vec3 dp2 = vec3(dFdy(p.x),dFdy(p.y),dFdy(p.z)); 
-    vec2 duv1 = vec2(dFdx(uv.x),dFdx(uv.y)); 
+    vec3 dp1 = vec3(dFdx(p.x),dFdx(p.y),dFdx(p.z));
+    vec3 dp2 = vec3(dFdy(p.x),dFdy(p.y),dFdy(p.z));
+    vec2 duv1 = vec2(dFdx(uv.x),dFdx(uv.y));
     vec2 duv2 = vec2(dFdy(uv.x),dFdy(uv.y));
 #ifdef GL_ES
     highp vec3 dp2perp = cross( dp2, N );
@@ -232,13 +232,13 @@ vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ){
 #endif
 
 vec3 computePointLight(vec3 texel, vec3 normal, vec3 pos, vec3 lPos,
-                        float lAmb, float lDif, float lSpec, float lConst, float lLin, float lQuad, float lAtt, 
+                        float lAmb, float lDif, float lSpec, float lConst, float lLin, float lQuad, float lAtt,
                         vec3 mAmb, vec3 mDif, vec3 mSpec, float mShin) {
-    
+
     vec3 bivector = lPos - pos;
 
     float specularity = 1.0;
-    
+
     #ifdef WITH_MATERIAL_SHININESS
         specularity = mShin;
     #endif
@@ -270,7 +270,7 @@ vec3 computePointLight(vec3 texel, vec3 normal, vec3 pos, vec3 lPos,
     #ifdef WITH_LIGHT_AMBIENT
         ambient *= lAmb;
     #endif
-    
+
     vec3 diffuse = texel;
     #ifdef WITH_MATERIAL_DIFFUSE
        diffuse += mDif;
@@ -281,7 +281,7 @@ vec3 computePointLight(vec3 texel, vec3 normal, vec3 pos, vec3 lPos,
     #ifdef WITH_GLOSS_SAMPLER
         diffuse *= roughness;
     #endif
-    
+
     diffuse *= max(dot(normal, L), 0.0);
     diffuse *= attenuation;
 
@@ -318,7 +318,7 @@ vec3 computePointLight(vec3 texel, vec3 normal, vec3 pos, vec3 lPos,
 
             reflectColor = vec3(rampR, rampG, rampB);
         #endif
-        
+
         texel += reflectColor;
     #endif
 
@@ -340,7 +340,7 @@ vec4 computeTexel() {
         texel += texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * vTexCoord);
     #endif
 
-    #ifdef WITH_V_POSITION        
+    #ifdef WITH_V_POSITION
         #ifdef WITH_V_TANGENT
             mat3 TBN = mat3(vTangent, vBinormal, vNormal);
             vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
@@ -350,7 +350,7 @@ vec4 computeTexel() {
         #else
             #ifdef WITH_V_NORMAL
                 vec3 normal = normalize(vNormal);
-            
+
                 #ifdef WITH_NORMAL_SAMPLER
                     #ifdef WITH_TBN_FROM_NORMALS
                         normal = perturb_normal(normal, vPosition, uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
@@ -361,52 +361,52 @@ vec4 computeTexel() {
 
         #ifdef WITH_RIM_LIGHT
             float vdn = 1.0 - max(dot(normalize(-vPosition), normal), 0.0);
-            vec3 rim = vec3(smoothstep(0.0, 1.0, vdn));
+            vec4 rim = vec4(smoothstep(0.0, 1.0, vdn));
             texel += rim;
         #endif
 
         #ifdef WITH_LIGHT_POSITION
             #ifdef WITH_LIGHT_0
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition0.xyz, 
-                                            uLightAmbient0, uLightDiffuse0, uLightSpecular0, uLightConstant0, uLightLinear0, uLightQuadratic0, uAttenuation0, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition0.xyz,
+                                            uLightAmbient0, uLightDiffuse0, uLightSpecular0, uLightConstant0, uLightLinear0, uLightQuadratic0, uAttenuation0,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
             #ifdef WITH_LIGHT_1
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition1.xyz, 
-                                            uLightAmbient1, uLightDiffuse1, uLightSpecular1, uLightConstant1, uLightLinear1, uLightQuadratic1, uAttenuation1, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition1.xyz,
+                                            uLightAmbient1, uLightDiffuse1, uLightSpecular1, uLightConstant1, uLightLinear1, uLightQuadratic1, uAttenuation1,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
             #ifdef WITH_LIGHT_2
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition2.xyz, 
-                                            uLightAmbient2, uLightDiffuse2, uLightSpecular2, uLightConstant2, uLightLinear2, uLightQuadratic2, uAttenuation2, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition2.xyz,
+                                            uLightAmbient2, uLightDiffuse2, uLightSpecular2, uLightConstant2, uLightLinear2, uLightQuadratic2, uAttenuation2,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
             #ifdef WITH_LIGHT_3
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition3.xyz, 
-                                            uLightAmbient3, uLightDiffuse3, uLightSpecular3, uLightConstant3, uLightLinear3, uLightQuadratic3, uAttenuation3, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition3.xyz,
+                                            uLightAmbient3, uLightDiffuse3, uLightSpecular3, uLightConstant3, uLightLinear3, uLightQuadratic3, uAttenuation3,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
             #ifdef WITH_LIGHT_4
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition4.xyz, 
-                                            uLightAmbient4, uLightDiffuse4, uLightSpecular4, uLightConstant4, uLightLinear4, uLightQuadratic4, uAttenuation4, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition4.xyz,
+                                            uLightAmbient4, uLightDiffuse4, uLightSpecular4, uLightConstant4, uLightLinear4, uLightQuadratic4, uAttenuation4,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
             #ifdef WITH_LIGHT_5
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition5.xyz, 
-                                            uLightAmbient5, uLightDiffuse5, uLightSpecular5, uLightConstant5, uLightLinear5, uLightQuadratic5, uAttenuation5, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition5.xyz,
+                                            uLightAmbient5, uLightDiffuse5, uLightSpecular5, uLightConstant5, uLightLinear5, uLightQuadratic5, uAttenuation5,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
             #ifdef WITH_LIGHT_6
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition6.xyz, 
-                                            uLightAmbient6, uLightDiffuse6, uLightSpecular6, uLightConstant6, uLightLinear6, uLightQuadratic6, uAttenuation6, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition6.xyz,
+                                            uLightAmbient6, uLightDiffuse6, uLightSpecular6, uLightConstant6, uLightLinear6, uLightQuadratic6, uAttenuation6,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
             #ifdef WITH_LIGHT_7
-            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition7.xyz, 
-                                            uLightAmbient7, uLightDiffuse7, uLightSpecular7, uLightConstant7, uLightLinear7, uLightQuadratic7, uAttenuation7, 
+            texel = vec4(computePointLight(texel.xyz, normal, vPosition.xyz, uLightPosition7.xyz,
+                                            uLightAmbient7, uLightDiffuse7, uLightSpecular7, uLightConstant7, uLightLinear7, uLightQuadratic7, uAttenuation7,
                                             uMaterialAmbient.xyz, uMaterialDiffuse.xyz, uMaterialSpecular.xyz, uMaterialShininess), texel.w);
             #endif
-            
+
             // #ifdef WITH_REFLECTION_SAMPLER
             //     vec3 r = -reflect( vPosition.xyz, normal.xyz );
             //     float m = 2.0 * sqrt( r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0) );
