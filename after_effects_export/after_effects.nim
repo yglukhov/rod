@@ -2,6 +2,8 @@ import strutils
 import adobe_tools
 export adobe_tools
 
+type File = adobe_tools.File
+
 type
     Application* = ref ApplicationObj
     ApplicationObj {.importc.} = object of RootObj
@@ -31,6 +33,9 @@ type
     AVItem* = ref AVItemObj
     AVItemObj {.importc.} = object of ItemObj
         duration*: float
+        frameDuration*: float
+        frameRate*: float
+        pixelAspect*: float
         width*, height*: int
 
     FootageItem* = ref FootageItemObj
@@ -59,6 +64,10 @@ type
         isNameSet*: bool
         isTrackMatte*: bool
         hasTrackMatte*: bool
+
+        ## The start time of the layer, expressed in composition time (seconds).
+        ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.
+        startTime*: float
 
     TextLayer* = ref TextLayerObj
     TextLayerObj {.importc.} = object of LayerObj
@@ -117,7 +126,7 @@ type
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
 
 template `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
-template len*[T](c: Collection[T]): int = cast[seq[T]](c).len
+template len*[T](c: Collection[T]): int = cast[seq[type(c.fieldToCheckType)]](c).len
 
 proc remove*(i: Item) {.importcpp.}
 
@@ -224,6 +233,8 @@ proc addText*(col: Collection[Layer]): TextLayer {.importcpp.}
 proc addNull*(col: Collection[Layer], duration: float): Layer {.importcpp.}
 proc addNull*(col: Collection[Layer]): Layer {.importcpp.}
 
+proc newTextDocument*(text: cstring = ""): TextDocument {.importc: "new TextDocument".}
+
 proc getProtoName*(y): cstring {.importc: "Object.prototype.toString.call".}
 
 proc jsObjectType*(y): string =
@@ -257,11 +268,12 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
 
     for i in allFilesInDir:
         var fMatches = i.name.match(pattern2)
-        var index = parseInt($fMatches[2])
-        if (matches[1] == fMatches[1] and
-                matches[^1] == fMatches[^1] and
-                index >= startIndex and index <= endIndex):
-            result.add(i)
+        if not fMatches.isNil and fMatches.len >= 2:
+            var index = parseInt($fMatches[2])
+            if (matches[1] == fMatches[1] and
+                    matches[^1] == fMatches[^1] and
+                    index >= startIndex and index <= endIndex):
+                result.add(i)
 
 proc justification*(td: TextDocument): TextJustification =
     {.emit: """

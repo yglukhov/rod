@@ -387,6 +387,48 @@ proc getLayerAnimationForMarker(layer: Layer, marker: Marker, props: openarray[A
         var fullyQualifiedPropName = layerName & "." & mapPropertyName($pr.name)
         result[fullyQualifiedPropName] = anim
 
+proc layerFootage(layer: Layer): FootageItem =
+    var source = layer.source
+    if not source.isNil:
+        if source.jsObjectType == "FootageItem":
+            result = FootageItem(source)
+
+proc isSequenceLayer(layer: Layer): bool =
+    let f = layer.layerFootage
+    if not f.isNil and not f.file.isNil and f.duration > 0:
+        result = true
+
+proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float): int =
+    let relTime = t - layer.startTime # TODO: Account for scale
+    if relTime > 0 and relTime <= f.duration:
+        result = int(relTime / f.frameDuration)
+
+proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
+    var animationStartTime = marker.time
+    var animationEndTime = marker.time + marker.duration;
+
+    var fps = 30.0;
+    var timeStep = 1.0 / fps;
+    var sampledPropertyValues = newJArray()
+
+    var dEndTime = animationEndTime - 0.0001; # Due to floating point errors, we
+    # may hit end time, so prevent that.
+
+    let footage = layer.layerFootage
+
+    var s = animationStartTime
+    while s < dEndTime:
+        sampledPropertyValues.add(%sequenceFrameAtTime(layer, footage, s))
+        s += timeStep
+
+    let anim = newJObject()
+    anim["duration"] = %(animationEndTime - animationStartTime)
+    anim["values"] = sampledPropertyValues
+    if marker.loops != 0: anim["numberOfLoops"] = %marker.loops
+
+    var fullyQualifiedPropName = layer.mangledName & ".curFrame"
+    result[fullyQualifiedPropName] = anim
+
 proc serializeCompositionAnimations(composition: Composition): JsonNode =
     var animationMarkers = getAnimationMarkers(composition)
     result = newJObject()
@@ -404,6 +446,10 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
                     getAnimatableProperties(layer, props)
                     layerAnimatebleProps.add(props)
                 getLayerAnimationForMarker(layer, m, layerAnimatebleProps[i], animations)
+
+                if layer.isSequenceLayer():
+                    getSequenceLayerAnimationForMarker(layer, m, animations)
+
                 inc i
         if animations.len > 0:
             result[m.animation] = animations
@@ -415,7 +461,6 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not rootLayer.isNil:
         result = serializeLayer(rootLayer)
         result["name"] = % $composition.name
-        #result.delete("translation")
     else:
         result = % {
           "name": % $composition.name
