@@ -191,14 +191,15 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
                 if mat.name.contains(child.materialName):
                     childColladaMaterial = mat
             
-            childMesh.material.setAmbientColor(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
+            var transparency = childColladaMaterial.transparency
+
             childMesh.material.setEmissionColor(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
+            childMesh.material.setAmbientColor(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
             childMesh.material.setDiffuseColor(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
             childMesh.material.setSpecularColor(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
             childMesh.material.setShininess(childColladaMaterial.shininess)
             childMesh.material.setReflectivity(childColladaMaterial.reflectivity)
-            if childColladaMaterial.transparency < 1.0:
-                childMesh.material.blendEnable = false
+
             #TODO 
             # reflective*: Vector4
             # transparent*: Vector4
@@ -216,7 +217,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
                     childMesh.material.reflectionTexture = imageWithResource("collada/" & texLocation)
 
                     #TODO add other material texture
-                    childMesh.material.falloffTexture = imageWithResource("collada/baloon_star_falloff.png")
+                    # childMesh.material.falloffTexture = imageWithResource("collada/baloon_star_falloff.png")
                     childMesh.material.normalTexture = imageWithResource("collada/baloon_star_normals.png")
 
             if childColladaMaterial.specularTextureName != nil:
