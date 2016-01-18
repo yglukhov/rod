@@ -34,6 +34,12 @@ type
         gravity*: Vector3
         particles: seq[ParticleData]
 
+        direction*: Coord
+        directionRandom*: float
+
+        velocity*: Coord
+        velocityRandom*: float
+
         lastDrawTime: float
         lastBirthTime: float
 
@@ -45,6 +51,8 @@ method init(p: ParticleEmitter) =
     p.animation = newAnimation()
     p.animation.numberOfLoops = -1
 
+template stop*(e: ParticleEmitter) = e.birthRate = inf
+
 template pmRandom(r: float): float = random(r * 2) - r
 template randomSign(): float =
     if random(2) == 1: 1.0 else: -1.0
@@ -54,7 +62,9 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
     part.coord = newVector3(0, 0)
     part.scale = newVector3(1, 1, 1)
     part.rotation = newQuaternion()
-    part.velocity = newVector3(10 * pmRandom(1.0), - 20 * random(1.0) + 3 * pmRandom(1.0))
+
+    let velocityLen = p.velocity + p.velocity * pmRandom(p.velocityRandom)
+    part.velocity = aroundZ(p.direction + p.direction * pmRandom(p.directionRandom)) * newVector3(velocityLen, 0, 0)
     part.initialLifetime = p.lifetime + p.lifetime * pmRandom(0.1)
     part.remainingLifetime = part.initialLifetime
     part.rotVelocity = newQuaternion(pmRandom(5.0), ForwardVector)
@@ -116,6 +126,11 @@ method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
     p.visitProperty("particlePrototype", pe.particlePrototype)
     p.visitProperty("numberOfParticles", pe.numberOfParticles)
     p.visitProperty("gravity", pe.gravity)
+
+    p.visitProperty("direction", pe.direction)
+    p.visitProperty("directionRandom", pe.directionRandom)
+    p.visitProperty("velocity", pe.velocity)
+    p.visitProperty("velocityRandom", pe.velocityRandom)
 
 registerComponent[ParticleEmitter]()
 registerComponent[Particle]()
