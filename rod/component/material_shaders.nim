@@ -258,6 +258,7 @@ float computeDiffuse(float lDif, float lAttenuation, vec3 L, vec3 normal) {
     return result;
 }
 
+
 float computeSpecular(float lSpec, float lAttenuation, float mShin, vec3 R, vec3 E) {
     float result = 1.0;
     #ifdef WITH_SPECULAR_SAMPLER
@@ -265,7 +266,6 @@ float computeSpecular(float lSpec, float lAttenuation, float mShin, vec3 R, vec3
     #else
         float specularity = mShin;
     #endif
-
     #ifdef WITH_LIGHT_SPECULAR
         result *= lSpec;
     #endif
@@ -328,6 +328,7 @@ vec4 computeTexel() {
                 #endif
             #endif
         #endif
+
 
         #ifdef WITH_REFLECTION_SAMPLER
             vec3 r = reflect( normalize(-vPosition.xyz), normal );

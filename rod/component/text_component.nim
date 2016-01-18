@@ -95,17 +95,12 @@ method draw*(t: Text) =
         c.drawText(t.font, p, t.text)
         t.font.horizontalSpacing = hs
 
-method animatableProperty1*(t: Text, name: string): proc (v: Coord) =
-    case name
-    of "Tracking Amount": result = proc (v: Coord) =
-        t.trackingAmount = v
-    else: result = nil
-
 method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("text", t.text)
     p.visitProperty("color", t.color)
     p.visitProperty("shadowX", t.shadowX)
     p.visitProperty("shadowY", t.shadowY)
     p.visitProperty("shadowColor", t.shadowColor)
+    p.visitProperty("Tracking Amount", t.trackingAmount)
 
 registerComponent[Text]()

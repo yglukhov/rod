@@ -3,7 +3,7 @@ import nimx.types
 import nimx.context
 import nimx.image
 import nimx.animation
-import json
+import json, strutils
 
 import rod.node
 import rod.property_visitor
@@ -77,13 +77,24 @@ method deserialize*(s: Sprite, j: JsonNode) =
         s.image = imageWithResource(j["name"].getStr())
     else:
         s.images = newSeq[Image](v.len)
+        var spriteSheets = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:
-            s.images[i] = imageWithResource(v[i].getStr())
+            var name = v[i].getStr()
+            if name.endsWith(".sspart"):
+                let parts1 = name.split(" - ")
+                let parts = parts1[1].split('.')
+                let rect = newRect(parts[^5].parseFloat(), parts[^4].parseFloat(), parts[^3].parseFloat(), parts[^2].parseFloat())
+                let realName = parts1[0]
+                let ss = imageWithResource(realName)
+                s.images[i] = ss.subimageWithRect(rect)
+            else:
+                s.images[i] = imageWithResource(name)
 
     if s.images.len > 1:
         s.createFrameAnimation()
 
 method visitProperties*(t: Sprite, p: var PropertyVisitor) =
     p.visitProperty("image", t.image)
+    p.visitProperty("curFrame", t.currentFrame)
 
 registerComponent[Sprite]()
