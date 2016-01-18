@@ -247,8 +247,8 @@ type
     JSRegExp = ref JSRegExpObj
     JSRegExpObj {.importc.} = object
 
-proc newRegex*(pattern, flags: cstring): JSRegExp {.importc: "new RegExp"}
-proc newRegex*(pattern: cstring): JSRegExp {.importc: "new RegExp"}
+proc newRegex*(pattern, flags: cstring): JSRegExp {.importc: "new RegExp".}
+proc newRegex*(pattern: cstring): JSRegExp {.importc: "new RegExp".}
 proc match*(str: cstring, reg: JSRegExp): seq[cstring] {.importcpp.}
 
 proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
@@ -300,6 +300,21 @@ proc saveSetting*(s: Settings, sectionName, keyName, value: cstring) {.importcpp
 proc haveSetting*(s: Settings, sectionName, keyName: cstring): bool {.importcpp.}
 
 var app* {.importc, nodecl.}: Application
+var systemUserName* {.importc: "system.userName", nodecl.}: cstring # The current user name.
+var systemMachineName* {.importc: "system.machineName", nodecl.}: cstring # The name of the host computer.
+var systemOsName* {.importc: "system.osName", nodecl.}: cstring # The name of the operating system.
+var systemOsVersion* {.importc: "system.osVersion", nodecl.}: cstring # The version of the operating system.
+
+# Executes a system command, as if you had typed it on the operating system’s command line.
+# Returns whatever the system outputs in response to the command, if anything.
+# In Windows, you can invoke commands using the `/c` switch for the `cmd.exe` command,
+# passing the command to run in escaped quotes (\"...\"). For example, the
+# following retrieves the current time and displays it to the user:
+# ```
+#   var timeStr = callSystem("cmd.exe /c \"time /t\"")
+#   alert("Current time is " & timeStr)
+# ```
+proc callSystem*(cmd: cstring): cstring {.importc: "system.callSystem".}
 
 proc projectPath*(i: Item): string =
     if app.project.rootFolder == i.parentFolder:
