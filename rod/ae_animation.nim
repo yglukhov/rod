@@ -35,11 +35,11 @@ proc nodeNameFromPropertyName(name: string): string =
     if dotIdx != -1:
         result = name.substr(0, dotIdx - 1)
 
-proc elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFNum()
-proc elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
-proc elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
-proc elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
-proc elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
+template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFNum()
+template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
+template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
+template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
+template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
 
 type AnimProcSetter = proc(progress: float)
 
