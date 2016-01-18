@@ -108,6 +108,7 @@ proc animationWithAEJson*(n: Node2D, j: JsonNode): Animation =
     var maxDuration = 0.0
     var numberOfLoops = 1
     result = newAnimation()
+    result.loopDuration = 0.0
 
     for k, v in j:
         result.loopDuration = max(v["duration"].getFNum(), result.loopDuration)

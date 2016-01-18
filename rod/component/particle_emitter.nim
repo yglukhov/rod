@@ -33,6 +33,7 @@ type
         numberOfParticles*: int
         gravity*: Vector3
         particles: seq[ParticleData]
+        drawDebug*: bool
 
         direction*: Coord
         directionRandom*: float
@@ -50,15 +51,15 @@ method init(p: ParticleEmitter) =
     p.gravity = newVector3(0, 0.5, 0)
     p.animation = newAnimation()
     p.animation.numberOfLoops = -1
+    p.drawDebug = false
 
-template stop*(e: ParticleEmitter) = e.birthRate = inf
+template stop*(e: ParticleEmitter) = e.birthRate = 999999999.0
 
 template pmRandom(r: float): float = random(r * 2) - r
 template randomSign(): float =
     if random(2) == 1: 1.0 else: -1.0
 
 template createParticle(p: ParticleEmitter, part: var ParticleData) =
-    part.coord = newVector3(pmRandom(3.0), random(3.0))
     part.coord = newVector3(0, 0)
     part.scale = newVector3(1, 1, 1)
     part.rotation = newQuaternion()
@@ -98,21 +99,19 @@ method draw*(p: ParticleEmitter) =
 
     for i in 0 ..< p.particles.len:
         var needsToDraw = false
-        var drawDebug = false
         if p.particles[i].remainingLifetime <= 0:
             if curTime - p.lastBirthTime >= p.birthRate:
                 # Create new particle
                 p.lastBirthTime = curTime
                 p.createParticle(p.particles[i])
                 needsToDraw = true
-                drawDebug = true
         else:
             p.updateParticle(p.particles[i], timeDiff)
             needsToDraw = true
 
         if needsToDraw:
             p.drawParticle(p.particles[i])
-            if drawDebug:
+            if p.drawDebug:
                 let c = currentContext()
                 c.fillColor = newColor(1, 0, 0)
                 c.strokeWidth = 0
