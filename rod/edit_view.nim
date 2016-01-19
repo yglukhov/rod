@@ -11,7 +11,14 @@ import rod_types
 import nimx.text_field
 import nimx.table_view_cell
 
+import rod.scene_composition
+
 import variant
+
+when defined(js):
+    import dom
+else:
+    import native_dialogs
 
 type Editor* = ref object
     rootNode*: Node3D
@@ -94,6 +101,21 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     refreshButton.onAction do():
         outlineView.reloadData()
     result.addSubview(refreshButton)
+
+    let loadButton = Button.new(newRect(110, result.bounds.height - 20, 60, 20))
+    loadButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    loadButton.title = "Load"
+    loadButton.onAction do():
+        when defined(js):
+            alert("Loading is currenlty availble in native version only.")
+        else:
+            let path = callDialogFileOpen("Select file")
+            let p = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+
+            loadSceneAsync path, proc(n: Node) =
+                p.addChild(n)
+                outlineView.reloadData()
+    result.addSubview(loadButton)
 
 
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
