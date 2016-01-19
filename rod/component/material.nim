@@ -62,8 +62,8 @@ type ShaderMacro = enum
     WITH_RIM_LIGHT
 
 type MaterialColor* = ref object of RootObj
-    ambient: Vector4
     emission: Vector4
+    ambient: Vector4
     diffuse: Vector4
     specular: Vector4
     shininess: float32
@@ -80,8 +80,8 @@ proc newMaterialWithDefaultColor*(): MaterialColor =
     result.new()
     result.ambient = newVector4(0.0, 0.0, 0.0, 0.0)
     result.emission = newVector4(0.0, 0.0, 0.0, 0.0)
-    result.diffuse = newVector4(0.3, 0.3, 0.3, 0.0)
-    result.specular = newVector4(0.8, 0.8, 0.8, 0.0)
+    result.diffuse = newVector4(0.0, 0.0, 0.0, 0.0)
+    result.specular = newVector4(0.0, 0.0, 0.0, 0.0)
     result.shininess = 10.0
     result.reflectivity = 0.35
 
@@ -136,8 +136,8 @@ type Material* = ref object of RootObj
     reflectionTexture*: Image
     falloffTexture*: Image
 
-    color: MaterialColor
-    transform: TransformInfo
+    color*: MaterialColor
+    transform*: TransformInfo
 
     # TODO
     # useNormals: bool
@@ -151,9 +151,10 @@ type Material* = ref object of RootObj
 
     currentLightSourcesCount: int
 
+    bUserDefinedShader: bool
     vertexShader: string
     fragmentShader: string
-    shader: GLuint
+    shader*: GLuint
     bShaderNeedUpdate: bool
     shaderMacroFlags: set[ShaderMacro]
 
@@ -244,7 +245,7 @@ proc newDefaultMaterial*(): Material =
     result.new()
 
     result.currentLightSourcesCount = 0
-    result.blendEnable = true
+    result.blendEnable = false
     result.depthEnable = true
     result.isWireframe = false
     result.isLightReceiver = true
@@ -376,7 +377,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1i(gl.getUniformLocation(m.shader, "falloffMapUnit"), textureIndex)
                 inc textureIndex
 
-proc setupMaterialAttributes(m: Material) =
+proc setupMaterialAttributes(m: Material, n: Node) =
     if not m.color.isNil:
         let c = currentContext()
         let gl = c.gl
@@ -406,6 +407,8 @@ proc setupMaterialAttributes(m: Material) =
                 m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
             else:
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialShininess"), m.color.shininess)
+        if m.shader != 0:
+            gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialTransparency"), n.alpha)
 
 proc setupLightAttributes(m: Material, v: SceneView) =
     var lightsCount = 0
@@ -468,6 +471,13 @@ proc setupLightAttributes(m: Material, v: SceneView) =
             m.shaderMacroFlags.excl(WITH_LIGHT_SPECULAR)
             m.shaderMacroFlags.excl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
             m.shaderMacroFlags.excl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+        else:
+            m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
+            m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
+            m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
+            m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
+            m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
+            m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
 
 proc setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
     if m.shader == 0:
@@ -485,10 +495,11 @@ proc createShader(m: Material) =
     let gl = c.gl
 
     if m.shader != 0:
-        gl.deleteProgram(m.shader)
-        m.shader = 0
-        m.vertexShader = ""
-        m.fragmentShader = ""
+        if not m.bUserDefinedShader:
+            gl.deleteProgram(m.shader)
+            m.shader = 0
+            m.vertexShader = ""
+            m.fragmentShader = ""
 
     var commonShaderDefines = ""
     for macros in m.shaderMacroFlags:
@@ -514,10 +525,19 @@ proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: stri
     m.shaderNeedUpdate()
 
 proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
+    m.bUserDefinedShader = true
+    var bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded: bool
+
+    template shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded: bool) =
+        if bVertexShaderSourceLoaded and bFragmentShaderSourceLoaded:
+            m.shaderNeedUpdate()
+
     if vertexShader != "":
         loadResourceAsync vertexShader, proc(s: Stream) =
             m.vertexShader = s.readAll()
             s.close()
+            bVertexShaderSourceLoaded = true
+            shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
     else:
         m.vertexShader = materialVertexShaderDefault
 
@@ -525,21 +545,24 @@ proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragment
         loadResourceAsync fragmentShader, proc(s: Stream) =
             m.fragmentShader = s.readAll()
             s.close()
+            bFragmentShaderSourceLoaded = true
+            shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
     else:
         m.fragmentShader = materialFragmentShaderDefault
-    m.shaderNeedUpdate()
+
+    shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
 
 method initSetup*(m: Material) {.base.} = discard
 
-method updateSetup*(m: Material, v: SceneView) {.base.} =
+method updateSetup*(m: Material, n: Node) {.base.} =
     let c = currentContext()
     let gl = c.gl
 
     if m.shader == 0 or m.bShaderNeedUpdate:
         m.setupSamplerAttributes()
-        m.setupMaterialAttributes()
+        m.setupMaterialAttributes(n)
         if m.isLightReceiver:
-            m.setupLightAttributes(v)
+            m.setupLightAttributes(n.sceneView)
         #TODO use techniques
         m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
         m.setupRIMLightTechnique()
@@ -548,9 +571,9 @@ method updateSetup*(m: Material, v: SceneView) {.base.} =
     gl.useProgram(m.shader)
 
     m.setupSamplerAttributes()
-    m.setupMaterialAttributes()
+    m.setupMaterialAttributes(n)
     if m.isLightReceiver:
-        m.setupLightAttributes(v)
+        m.setupLightAttributes(n.sceneView)
 
     c.setTransformUniform(m.shader)
 
@@ -558,7 +581,7 @@ method updateSetup*(m: Material, v: SceneView) {.base.} =
         gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelMatrix"), false, m.transform.modelMatrix)
         gl.uniformMatrix3fv(gl.getUniformLocation(m.shader, "normalMatrix"), false, m.transform.normalMatrix)
 
-    if m.blendEnable:
+    if n.alpha < 1.0 or m.blendEnable:
         gl.enable(gl.BLEND)
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     else:
