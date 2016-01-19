@@ -70,12 +70,12 @@ proc createProgressSetterWithPropSetter[T](setter: proc(v: T), janim: JsonNode):
 
     let fromValue = 0.0
     let toValue = (propValues.len - 1).float
+    let doLerp = janim["frameLerp"].getBVal(true)
 
     result = proc(p: float) =
         let i = interpolate(fromValue, toValue, p)
         let index = floor(i).int
-        var doInter = true
-        if not doInter or index == propValues.len - 1:
+        if not doLerp or index == propValues.len - 1:
             #echo "i: ", index, " p: ", p
             setter(propValues[index])
         else:
