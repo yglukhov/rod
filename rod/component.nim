@@ -36,7 +36,6 @@ method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
 method isPosteffectComponent*(c: Component): bool {.base.} = false
 
-method animatableProperty1*(c: Component, name: string) : (proc (v: Coord)) {.base.} = discard
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method deserialize*(c: Component, j: JsonNode) {.base.} = discard
 

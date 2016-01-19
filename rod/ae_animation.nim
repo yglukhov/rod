@@ -1,8 +1,11 @@
-import json
+import json, math, strutils, tables
+
+import variant
+
 import rod_types
 import node
-import math
-import strutils
+import component
+import property_visitor
 
 import nimx.matrixes
 import nimx.types
@@ -32,51 +35,38 @@ proc nodeNameFromPropertyName(name: string): string =
     if dotIdx != -1:
         result = name.substr(0, dotIdx - 1)
 
-proc numberOfComponentsInPropertyAnimation(janim: JsonNode): int =
-    let firstVal = janim["values"][0]
-    if firstVal.kind == JArray:
-        result = firstVal.len
-    else:
-        result = 1
-
-proc createElementFromJson(componentsCount: static[int], jelem: JsonNode): auto {.inline.} =
-    when componentsCount == 1:
-        return jelem.getFNum()
-    elif componentsCount == 2:
-        return newVector2(jelem[0].getFNum(), jelem[1].getFNum())
-    elif componentsCount == 3:
-        return newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
-    elif componentsCount == 4:
-        return newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
+template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFNum()
+template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
+template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
+template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
+template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
 
 type AnimProcSetter = proc(progress: float)
 
-proc createProgressSetter(componentsCount: static[int], propName: string, node: Node2D, janim: JsonNode): AnimProcSetter =
-    let rawPropName = rawPropertyNameFromPropertyName(propName)
-    let nodeName = nodeNameFromPropertyName(propName)
-    let animatedNode = if nodeName.isNil: node else: node.findNode(nodeName)
-    if animatedNode.isNil:
-        raise newException(Exception, "Animated node " & nodeName & " not found")
+proc findAnimatableProperty(n: Node, propName: string): Variant =
+    var res : Variant
+    var visitor : PropertyVisitor
+    visitor.requireName = true
+    visitor.requireSetter = true
+    visitor.flags = { pfAnimatable }
+    visitor.commit = proc() =
+        if res.isEmpty:
+            if visitor.name == propName:
+                res = visitor.setterAndGetter
 
-    when componentsCount == 1:
-        let setter = animatedNode.animatableProperty1(rawPropName)
-        type ElementType = Coord
-    elif componentsCount == 2:
-        let setter = animatedNode.animatableProperty2(rawPropName)
-        type ElementType = Vector2
-    elif componentsCount == 3:
-        let setter = animatedNode.animatableProperty3(rawPropName)
-        type ElementType = Vector3
-    elif componentsCount == 4:
-        let setter = animatedNode.animatableProperty4(rawPropName)
-        type ElementType = Vector4
+    n.visitProperties(visitor)
 
-    if setter.isNil: return
+    if res.isEmpty and not n.components.isNil:
+        for k, v in n.components:
+            v.visitProperties(visitor)
+            if not res.isEmpty: break
 
-    var propValues = newSeq[ElementType](janim["values"].len)
+    result = res
+
+proc createProgressSetterWithPropSetter[T](setter: proc(v: T), janim: JsonNode): AnimProcSetter =
+    var propValues = newSeq[T](janim["values"].len)
     for i in 0 ..< propValues.len:
-        let p = createElementFromJson(componentsCount, janim["values"][i])
-        propValues[i] = p
+        propValues[i] = elementFromJson(T, janim["values"][i])
 
     let fromValue = 0.0
     let toValue = (propValues.len - 1).float
@@ -93,23 +83,37 @@ proc createProgressSetter(componentsCount: static[int], propName: string, node: 
             #echo "i: ", index, " m: ", m, " p: ", p
             setter(interpolate(propValues[index], propValues[index + 1], m))
 
+proc createProgressSetter(propName: string, node: Node2D, janim: JsonNode): AnimProcSetter =
+    let rawPropName = rawPropertyNameFromPropertyName(propName)
+    let nodeName = nodeNameFromPropertyName(propName)
+    let animatedNode = if nodeName.isNil: node else: node.findNode(nodeName)
+    if animatedNode.isNil:
+        raise newException(Exception, "Animated node " & nodeName & " not found")
+
+    let ap = animatedNode.findAnimatableProperty(rawPropName)
+    if ap.isEmpty:
+        raise newException(Exception, "Property " & rawPropName & " not found in node " & animatedNode.name)
+
+    variantMatch case ap as sng
+    of SetterAndGetter[Coord]: result = createProgressSetterWithPropSetter(sng.setter, janim)
+    of SetterAndGetter[Vector2]: result = createProgressSetterWithPropSetter(sng.setter, janim)
+    of SetterAndGetter[Vector3]: result = createProgressSetterWithPropSetter(sng.setter, janim)
+    of SetterAndGetter[Vector4]: result = createProgressSetterWithPropSetter(sng.setter, janim)
+    of SetterAndGetter[int]: result = createProgressSetterWithPropSetter(sng.setter, janim)
+    else:
+        raise newException(Exception, "Wrong type for property " & rawPropName & " of node " & animatedNode.name)
+
 proc animationWithAEJson*(n: Node2D, j: JsonNode): Animation =
     var animProgressSetters = newSeq[AnimProcSetter]()
     var maxDuration = 0.0
     var numberOfLoops = 1
     result = newAnimation()
+    result.loopDuration = 0.0
 
     for k, v in j:
-        let numComponents = numberOfComponentsInPropertyAnimation(v)
         result.loopDuration = max(v["duration"].getFNum(), result.loopDuration)
         result.numberOfLoops = v["numberOfLoops"].getNum(1).int
-
-        let progressSetter = case numComponents
-            of 1: createProgressSetter(1, k, n, v)
-            of 2: createProgressSetter(2, k, n, v)
-            of 3: createProgressSetter(3, k, n, v)
-            of 4: createProgressSetter(4, k, n, v)
-            else: nil
+        let progressSetter = createProgressSetter(k, n, v)
         if not progressSetter.isNil:
             animProgressSetters.add(progressSetter)
 
