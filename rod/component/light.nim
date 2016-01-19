@@ -40,9 +40,9 @@ template lightQuadratic*(ls: LightSource): Coord = ls.mLightQuadratic
 template lightAttenuation*(ls: LightSource): Coord = ls.mLightAttenuation
 
 proc setDefaultLightSource*(ls: LightSource) =
-    ls.lightAmbient = 0.2
-    ls.lightDiffuse = 0.3
-    ls.lightSpecular = 0.5
+    ls.lightAmbient = 1.0
+    ls.lightDiffuse = 1.0
+    ls.lightSpecular = 1.0
     ls.lightConstant = 1.0
     ls.lightLinear = 0.000014
     ls.lightQuadratic = 0.00000007

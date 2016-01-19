@@ -20,10 +20,10 @@
         <technique sid="standard">
           <phong>
             <emission>
-              <color sid="emission">0.444465  0.249345 0.054225 1.000000</color>
+              <color sid="emission">0.000000  0.000000 0.000000 1.000000</color>
             </emission>
             <ambient>
-              <color sid="ambient">0.000000  0.000000 0.000000 1.000000</color>
+              <color sid="ambient">0.444465  0.249345 0.054225 1.000000</color>
             </ambient>
             <diffuse>
               <texture texture="test_obj_balloon_star_LP_star_baloon_file3-image" texcoord="CHANNEL0">
@@ -66,10 +66,10 @@
         <technique sid="standard">
           <phong>
             <emission>
-              <color sid="emission">2.279881  0.278145 0.278145 1.000000</color>
+              <color sid="emission">0.000000  0.000000 0.000000 1.000000</color>
             </emission>
             <ambient>
-              <color sid="ambient">0.000000  0.000000 0.000000 1.000000</color>
+              <color sid="ambient">2.279881  0.278145 0.278145 1.000000</color>
             </ambient>
             <diffuse>
               <color sid="diffuse">0.515000  0.009785 0.009785 1.000000</color>

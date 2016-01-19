@@ -13,6 +13,7 @@ import rod.component.solid
 import rod.component.mesh_component
 import rod.component.material
 import rod.component.light
+import rod.component.sprite
 import rod.component
 import rod.scene_composition
 
@@ -51,22 +52,10 @@ proc startApplication() =
 
     let light = editView.rootNode.newChild("point_light")
     light.translation = newVector3(-100,100,70)
-    let lightMesh = light.component(MeshComponent)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
-    lightSource.lightAmbient = 0.2
-    lightSource.lightDiffuse = 0.3
-    lightSource.lightSpecular = 0.5
-    lightSource.lightConstant = 1.0
-    lightSource.lightLinear = 0.0014
-    lightSource.lightQuadratic = 0.000007
-
-    # let baloon = editView.rootNode.newChild("baloon")
+    
     # let anim = newAnimation()
-    # let toVal = 360.0
-    # anim.animate val in 0.0..toVal:
-    #     baloon.rotation = aroundY(val)
-    # anim.loopDuration = 5.0
     # mainWindow.addAnimation(anim)
 
     loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =

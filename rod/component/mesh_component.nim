@@ -175,7 +175,7 @@ method draw*(m: MeshComponent) =
 
     m.material.updateTransformSetup(m.node.translation, m.node.rotation, m.node.scale)
 
-    m.material.updateSetup(m.node.sceneView)
+    m.material.updateSetup(m.node)
 
     if m.material.bEnableBackfaceCulling:
         gl.enable(gl.CULL_FACE)
