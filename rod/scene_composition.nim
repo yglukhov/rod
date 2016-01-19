@@ -26,13 +26,13 @@ import algorithm
 import tables
 import hashes
 
-proc parseVector4(source: string): Vector4 = 
+proc parseVector4(source: string): Vector4 =
   var i = 0
   for it in split(source):
     result[i] = parseFloat(it)
     inc(i)
 
-proc parseMatrix4(source: string): Matrix4 = 
+proc parseMatrix4(source: string): Matrix4 =
     var nodeMarix: array[16, float32]
     var i = 0
     for it in split(source):
@@ -54,8 +54,8 @@ proc hash(v: VertexNormal): Hash =
     result = v.vx.hash() !& v.vy.hash() !& v.vz.hash() !& v.nx.hash() !& v.ny.hash() !& v.nz.hash()
     result = !$result
 
-proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ni, ti: int, 
-                  vertexesHash: var Table[VertexNormal, GLushort], tgX = 0.0, tgY = 0.0, tgZ: float32 = 0.0, bNeedTangent: bool = false): GLushort = 
+proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ni, ti: int,
+                  vertexesHash: var Table[VertexNormal, GLushort], tgX = 0.0, tgY = 0.0, tgZ: float32 = 0.0, bNeedTangent: bool = false): GLushort =
     var attributesPerVertex: int = 0
     attributesPerVertex += 3
     if texCoordData.len > 0:
@@ -98,18 +98,18 @@ proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vert
             vertexAttrData.add(tgZ)
             attributesPerVertex += 3
 
-        result = GLushort(vertexAttrData.len / attributesPerVertex - 1)        
-        
+        result = GLushort(vertexAttrData.len / attributesPerVertex - 1)
+
         vertexesHash[v] = result
     else:
         result = vertexesHash[v]
 
 proc prepareVBO(vertexData, texCoordData, normalData: openarray[GLfloat], faces: seq[int],
-                vertexAttrData: var seq[GLfloat], indexData: var seq[GLushort], 
-                vertexOfset, normalOfset, texcoordOfset: int, bNeedComputeTangentData: bool = false) = 
+                vertexAttrData: var seq[GLfloat], indexData: var seq[GLushort],
+                vertexOfset, normalOfset, texcoordOfset: int, bNeedComputeTangentData: bool = false) =
     var i = 0
     var stride = 1
-    const coordPerVertex = 3    
+    const coordPerVertex = 3
     if normalOfset != 0:
         inc(stride)
     if texcoordOfset != 0:
@@ -119,7 +119,7 @@ proc prepareVBO(vertexData, texCoordData, normalData: openarray[GLfloat], faces:
     var vertexesHash = initTable[VertexNormal, GLushort]()
 
     while i < faces.len:
-        let 
+        let
             vi0 = faces[i+vertexOfset]
             vi1 = faces[i+vertexOfset+stride]
             vi2 = faces[i+vertexOfset+2*stride]
@@ -131,7 +131,7 @@ proc prepareVBO(vertexData, texCoordData, normalData: openarray[GLfloat], faces:
             ti2 = faces[i+texcoordOfset+2*stride]
 
         if bNeedComputeTangentData:
-            var 
+            var
                 v0 = newVector3(vertexData[vi0 * 3 + 0], vertexData[vi0 * 3 + 1], vertexData[vi0 * 3 + 2])
                 v1 = newVector3(vertexData[vi1 * 3 + 0], vertexData[vi1 * 3 + 1], vertexData[vi1 * 3 + 2])
                 v2 = newVector3(vertexData[vi2 * 3 + 0], vertexData[vi2 * 3 + 1], vertexData[vi2 * 3 + 2])
@@ -159,7 +159,8 @@ proc prepareVBO(vertexData, texCoordData, normalData: openarray[GLfloat], faces:
 
         i += faceStep
 
-proc getTextureLocationByName(cs: ColladaScene, texName: string): string = 
+proc getTextureLocationByName(cs: ColladaScene, texName: string): string =
+    # TODO: This looks wrong. The paths should be relative in dae file.
     for img in cs.childNodesImages:
         if texName.contains(img.name):
             var texLocationSplited = img.location.split('/')
@@ -174,6 +175,9 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
 
         let res = newNode(colladaRootNode.name)
 
+        pushParentResource(resourceName)
+        defer: popParentResource()
+
         var i = 0
         for child in colladaRootNode.childNodesGeometry:
             let childNode = res.newChild(child.name)
@@ -182,7 +186,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             childNode.translation = newVector(nodeTranslation[3], nodeTranslation[7], nodeTranslation[11])
             inc(i)
             #TODO scene translation
-            
+
             let childMesh = childNode.component(MeshComponent)
 
             var childColladaMaterial: ColladaMaterial
@@ -190,7 +194,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             for mat in colladaRootNode.childNodesMaterial:
                 if mat.name.contains(child.materialName):
                     childColladaMaterial = mat
-            
+
             var transparency = childColladaMaterial.transparency
 
             childMesh.material.setEmissionColor(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
@@ -200,7 +204,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             childMesh.material.setShininess(childColladaMaterial.shininess)
             childMesh.material.setReflectivity(childColladaMaterial.reflectivity)
 
-            #TODO 
+            #TODO
             # reflective*: Vector4
             # transparent*: Vector4
             # transparency*: float32
@@ -209,21 +213,21 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             if childColladaMaterial.diffuseTextureName != nil:
                 var texLocation = colladaRootNode.getTextureLocationByName(childColladaMaterial.diffuseTextureName)
                 if texLocation != nil:
-                    childMesh.material.albedoTexture = imageWithResource("collada/" & texLocation)
-                
+                    childMesh.material.albedoTexture = imageWithResource(texLocation)
+
             if childColladaMaterial.reflectiveTextureName != nil:
                 var texLocation = colladaRootNode.getTextureLocationByName(childColladaMaterial.reflectiveTextureName)
                 if texLocation != nil:
-                    childMesh.material.reflectionTexture = imageWithResource("collada/" & texLocation)
+                    childMesh.material.reflectionTexture = imageWithResource(texLocation)
 
                     #TODO add other material texture
                     # childMesh.material.falloffTexture = imageWithResource("collada/baloon_star_falloff.png")
-                    childMesh.material.normalTexture = imageWithResource("collada/baloon_star_normals.png")
+                    childMesh.material.normalTexture = imageWithResource("baloon_star_normals.png")
 
             if childColladaMaterial.specularTextureName != nil:
                 var texLocation = colladaRootNode.getTextureLocationByName(childColladaMaterial.specularTextureName)
                 if texLocation != nil:
-                    childMesh.material.specularTexture = imageWithResource("collada/" & texLocation)
+                    childMesh.material.specularTexture = imageWithResource(texLocation)
 
             let bNeedComputeTangentData = if childMesh.material.normalTexture.isNil(): false else: true
 
