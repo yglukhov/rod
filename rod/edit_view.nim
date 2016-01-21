@@ -90,9 +90,13 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     deleteNodeButton.title = "-"
     deleteNodeButton.onAction do():
-        let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
-        n.removeFromParent()
-        outlineView.reloadData()
+        if outlineView.selectedIndexPath.len != 0:
+            let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+            n.removeFromParent()
+            var sip = outlineView.selectedIndexPath
+            sip.delete(sip.len-1)
+            outlineView.selectItemAtIndexPath(sip)
+            outlineView.reloadData()
     result.addSubview(deleteNodeButton)
 
     let refreshButton = Button.new(newRect(46, result.bounds.height - 20, 60, 20))
@@ -109,9 +113,15 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         when defined(js):
             alert("Loading is currenlty availble in native version only.")
         else:
-            let path = callDialogFileOpen("Select file")
-            let p = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+            var sip = outlineView.selectedIndexPath
+            var p = e.rootNode
+            if sip.len == 0:
+                sip.add(0)
+            else:
+                p = outlineView.itemAtIndexPath(sip).get(Node3D)
 
+            outlineView.expandRow(sip)
+            let path = callDialogFileOpen("Select file")
             loadSceneAsync path, proc(n: Node) =
                 p.addChild(n)
                 outlineView.reloadData()

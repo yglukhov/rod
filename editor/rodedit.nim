@@ -55,11 +55,12 @@ proc startApplication() =
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) = editView.rootNode.addChild(n)
+    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
+        editView.rootNode.addChild(n)
 
-    mainWindow.addSubview(editView)
+        mainWindow.addSubview(editView)
 
-    discard startEditingNodeInView(editView.rootNode, editView)
+        discard startEditingNodeInView(editView.rootNode, editView)
 
     runAutoTestsIfNeeded()
 

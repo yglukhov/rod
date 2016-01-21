@@ -138,6 +138,12 @@ proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc()
         setter(editedNode.sceneView.rootNode.findNode(textField.text))
     result = textField
 
+proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc(): bool): View =
+    let cb = newCheckbox(newRect(0, 0, 200, 17))
+    cb.value = if getter(): 1 else: 0
+    cb.onAction do():
+        setter(cb.boolValue)
+    result = cb
 
 registerPropertyEditor(newTextPropertyView)
 registerPropertyEditor(newScalarPropertyView[Coord])
@@ -150,4 +156,4 @@ registerPropertyEditor(newColorPropertyView)
 registerPropertyEditor(newSizePropertyView)
 registerPropertyEditor(newPointPropertyView)
 registerPropertyEditor(newImagePropertyView)
-registerPropertyEditor(newNodePropertyView)
+registerPropertyEditor(newBoolPropertyView)

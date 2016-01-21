@@ -62,62 +62,48 @@ type ShaderMacro = enum
     WITH_TBN_FROM_NORMALS
     WITH_RIM_LIGHT
 
-type MaterialColor* = ref object of RootObj
-    emission: Vector4
-    ambient: Vector4
-    diffuse: Vector4
-    specular: Vector4
-    shininess: float32
-    reflectivity: float32
+type
+    MaterialColor* = ref object
+        emission*: Vector4
+        ambient*: Vector4
+        diffuse*: Vector4
+        specular*: Vector4
+        shininess*: float32
+        reflectivity*: float32
 
-    ambientInited: bool
-    emissionInited: bool
-    diffuseInited: bool
-    specularInited: bool
-    shininessInited: bool
-    reflectivityInited: bool
+        ambientInited: bool
+        emissionInited: bool
+        diffuseInited: bool
+        specularInited: bool
+        shininessInited: bool
+        reflectivityInited: bool
 
-type Material* = ref object of RootObj
-    albedoTexture*: Image
-    glossTexture*: Image
-    specularTexture*: Image
-    normalTexture*: Image
-    bumpTexture*: Image
-    reflectionTexture*: Image
-    falloffTexture*: Image
+    Material* = ref object of RootObj
+        albedoTexture*: Image
+        glossTexture*: Image
+        specularTexture*: Image
+        normalTexture*: Image
+        bumpTexture*: Image
+        reflectionTexture*: Image
+        falloffTexture*: Image
 
-    color*: MaterialColor
+        color*: MaterialColor
 
-    currentLightSourcesCount: int
+        currentLightSourcesCount: int
+        isLightReceiver: bool
 
-    bEnableBackfaceCulling*: bool
-    isLightReceiver*: bool
-    blendEnable*: bool
-    depthEnable*: bool
-    isWireframe*: bool
+        bEnableBackfaceCulling*: bool
+        blendEnable*: bool
+        depthEnable*: bool
+        isWireframe*: bool
+        isRIM: bool
 
-    shader*: GLuint
-    vertexShader: string
-    fragmentShader: string
-    bUserDefinedShader: bool
-    bShaderNeedUpdate: bool
-    shaderMacroFlags: set[ShaderMacro]
-
-proc newMaterialWithDefaultColor*(): MaterialColor =
-    result.new()
-    result.ambient = newVector4(0.0, 0.0, 0.0, 0.0)
-    result.emission = newVector4(0.0, 0.0, 0.0, 0.0)
-    result.diffuse = newVector4(0.0, 0.0, 0.0, 0.0)
-    result.specular = newVector4(0.0, 0.0, 0.0, 0.0)
-    result.shininess = 10.0
-    result.reflectivity = 0.35
-
-    result.ambientInited = true
-    result.emissionInited = true
-    result.diffuseInited = true
-    result.specularInited = true
-    result.shininessInited = true
-    result.reflectivityInited = true
+        shader*: GLuint
+        vertexShader: string
+        fragmentShader: string
+        bUserDefinedShader: bool
+        bShaderNeedUpdate: bool
+        shaderMacroFlags: set[ShaderMacro]
 
 proc shaderNeedUpdate(m: Material) =
     m.bShaderNeedUpdate = true
@@ -199,7 +185,7 @@ proc setReflectivity*(m: Material, r: Coord) =
 
 proc removeReflectivity*(m: Material) =
     m.color.reflectivityInited = false
-    # m.shaderMacroFlags.excl(WITH_MATERIAL_REFLECTIVITY)
+    # m.shaderMacroFlags.excl(WITH_MATERIAL_REFLECTIVITY) # defined with reflection texture
     m.shaderNeedUpdate()
 
 proc newDefaultMaterial*(): Material =
@@ -210,9 +196,47 @@ proc newDefaultMaterial*(): Material =
     result.isWireframe = false
     result.isLightReceiver = true
     result.bEnableBackfaceCulling = true
-    result.color = newMaterialWithDefaultColor()
+    result.color.new()
     result.shader = 0
     result.shaderNeedUpdate()
+
+proc isLightReceiver*(m: Material): bool =
+    result = m.isLightReceiver
+
+proc `isLightReceiver=`*(m: Material, val: bool) =
+    m.isLightReceiver = val
+    m.shaderNeedUpdate()
+
+    if not val:
+        for i in 0 .. m.currentLightSourcesCount - 1:
+            m.shaderMacroFlags.excl(ShaderMacro(int(WITH_LIGHT_0) + i))
+
+        m.shaderMacroFlags.excl(WITH_LIGHT_POSITION)
+        m.shaderMacroFlags.excl(WITH_LIGHT_AMBIENT)
+        m.shaderMacroFlags.excl(WITH_LIGHT_DIFFUSE)
+        m.shaderMacroFlags.excl(WITH_LIGHT_SPECULAR)
+        m.shaderMacroFlags.excl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
+        m.shaderMacroFlags.excl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+    else:
+        for i in 0 .. m.currentLightSourcesCount - 1:
+            m.shaderMacroFlags.incl(ShaderMacro(int(WITH_LIGHT_0) + i))
+        m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
+        m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
+        m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
+        m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
+        m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
+        m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+
+proc isRIM*(m: Material): bool =
+    result = m.isRIM
+
+proc `isRIM=`*(m: Material, val: bool) =
+    m.isRIM = val
+    if val:
+        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
+    else:
+        m.shaderMacroFlags.excl(WITH_RIM_LIGHT)
+    m.shaderNeedUpdate()
 
 proc updateVertexAttributesSetup*(m: Material, vertInfo: VertexDataInfo) =
     let c = currentContext()
@@ -249,7 +273,7 @@ proc updateVertexAttributesSetup*(m: Material, vertInfo: VertexDataInfo) =
         gl.enableVertexAttribArray(aBinormal.GLuint)
         gl.vertexAttribPointer(aBinormal.GLuint, vertInfo.numOfCoordPerBinormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerBinormal * sizeof(GLfloat)
-    
+
 
 proc setupSamplerAttributes(m: Material) =
     let c = currentContext()
@@ -444,14 +468,14 @@ proc setupRIMLightTechnique*(m: Material) =
     if m.shader == 0:
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
 
-proc updateTransformSetup*(m: Material, n: Node) =    
+proc updateTransformSetup*(m: Material, n: Node) =
     let c = currentContext()
     let gl = c.gl
 
     var modelViewMatrix: Matrix4
     var normalMatrix: Matrix3
 
-    modelViewMatrix = n.mSceneView.viewMatrixCached * n.worldTransform
+    modelViewMatrix = n.sceneView.viewMatrixCached * n.worldTransform
 
     if n.scale.x != 0 and n.scale.y != 0 and n.scale.z != 0:
         modelViewMatrix.toInversedMatrix3(normalMatrix)
@@ -462,6 +486,10 @@ proc updateTransformSetup*(m: Material, n: Node) =
     gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelViewMatrix"), false, modelViewMatrix)
     gl.uniformMatrix3fv(gl.getUniformLocation(m.shader, "normalMatrix"), false, normalMatrix)
     c.setTransformUniform(m.shader) # setup modelViewProjectionMatrix
+
+    # let worldCamPos = n.sceneView.camera.node.translation
+    # let camPos = newVector4(worldCamPos.x, worldCamPos.y, worldCamPos.z, 1.0)
+    # gl.uniform4fv(gl.getUniformLocation(m.shader, "uCamPosition"), camPos)
 
 proc createShader(m: Material) =
     let c = currentContext()
@@ -491,6 +519,8 @@ proc createShader(m: Material) =
     m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord),
                                     (aNormal.GLuint, $aNormal), (aTangent.GLuint, $aTangent), (aBinormal.GLuint, $aBinormal)])
     m.bShaderNeedUpdate = false
+
+    # echo("\n", m.shaderMacroFlags, "\n")
 
 proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
     m.vertexShader = vertexShader
@@ -537,8 +567,9 @@ method updateSetup*(m: Material, n: Node) {.base.} =
         if m.isLightReceiver:
             m.setupLightAttributes(n.sceneView)
         #TODO use techniques
-        # m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
-        # m.setupRIMLightTechnique()
+        m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
+        if m.isRIM:
+            m.setupRIMLightTechnique()
         m.createShader()
 
     gl.useProgram(m.shader)
