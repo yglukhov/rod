@@ -192,7 +192,7 @@ proc tryWorldToLocal*(n: Node, p: Vector3, res: var Vector3): bool =
         res = m * p
         result = true
 
-proc worldPos(n: Node): Vector3 =
+proc worldPos*(n: Node): Vector3 =
     result = n.localToWorld(newVector3())
 
 proc `worldPos=`(n: Node, p: Vector3) =

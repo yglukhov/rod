@@ -51,19 +51,15 @@ proc startApplication() =
     cameraNode.translation.z = 1
 
     let light = editView.rootNode.newChild("point_light")
-    light.translation = newVector3(-100,100,70)
+    light.translation = newVector3(0,0,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
-    
-    # let anim = newAnimation()
-    # mainWindow.addAnimation(anim)
 
-    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
-        editView.rootNode.addChild(n)
+    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) = editView.rootNode.addChild(n)
 
-        mainWindow.addSubview(editView)
+    mainWindow.addSubview(editView)
 
-        discard startEditingNodeInView(editView.rootNode, editView)
+    discard startEditingNodeInView(editView.rootNode, editView)
 
     runAutoTestsIfNeeded()
 

@@ -173,8 +173,6 @@ method draw*(m: MeshComponent) =
 
     m.material.updateVertexAttributesSetup(m.vertInfo)
 
-    m.material.updateTransformSetup(m.node.translation, m.node.rotation, m.node.scale)
-
     m.material.updateSetup(m.node)
 
     if m.material.bEnableBackfaceCulling:

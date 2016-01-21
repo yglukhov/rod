@@ -2,9 +2,9 @@
 <COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
   <asset><contributor><author></author><authoring_tool>FBX COLLADA exporter</authoring_tool><comments></comments></contributor><created>2015-12-24T09:09:32Z</created><keywords></keywords><modified>2015-12-24T09:09:32Z</modified><revision></revision><subject></subject><title></title><unit meter="0.010000" name="centimeter"></unit><up_axis>Y_UP</up_axis></asset>
   <library_images>
-    <image id="test_obj_balloon_star_LP_star_baloon_file3-image" name="test_obj_balloon_star_LP_star_baloon_file3"><init_from>file://D:/falcon_project/sourceimages/balloons/baloon_star_color.png</init_from></image>
-    <image id="balloon_reflection-image" name="balloon_reflection"><init_from>file://D:/falcon_project/sourceimages/balloons/baloon_star_reflective.jpg</init_from></image>
-    <image id="balloon_specular-image" name="balloon_specular"><init_from>file://D:/falcon_project/sourceimages/balloons/baloon_star_specular.png</init_from></image>
+    <image id="test_obj_balloon_star_LP_star_baloon_file3-image" name="test_obj_balloon_star_LP_star_baloon_file3"><init_from>baloon_star_color.png</init_from></image>
+    <image id="balloon_reflection-image" name="balloon_reflection"><init_from>baloon_star_reflective.jpg</init_from></image>
+    <image id="balloon_normalmap-image" name="balloon_normalmap"><init_from>baloon_star_normals.png</init_from></image>
   </library_images>
   <library_materials>
     <material id="test_obj_gold_ball_nmapped_mat" name="test_obj_gold_ball_nmapped_mat">
@@ -36,9 +36,6 @@
                 </extra>
               </texture>
             </diffuse>
-     <!--        <specular>
-              <texture texture="balloon_specular-image" texcoord="CHANNEL0">
-            </specular> -->
             <specular>
               <color sid="specular">5.000000  2.884583 0.000000 1.000000</color>
             </specular>
@@ -57,6 +54,9 @@
             <transparency>
               <float sid="transparency">1.000000</float>
             </transparency>
+            <normalmap>
+              <texture texture="balloon_normalmap-image" texcoord="CHANNEL0">
+            </normalmap>
           </phong>
         </technique>
       </profile_COMMON>
