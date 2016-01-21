@@ -56,13 +56,15 @@ proc prepareFramebuffers(v: SceneView) =
         v.mScreenFramebuffer = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
         gl.bindFramebuffer(v.mActiveFrameBuffer)
 
-proc getViewMatrix*(v: SceneView): Matrix4 =
+proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
     let cam = v.camera
     doAssert(not cam.isNil)
     var viewTransform = v.viewMatrix
     var projTransform : Transform3D
     cam.getProjectionMatrix(v.bounds, projTransform)
     result = projTransform * viewTransform
+
+template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProjectionMatrix()
 
 proc swapCompositingBuffers*(v: SceneView)
 
@@ -72,7 +74,7 @@ method draw*(v: SceneView, r: Rect) =
     let c = currentContext()
     v.prepareFramebuffers()
 
-    c.withTransform v.getViewMatrix():
+    c.withTransform v.getViewProjectionMatrix():
         v.rootNode.recursiveDraw()
 
     if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
