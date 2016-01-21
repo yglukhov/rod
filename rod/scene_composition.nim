@@ -48,28 +48,29 @@ proc isEqual(v0x, v0y, v0z, v1x, v1y, v1z: float32): bool =
     result = isNear(v0x, v1x) and isNear(v0y, v1y) and isNear(v0z, v1z)
 
 type VertexNormal = object
-    vx, vy, vz, nx, ny, nz: float
+    vx, vy, vz, nx, ny, nz, tx, ty: float
 
 proc hash(v: VertexNormal): Hash =
-    result = v.vx.hash() !& v.vy.hash() !& v.vz.hash() !& v.nx.hash() !& v.ny.hash() !& v.nz.hash()
+    result = v.vx.hash() !& v.vy.hash() !& v.vz.hash() !& v.nx.hash() !& v.ny.hash() !& v.nz.hash() !& v.tx.hash() !& v.ty.hash()
     result = !$result
 
 proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ni, ti: int,
                   vertexesHash: var Table[VertexNormal, GLushort], tgX = 0.0, tgY = 0.0, tgZ: float32 = 0.0, bNeedTangent: bool = false): GLushort =
-    var attributesPerVertex: int = 0
-    attributesPerVertex += 3
-    if texCoordData.len > 0:
-        attributesPerVertex += 2
-    if normalData.len > 0:
-        attributesPerVertex += 3
-
     var v: VertexNormal
     v.vx = vertexData[vi * 3 + 0]
     v.vy = vertexData[vi * 3 + 1]
     v.vz = vertexData[vi * 3 + 2]
-    v.nx = normalData[ni * 3 + 0]
-    v.ny = normalData[ni * 3 + 1]
-    v.nz = normalData[ni * 3 + 2]
+    var attributesPerVertex: int = 0
+    attributesPerVertex += 3
+    if texCoordData.len > 0:
+        attributesPerVertex += 2
+        v.tx = texCoordData[ti * 2 + 0]
+        v.ty = texCoordData[ti * 2 + 1]
+    if normalData.len > 0:
+        attributesPerVertex += 3
+        v.nx = normalData[ni * 3 + 0]
+        v.ny = normalData[ni * 3 + 1]
+        v.nz = normalData[ni * 3 + 2]
 
     if not vertexesHash.contains(v):
         vertexAttrData.add(vertexData[vi * 3 + 0])
@@ -81,8 +82,8 @@ proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vert
                 vertexAttrData.add(texCoordData[ti * 2 + 0])
                 vertexAttrData.add(1.0 - texCoordData[ti * 2 + 1])
             else:
-                vertexAttrData.add(texCoordData[vi * 2 + 0])
-                vertexAttrData.add(1.0 - texCoordData[vi * 2 + 1])
+                vertexAttrData.add(vertexData[vi * 2 + 0])
+                vertexAttrData.add(1.0 - vertexData[vi * 2 + 1])
         if normalData.len > 0:
             if ni != -1:
                 vertexAttrData.add(normalData[ni * 3 + 0])
@@ -160,83 +161,108 @@ proc prepareVBO(vertexData, texCoordData, normalData: openarray[GLfloat], faces:
         i += faceStep
 
 proc getTextureLocationByName(cs: ColladaScene, texName: string): string =
-    # TODO: This looks wrong. The paths should be relative in dae file.
     for img in cs.childNodesImages:
         if texName.contains(img.name):
-            var texLocationSplited = img.location.split('/')
-            result = texLocationSplited[texLocationSplited.len() - 1]
+            result = img.location
+
+proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
+    result = newNode(cn.name)
+    var materialInited = false
+    var geometryInited = false
+    var childColladaMaterial: ColladaMaterial
+    var childColladaGeometry: ColladaGeometry
+    var nodeMesh: MeshComponent
+
+    if cn.matrix != nil:
+        let nodeTranslation = parseMatrix4(cn.matrix)
+        result.translation = newVector(nodeTranslation[3], nodeTranslation[7], nodeTranslation[11])
+
+    if cn.geometry != nil:
+        for geom in colladaScene.childNodesGeometry:
+            if cn.geometry.contains(geom.name) or geom.name.contains(cn.geometry):
+                childColladaGeometry = geom
+                geometryInited = true
+                nodeMesh = result.component(MeshComponent)
+
+    if cn.material != nil:
+        for mat in colladaScene.childNodesMaterial:
+            if mat.name.contains(cn.material) or cn.material.contains(mat.name):
+                childColladaMaterial = mat
+                materialInited = true
+
+    if materialInited:
+        var transparency = childColladaMaterial.transparency
+
+        if transparency < 1.0:
+            nodeMesh.material.blendEnable = true
+
+        nodeMesh.material.setEmissionColor(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
+        nodeMesh.material.setAmbientColor(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
+        nodeMesh.material.setDiffuseColor(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
+        nodeMesh.material.setSpecularColor(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
+        if childColladaMaterial.shininess > 1.0:
+            nodeMesh.material.setShininess(childColladaMaterial.shininess)
+        else:
+            nodeMesh.material.setShininess(1.0)
+        nodeMesh.material.setReflectivity(childColladaMaterial.reflectivity)
+
+        #TODO
+        # reflective*: Vector4
+        # transparent*: Vector4
+        # transparentTextureName*: string
+        #TODO add other material texture
+        # childMesh.material.falloffTexture = imageWithResource("collada/baloon_star_falloff.png")
+        # childMesh.material.normalTexture = imageWithResource("collada/baloon_star_normals.png")
+
+        if childColladaMaterial.diffuseTextureName != nil:
+            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.diffuseTextureName)
+            if texName != nil:
+                nodeMesh.material.albedoTexture = imageWithResource(texName)
+
+        if childColladaMaterial.reflectiveTextureName != nil:
+            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.reflectiveTextureName)
+            if texName != nil:
+                nodeMesh.material.reflectionTexture = imageWithResource(texName)
+
+        if childColladaMaterial.specularTextureName != nil:
+            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.specularTextureName)
+            if texName != nil:
+                nodeMesh.material.specularTexture = imageWithResource(texName)
+        # normalmap tex seted manually in dae file
+        if childColladaMaterial.normalmapTextureName != nil:
+            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.normalmapTextureName)
+            if texName != nil:
+                nodeMesh.material.normalTexture = imageWithResource(texName)
+    else:
+        echo("material does not inited for ", cn.name, " node")
+
+    if geometryInited:
+        let bNeedComputeTangentData = if nodeMesh.material.normalTexture.isNil(): false else: true
+
+        var vertexAttrData = newSeq[GLfloat]()
+        var indexData = newSeq[GLushort]()
+
+        prepareVBO(childColladaGeometry.vertices, childColladaGeometry.texcoords, childColladaGeometry.normals, childColladaGeometry.triangles, vertexAttrData, indexData,
+                   childColladaGeometry.faceAccessor.vertexOfset, childColladaGeometry.faceAccessor.normalOfset, childColladaGeometry.faceAccessor.texcoordOfset, bNeedComputeTangentData)
+
+        nodeMesh.vertInfo = newVertexInfoWithVertexData(childColladaGeometry.vertices.len, childColladaGeometry.texcoords.len, childColladaGeometry.normals.len, if bNeedComputeTangentData: 3 else: 0)
+        nodeMesh.createVBO(indexData, vertexAttrData)
+    else:
+        echo("geometry does not inited for ", cn.name, " node")
+
+    for it in cn.childs:
+        result.addChild(setupFromColladaNode(it, colladaScene))
 
 proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
     loadResourceAsync resourceName, proc(s: Stream) =
         var loader: ColladaLoader
 
-        let colladaRootNode = loader.load(s)
-        s.close()
-
-        let res = newNode(colladaRootNode.name)
-
         pushParentResource(resourceName)
         defer: popParentResource()
 
-        var i = 0
-        for child in colladaRootNode.childNodesGeometry:
-            let childNode = res.newChild(child.name)
+        let colladaScene = loader.load(s)
+        s.close()
 
-            let nodeTranslation = parseMatrix4(colladaRootNode.childNodesMatrices[i])
-            childNode.translation = newVector(nodeTranslation[3], nodeTranslation[7], nodeTranslation[11])
-            inc(i)
-            #TODO scene translation
+        let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
 
-            let childMesh = childNode.component(MeshComponent)
-
-            var childColladaMaterial: ColladaMaterial
-
-            for mat in colladaRootNode.childNodesMaterial:
-                if mat.name.contains(child.materialName):
-                    childColladaMaterial = mat
-
-            var transparency = childColladaMaterial.transparency
-
-            childMesh.material.setEmissionColor(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
-            childMesh.material.setAmbientColor(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
-            childMesh.material.setDiffuseColor(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
-            childMesh.material.setSpecularColor(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
-            childMesh.material.setShininess(childColladaMaterial.shininess)
-            childMesh.material.setReflectivity(childColladaMaterial.reflectivity)
-
-            #TODO
-            # reflective*: Vector4
-            # transparent*: Vector4
-            # transparency*: float32
-            # transparentsTextureName*: string
-
-            if childColladaMaterial.diffuseTextureName != nil:
-                var texLocation = colladaRootNode.getTextureLocationByName(childColladaMaterial.diffuseTextureName)
-                if texLocation != nil:
-                    childMesh.material.albedoTexture = imageWithResource(texLocation)
-
-            if childColladaMaterial.reflectiveTextureName != nil:
-                var texLocation = colladaRootNode.getTextureLocationByName(childColladaMaterial.reflectiveTextureName)
-                if texLocation != nil:
-                    childMesh.material.reflectionTexture = imageWithResource(texLocation)
-
-                    #TODO add other material texture
-                    # childMesh.material.falloffTexture = imageWithResource("collada/baloon_star_falloff.png")
-                    childMesh.material.normalTexture = imageWithResource("baloon_star_normals.png")
-
-            if childColladaMaterial.specularTextureName != nil:
-                var texLocation = colladaRootNode.getTextureLocationByName(childColladaMaterial.specularTextureName)
-                if texLocation != nil:
-                    childMesh.material.specularTexture = imageWithResource(texLocation)
-
-            let bNeedComputeTangentData = if childMesh.material.normalTexture.isNil(): false else: true
-
-            var vertexAttrData = newSeq[GLfloat]()
-            var indexData = newSeq[GLushort]()
-
-            prepareVBO(child.vertices, child.texcoords, child.normals, child.triangles, vertexAttrData, indexData,
-                       child.faceAccessor.vertexOfset, child.faceAccessor.normalOfset, child.faceAccessor.texcoordOfset, bNeedComputeTangentData)
-
-            childMesh.vertInfo = newVertexInfoWithVertexData(child.vertices.len, child.texcoords.len, child.normals.len, if bNeedComputeTangentData: 3 else: 0)
-            childMesh.createVBO(indexData, vertexAttrData)
         handler(res)

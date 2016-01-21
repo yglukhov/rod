@@ -59,10 +59,10 @@ proc prepareFramebuffers(v: SceneView) =
 proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
     let cam = v.camera
     doAssert(not cam.isNil)
-    var viewTransform = v.viewMatrix
+    v.viewMatrixCached = v.viewMatrix
     var projTransform : Transform3D
     cam.getProjectionMatrix(v.bounds, projTransform)
-    result = projTransform * viewTransform
+    result = projTransform * v.viewMatrixCached
 
 template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProjectionMatrix()
 

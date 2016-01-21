@@ -32,6 +32,7 @@ type
         node*: Node3D
 
     SceneView* = ref object of View
+        viewMatrixCached*: Matrix4
         mCamera*: Camera
         mRootNode*: Node3D
         #view*: View
@@ -40,9 +41,6 @@ type
         mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
         mScreenFrameBuffer*: GLuint
         tempFramebuffers*: seq[SelfContainedImage]
-        # passID
-        # renderPath
-        # observ
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]
 

@@ -12,6 +12,7 @@ import rod.node
 import rod.component.mesh_component
 import rod.component.material_shaders
 import rod.component.light
+import rod.component.camera
 import rod.quaternion
 import rod.vertex_data_info
 import rod.viewport
@@ -76,6 +77,32 @@ type MaterialColor* = ref object of RootObj
     shininessInited: bool
     reflectivityInited: bool
 
+type Material* = ref object of RootObj
+    albedoTexture*: Image
+    glossTexture*: Image
+    specularTexture*: Image
+    normalTexture*: Image
+    bumpTexture*: Image
+    reflectionTexture*: Image
+    falloffTexture*: Image
+
+    color*: MaterialColor
+
+    currentLightSourcesCount: int
+
+    bEnableBackfaceCulling*: bool
+    isLightReceiver*: bool
+    blendEnable*: bool
+    depthEnable*: bool
+    isWireframe*: bool
+
+    shader*: GLuint
+    vertexShader: string
+    fragmentShader: string
+    bUserDefinedShader: bool
+    bShaderNeedUpdate: bool
+    shaderMacroFlags: set[ShaderMacro]
+
 proc newMaterialWithDefaultColor*(): MaterialColor =
     result.new()
     result.ambient = newVector4(0.0, 0.0, 0.0, 0.0)
@@ -91,72 +118,6 @@ proc newMaterialWithDefaultColor*(): MaterialColor =
     result.specularInited = true
     result.shininessInited = true
     result.reflectivityInited = true
-
-type TransformInfo* = ref object of RootObj
-    modelMatrix*: Matrix4
-    normalMatrix*: Matrix3
-    scale: Vector3
-    rotation: Quaternion
-    translation: Vector3
-
-proc newTransformInfoWithIdentity*(): TransformInfo =
-    result.new()
-    result.scale = newVector3(1.0, 1.0, 1.0)
-    result.rotation = newQuaternion()
-    result.translation = newVector3(0.0, 0.0, 0.0)
-    result.modelMatrix.loadIdentity()
-    result.normalMatrix.loadIdentity()
-
-proc fromScaleRotationTranslation(t: TransformInfo, scale: Vector3, rotation: Quaternion, translation: Vector3) =
-    var bTransl, bScale, bRot: bool
-    if t.scale != scale and scale.x != 0 and scale.y != 0 and scale.z != 0:
-        t.scale = scale
-        bScale = true
-    if t.rotation != rotation:
-        t.rotation = rotation
-        bRot = true
-    if t.translation != translation:
-        t.translation = translation
-        bTransl = true
-    if bScale or bRot or bTransl:
-        t.modelMatrix.loadIdentity()
-        t.modelMatrix.translate(t.translation)
-        t.modelMatrix.multiply(t.rotation.toMatrix4(), t.modelMatrix)
-        t.modelMatrix.scale(t.scale)
-        # toInversedMatrix3 proc asserts with zero matrix( and on scale == 0)
-        t.modelMatrix.toInversedMatrix3(t.normalMatrix)
-        t.normalMatrix.transpose()
-
-type Material* = ref object of RootObj
-    albedoTexture*: Image
-    glossTexture*: Image
-    specularTexture*: Image
-    normalTexture*: Image
-    bumpTexture*: Image
-    reflectionTexture*: Image
-    falloffTexture*: Image
-
-    color*: MaterialColor
-    transform*: TransformInfo
-
-    # TODO
-    # useNormals: bool
-    # useNormalMap: bool
-
-    isLightReceiver*: bool
-    blendEnable*: bool
-    depthEnable*: bool
-    isWireframe*: bool
-    bEnableBackfaceCulling*: bool
-
-    currentLightSourcesCount: int
-
-    bUserDefinedShader: bool
-    vertexShader: string
-    fragmentShader: string
-    shader*: GLuint
-    bShaderNeedUpdate: bool
-    shaderMacroFlags: set[ShaderMacro]
 
 proc shaderNeedUpdate(m: Material) =
     m.bShaderNeedUpdate = true
@@ -243,17 +204,13 @@ proc removeReflectivity*(m: Material) =
 
 proc newDefaultMaterial*(): Material =
     result.new()
-
     result.currentLightSourcesCount = 0
     result.blendEnable = false
     result.depthEnable = true
     result.isWireframe = false
     result.isLightReceiver = true
     result.bEnableBackfaceCulling = true
-
     result.color = newMaterialWithDefaultColor()
-    result.transform = newTransformInfoWithIdentity()
-
     result.shader = 0
     result.shaderNeedUpdate()
 
@@ -421,8 +378,8 @@ proc setupLightAttributes(m: Material, v: SceneView) =
             if m.shader == 0:
                 m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
             else:
-                let lightPosition = newVector4(ls.node.translation.x, ls.node.translation.y, ls.node.translation.z, 0.0)
-                # var lightPosFromWorld = m.transform.normalMatrix * lightPosition
+                let lightWorldPos = ls.node.worldPos()
+                let lightPosition = v.viewMatrixCached * newVector4(lightWorldPos.x, lightWorldPos.y, lightWorldPos.z, 1.0)
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uLightPosition" & $lightsCount), lightPosition)
             if ls.lightAmbientInited:
                 if m.shader == 0:
@@ -487,8 +444,24 @@ proc setupRIMLightTechnique*(m: Material) =
     if m.shader == 0:
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
 
-proc updateTransformSetup*(m: Material, translation: Vector3, rotation: Quaternion, scale: Vector3) =
-    m.transform.fromScaleRotationTranslation(scale, rotation, translation)
+proc updateTransformSetup*(m: Material, n: Node) =    
+    let c = currentContext()
+    let gl = c.gl
+
+    var modelViewMatrix: Matrix4
+    var normalMatrix: Matrix3
+
+    modelViewMatrix = n.mSceneView.viewMatrixCached * n.worldTransform
+
+    if n.scale.x != 0 and n.scale.y != 0 and n.scale.z != 0:
+        modelViewMatrix.toInversedMatrix3(normalMatrix)
+        normalMatrix.transpose()
+    else:
+        normalMatrix.loadIdentity()
+
+    gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelViewMatrix"), false, modelViewMatrix)
+    gl.uniformMatrix3fv(gl.getUniformLocation(m.shader, "normalMatrix"), false, normalMatrix)
+    c.setTransformUniform(m.shader) # setup modelViewProjectionMatrix
 
 proc createShader(m: Material) =
     let c = currentContext()
@@ -564,31 +537,23 @@ method updateSetup*(m: Material, n: Node) {.base.} =
         if m.isLightReceiver:
             m.setupLightAttributes(n.sceneView)
         #TODO use techniques
-        m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
-        m.setupRIMLightTechnique()
+        # m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
+        # m.setupRIMLightTechnique()
         m.createShader()
 
     gl.useProgram(m.shader)
-
     m.setupSamplerAttributes()
     m.setupMaterialAttributes(n)
     if m.isLightReceiver:
         m.setupLightAttributes(n.sceneView)
-
-    c.setTransformUniform(m.shader)
-
-    if not m.transform.isNil:
-        gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelMatrix"), false, m.transform.modelMatrix)
-        gl.uniformMatrix3fv(gl.getUniformLocation(m.shader, "normalMatrix"), false, m.transform.normalMatrix)
+    m.updateTransformSetup(n)
 
     if n.alpha < 1.0 or m.blendEnable:
         gl.enable(gl.BLEND)
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     else:
         gl.disable(gl.BLEND)
-
     if m.depthEnable:
         gl.enable(gl.DEPTH_TEST)
-
     when not defined(ios) and not defined(android) and not defined(js):
         glPolygonMode(GL_FRONT_AND_BACK, if m.isWireframe: GL_LINE else: GL_FILL)

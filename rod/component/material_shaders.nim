@@ -20,12 +20,12 @@ varying vec2 vTexCoord;
 #endif
 
 uniform mat4 modelViewProjectionMatrix;
-uniform mat4 modelMatrix;
+uniform mat4 modelViewMatrix;
 uniform mat3 normalMatrix;
 
 void main() {
 #ifdef WITH_V_POSITION
-    vPosition = vec4(modelMatrix * aPosition).xyz;
+    vPosition = vec4(modelViewMatrix * aPosition).xyz;
 #endif
 #ifdef WITH_V_NORMAL
     vNormal = normalize(normalMatrix * aNormal.xyz);
@@ -192,6 +192,8 @@ uniform float uLightLinear7;
 uniform float uLightQuadratic7;
 uniform float uAttenuation7;
 #endif
+
+uniform vec3 uCamPosition;
 
 const float mipBias = 0.0;
 
@@ -455,6 +457,7 @@ vec4 computeTexel() {
         vec4 texel = emission + ambient + diffuse + specular;
     #endif
 
+    texel.a = diffuse.a;
     texel.a *= uMaterialTransparency;
 
     return texel;
