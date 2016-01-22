@@ -204,7 +204,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("worldPos", n.worldPos)
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
-    p.visitProperty("alpha", n.alpha)
+    p.visitProperty("alpha", n.alpha, { pfAnimatable })
 
     p.visitProperty("tX", n.translation.x, { pfAnimatable })
     p.visitProperty("tY", n.translation.y, { pfAnimatable })

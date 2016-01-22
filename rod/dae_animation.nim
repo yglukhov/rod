@@ -1,15 +1,18 @@
 import math
 import strutils
 
+import nimasset.collada
+
 import nimx.matrixes
 import nimx.types
 import nimx.animation
 
-import rod_types
+import component
 import node
+import property_visitor
 import quaternion
-
-import nimasset.collada
+import rod_types
+import variant
 
 type AnimProcSetter = proc(progress: float)
 
@@ -35,7 +38,27 @@ proc getAnimScale(m: var seq[float32]): Vector3 =
         newVector3(m[2], m[6], m[10]).length().float32
     )
 
-proc animationWithCollada*(node: Node, anim: ColladaAnimation) =
+proc findAnimatableProperty(n: Node, propName: string): Variant =
+    var res : Variant
+    var visitor : PropertyVisitor
+    visitor.requireName = true
+    visitor.requireSetter = true
+    visitor.flags = { pfAnimatable }
+    visitor.commit = proc() =
+        if res.isEmpty:
+            if visitor.name == propName:
+                res = visitor.setterAndGetter
+
+    n.visitProperties(visitor)
+
+    if res.isEmpty and not n.components.isNil:
+        for k, v in n.components:
+            v.visitProperties(visitor)
+            if not res.isEmpty: break
+
+    result = res
+
+proc animationWithCollada*(node: Node3D, anim: ColladaAnimation) =
     ## Attach animation to node
     if anim.isComplex:
         for subanim in anim.children:
@@ -57,6 +80,15 @@ proc animationWithCollada*(node: Node, anim: ColladaAnimation) =
         of ChannelKind.Visibility:
             realAnimation.loopDuration = 0.0
             realAnimation.numberOfLoops = 1
+            let
+                dataX = anim.sourceById(anim.sampler.input.source)
+                dataY = anim.sourceById(anim.sampler.output.source)
+            assert dataX.dataFloat.len == dataY.dataFloat.len
+
+            for i, time in dataX.dataFloat:
+                let visibility = dataY.dataFloat[i]
+                # TODO: add visibility animation here
+
         # Affine-transformations (linear) node parameters value
         of ChannelKind.Matrix:
             discard
