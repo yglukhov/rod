@@ -1,4 +1,5 @@
 import math
+import sequtils
 import strutils
 
 import nimasset.collada
@@ -65,8 +66,6 @@ proc animationWithCollada*(node: Node3D, anim: ColladaAnimation) =
             animationWithCollada(node, subanim)
     else:
         ## General Animation object preperation
-        let
-            realAnimation = newAnimation()
         var
             animProcSetters = newSeq[AnimProcSetter]()
             nodeToAttach = node.findNode(anim.channel.target)
@@ -78,17 +77,33 @@ proc animationWithCollada*(node: Node3D, anim: ColladaAnimation) =
         case anim.channel.kind
         # Animation of node's alpha value
         of ChannelKind.Visibility:
-            realAnimation.loopDuration = 0.0
-            realAnimation.numberOfLoops = 1
             let
                 dataX = anim.sourceById(anim.sampler.input.source)
                 dataY = anim.sourceById(anim.sampler.output.source)
+
             assert dataX.dataFloat.len == dataY.dataFloat.len
 
-            for i, time in dataX.dataFloat:
-                let visibility = dataY.dataFloat[i]
-                # TODO: add visibility animation here
+            for timeVisiblity in zip(dataX.dataFloat, dataY.dataFloat):
+                let realAnimation = newAnimation()
+                realAnimation.loopDuration = 0.0
+                realAnimation.numberOfLoops = 1
+                # TODO #1: add visibility animation progress setter here
 
         # Affine-transformations (linear) node parameters value
         of ChannelKind.Matrix:
-            discard
+            let
+                dataX = anim.sourceById(anim.sampler.input.source)
+                dataY = anim.sourceById(anim.sampler.output.source)
+
+            assert dataX.dataFloat.len * 16 == dataY.dataFloat.len
+
+            for i in 0 ..< dataX.dataFloat.len:
+                var
+                    transMatrix: seq[float32] = @[]
+                    time = dataX.dataFloat[i]
+                for j in i * 16 ..< (i + 1) * 16: transMatrix.add(dataY.dataFloat[i])
+                let
+                    translate = getAnimTranslation(transMatrix)
+                    rotate = getAnimRotation(transMatrix)
+                    scale = getAnimScale(transMatrix)
+                # TODO #2: add affine transformations animation progress setter here
