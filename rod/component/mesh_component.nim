@@ -13,6 +13,7 @@ import rod.component.material
 import rod.component.light
 import rod.vertex_data_info
 import rod.node
+import rod.property_visitor
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
@@ -198,5 +199,20 @@ method draw*(m: MeshComponent) =
     gl.disable(gl.DEPTH_TEST)
     gl.activeTexture(gl.TEXTURE0)
     gl.enable(gl.BLEND)
+
+method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
+    p.visitProperty("emission", m.material.color.emission)
+    p.visitProperty("ambient", m.material.color.ambient)
+    p.visitProperty("diffuse", m.material.color.diffuse)
+    p.visitProperty("specular", m.material.color.specular)
+    p.visitProperty("shininess", m.material.color.shininess)
+    p.visitProperty("reflectivity", m.material.color.reflectivity)
+
+    p.visitProperty("culling", m.material.bEnableBackfaceCulling)
+    p.visitProperty("light", m.material.isLightReceiver)
+    p.visitProperty("blend", m.material.blendEnable)
+    p.visitProperty("depth test", m.material.depthEnable)
+    p.visitProperty("wireframe", m.material.isWireframe)
+    p.visitProperty("RIM", m.material.isRIM)
 
 registerComponent[MeshComponent]()

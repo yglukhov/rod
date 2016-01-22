@@ -65,7 +65,7 @@ varying vec3 vBinormal;
 varying vec2 vTexCoord;
 #endif
 
-#ifdef WITH_MATERIAL_DIFFUSE
+#ifdef WITH_AMBIENT_SAMPLER
 uniform sampler2D texUnit;
 uniform vec4 uTexUnitCoords;
 #endif
@@ -193,7 +193,7 @@ uniform float uLightQuadratic7;
 uniform float uAttenuation7;
 #endif
 
-uniform vec3 uCamPosition;
+// uniform vec4 uCamPosition;
 
 const float mipBias = 0.0;
 
@@ -337,7 +337,7 @@ vec4 computeTexel() {
             float m = 2.0 * sqrt( r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0) );
             vec2 vReflCoord = vec2(r.x/m + 0.5, r.y/m + 0.5);
             vec4 reflectColor = texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord, mipBias) * uReflectivity;
-            
+
             ambient += reflectColor;
 
             // #ifdef WITH_FALLOF_SAMPLER
