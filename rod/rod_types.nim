@@ -39,7 +39,7 @@ type
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int
         mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
-        mScreenFrameBuffer*: GLuint
+        mScreenFrameBuffer*: FramebufferRef
         tempFramebuffers*: seq[SelfContainedImage]
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]

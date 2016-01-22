@@ -53,7 +53,7 @@ proc prepareFramebuffers(v: SceneView) =
         let sz = newSize(vp[2].Coord, vp[3].Coord)
         v.prepareFramebuffer(v.mActiveFrameBuffer, sz)
         v.prepareFramebuffer(v.mBackupFrameBuffer, sz)
-        v.mScreenFramebuffer = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
+        v.mScreenFramebuffer = gl.boundFramebuffer()
         gl.bindFramebuffer(v.mActiveFrameBuffer)
 
 proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
