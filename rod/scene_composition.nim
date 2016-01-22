@@ -247,7 +247,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     # else:
     #     echo("geometry does not inited for ", cn.name, " node")
 
-    for it in cn.childs:
+    for it in cn.children:
         result.addChild(setupFromColladaNode(it, colladaScene))
 
 proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
