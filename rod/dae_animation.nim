@@ -59,51 +59,100 @@ proc findAnimatableProperty(n: Node, propName: string): Variant =
 
     result = res
 
-proc animationWithCollada*(node: Node3D, anim: ColladaAnimation) =
+proc createProgressSetterWithPropSetter[T](setter: proc(v: T), numSamples: int, parsedValues: seq[T]): AnimProcSetter =
+    let
+        fromValue = 0.0
+        toValue = (parsedValues.len - 1).float
+        propValues = parsedValues
+
+    result = proc(p: float) =
+        let i = interpolate(fromValue, toValue - 1, p)
+        let index = floor(i).int
+        setter(propValues[index])
+
+proc createProgressSetter[T](propName: string, node: Node3D, parsedValues: seq[T]): AnimProcSetter =
+    let ap = node.findAnimatableProperty(propName)
+    if ap.isEmpty:
+        raise newException(Exception, "Property " & propName & " not found in node " & node.name)
+
+    variantMatch case ap as sng
+    of SetterAndGetter[float32]: result = createProgressSetterWithPropSetter(sng.setter, parsedValues)
+    of SetterAndGetter[Vector3]: result = createProgressSetterWithPropSetter(sng.setter, parsedValues)
+    of SetterAndGetter[Quaternion]: result = createProgressSetterWithPropSetter(sng.setter, parsedValue)
+    else:
+        raise newException(Exception, "Wrong type for property " & rawPropName & " of node " & animatedNode.name)
+
+proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] =
+    ## Attach single animation to node
+    ## General Animation object preperation
+    case anim.channel.kind
+    # Animation of node's alpha value
+    of ChannelKind.Visibility:
+        let
+            dataX = anim.sourceById(anim.sampler.input.source)
+            dataY = anim.sourceById(anim.sampler.output.source)
+
+        assert dataX.dataFloat.len == dataY.dataFloat.len
+
+        var parsedValues: seq[float32] = newSeq[float32](dataY.dataFloat.len)
+        for i, val in dataY.dataFloat: parsedValues[i] = val
+
+        let progressSetter = createProgressSetter[float32]("alpha", node, parsedValues)
+        if not progressSetter.isNil:
+            return @[progressSetter]
+
+    # Affine-transformations (linear) node parameters value
+    of ChannelKind.Matrix:
+        let
+            dataX = anim.sourceById(anim.sampler.input.source)
+            dataY = anim.sourceById(anim.sampler.output.source)
+
+        assert dataX.dataFloat.len * 16 == dataY.dataFloat.len
+
+        var
+            parsedTranslations: seq[Vector3] = @[]
+            parsedRotations: seq[Quaternion] = @[]
+            parsedScales: seq[Vector3] = @[]
+
+        for i in 0 ..< dataX.dataFloat.len:
+            var
+                transMatrix: seq[float32] = @[]
+                time = dataX.dataFloat[i]
+            for j in i * 16 ..< (i + 1) * 16:
+                transMatrix.add(dataY.dataFloat[i])
+            parsedTranslations.add(getAnimTranslation(transMatrix))
+            parsedRotations.add(getAnimRotation(transMatrix))
+            parsedScales.add(getAnimScale(transMatrix))
+
+        return @[
+            createProgressSetter[Vector3]("translation", node, parsedTranslations),
+            createProgressSetter[Quaternion]("rotation", node, parsedRotations),
+            createProgressSetter[Vector3]("scale", node, parsedScales)
+        ]
+
+proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
     ## Attach animation to node
+    result = newAnimation()
+    var animProgressSetters: seq[AnimProcSetter] = @[]
+
     if anim.isComplex:
         for subanim in anim.children:
-            animationWithCollada(node, subanim)
+            let nodeToAttach = root.findNode(anim.channel.target)
+            if nodeToAttach.isNil:
+                echo "Could not find node to attach animation to: $#" % [anim.channel.target]
+                continue
+            animProgressSetters.add(animationAttach(root, subanim))
     else:
-        ## General Animation object preperation
-        var
-            animProcSetters = newSeq[AnimProcSetter]()
-            nodeToAttach = node.findNode(anim.channel.target)
-
+        let nodeToAttach = root.findNode(anim.channel.target)
         if nodeToAttach.isNil:
             echo "Could not find node to attach animation to: $#" % [anim.channel.target]
             return
+        else:
+            animProgressSetters.add(animationAttach(root, anim))
 
-        case anim.channel.kind
-        # Animation of node's alpha value
-        of ChannelKind.Visibility:
-            let
-                dataX = anim.sourceById(anim.sampler.input.source)
-                dataY = anim.sourceById(anim.sampler.output.source)
+    result.loopDuration = 1    # TODO: GET REAL DURATION
+    result.numberOfLoops = 100
 
-            assert dataX.dataFloat.len == dataY.dataFloat.len
-
-            for timeVisiblity in zip(dataX.dataFloat, dataY.dataFloat):
-                let realAnimation = newAnimation()
-                realAnimation.loopDuration = 0.0
-                realAnimation.numberOfLoops = 1
-                # TODO #1: add visibility animation progress setter here
-
-        # Affine-transformations (linear) node parameters value
-        of ChannelKind.Matrix:
-            let
-                dataX = anim.sourceById(anim.sampler.input.source)
-                dataY = anim.sourceById(anim.sampler.output.source)
-
-            assert dataX.dataFloat.len * 16 == dataY.dataFloat.len
-
-            for i in 0 ..< dataX.dataFloat.len:
-                var
-                    transMatrix: seq[float32] = @[]
-                    time = dataX.dataFloat[i]
-                for j in i * 16 ..< (i + 1) * 16: transMatrix.add(dataY.dataFloat[i])
-                let
-                    translate = getAnimTranslation(transMatrix)
-                    rotate = getAnimRotation(transMatrix)
-                    scale = getAnimScale(transMatrix)
-                # TODO #2: add affine transformations animation progress setter here
+    result.onAnimate = proc(progress: float) =
+        for ps in animProgressSetters:
+            ps(progress)
