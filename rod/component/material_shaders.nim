@@ -314,11 +314,16 @@ vec4 computeTexel() {
 
     #ifdef WITH_V_POSITION
         #ifdef WITH_V_TANGENT
-            mat3 TBN = mat3(vTangent, vBinormal, vNormal);
-            vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
-            vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0;
-            vec3 normal = TBN * bumpNormal;
-            normal = normalize(normal);
+            #ifdef WITH_NORMAL_SAMPLER
+                mat3 TBN = mat3(vTangent, vBinormal, vNormal);
+                vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
+                vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0;
+                vec3 normal = TBN * bumpNormal;
+                normal = normalize(normal);
+            #else
+                vec3 normal = normalize(vNormal);
+            #endif
+
         #else
             #ifdef WITH_V_NORMAL
                 vec3 normal = normalize(vNormal);
@@ -371,7 +376,9 @@ vec4 computeTexel() {
                 float attenuation0 = computeAttenuation(uLightConstant0, uLightLinear0, uLightQuadratic0, distance0, uAttenuation0);
                 ambCoef += computeAmbient(uLightAmbient0);
                 diffCoef += computeDiffuse(uLightDiffuse0, attenuation0, L0, normal);
-                specCoef += computeSpecular(uLightSpecular0, attenuation0, uMaterialShininess, R0, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specCoef += computeSpecular(uLightSpecular0, attenuation0, uMaterialShininess, R0, E);
+                #endif
             #endif
             #ifdef WITH_LIGHT_1
                 vec3 bivector1 = uLightPosition1.xyz - vPosition.xyz;
@@ -381,7 +388,9 @@ vec4 computeTexel() {
                 float attenuation1 = computeAttenuation(uLightConstant1, uLightLinear1, uLightQuadratic1, distance1, uAttenuation1);
                 ambCoef += computeAmbient(uLightAmbient1);
                 diffCoef += computeDiffuse(uLightDiffuse1, attenuation1, L1, normal);
-                specCoef += computeSpecular(uLightSpecular1, attenuation1, uMaterialShininess, R1, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specCoef += computeSpecular(uLightSpecular1, attenuation1, uMaterialShininess, R1, E);
+                #endif
             #endif
             #ifdef WITH_LIGHT_2
                 vec3 bivector2 = uLightPosition2.xyz - vPosition.xyz;
@@ -391,7 +400,9 @@ vec4 computeTexel() {
                 float attenuation2 = computeAttenuation(uLightConstant2, uLightLinear2, uLightQuadratic2, distance2, uAttenuation2);
                 ambCoef += computeAmbient(uLightAmbient2);
                 diffCoef += computeDiffuse(uLightDiffuse2, attenuation2, L2, normal);
-                specCoef += computeSpecular(uLightSpecular2, attenuation2, uMaterialShininess, R2, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specCoef += computeSpecular(uLightSpecular2, attenuation2, uMaterialShininess, R2, E);
+                #endif
             #endif
             #ifdef WITH_LIGHT_3
                 vec3 bivector3 = uLightPosition3.xyz - vPosition.xyz;
@@ -401,7 +412,9 @@ vec4 computeTexel() {
                 float attenuation3 = computeAttenuation(uLightConstant3, uLightLinear3, uLightQuadratic3, distance3, uAttenuation3);
                 ambCoef += computeAmbient(uLightAmbient3);
                 diffCoef += computeDiffuse(uLightDiffuse3, attenuation3, L3, normal);
-                specCoef += computeSpecular(uLightSpecular3, attenuation3, uMaterialShininess, R3, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specCoef += computeSpecular(uLightSpecular3, attenuation3, uMaterialShininess, R3, E);
+                #endif
             #endif
             #ifdef WITH_LIGHT_4
                 vec3 bivector4 = uLightPosition4.xyz - vPosition.xyz;
@@ -411,7 +424,9 @@ vec4 computeTexel() {
                 float attenuation4 = computeAttenuation(uLightConstant4, uLightLinear4, uLightQuadratic4, distance4, uAttenuation4);
                 ambient += computeAmbient(uLightAmbient4);
                 diffuse += computeDiffuse(uLightDiffuse4, attenuation4, L4, normal);
-                specular += computeSpecular(uLightSpecular4, attenuation4, uMaterialShininess, R4, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specular += computeSpecular(uLightSpecular4, attenuation4, uMaterialShininess, R4, E);
+                #endif
             #endif
             #ifdef WITH_LIGHT_5
                 vec3 bivector5 = uLightPosition5.xyz - vPosition.xyz;
@@ -421,7 +436,9 @@ vec4 computeTexel() {
                 float attenuation5 = computeAttenuation(uLightConstant5, uLightLinear5, uLightQuadratic5, distance5, uAttenuation5);
                 ambCoef += computeAmbient(uLightAmbient5);
                 diffCoef += computeDiffuse(uLightDiffuse5, attenuation5, L5, normal);
-                specCoef += computeSpecular(uLightSpecular5, attenuation5, uMaterialShininess, R5, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specCoef += computeSpecular(uLightSpecular5, attenuation5, uMaterialShininess, R5, E);
+                #endif
             #endif
             #ifdef WITH_LIGHT_6
                 vec3 bivector6 = uLightPosition6.xyz - vPosition.xyz;
@@ -431,7 +448,9 @@ vec4 computeTexel() {
                 float attenuation6 = computeAttenuation(uLightConstant6, uLightLinear6, uLightQuadratic6, distance6, uAttenuation6);
                 ambCoef += computeAmbient(uLightAmbient6);
                 diffCoef += computeDiffuse(uLightDiffuse6, attenuation6, L6, normal);
-                specCoef += computeSpecular(uLightSpecular6, attenuation6, uMaterialShininess, R6, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specCoef += computeSpecular(uLightSpecular6, attenuation6, uMaterialShininess, R6, E);
+                #endif
             #endif
             #ifdef WITH_LIGHT_7
                 vec3 bivector7 = uLightPosition7.xyz - vPosition.xyz;
@@ -441,17 +460,19 @@ vec4 computeTexel() {
                 float attenuation7 = computeAttenuation(uLightConstant7, uLightLinear7, uLightQuadratic7, distance7, uAttenuation7);
                 ambCoef += computeAmbient(uLightAmbient7);
                 diffCoef += computeDiffuse(uLightDiffuse7, attenuation7, L7, normal);
-                specCoef += computeSpecular(uLightSpecular7, attenuation7, uMaterialShininess, R7, E);
+                #ifdef WITH_MATERIAL_SHININESS
+                    specCoef += computeSpecular(uLightSpecular7, attenuation7, uMaterialShininess, R7, E);
+                #endif
             #endif
         #endif
 
         vec4 texel = emission + ambient*ambCoef + diffuse*diffCoef + specular*specCoef;
 
         #ifdef WITH_RIM_LIGHT
-            float vdn = 1.0 - max(dot(normalize(-vPosition), normal), 0.0);
-            vec4 rim = vec4(smoothstep(0.5, 1.0, vdn));
+           float vdn = 1.0 - max(dot(normalize(-vPosition), normal), 0.0);
+           vec4 rim = vec4(smoothstep(0.5, 1.0, vdn));
 
-            texel += rim * diffCoef;
+           texel += rim * diffCoef;
         #endif
     #else
         vec4 texel = emission + ambient + diffuse + specular;

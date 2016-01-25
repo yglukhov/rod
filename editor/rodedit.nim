@@ -55,6 +55,9 @@ proc startApplication() =
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
+    # let anim = newAnimation()
+    # mainWindow.addAnimation(anim)
+
     loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
         editView.rootNode.addChild(n)
 

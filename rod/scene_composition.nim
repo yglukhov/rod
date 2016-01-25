@@ -14,6 +14,7 @@ import rod.quaternion
 
 import nimx.image
 import nimx.resource
+import nimx.resource_cache
 import nimx.context
 import nimx.portable_gl
 import nimx.window
@@ -194,14 +195,14 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
         var transparency = childColladaMaterial.transparency
         if transparency < 1.0:
             nodeMesh.material.blendEnable = true
-        nodeMesh.material.setEmissionColor(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
-        nodeMesh.material.setAmbientColor(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
-        nodeMesh.material.setDiffuseColor(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
-        nodeMesh.material.setSpecularColor(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
+        nodeMesh.material.emission = newVector4(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
+        nodeMesh.material.ambient = newVector4(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
+        nodeMesh.material.diffuse = newVector4(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
+        nodeMesh.material.specular = newVector4(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
         if childColladaMaterial.shininess > 1.0:
-            nodeMesh.material.setShininess(childColladaMaterial.shininess)
+            nodeMesh.material.shininess = childColladaMaterial.shininess
         else:
-            nodeMesh.material.setShininess(1.0)
+            nodeMesh.material.shininess = 1.0
 
         #TODO
         # reflective*: Vector4
@@ -219,7 +220,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
             var texName = colladaScene.getTextureLocationByName(childColladaMaterial.reflectiveTextureName)
             if texName != nil:
                 nodeMesh.material.reflectionTexture = imageWithResource(texName)
-                nodeMesh.material.setReflectivity(childColladaMaterial.reflectivity)
+                nodeMesh.material.reflectivity = childColladaMaterial.reflectivity
 
         if childColladaMaterial.specularTextureName != nil:
             var texName = colladaScene.getTextureLocationByName(childColladaMaterial.specularTextureName)
@@ -250,16 +251,43 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     for it in cn.children:
         result.addChild(setupFromColladaNode(it, colladaScene))
 
-proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
-    loadResourceAsync resourceName, proc(s: Stream) =
-        var loader: ColladaLoader
+var gScenesResCache = initTable[string, ColladaScene]()
 
+proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
+    var loader: ColladaLoader
+    result = loader.load(s)
+    s.close()
+
+proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
+    let colladaScene = gScenesResCache.getOrDefault(resourceName)
+
+    if colladaScene.isNil:
+        resourceNotCached(resourceName)
+
+        loadResourceAsync resourceName, proc(s: Stream) =
+            pushParentResource(resourceName)
+            defer: popParentResource()
+
+            let colladaScene = loadColladaFromStream(s, resourceName)
+            gScenesResCache[resourceName] = colladaScene
+
+            let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+            handler(res)
+    else:
         pushParentResource(resourceName)
         defer: popParentResource()
 
-        let colladaScene = loader.load(s)
-        s.close()
-
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
-
         handler(res)
+
+# registerResourcePreloader(["dae"], proc(name: string, callback: proc(n: Node3D)) =
+#     loadResourceAsync(name, proc(s: Stream) =
+#         pushParentResource(name)
+#         defer: popParentResource()
+
+#         let colladaScene = loadColladaFromStream(s, name)
+#         gScenesResCache[name] = colladaScene
+#         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+#         callback(res)
+#     )
+# )
