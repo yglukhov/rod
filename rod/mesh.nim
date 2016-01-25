@@ -162,7 +162,7 @@ proc draw*(m: Mesh) =
 
     var texCoords : array[4, GLfloat]
     let tex = m.texture.getTextureQuad(gl, texCoords)
-    if tex == 0:
+    if tex.isEmpty:
         return
 
     when not defined(ios) and not defined(android) and not defined(js):

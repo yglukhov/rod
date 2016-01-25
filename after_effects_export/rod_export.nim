@@ -520,6 +520,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
         file.openForWriting()
+        file.lineFeed = lfUnix
         try:
             var serializedComp = serializeComposition(c)
             file.write(fastJsonStringify(serializedComp))

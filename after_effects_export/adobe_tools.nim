@@ -5,12 +5,17 @@ type
     FileObj {.importc.} = object of RootObj
         name*: cstring
         path*: cstring
+        lineFeed*: cstring # lfWindows, lfUnix or lfMacintosh
 
     Folder* = ref FolderObj
     FolderObj {.importc.} = object of RootObj
         name*: cstring
         exists*: bool
         parent*: Folder
+
+const lfWindows*: cstring = "Windows"
+const lfUnix*: cstring = "Unix"
+const lfMacintosh*: cstring = "Macintosh"
 
 proc newFile*(path: cstring): File {.importc: "new File".}
 proc open*(f: File, mode: cstring) {.importcpp.}

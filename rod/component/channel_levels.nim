@@ -60,7 +60,7 @@ method draw*(cl: ChannelLevels) =
         let vp = cl.node.sceneView
         let c = currentContext()
         let gl = c.gl
-        let oldBuf = cast[GLuint](gl.getParami(gl.FRAMEBUFFER_BINDING))
+        let oldBuf = gl.boundFramebuffer()
 
         let tmpBuf = vp.aquireTempFramebuffer()
 
