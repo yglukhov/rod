@@ -67,7 +67,6 @@ proc createProgressSetterWithPropSetter[T](setter: proc(v: T), parsedValues: seq
 
     result = proc(p: float) =
         let i = interpolate(fromValue, toValue - 1, p)
-        echo "Interpolated: ", i
         let index = floor(i).int
         setter(propValues[index])
 
@@ -128,10 +127,6 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] 
             parsedRotations.add(getAnimRotation(transMatrix))
             parsedScales.add(getAnimScale(transMatrix))
 
-            echo "Translation: ", parsedTranslations[i]
-            echo "Rotation: ", parsedRotations[i]
-            echo "Scale: ", parsedScales[i]
-
         return @[
             createProgressSetter("translation", node, parsedTranslations),
             createProgressSetter("rotation", node, parsedRotations),
@@ -163,7 +158,5 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
                 animProgressSetters.add(progressSetter)
 
     result.onAnimate = proc(progress: float) =
-        echo "ON ANIMATE!!! ", progress
         for ps in animProgressSetters:
-            echo "Progress: ", progress
             ps(progress)

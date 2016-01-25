@@ -56,13 +56,13 @@ proc startApplication() =
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    loadSceneAsync "../../nimasset/balloon_animation_test.dae", proc(n: Node, a: seq[Animation] = @[]) =
+    loadSceneAsync "collada/balloons_test.dae", proc(n: Node, a: seq[Animation] = @[]) =
         editView.rootNode.addChild(n)
 
         mainWindow.addSubview(editView)
 
         for anim in a:
-            editView.window.animations.add(anim)
+            editView.window.addAnimation(anim)
 
         discard startEditingNodeInView(editView.rootNode, editView)
 
