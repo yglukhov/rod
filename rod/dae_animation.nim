@@ -1,19 +1,21 @@
+import tables
 import math
 import sequtils
 import strutils
 
+import variant
+
 import nimasset.collada
 
-import nimx.matrixes
-import nimx.types
 import nimx.animation
+import nimx.types
+import nimx.matrixes
 
-import component
+import rod_types
 import node
+import component
 import property_visitor
 import quaternion
-import rod_types
-import variant
 
 type AnimProcSetter = proc(progress: float)
 
@@ -22,14 +24,12 @@ proc getAnimTranslation(m: var seq[float32]): Vector3 =
 
 proc getAnimRotation(m: var seq[float32]): Quaternion =
     ## Return quaternion from transform matrix
-    template w: float32 =
-        bind m
-        sqrt(1 + m[0] + m[5] + m[10]) / 2
+    let w = sqrt(1 + m[0] + m[5] + m[10]) / 2
     return newQuaternion(
-        (m[9] - m[6]) / (4 * w()),
-        (m[2] - m[8]) / (4 * w()),
-        (m[4] - m[1]) / (4 * w()),
-        w()
+        (m[9] - m[6]) / (4 * w),
+        (m[2] - m[8]) / (4 * w),
+        (m[4] - m[1]) / (4 * w),
+        w
     )
 
 proc getAnimScale(m: var seq[float32]): Vector3 =
@@ -59,7 +59,7 @@ proc findAnimatableProperty(n: Node, propName: string): Variant =
 
     result = res
 
-proc createProgressSetterWithPropSetter[T](setter: proc(v: T), numSamples: int, parsedValues: seq[T]): AnimProcSetter =
+proc createProgressSetterWithPropSetter[T](setter: proc(v: T), parsedValues: seq[T]): AnimProcSetter =
     let
         fromValue = 0.0
         toValue = (parsedValues.len - 1).float
@@ -75,10 +75,12 @@ proc createProgressSetter[T](propName: string, node: Node3D, parsedValues: seq[T
     if ap.isEmpty:
         raise newException(Exception, "Property " & propName & " not found in node " & node.name)
 
-    variantMatch case ap as sng
-    of SetterAndGetter[float32]: result = createProgressSetterWithPropSetter(sng.setter, parsedValues)
-    of SetterAndGetter[Vector3]: result = createProgressSetterWithPropSetter(sng.setter, parsedValues)
-    of SetterAndGetter[Quaternion]: result = createProgressSetterWithPropSetter(sng.setter, parsedValue)
+    when T is float32:
+        result = createProgressSetterWithPropSetter(ap.get(SetterAndGetter[float32]).setter, parsedValues)
+    elif T is Vector3:
+        result = createProgressSetterWithPropSetter(ap.get(SetterAndGetter[Vector3]).setter, parsedValues)
+    elif T is Quaternion:
+        result = createProgressSetterWithPropSetter(ap.get(SetterAndGetter[Quaternion]).setter, parsedValues)
     else:
         raise newException(Exception, "Wrong type for property " & rawPropName & " of node " & animatedNode.name)
 
@@ -97,7 +99,7 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] 
         var parsedValues: seq[float32] = newSeq[float32](dataY.dataFloat.len)
         for i, val in dataY.dataFloat: parsedValues[i] = val
 
-        let progressSetter = createProgressSetter[float32]("alpha", node, parsedValues)
+        let progressSetter = createProgressSetter("alpha", node, parsedValues)
         if not progressSetter.isNil:
             return @[progressSetter]
 
@@ -120,14 +122,19 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] 
                 time = dataX.dataFloat[i]
             for j in i * 16 ..< (i + 1) * 16:
                 transMatrix.add(dataY.dataFloat[i])
+
             parsedTranslations.add(getAnimTranslation(transMatrix))
             parsedRotations.add(getAnimRotation(transMatrix))
             parsedScales.add(getAnimScale(transMatrix))
 
+            echo "Translation: ", parsedTranslations[i]
+            echo "Rotation: ", parsedRotations[i]
+            echo "Scale: ", parsedScales[i]
+
         return @[
-            createProgressSetter[Vector3]("translation", node, parsedTranslations),
-            createProgressSetter[Quaternion]("rotation", node, parsedRotations),
-            createProgressSetter[Vector3]("scale", node, parsedScales)
+            createProgressSetter("translation", node, parsedTranslations),
+            createProgressSetter("rotation", node, parsedRotations),
+            createProgressSetter("scale", node, parsedScales)
         ]
 
 proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
@@ -135,9 +142,9 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
     result = newAnimation()
     var animProgressSetters: seq[AnimProcSetter] = @[]
 
-    if anim.isComplex:
+    if anim.isComplex():
         for subanim in anim.children:
-            let nodeToAttach = root.findNode(anim.channel.target)
+            let nodeToAttach = root.findNode(subanim.channel.target)
             if nodeToAttach.isNil:
                 echo "Could not find node to attach animation to: $#" % [anim.channel.target]
                 continue
@@ -150,9 +157,11 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
         else:
             animProgressSetters.add(animationAttach(root, anim))
 
-    result.loopDuration = 1    # TODO: GET REAL DURATION
-    result.numberOfLoops = 100
+    result.loopDuration = 10.0    # TODO: GET REAL DURATION
+    result.numberOfLoops = 1
 
     result.onAnimate = proc(progress: float) =
+        echo "ON ANIMATE!!! ", progress
         for ps in animProgressSetters:
+            echo "Progress: ", progress
             ps(progress)

@@ -8,6 +8,7 @@ import outline_view
 import inspector_view
 import rod_types
 
+import nimx.animation
 import nimx.text_field
 import nimx.table_view_cell
 
@@ -122,9 +123,12 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
             outlineView.expandRow(sip)
             let path = callDialogFileOpen("Select file")
-            loadSceneAsync path, proc(n: Node) =
+            loadSceneAsync path, proc(n: Node, a: seq[Animation] = @[]) =
                 p.addChild(n)
                 outlineView.reloadData()
+                for anim in a:
+                    sceneView(p).window.animations.add(anim)
+
     result.addSubview(loadButton)
 
 
