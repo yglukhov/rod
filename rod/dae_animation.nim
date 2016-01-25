@@ -63,10 +63,11 @@ proc createProgressSetterWithPropSetter[T](setter: proc(v: T), parsedValues: seq
     let
         fromValue = 0.0
         toValue = (parsedValues.len - 1).float
-        propValues = parsedValues
+    var propValues = parsedValues
 
     result = proc(p: float) =
         let i = interpolate(fromValue, toValue - 1, p)
+        echo "Interpolated: ", i
         let index = floor(i).int
         setter(propValues[index])
 
@@ -121,7 +122,7 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] 
                 transMatrix: seq[float32] = @[]
                 time = dataX.dataFloat[i]
             for j in i * 16 ..< (i + 1) * 16:
-                transMatrix.add(dataY.dataFloat[i])
+                transMatrix.add(dataY.dataFloat[j])
 
             parsedTranslations.add(getAnimTranslation(transMatrix))
             parsedRotations.add(getAnimRotation(transMatrix))
@@ -140,7 +141,7 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] 
 proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
     ## Attach animation to node
     result = newAnimation()
-    var animProgressSetters: seq[AnimProcSetter] = @[]
+    var animProgressSetters = newSeq[AnimProcSetter]()
 
     if anim.isComplex():
         for subanim in anim.children:
@@ -148,17 +149,18 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
             if nodeToAttach.isNil:
                 echo "Could not find node to attach animation to: $#" % [anim.channel.target]
                 continue
-            animProgressSetters.add(animationAttach(root, subanim))
+            let progressSetter = animationAttach(root, subanim)
+            if not isNil(progressSetter):
+                animProgressSetters.add(progressSetter)
     else:
         let nodeToAttach = root.findNode(anim.channel.target)
         if nodeToAttach.isNil:
             echo "Could not find node to attach animation to: $#" % [anim.channel.target]
             return
         else:
-            animProgressSetters.add(animationAttach(root, anim))
-
-    result.loopDuration = 10.0    # TODO: GET REAL DURATION
-    result.numberOfLoops = 1
+            let progressSetter = animationAttach(root, anim)
+            if not isNil(progressSetter):
+                animProgressSetters.add(progressSetter)
 
     result.onAnimate = proc(progress: float) =
         echo "ON ANIMATE!!! ", progress

@@ -42,7 +42,7 @@ proc startApplication() =
         var mainWindow = newWindow(newRect(40, 40, 1200, 600))
 
     mainWindow.title = "Rod"
-    mainWindow.enableAnimation(true)
+    #mainWindow.enableAnimation(true)
 
     let editView = EditView.new(mainWindow.bounds)
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
