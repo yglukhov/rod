@@ -200,11 +200,11 @@ proc `worldPos=`(n: Node, p: Vector3) =
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
-    p.visitProperty("translation", n.translation)
+    p.visitProperty("translation", n.translation, { pfAnimatable })
     p.visitProperty("worldPos", n.worldPos)
-    p.visitProperty("scale", n.scale)
-    p.visitProperty("rotation", n.rotation)
-    p.visitProperty("alpha", n.alpha)
+    p.visitProperty("scale", n.scale, { pfAnimatable })
+    p.visitProperty("rotation", n.rotation, { pfAnimatable })
+    p.visitProperty("alpha", n.alpha, { pfAnimatable })
 
     p.visitProperty("tX", n.translation.x, { pfAnimatable })
     p.visitProperty("tY", n.translation.y, { pfAnimatable })

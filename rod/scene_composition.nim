@@ -12,6 +12,8 @@ import rod.component
 import rod.rod_types
 import rod.quaternion
 
+import rod.dae_animation
+
 import nimx.image
 import nimx.resource
 import nimx.context
@@ -250,7 +252,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     for it in cn.children:
         result.addChild(setupFromColladaNode(it, colladaScene))
 
-proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
+proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D, a: seq[Animation] = @[])) =
     loadResourceAsync resourceName, proc(s: Stream) =
         var loader: ColladaLoader
 
@@ -262,4 +264,8 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
 
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
 
-        handler(res)
+        var animations: seq[Animation] = @[]
+        for anim in colladaScene.animations:
+            animations.add(animationWithCollada(res, anim))
+
+        handler(res, animations)

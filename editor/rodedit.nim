@@ -42,23 +42,27 @@ proc startApplication() =
         var mainWindow = newWindow(newRect(40, 40, 1200, 600))
 
     mainWindow.title = "Rod"
+    #mainWindow.enableAnimation(true)
 
     let editView = EditView.new(mainWindow.bounds)
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
-    cameraNode.translation.z = 1
+    cameraNode.translation.z = 80
 
     let light = editView.rootNode.newChild("point_light")
     light.translation = newVector3(0,0,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
+    loadSceneAsync "collada/balloons_test.dae", proc(n: Node, a: seq[Animation] = @[]) =
         editView.rootNode.addChild(n)
 
         mainWindow.addSubview(editView)
+
+        for anim in a:
+            editView.window.addAnimation(anim)
 
         discard startEditingNodeInView(editView.rootNode, editView)
 
