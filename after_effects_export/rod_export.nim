@@ -46,6 +46,33 @@ var propertyNameMap = {
 
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
 
+var compExportPath = ""
+
+proc relativePathToPath(path, toPath: string): string =
+    # Returns a relative path to `toPath` which is equivalent of absolute `path`
+    # E.g. given `path` = "/a/b/c/d/e" and `toPath` = "/a/b/c/f/g"
+    # result = ""
+
+    let pc = path.split('/')
+    let tpc = toPath.split('/')
+
+    let ln = min(pc.len, tpc.len)
+    var cp = 0
+    while cp < ln:
+        if pc[cp] != tpc[cp]: break
+        inc cp
+
+    var ccp = pc.len - cp
+    result = ""
+    while ccp > 0:
+        result &= "../"
+        dec ccp
+    while cp < tpc.len:
+        result &= tpc[cp]
+        if cp != tpc.len - 1:
+            result &= "/"
+        inc cp
+
 proc getResourceNameFromSourceFile(file: File): string {.exportc.} =
     const footageToken = "(Footage)/"
     let p = $decodeURIComponent(file.path)
@@ -53,7 +80,10 @@ proc getResourceNameFromSourceFile(file: File): string {.exportc.} =
     var path = ""
     if n != -1:
         path = p.substr(n + footageToken.len) & "/"
-    result = path & $decodeURIComponent(file.name)
+    logi "Abs path: ", path & $decodeURIComponent(file.name)
+    logi "Comp path: ", compExportPath
+    logi "Res path: ", relativePathToPath(compExportPath, path & $decodeURIComponent(file.name))
+    result = relativePathToPath(compExportPath, path & $decodeURIComponent(file.name))
 
 proc getSequenceFileNamesFromSource(f: FootageItem): seq[string] =
     result = newSeq[string]()
@@ -191,7 +221,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         result["children"] = chres
 
     if layer.layerIsCompositionRef():
-        result["compositionRef"] = % (layer.source.exportPath & "/" & $layer.source.name)
+        result["compositionRef"] = %relativePathToPath(compExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
 
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
@@ -513,10 +543,11 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     let compositions = getSelectedCompositions()
     let folderPath = $exportFolderPath
     for c in compositions:
-        let compExportPath = folderPath & "/" & c.exportPath
-        if not newFolder(compExportPath).create():
-            logi "ERROR: Could not create filder ", compExportPath
-        let filePath = compExportPath & "/" & $c.name & ".json"
+        compExportPath = c.exportPath
+        let fullExportPath = folderPath & "/" & c.exportPath
+        if not newFolder(fullExportPath).create():
+            logi "ERROR: Could not create filder ", fullExportPath
+        let filePath = fullExportPath & "/" & $c.name & ".json"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
         file.openForWriting()

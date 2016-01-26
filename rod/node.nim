@@ -234,12 +234,11 @@ proc registerAnimation*(n: Node, name: string, a: Animation) =
 proc newNodeFromJson*(j: JsonNode): Node
 proc deserialize*(n: Node, j: JsonNode)
 
-proc loadComposition*(n: Node, compositionName: string) =
-    var path = compositionName
-    if compositionName.find("/") == -1:
-        path = "compositions/" & compositionName
-    loadJsonResourceAsync path & ".json", proc(j: JsonNode) =
+proc loadComposition*(n: Node, resourceName: string) =
+    loadJsonResourceAsync resourceName, proc(j: JsonNode) =
+        pushParentResource(resourceName)
         n.deserialize(j)
+        popParentResource()
 
 import ae_animation
 
@@ -282,6 +281,10 @@ proc newNodeFromJson*(j: JsonNode): Node =
     result = newNode()
     result.deserialize(j)
 
-proc newNodeWithCompositionName*(name: string): Node =
-    result = newNode(name)
+proc newNodeWithResource*(name: string): Node =
+    result = newNode()
     result.loadComposition(name)
+
+proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
+    result = newNode()
+    result.loadComposition("compositions/" & name & ".json")
