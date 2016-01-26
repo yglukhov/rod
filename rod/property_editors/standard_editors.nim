@@ -13,7 +13,7 @@ import rod.viewport
 
 when defined(js):
     from dom import alert
-else:
+elif not defined(android) and not defined(ios):
     import native_dialogs
 
 template toStr(v: SomeReal): string = formatFloat(v, ffDecimal, 2)
@@ -115,17 +115,20 @@ proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): View =
             result = newVector2(s.x, s.y)
             )
 
-proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): View =
-    let b = Button.new(newRect(0, 0, 200, 17))
-    b.title = "Open image..."
-    b.onAction do():
-        when defined(js):
-            alert("Files can be opened only in native editor version")
-        else:
-            let path = callDialogFileOpen("Select Image")
-            if not path.isNil:
-                setter(imageWithContentsOfFile(path))
-    result = b
+when not defined(android) and not defined(ios):
+    proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): View =
+        let b = Button.new(newRect(0, 0, 200, 17))
+        b.title = "Open image..."
+        b.onAction do():
+            when defined(js):
+                alert("Files can be opened only in native editor version")
+            else:
+                let path = callDialogFileOpen("Select Image")
+                if not path.isNil:
+                    setter(imageWithContentsOfFile(path))
+        result = b
+
+    registerPropertyEditor(newImagePropertyView)
 
 proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): View =
     let textField = newTextField(newRect(0, 0, 200, 17))
@@ -155,6 +158,5 @@ registerPropertyEditor(newVecPropertyView[Vector4])
 registerPropertyEditor(newColorPropertyView)
 registerPropertyEditor(newSizePropertyView)
 registerPropertyEditor(newPointPropertyView)
-registerPropertyEditor(newImagePropertyView)
 registerPropertyEditor(newNodePropertyView)
 registerPropertyEditor(newBoolPropertyView)
