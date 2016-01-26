@@ -61,6 +61,7 @@ type ShaderMacro = enum
     WITH_LIGHT_7
     WITH_TBN_FROM_NORMALS
     WITH_RIM_LIGHT
+    WITH_NORMALMAP_TO_SRGB
 
 type
     MaterialColor* = ref object
@@ -97,6 +98,7 @@ type
         depthEnable*: bool
         isWireframe*: bool
         isRIM: bool
+        isNormalSRGB: bool
 
         shader*: GLuint
         vertexShader: string
@@ -210,6 +212,30 @@ template `isRIM=`*(m: Material, val: bool) =
         else:
             m.shaderMacroFlags.excl(WITH_RIM_LIGHT)
         m.bShaderNeedUpdate = true
+
+template setupRIMLightTechnique*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
+
+template setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_TBN_FROM_NORMALS)
+
+proc isNormalSRGB*(m: Material): bool =
+    result = m.isNormalSRGB
+
+template `isNormalSRGB=`*(m: Material, val: bool) =
+    if m.isNormalSRGB != val:
+        m.isNormalSRGB = val
+        if val:
+            m.shaderMacroFlags.incl(WITH_NORMALMAP_TO_SRGB)
+        else:
+            m.shaderMacroFlags.excl(WITH_NORMALMAP_TO_SRGB)
+        m.bShaderNeedUpdate = true
+
+template setupNormalSRGBTechnique*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_NORMALMAP_TO_SRGB)
 
 proc newDefaultMaterial*(): Material =
     result.new()
@@ -442,14 +468,6 @@ proc setupLightAttributes(m: Material, v: SceneView) =
             m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
             m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
 
-template setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
-    if m.shader == 0:
-        m.shaderMacroFlags.incl(WITH_TBN_FROM_NORMALS)
-
-template setupRIMLightTechnique*(m: Material) =
-    if m.shader == 0:
-        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
-
 template setupTransform*(m: Material, n: Node) =
     let c = currentContext()
     let gl = c.gl
@@ -548,10 +566,12 @@ method updateSetup*(m: Material, n: Node) {.base.} =
         m.setupMaterialAttributes(n)
         if m.isLightReceiver:
             m.setupLightAttributes(n.sceneView)
-        #TODO use techniques
+        # setup shader techniques
         m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
         if m.isRIM:
             m.setupRIMLightTechnique()
+        if m.isNormalSRGB:
+            m.setupNormalSRGBTechnique()
         m.createShader()
 
     gl.useProgram(m.shader)

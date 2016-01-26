@@ -48,10 +48,10 @@ proc startApplication() =
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
-    cameraNode.translation.z = 1
+    cameraNode.translation.z = 10
 
     let light = editView.rootNode.newChild("point_light")
-    light.translation = newVector3(0,0,100)
+    light.translation = newVector3(-100,100,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 

@@ -217,5 +217,6 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("depth test", m.material.depthEnable)
     p.visitProperty("wireframe", m.material.isWireframe)
     p.visitProperty("RIM", m.material.isRIM)
+    p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
 registerComponent[MeshComponent]()

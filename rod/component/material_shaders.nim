@@ -290,6 +290,16 @@ float computeAttenuation(float lConst, float lLin, float lQuad, float distance, 
     return result;
 }
 
+float sRGB(float c) {
+    const float a = 0.055;
+    if(c < 0.0031308) { return 12.92*c; }
+    else { return (1.0+a)*pow(c, 1.0/2.2) - a; }
+}
+
+vec3 toSRGB(vec3 c) {
+    return vec3(sRGB(c.x),sRGB(c.y),sRGB(c.z));
+}
+
 vec4 computeTexel() {
     vec4 emission = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 ambient = vec4(0.0, 0.0, 0.0, 0.0);
@@ -318,7 +328,13 @@ vec4 computeTexel() {
                 mat3 TBN = mat3(vTangent, vBinormal, vNormal);
                 vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
                 vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0;
+
                 vec3 normal = TBN * bumpNormal;
+
+                #ifdef WITH_NORMALMAP_TO_SRGB
+                    normal = toSRGB(normal);
+                #endif
+
                 normal = normalize(normal);
             #else
                 vec3 normal = normalize(vNormal);
