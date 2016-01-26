@@ -8,6 +8,7 @@ import outline_view
 import inspector_view
 import rod_types
 
+import nimx.animation
 import nimx.text_field
 import nimx.table_view_cell
 
@@ -127,7 +128,6 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
                     p.addChild(n)
                     outlineView.reloadData()
         result.addSubview(loadButton)
-
 
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()

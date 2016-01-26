@@ -1,3 +1,5 @@
+import tables
+
 import nimx.matrixes
 import nimx.system_logger
 import nimx.animation
@@ -42,23 +44,30 @@ proc startApplication() =
         var mainWindow = newWindow(newRect(40, 40, 1200, 600))
 
     mainWindow.title = "Rod"
+    #mainWindow.enableAnimation(true)
 
     let editView = EditView.new(mainWindow.bounds)
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
-    cameraNode.translation.z = 1
+    cameraNode.translation.z = 80
 
     let light = editView.rootNode.newChild("point_light")
     light.translation = newVector3(0,0,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
+    loadSceneAsync "collada/balloon_animation_test.dae", proc(n: Node) =
         editView.rootNode.addChild(n)
 
         mainWindow.addSubview(editView)
+
+        echo "Node: ", n.name
+        if not isNil(n.animations):
+            echo "ANIMATIONS: ", n.animations.len
+            for anim in n.animations.values():
+                editView.window.addAnimation(anim)
 
         discard startEditingNodeInView(editView.rootNode, editView)
 

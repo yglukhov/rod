@@ -12,6 +12,8 @@ import rod.component
 import rod.rod_types
 import rod.quaternion
 
+import rod.dae_animation
+
 import nimx.image
 import nimx.resource
 import nimx.context
@@ -261,5 +263,9 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
         s.close()
 
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+
+        var animations: seq[Animation] = @[]
+        for anim in colladaScene.animations:
+            animations.add(animationWithCollada(res, anim))
 
         handler(res)
