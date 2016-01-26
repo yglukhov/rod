@@ -1,3 +1,5 @@
+import tables
+
 import nimx.matrixes
 import nimx.system_logger
 import nimx.animation
@@ -56,13 +58,16 @@ proc startApplication() =
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    loadSceneAsync "collada/balloons_test.dae", proc(n: Node, a: seq[Animation] = @[]) =
+    loadSceneAsync "collada/balloon_animation_test.dae", proc(n: Node) =
         editView.rootNode.addChild(n)
 
         mainWindow.addSubview(editView)
 
-        for anim in a:
-            editView.window.addAnimation(anim)
+        echo "Node: ", n.name
+        if not isNil(n.animations):
+            echo "ANIMATIONS: ", n.animations.len
+            for anim in n.animations.values():
+                editView.window.addAnimation(anim)
 
         discard startEditingNodeInView(editView.rootNode, editView)
 

@@ -138,9 +138,11 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
     result = newAnimation()
     var animProgressSetters = newSeq[AnimProcSetter]()
 
+    var nodeToAttach: Node = nil
+
     if anim.isComplex():
         for subanim in anim.children:
-            let nodeToAttach = root.findNode(subanim.channel.target)
+            nodeToAttach = root.findNode(subanim.channel.target)
             if nodeToAttach.isNil:
                 echo "Could not find node to attach animation to: $#" % [anim.channel.target]
                 continue
@@ -148,7 +150,7 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
             if not isNil(progressSetter):
                 animProgressSetters.add(progressSetter)
     else:
-        let nodeToAttach = root.findNode(anim.channel.target)
+        nodeToAttach = root.findNode(anim.channel.target)
         if nodeToAttach.isNil:
             echo "Could not find node to attach animation to: $#" % [anim.channel.target]
             return
@@ -160,3 +162,7 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
     result.onAnimate = proc(progress: float) =
         for ps in animProgressSetters:
             ps(progress)
+
+    if anim.id != "":
+        echo "Attaching $# to $#" % [anim.id, root.name]
+        root.registerAnimation(anim.id, result)

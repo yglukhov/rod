@@ -252,7 +252,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     for it in cn.children:
         result.addChild(setupFromColladaNode(it, colladaScene))
 
-proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D, a: seq[Animation] = @[])) =
+proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
     loadResourceAsync resourceName, proc(s: Stream) =
         var loader: ColladaLoader
 
@@ -268,4 +268,4 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D, a: seq[Anima
         for anim in colladaScene.animations:
             animations.add(animationWithCollada(res, anim))
 
-        handler(res, animations)
+        handler(res)
