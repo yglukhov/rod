@@ -41,9 +41,9 @@ proc registerAnimation(n: Node, v: EditView) =
     if not isNil(n.animations):
         for anim in n.animations.values():
             v.window.addAnimation(anim)
-            anim.loopPattern = lpStartToEndToStart
-            anim.loopDuration *= 2.0
-            anim.numberOfLoops = 1
+            # anim.loopPattern = lpStartToEndToStart
+            # anim.loopDuration *= 2.0
+            # anim.numberOfLoops = 1
 
     if not n.children.isNil:
        for child in n.children:
