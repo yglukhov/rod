@@ -12,6 +12,8 @@ import rod.component
 import rod.rod_types
 import rod.quaternion
 
+import rod.dae_animation
+
 import nimx.image
 import nimx.resource
 import nimx.resource_cache
@@ -272,12 +274,20 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             gScenesResCache[resourceName] = colladaScene
 
             let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+            #var animations: seq[Animation] = @[]
+            for anim in colladaScene.animations:
+                discard animationWithCollada(res, anim)
+
             handler(res)
     else:
         pushParentResource(resourceName)
         defer: popParentResource()
 
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+        #var animations: seq[Animation] = @[]
+        for anim in colladaScene.animations:
+            discard animationWithCollada(res, anim)
+
         handler(res)
 
 # registerResourcePreloader(["dae"], proc(name: string, callback: proc(n: Node3D)) =

@@ -8,6 +8,7 @@ import outline_view
 import inspector_view
 import rod_types
 
+import nimx.animation
 import nimx.text_field
 import nimx.table_view_cell
 
@@ -18,7 +19,7 @@ import variant
 
 when defined(js):
     import dom
-else:
+elif not defined(android) and not defined(ios):
     import native_dialogs
 
 type Editor* = ref object
@@ -121,27 +122,27 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         outlineView.reloadData()
     result.addSubview(refreshButton)
 
-    let loadButton = Button.new(newRect(110, result.bounds.height - 20, 60, 20))
-    loadButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
-    loadButton.title = "Load"
-    loadButton.onAction do():
-        when defined(js):
-            alert("Loading is currenlty availble in native version only.")
-        else:
-            var sip = outlineView.selectedIndexPath
-            var p = e.rootNode
-            if sip.len == 0:
-                sip.add(0)
+    when not defined(android) and not defined(ios):
+        let loadButton = Button.new(newRect(110, result.bounds.height - 20, 60, 20))
+        loadButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+        loadButton.title = "Load"
+        loadButton.onAction do():
+            when defined(js):
+                alert("Loading is currenlty availble in native version only.")
             else:
-                p = outlineView.itemAtIndexPath(sip).get(Node3D)
+                var sip = outlineView.selectedIndexPath
+                var p = e.rootNode
+                if sip.len == 0:
+                    sip.add(0)
+                else:
+                    p = outlineView.itemAtIndexPath(sip).get(Node3D)
 
-            outlineView.expandRow(sip)
-            let path = callDialogFileOpen("Select file")
-            loadSceneAsync path, proc(n: Node) =
-                p.addChild(n)
-                outlineView.reloadData()
-    result.addSubview(loadButton)
-
+                outlineView.expandRow(sip)
+                let path = callDialogFileOpen("Select file")
+                loadSceneAsync path, proc(n: Node) =
+                    p.addChild(n)
+                    outlineView.reloadData()
+        result.addSubview(loadButton)
 
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
