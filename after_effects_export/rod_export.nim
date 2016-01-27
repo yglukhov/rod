@@ -55,9 +55,6 @@ proc getResourceNameFromSourceFile(file: File): string {.exportc.} =
     var path = ""
     if n != -1:
         path = p.substr(n + footageToken.len) & "/"
-    logi "Abs path: ", path & $decodeURIComponent(file.name)
-    logi "Comp path: ", compExportPath
-    logi "Res path: ", relativePathToPath(compExportPath, path & $decodeURIComponent(file.name))
     result = relativePathToPath(compExportPath, path & $decodeURIComponent(file.name))
 
 proc getSequenceFileNamesFromSource(f: FootageItem): seq[string] =
