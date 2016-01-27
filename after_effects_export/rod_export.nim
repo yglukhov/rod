@@ -4,7 +4,7 @@ import times
 import json
 import algorithm
 import strutils
-import nimx.matrixes
+import nimx.matrixes, nimx.pathutils
 import rod.quaternion
 
 type File = after_effects.File
@@ -47,31 +47,6 @@ var propertyNameMap = {
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
 
 var compExportPath = ""
-
-proc relativePathToPath(path, toPath: string): string =
-    # Returns a relative path to `toPath` which is equivalent of absolute `path`
-    # E.g. given `path` = "/a/b/c/d/e" and `toPath` = "/a/b/c/f/g"
-    # result = ""
-
-    let pc = path.split('/')
-    let tpc = toPath.split('/')
-
-    let ln = min(pc.len, tpc.len)
-    var cp = 0
-    while cp < ln:
-        if pc[cp] != tpc[cp]: break
-        inc cp
-
-    var ccp = pc.len - cp
-    result = ""
-    while ccp > 0:
-        result &= "../"
-        dec ccp
-    while cp < tpc.len:
-        result &= tpc[cp]
-        if cp != tpc.len - 1:
-            result &= "/"
-        inc cp
 
 proc getResourceNameFromSourceFile(file: File): string {.exportc.} =
     const footageToken = "(Footage)/"
