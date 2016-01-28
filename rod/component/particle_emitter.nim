@@ -68,13 +68,17 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
     part.velocity = aroundZ(p.direction + p.direction * pmRandom(p.directionRandom)) * newVector3(velocityLen, 0, 0)
     part.initialLifetime = p.lifetime + p.lifetime * pmRandom(0.1)
     part.remainingLifetime = part.initialLifetime
-    part.rotVelocity = newQuaternion(pmRandom(5.0), ForwardVector)
+    part.rotVelocity = newQuaternion(pmRandom(3.0), ForwardVector)
 
 template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: float) =
     part.remainingLifetime -= timeDiff
     part.velocity += p.gravity
-    part.coord += part.velocity
-    part.rotation = (part.rotation * part.rotVelocity).normalized()
+
+    let velDiff = part.velocity * timeDiff / 0.01
+    part.coord += velDiff
+
+    let newRotation = (part.rotation * part.rotVelocity).normalized() * timeDiff / 0.01
+    part.rotation = newRotation
 
 template drawParticle(p: ParticleEmitter, part: ParticleData) =
     let proto = p.particlePrototype
@@ -96,7 +100,6 @@ method draw*(p: ParticleEmitter) =
 
     let curTime = epochTime()
     let timeDiff = curTime - p.lastDrawTime
-
     for i in 0 ..< p.particles.len:
         var needsToDraw = false
         if p.particles[i].remainingLifetime <= 0:
