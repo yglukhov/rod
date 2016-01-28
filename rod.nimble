@@ -1,13 +1,14 @@
-[Package]
-name          = "rod"
+# Package
 version       = "0.1.0"
 author        = "Anonymous"
-description   = "New Nimble project for Nim"
+description   = "Graphics engine"
 license       = "MIT"
 #bin           = "editor/rodedit"
 
-[Deps]
-Requires: "nimx"
-Requires: "https://github.com/SSPKrolik/nimasset"
-Requires: "variant"
-Requires: "native_dialogs"
+# Dependencies
+requires "nimx"
+requires "https://github.com/SSPKrolik/nimasset"
+requires "variant"
+requires "native_dialogs"
+requires "nimPNG"
+requires "https://github.com/yglukhov/imgtools"
