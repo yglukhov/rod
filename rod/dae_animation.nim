@@ -84,7 +84,7 @@ proc createProgressSetter[T](propName: string, node: Node3D, parsedValues: seq[T
     else:
         raise newException(Exception, "Wrong type for property " & rawPropName & " of node " & animatedNode.name)
 
-proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] =
+proc animationAttach(node: Node3D, anim: ColladaAnimation, duration: var float32): seq[AnimProcSetter] =
     ## Attach single animation to node
     ## General Animation object preperation
     case anim.channel.kind
@@ -108,6 +108,8 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] 
         let
             dataX = anim.sourceById(anim.sampler.input.source)
             dataY = anim.sourceById(anim.sampler.output.source)
+
+        duration = dataX.dataFloat[^1] - dataX.dataFloat[0]
 
         assert dataX.dataFloat.len * 16 == dataY.dataFloat.len
 
@@ -136,6 +138,9 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation): seq[AnimProcSetter] 
 proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
     ## Attach animation to node
     result = newAnimation()
+
+    var animDuration: float32
+
     var animProgressSetters = newSeq[AnimProcSetter]()
 
     var nodeToAttach: Node = nil
@@ -146,7 +151,7 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
             if nodeToAttach.isNil:
                 echo "Could not find node to attach animation to: $#" % [anim.channel.target]
                 continue
-            let progressSetter = animationAttach(root, subanim)
+            let progressSetter = animationAttach(nodeToAttach, subanim, animDuration)
             if not isNil(progressSetter):
                 animProgressSetters.add(progressSetter)
     else:
@@ -155,7 +160,7 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
             echo "Could not find node to attach animation to: $#" % [anim.channel.target]
             return
         else:
-            let progressSetter = animationAttach(root, anim)
+            let progressSetter = animationAttach(nodeToAttach, anim, animDuration)
             if not isNil(progressSetter):
                 animProgressSetters.add(progressSetter)
 
@@ -164,5 +169,7 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
             ps(progress)
 
     if anim.id != "":
-        echo "Attaching $# to $#" % [anim.id, root.name]
-        root.registerAnimation(anim.id, result)
+        echo "Attaching $# to $#" % [anim.id, nodeToAttach.name]
+        nodeToAttach.registerAnimation(anim.id, result)
+
+    result.loopDuration = animDuration

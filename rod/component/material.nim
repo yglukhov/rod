@@ -24,8 +24,8 @@ type Attrib = enum
     aPosition
     aTexCoord
     aNormal
-    aBinormal
     aTangent
+    aBinormal
 
 type ShaderMacro = enum
     WITH_V_POSITION
@@ -61,15 +61,16 @@ type ShaderMacro = enum
     WITH_LIGHT_7
     WITH_TBN_FROM_NORMALS
     WITH_RIM_LIGHT
+    WITH_NORMALMAP_TO_SRGB
 
 type
     MaterialColor* = ref object
-        emission*: Vector4
-        ambient*: Vector4
-        diffuse*: Vector4
-        specular*: Vector4
-        shininess*: float32
-        reflectivity*: float32
+        emission: Vector4
+        ambient: Vector4
+        diffuse: Vector4
+        specular: Vector4
+        shininess: float32
+        reflectivity: float32
 
         ambientInited: bool
         emissionInited: bool
@@ -87,7 +88,7 @@ type
         reflectionTexture*: Image
         falloffTexture*: Image
 
-        color*: MaterialColor
+        color: MaterialColor
 
         currentLightSourcesCount: int
         isLightReceiver: bool
@@ -97,6 +98,7 @@ type
         depthEnable*: bool
         isWireframe*: bool
         isRIM: bool
+        isNormalSRGB: bool
 
         shader*: GLuint
         vertexShader: string
@@ -105,88 +107,135 @@ type
         bShaderNeedUpdate: bool
         shaderMacroFlags: set[ShaderMacro]
 
-proc shaderNeedUpdate(m: Material) =
-    m.bShaderNeedUpdate = true
+template shaderNeedUpdate(m: Material) = m.bShaderNeedUpdate = true
 
-proc setAmbientColor*(m: Material, x, y, z: Coord) =
-    m.color.ambient = newVector4(x, y, z, 1.0)
-    m.color.ambientInited = true
-    m.shaderNeedUpdate()
+proc emission*(m: Material): Vector4 = result = m.color.emission
+proc ambient*(m: Material): Vector4 = result = m.color.ambient
+proc diffuse*(m: Material): Vector4 = result = m.color.diffuse
+proc specular*(m: Material): Vector4 = result = m.color.specular
+proc shininess*(m: Material): Coord = result = m.color.shininess
+proc reflectivity*(m: Material): Coord = result = m.color.reflectivity
 
-proc setAmbientColor*(m: Material, x, y, z, w: Coord) =
-    m.color.ambient = newVector4(x, y, z, w)
-    m.color.ambientInited = true
-    m.shaderNeedUpdate()
-
-proc removeAmbientColor*(m: Material) =
-    m.color.ambientInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_AMBIENT)
-    m.shaderNeedUpdate()
-
-proc setEmissionColor*(m: Material, x, y, z, w: Coord) =
-    m.color.emission = newVector4(x, y, z, w)
+template `emission=`*(m: Material, v: Vector4) =
+    if not m.color.emissionInited:
+        m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
+        m.bShaderNeedUpdate = true
+    m.color.emission = v
     m.color.emissionInited = true
-    m.shaderNeedUpdate()
-
-proc setEmissionColor*(m: Material, x, y, z: Coord) =
-    m.color.emission = newVector4(x, y, z, 1.0)
-    m.color.emissionInited = true
-    m.shaderNeedUpdate()
-
-proc removeEmissionColor*(m: Material) =
-    m.color.emissionInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_EMISSION)
-    m.shaderNeedUpdate()
-
-proc setDiffuseColor*(m: Material, x, y, z: Coord) =
-    m.color.diffuse = newVector4(x, y, z, 1.0)
+template `ambient=`*(m: Material, v: Vector4) =
+    if not m.color.ambientInited:
+        m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
+        m.bShaderNeedUpdate = true
+    m.color.ambient = v
+    m.color.ambientInited = true
+template `diffuse=`*(m: Material, v: Vector4) =
+    if not m.color.diffuseInited:
+        m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
+        m.bShaderNeedUpdate = true
+    m.color.diffuse = v
     m.color.diffuseInited = true
-    m.shaderNeedUpdate()
-
-proc setDiffuseColor*(m: Material, x, y, z, w: Coord) =
-    m.color.diffuse = newVector4(x, y, z, w)
-    m.color.diffuseInited = true
-    m.shaderNeedUpdate()
-
-proc removeDiffuseColor*(m: Material) =
-    m.color.diffuseInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_DIFFUSE)
-    m.shaderNeedUpdate()
-
-proc setSpecularColor*(m: Material, x, y, z: Coord) =
-    m.color.specular = newVector4(x, y, z, 1.0)
+template `specular=`*(m: Material, v: Vector4) =
+    if not m.color.specularInited:
+        m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
+        m.bShaderNeedUpdate = true
+    m.color.specular = v
     m.color.specularInited = true
-    m.shaderNeedUpdate()
-
-proc setSpecularColor*(m: Material, x, y, z, w: Coord) =
-    m.color.specular = newVector4(x, y, z, w)
-    m.color.specularInited = true
-    m.shaderNeedUpdate()
-
-proc removeSpecularColor*(m: Material) =
-    m.color.specularInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_SPECULAR)
-    m.shaderNeedUpdate()
-
-proc setShininess*(m: Material, s: Coord) =
+template `shininess=`*(m: Material, s: Coord) =
+    if not m.color.shininessInited:
+        m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
+        m.bShaderNeedUpdate = true
     m.color.shininess = s
     m.color.shininessInited = true
-    m.shaderNeedUpdate()
-
-proc removeShininess*(m: Material) =
-    m.color.shininessInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_SHININESS)
-    m.shaderNeedUpdate()
-
-proc setReflectivity*(m: Material, r: Coord) =
+template `reflectivity=`*(m: Material, r: Coord) =
     m.color.reflectivity = r
     m.color.reflectivityInited = true
-    m.shaderNeedUpdate()
 
-proc removeReflectivity*(m: Material) =
+template removeEmissionColor*(m: Material) =
+    m.color.emissionInited = false
+    m.shaderMacroFlags.excl(WITH_MATERIAL_EMISSION)
+    m.bShaderNeedUpdate = true
+template removeAmbientColor*(m: Material) =
+    m.color.ambientInited = false
+    m.shaderMacroFlags.excl(WITH_MATERIAL_AMBIENT)
+    m.bShaderNeedUpdate = true
+template removeDiffuseColor*(m: Material) =
+    m.color.diffuseInited = false
+    m.shaderMacroFlags.excl(WITH_MATERIAL_DIFFUSE)
+    m.bShaderNeedUpdate = true
+template removeSpecularColor*(m: Material) =
+    m.color.specularInited = false
+    m.shaderMacroFlags.excl(WITH_MATERIAL_SPECULAR)
+    m.bShaderNeedUpdate = true
+template removeShininess*(m: Material) =
+    m.color.shininessInited = false
+    m.shaderMacroFlags.excl(WITH_MATERIAL_SHININESS)
+    m.bShaderNeedUpdate = true
+template removeReflectivity*(m: Material) =
     m.color.reflectivityInited = false
-    # m.shaderMacroFlags.excl(WITH_MATERIAL_REFLECTIVITY) # defined with reflection texture
-    m.shaderNeedUpdate()
+
+proc isLightReceiver*(m: Material): bool =
+    result = m.isLightReceiver
+
+template `isLightReceiver=`*(m: Material, val: bool) =
+    if m.isLightReceiver != val:
+        m.isLightReceiver = val
+        m.bShaderNeedUpdate = true
+
+        if not val:
+            for i in 0 .. m.currentLightSourcesCount - 1:
+                m.shaderMacroFlags.excl(ShaderMacro(int(WITH_LIGHT_0) + i))
+
+            m.shaderMacroFlags.excl(WITH_LIGHT_POSITION)
+            m.shaderMacroFlags.excl(WITH_LIGHT_AMBIENT)
+            m.shaderMacroFlags.excl(WITH_LIGHT_DIFFUSE)
+            m.shaderMacroFlags.excl(WITH_LIGHT_SPECULAR)
+            m.shaderMacroFlags.excl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
+            m.shaderMacroFlags.excl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+        else:
+            for i in 0 .. m.currentLightSourcesCount - 1:
+                m.shaderMacroFlags.incl(ShaderMacro(int(WITH_LIGHT_0) + i))
+            m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
+            m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
+            m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
+            m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
+            m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
+            m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+
+proc isRIM*(m: Material): bool =
+    result = m.isRIM
+
+template `isRIM=`*(m: Material, val: bool) =
+    if m.isRIM != val:
+        m.isRIM = val
+        if val:
+            m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
+        else:
+            m.shaderMacroFlags.excl(WITH_RIM_LIGHT)
+        m.bShaderNeedUpdate = true
+
+template setupRIMLightTechnique*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
+
+template setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_TBN_FROM_NORMALS)
+
+proc isNormalSRGB*(m: Material): bool =
+    result = m.isNormalSRGB
+
+template `isNormalSRGB=`*(m: Material, val: bool) =
+    if m.isNormalSRGB != val:
+        m.isNormalSRGB = val
+        if val:
+            m.shaderMacroFlags.incl(WITH_NORMALMAP_TO_SRGB)
+        else:
+            m.shaderMacroFlags.excl(WITH_NORMALMAP_TO_SRGB)
+        m.bShaderNeedUpdate = true
+
+template setupNormalSRGBTechnique*(m: Material) =
+    if m.shader == 0:
+        m.shaderMacroFlags.incl(WITH_NORMALMAP_TO_SRGB)
 
 proc newDefaultMaterial*(): Material =
     result.new()
@@ -197,48 +246,8 @@ proc newDefaultMaterial*(): Material =
     result.isLightReceiver = true
     result.bEnableBackfaceCulling = true
     result.color.new()
-    result.shader = 0
-    result.shaderNeedUpdate()
 
-proc isLightReceiver*(m: Material): bool =
-    result = m.isLightReceiver
-
-proc `isLightReceiver=`*(m: Material, val: bool) =
-    m.isLightReceiver = val
-    m.shaderNeedUpdate()
-
-    if not val:
-        for i in 0 .. m.currentLightSourcesCount - 1:
-            m.shaderMacroFlags.excl(ShaderMacro(int(WITH_LIGHT_0) + i))
-
-        m.shaderMacroFlags.excl(WITH_LIGHT_POSITION)
-        m.shaderMacroFlags.excl(WITH_LIGHT_AMBIENT)
-        m.shaderMacroFlags.excl(WITH_LIGHT_DIFFUSE)
-        m.shaderMacroFlags.excl(WITH_LIGHT_SPECULAR)
-        m.shaderMacroFlags.excl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
-        m.shaderMacroFlags.excl(WITH_LIGHT_DYNAMIC_ATTENUATION)
-    else:
-        for i in 0 .. m.currentLightSourcesCount - 1:
-            m.shaderMacroFlags.incl(ShaderMacro(int(WITH_LIGHT_0) + i))
-        m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
-        m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
-        m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
-        m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
-        m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
-        m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
-
-proc isRIM*(m: Material): bool =
-    result = m.isRIM
-
-proc `isRIM=`*(m: Material, val: bool) =
-    m.isRIM = val
-    if val:
-        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
-    else:
-        m.shaderMacroFlags.excl(WITH_RIM_LIGHT)
-    m.shaderNeedUpdate()
-
-proc updateVertexAttributesSetup*(m: Material, vertInfo: VertexDataInfo) =
+proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
     let c = currentContext()
     let gl = c.gl
 
@@ -273,7 +282,6 @@ proc updateVertexAttributesSetup*(m: Material, vertInfo: VertexDataInfo) =
         gl.enableVertexAttribArray(aBinormal.GLuint)
         gl.vertexAttribPointer(aBinormal.GLuint, vertInfo.numOfCoordPerBinormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerBinormal * sizeof(GLfloat)
-
 
 proc setupSamplerAttributes(m: Material) =
     let c = currentContext()
@@ -460,15 +468,7 @@ proc setupLightAttributes(m: Material, v: SceneView) =
             m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
             m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
 
-proc setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
-    if m.shader == 0:
-        m.shaderMacroFlags.incl(WITH_TBN_FROM_NORMALS)
-
-proc setupRIMLightTechnique*(m: Material) =
-    if m.shader == 0:
-        m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
-
-proc updateTransformSetup*(m: Material, n: Node) =
+template setupTransform*(m: Material, n: Node) =
     let c = currentContext()
     let gl = c.gl
 
@@ -522,10 +522,10 @@ proc createShader(m: Material) =
 
     # echo("\n", m.shaderMacroFlags, "\n")
 
-proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
+template assignShaders*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
     m.vertexShader = vertexShader
     m.fragmentShader = fragmentShader
-    m.shaderNeedUpdate()
+    m.shaderNeedUpdate = true
 
 proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
     m.bUserDefinedShader = true
@@ -566,10 +566,12 @@ method updateSetup*(m: Material, n: Node) {.base.} =
         m.setupMaterialAttributes(n)
         if m.isLightReceiver:
             m.setupLightAttributes(n.sceneView)
-        #TODO use techniques
+        # setup shader techniques
         m.setupNormalMappingTechniqueWithoutPrecomputedTangents()
         if m.isRIM:
             m.setupRIMLightTechnique()
+        if m.isNormalSRGB:
+            m.setupNormalSRGBTechnique()
         m.createShader()
 
     gl.useProgram(m.shader)
@@ -577,7 +579,7 @@ method updateSetup*(m: Material, n: Node) {.base.} =
     m.setupMaterialAttributes(n)
     if m.isLightReceiver:
         m.setupLightAttributes(n.sceneView)
-    m.updateTransformSetup(n)
+    m.setupTransform(n)
 
     if n.alpha < 1.0 or m.blendEnable:
         gl.enable(gl.BLEND)

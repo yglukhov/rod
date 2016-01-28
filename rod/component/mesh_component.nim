@@ -28,12 +28,13 @@ type MeshComponent* = ref object of Component
     loadFunc: proc()
     vertInfo*: VertexDataInfo
     material*: Material
+    bShowObjectSelection*: bool
 
 method init*(m: MeshComponent) =
     m.material = newDefaultMaterial()
     procCall m.Component.init()
 
-proc setInstancedVBOAttributes*(m: MeshComponent, indBuffer, vertBuffer: GLuint, numOfIndices: GLsizei, vInfo: VertexDataInfo) =
+proc setInstancedVBOAttributes(m: MeshComponent, indBuffer, vertBuffer: GLuint, numOfIndices: GLsizei, vInfo: VertexDataInfo) =
     m.indexBuffer = indBuffer
     m.vertexBuffer = vertBuffer
     m.numberOfIndices = numOfIndices
@@ -155,10 +156,10 @@ proc loadWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Po
 template meshComponentWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) {.deprecated.} =
     m.loadWithQuad(v1, v2, v3, v4, t1, t2, t3, t4)
 
-proc load(mc: MeshComponent) =
-    if not mc.loadFunc.isNil:
-        mc.loadFunc()
-        mc.loadFunc = nil
+proc load(m: MeshComponent) =
+    if not m.loadFunc.isNil:
+        m.loadFunc()
+        m.loadFunc = nil
 
 method draw*(m: MeshComponent) =
     let c = currentContext()
@@ -172,16 +173,18 @@ method draw*(m: MeshComponent) =
     gl.bindBuffer(gl.ARRAY_BUFFER, m.vertexBuffer)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.indexBuffer)
 
-    m.material.updateVertexAttributesSetup(m.vertInfo)
-
+    m.material.setupVertexAttributes(m.vertInfo)
     m.material.updateSetup(m.node)
-
     if m.material.bEnableBackfaceCulling:
         gl.enable(gl.CULL_FACE)
         gl.cullFace(gl.BACK)
 
-    gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
+    if m.bShowObjectSelection:
+        gl.enable(gl.BLEND)
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+        gl.uniform1f(gl.getUniformLocation(m.material.shader, "uMaterialTransparency"), 0.5)
 
+    gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
     gl.disable(gl.CULL_FACE)
 
     when defined(js):
@@ -201,12 +204,12 @@ method draw*(m: MeshComponent) =
     gl.enable(gl.BLEND)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
-    p.visitProperty("emission", m.material.color.emission)
-    p.visitProperty("ambient", m.material.color.ambient)
-    p.visitProperty("diffuse", m.material.color.diffuse)
-    p.visitProperty("specular", m.material.color.specular)
-    p.visitProperty("shininess", m.material.color.shininess)
-    p.visitProperty("reflectivity", m.material.color.reflectivity)
+    p.visitProperty("emission", m.material.emission)
+    p.visitProperty("ambient", m.material.ambient)
+    p.visitProperty("diffuse", m.material.diffuse)
+    p.visitProperty("specular", m.material.specular)
+    p.visitProperty("shininess", m.material.shininess)
+    p.visitProperty("reflectivity", m.material.reflectivity)
 
     p.visitProperty("culling", m.material.bEnableBackfaceCulling)
     p.visitProperty("light", m.material.isLightReceiver)
@@ -214,5 +217,6 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("depth test", m.material.depthEnable)
     p.visitProperty("wireframe", m.material.isWireframe)
     p.visitProperty("RIM", m.material.isRIM)
+    p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
 registerComponent[MeshComponent]()

@@ -90,7 +90,7 @@ proc toMatrix4*(q: Quaternion): Matrix4 =
         2.0f*qx*qz - 2.0f*qy*qw, 2.0f*qy*qz + 2.0f*qx*qw, 1.0f - 2.0f*qx*qx - 2.0f*qy*qy, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f]
 
-proc fromMatrix4*(mat: Matrix4): Quaternion = 
+proc fromMatrix4*(mat: Matrix4): Quaternion =
     var s, x, y, z, w: Coord
     if mat[0] > mat[5] and mat[0] > mat[10]:
         s = sqrt(1.0 + mat[0] - mat[5] - mat[10]) * 2.0

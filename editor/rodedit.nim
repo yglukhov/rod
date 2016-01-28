@@ -37,6 +37,18 @@ proc runAutoTestsIfNeeded() =
     when defined(runAutoTests):
         startRegisteredTests()
 
+proc registerAnimation(n: Node, v: EditView) =
+    if not isNil(n.animations):
+        for anim in n.animations.values():
+            v.window.addAnimation(anim)
+            # anim.loopPattern = lpStartToEndToStart
+            # anim.loopDuration *= 2.0
+            # anim.numberOfLoops = 1
+
+    if not n.children.isNil:
+       for child in n.children:
+            registerAnimation(child, v)
+
 proc startApplication() =
     when isMobile:
         var mainWindow = newFullscreenWindow()
@@ -51,23 +63,31 @@ proc startApplication() =
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
-    cameraNode.translation.z = 80
+    cameraNode.translation.z = 250
+
 
     let light = editView.rootNode.newChild("point_light")
-    light.translation = newVector3(0,0,100)
+    light.translation = newVector3(-100,100,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    loadSceneAsync "collada/balloon_animation_test.dae", proc(n: Node) =
+    # let anim = newAnimation()
+    # mainWindow.addAnimation(anim)
+
+    loadSceneAsync "collada/motion.dae", proc(n: Node) =
+
         editView.rootNode.addChild(n)
 
         mainWindow.addSubview(editView)
 
-        echo "Node: ", n.name
-        if not isNil(n.animations):
-            echo "ANIMATIONS: ", n.animations.len
-            for anim in n.animations.values():
-                editView.window.addAnimation(anim)
+        # echo "Node: ", n.name
+        # if not isNil(n.animations):
+        #     echo "ANIMATIONS: ", n.animations.len
+        #     for anim in n.animations.values():
+        #         editView.window.addAnimation(anim)
+        #         anim.loopDuration *= 2.0
+
+        registerAnimation(n, editView)
 
         discard startEditingNodeInView(editView.rootNode, editView)
 

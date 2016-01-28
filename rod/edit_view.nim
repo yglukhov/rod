@@ -13,6 +13,7 @@ import nimx.text_field
 import nimx.table_view_cell
 
 import rod.scene_composition
+import rod.component.mesh_component
 
 import variant
 
@@ -25,6 +26,7 @@ type Editor* = ref object
     rootNode*: Node3D
     eventCatchingView*: View
     treeView*: View
+    selectedNode*: Node3D
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 700))
@@ -64,7 +66,20 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
                 outlineView.itemAtIndexPath(ip).get(Node3D)
             else:
                 nil
+
+        if not e.selectedNode.isNil:
+            let mesh = e.selectedNode.componentIfAvailable(MeshComponent)
+            if not mesh.isNil:
+                mesh.bShowObjectSelection = false
+
         inspector.inspectedNode = n
+
+        e.selectedNode = n
+
+        if not e.selectedNode.isNil:
+            let mesh = e.selectedNode.componentIfAvailable(MeshComponent)
+            if not mesh.isNil:
+                mesh.bShowObjectSelection = true
 
     outlineView.reloadData()
     result.addSubview(outlineView)
