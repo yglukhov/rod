@@ -77,18 +77,27 @@ method deserialize*(s: Sprite, j: JsonNode) =
         s.image = imageWithResource(j["name"].getStr())
     else:
         s.images = newSeq[Image](v.len)
-        var spriteSheets = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:
-            var name = v[i].getStr()
-            if name.endsWith(".sspart"):
-                let parts1 = name.split(" - ")
-                let parts = parts1[1].split('.')
-                let rect = newRect(parts[^5].parseFloat(), parts[^4].parseFloat(), parts[^3].parseFloat(), parts[^2].parseFloat())
-                let realName = parts1[0]
-                let ss = imageWithResource(realName)
-                s.images[i] = ss.subimageWithRect(rect)
+            if v[i].kind == JString:
+                let name = v[i].getStr()
+                if name.endsWith(".sspart"):
+                    let parts1 = name.split(" - ")
+                    let parts = parts1[1].split('.')
+                    let rect = newRect(parts[^5].parseFloat(), parts[^4].parseFloat(), parts[^3].parseFloat(), parts[^2].parseFloat())
+                    let realName = parts1[0]
+                    let ss = imageWithResource(realName)
+                    s.images[i] = ss.subimageWithRect(rect)
+                else:
+                    s.images[i] = imageWithResource(name)
             else:
-                s.images[i] = imageWithResource(name)
+                let realName = v[i]["file"].getStr()
+                let uv = v[i]["tex"]
+                let sz = v[i]["size"]
+                let ss = imageWithResource(realName)
+                s.images[i] = ss.subimageWithTexCoords(
+                                newSize(sz[0].getFNum(), sz[1].getFNum()),
+                                [uv[0].getFNum().float32, uv[1].getFNum(), uv[2].getFNum(), uv[3].getFNum()]
+                                )
 
     if s.images.len > 1:
         s.createFrameAnimation()
