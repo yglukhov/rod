@@ -74,7 +74,7 @@ method draw*(cl: ChannelLevels) =
         let vpbounds = gl.getViewport()
         let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
 
-        c.withTransform vp.getViewMatrix():
+        c.withTransform vp.getViewProjectionMatrix():
             levelsComposition.draw newRect(0, 0, 1920, 1080):
                 setUniform("inWhite", cl.inWhite)
                 setUniform("inBlack", cl.inBlack)
