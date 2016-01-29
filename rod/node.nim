@@ -288,3 +288,10 @@ proc newNodeWithResource*(name: string): Node =
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
     result.loadComposition("compositions/" & name & ".json")
+
+
+# Debugging
+proc recursiveChildrenCount*(n: Node): int =
+    result = n.children.len
+    for c in n.children:
+        result += c.recursiveChildrenCount
