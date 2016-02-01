@@ -27,8 +27,12 @@ vec4 colorPow(vec4 i, float p) {
     return vec4(pow(i.r, p), pow(i.g, p), pow(i.b, p), i.a);
 }
 
+vec2 fbUv(vec4 imgTexCoords) {
+    return imgTexCoords.xy + (imgTexCoords.zw - imgTexCoords.xy) * (vPos / viewportSize);
+}
+
 void compose() {
-    vec2 uv = gl_FragCoord.xy / viewportSize * uForeground.texCoords.zw;
+    vec2 uv = fbUv(uForeground.texCoords);
     vec4 inPixel = texture2D(uForeground.tex, uv);
     gl_FragColor = (colorPow(((inPixel) - inBlack) / (inWhite - inBlack),
                     inGamma) * (outWhite - outBlack) + outBlack);
@@ -64,9 +68,8 @@ method draw*(cl: ChannelLevels) =
 
         let tmpBuf = vp.aquireTempFramebuffer()
 
-        bindFramebuffer(gl, tmpBuf)
-
-        gl.clear(c.gl.COLOR_BUFFER_BIT or c.gl.STENCIL_BUFFER_BIT or c.gl.DEPTH_BUFFER_BIT)
+        gl.bindFramebuffer(tmpBuf)
+        gl.clearWithColor(0, 0, 0, 0)
         for c in cl.node.children: c.recursiveDraw()
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, oldBuf)
@@ -74,8 +77,10 @@ method draw*(cl: ChannelLevels) =
         let vpbounds = gl.getViewport()
         let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
 
-        c.withTransform vp.getViewProjectionMatrix():
-            levelsComposition.draw newRect(0, 0, 1920, 1080):
+        let o = ortho(vpbounds[0].Coord, vpbounds[2].Coord, vpbounds[3].Coord, vpbounds[1].Coord, -1, 1)
+
+        c.withTransform o:
+            levelsComposition.draw newRect(0, 0, vpbounds[2].Coord, vpbounds[3].Coord):
                 setUniform("inWhite", cl.inWhite)
                 setUniform("inBlack", cl.inBlack)
                 setUniform("inGamma", cl.inGamma)
