@@ -56,7 +56,7 @@ proc prepareFramebuffers(v: SceneView) =
         v.prepareFramebuffer(v.mActiveFrameBuffer, sz)
         v.prepareFramebuffer(v.mBackupFrameBuffer, sz)
         v.mScreenFramebuffer = gl.boundFramebuffer()
-        gl.bindFramebuffer(v.mActiveFrameBuffer)
+        gl.bindFramebuffer(v.mActiveFrameBuffer, false)
         gl.clearWithColor(0, 0, 0, 0)
 
 proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
@@ -146,7 +146,7 @@ proc swapCompositingBuffers*(v: SceneView) =
             if v.numberOfNodesWithBackCompositionInCurrentFrame == 0:
                 gl.bindFramebuffer(gl.FRAMEBUFFER, v.mScreenFrameBuffer)
             else:
-                gl.bindFramebuffer(gl.FRAMEBUFFER, v.mBackupFrameBuffer.framebuffer)
+                gl.bindFramebuffer(v.mBackupFrameBuffer, false)
             let a = c.alpha
             c.alpha = 1.0
             gl.disable(gl.BLEND)
@@ -160,9 +160,9 @@ proc swapCompositingBuffers*(v: SceneView) =
             gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, v.mScreenFrameBuffer)
         else:
             # Swap active buffer to backup buffer
+            gl.bindFramebuffer(v.mBackupFrameBuffer, false)
             gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
-            gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, v.mBackupFrameBuffer.framebuffer)
-        glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT or GL_DEPTH_BUFFER_BIT or GL_STENCIL_BUFFER_BIT, GL_NEAREST)
+        glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT, GL_NEAREST)
 
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 

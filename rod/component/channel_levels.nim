@@ -71,7 +71,7 @@ method draw*(cl: ChannelLevels) =
 
         let tmpBuf = vp.aquireTempFramebuffer()
 
-        gl.bindFramebuffer(tmpBuf)
+        gl.bindFramebuffer(tmpBuf, false)
         gl.clearWithColor(0, 0, 0, 0)
         for c in cl.node.children: c.recursiveDraw()
 

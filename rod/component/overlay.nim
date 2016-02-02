@@ -35,7 +35,7 @@ method draw*(o: Overlay) =
     let tmpBuf = vp.aquireTempFramebuffer()
 
     let c = currentContext()
-    c.gl.bindFramebuffer(tmpBuf)
+    c.gl.bindFramebuffer(tmpBuf, false)
     c.gl.clearWithColor(0, 0, 0, 0)
     for c in o.node.children: c.recursiveDraw()
 
