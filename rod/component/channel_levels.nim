@@ -40,9 +40,12 @@ void compose() {
 }
 """
 
+# Dirty hack to optimize out extra drawing:
+template `~==`(f1, f2: float): bool = (f1 > f2 - 0.2 and f1 < f2 + 0.2)
+
 template areValuesNormal(c: ChannelLevels): bool =
-    c.inWhite == 1 and c.inBlack == 0 and
-        c.inGamma == 1 and c.outWhite == 1 and c.outBlack == 0
+    c.inWhite ~== 1 and c.inBlack ~== 0 and
+        c.inGamma ~== 1 and c.outWhite ~== 1 and c.outBlack ~== 0
 
 method init*(c: ChannelLevels) =
     c.inWhite = 1
