@@ -175,8 +175,8 @@ method draw*(m: MeshComponent) =
 
     m.material.setupVertexAttributes(m.vertInfo)
     m.material.updateSetup(m.node)
-    if not m.material.bEnableBackfaceCulling:
-        gl.disable(gl.CULL_FACE)
+    if m.material.bEnableBackfaceCulling:
+        gl.enable(gl.CULL_FACE)
 
     if m.bShowObjectSelection:
         gl.enable(gl.BLEND)
@@ -185,8 +185,8 @@ method draw*(m: MeshComponent) =
 
     gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
 
-    if not m.material.bEnableBackfaceCulling:
-        gl.enable(gl.CULL_FACE)
+    if m.material.bEnableBackfaceCulling:
+        gl.disable(gl.CULL_FACE)
 
     when defined(js):
         {.emit: """
