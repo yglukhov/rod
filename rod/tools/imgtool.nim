@@ -11,6 +11,8 @@ type Rect = imgtools.Rect
 type Point = tuple[x, y: int32]
 type Size = tuple[width, height: int]
 
+const consumeLessMemory = defined(windows)
+
 type
     SpriteSheetImage = ref object
         imageIndex: int # Index of this image in tool.images array
@@ -36,6 +38,10 @@ proc newSpriteSheetImage(path: string): SpriteSheetImage =
         echo "PNG NOT LOADED: ", path
         return nil
     result.actualBounds = imageBounds(result.png.data, result.png.width, result.png.height)
+
+    when consumeLessMemory:
+        result.png = nil
+
     result.srcBounds.width = result.actualBounds.x + result.actualBounds.width
     result.srcBounds.height = result.actualBounds.y + result.actualBounds.height
 
@@ -86,6 +92,9 @@ proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
     for im in ss.images:
+        if im.png.isNil:
+            im.png = loadPNG32(im.originalPath)
+
         if im.srcSize == im.targetSize:
             blitImage(
                 data, ss.packer.width, ss.packer.height, # Target image
@@ -98,13 +107,16 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height,
                 im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
 
-        im.png.data = nil # We no longer need the data in memory
+        im.png = nil # We no longer need the data in memory
         if tool.removeOriginals:
             removeFile(im.originalPath)
 
     discard savePNG32(path, data, ss.packer.width, ss.packer.height)
     if tool.compressOutput:
         discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
+
+    when consumeLessMemory:
+        GC_fullCollect()
 
 proc adjustTranslationValueForFrame(trans: JsonNode, im: SpriteSheetImage): JsonNode =
     result = trans
@@ -146,7 +158,7 @@ proc adjustImageNode(tool: ImgTool, jComp, jNode, jSprite, jFileName: JsonNode,
     result["file"] = %relativePathToPath(compPath, tool.outPrefix & $im.spriteSheet.index & ".png")
     let w = im.spriteSheet.packer.width.float
     let h = im.spriteSheet.packer.height.float
-    result["tex"] = %*[im.pos.x.float / w, im.pos.y.float / h, (im.pos.x + im.targetSize.width).float / w, (im.pos.y + im.targetSize.height).float / h]
+    result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float + 0.5) / w, ((im.pos.y + im.targetSize.height).float + 0.5) / h]
     result["size"] = %*[im.srcSize.width, im.srcSize.height]
 
     if im.srcBounds.x > 0 or im.srcBounds.y > 0:
@@ -192,15 +204,18 @@ proc recalculateSourceBounds(im: SpriteSheetImage, jComp, jNode, jSprite: JsonNo
         im.srcSize.width = im.srcBounds.width
         im.srcSize.height = im.srcBounds.height
 
+const forceDownsampleRatio = 1
+
 proc betterDimension(d: int): int =
-    result = case d
+    let r = int(d / forceDownsampleRatio)
+    result = case r
         of 257 .. 400: 256
         of 513 .. 700: 512
         of 1025 .. 1300: 1024
-        else: d
+        else: r
     if result > 2048: result = 2048
 
-proc recalculateTargetSize(im: SpriteSheetImage) =
+proc recalculateTargetSize(im: SpriteSheetImage, jComp, jNode, jSprite: JsonNode, frameIdx: int) =
     im.targetSize.width = betterDimension(im.srcSize.width)
     im.targetSize.height = betterDimension(im.srcSize.height)
 
@@ -224,9 +239,12 @@ proc run(tool: ImgTool) =
                 let im = newSpriteSheetImage(absPath)
                 if not im.isNil:
                     im.recalculateSourceBounds(c, n, s, ifn)
-                    im.recalculateTargetSize()
+                    im.recalculateTargetSize(c, n, s, ifn)
                     im.imageIndex = tool.images.len
                     tool.images[absPath] = im
+
+    when consumeLessMemory:
+        GC_fullCollect()
 
     # Sort images by area
     var allImages = toSeq(values(tool.images))
