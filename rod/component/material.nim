@@ -100,7 +100,7 @@ type
         isRIM: bool
         isNormalSRGB: bool
 
-        shader*: GLuint
+        shader*: ProgramRef
         vertexShader: string
         fragmentShader: string
         bUserDefinedShader: bool
@@ -214,11 +214,11 @@ template `isRIM=`*(m: Material, val: bool) =
         m.bShaderNeedUpdate = true
 
 template setupRIMLightTechnique*(m: Material) =
-    if m.shader == 0:
+    if m.shader == invalidProgram:
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
 
 template setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
-    if m.shader == 0:
+    if m.shader == invalidProgram:
         m.shaderMacroFlags.incl(WITH_TBN_FROM_NORMALS)
 
 proc isNormalSRGB*(m: Material): bool =
@@ -234,7 +234,7 @@ template `isNormalSRGB=`*(m: Material, val: bool) =
         m.bShaderNeedUpdate = true
 
 template setupNormalSRGBTechnique*(m: Material) =
-    if m.shader == 0:
+    if m.shader == invalidProgram:
         m.shaderMacroFlags.incl(WITH_NORMALMAP_TO_SRGB)
 
 proc newDefaultMaterial*(): Material =
@@ -258,26 +258,26 @@ proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
         gl.vertexAttribPointer(aPosition.GLuint, vertInfo.numOfCoordPerVert, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerVert * sizeof(GLfloat)
     if vertInfo.numOfCoordPerTexCoord != 0:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_V_TEXCOORD)
         gl.enableVertexAttribArray(aTexCoord.GLuint)
         gl.vertexAttribPointer(aTexCoord.GLuint, vertInfo.numOfCoordPerTexCoord, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerTexCoord * sizeof(GLfloat)
     if vertInfo.numOfCoordPerNormal != 0:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_V_NORMAL)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         gl.enableVertexAttribArray(aNormal.GLuint)
         gl.vertexAttribPointer(aNormal.GLuint, vertInfo.numOfCoordPerNormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerNormal * sizeof(GLfloat)
     if vertInfo.numOfCoordPerTangent != 0:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_V_TANGENT)
         gl.enableVertexAttribArray(aTangent.GLuint)
         gl.vertexAttribPointer(aTangent.GLuint, vertInfo.numOfCoordPerTangent, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerTangent * sizeof(GLfloat)
     if vertInfo.numOfCoordPerBinormal != 0:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_V_BINORMAL)
         gl.enableVertexAttribArray(aBinormal.GLuint)
         gl.vertexAttribPointer(aBinormal.GLuint, vertInfo.numOfCoordPerBinormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
@@ -291,7 +291,7 @@ proc setupSamplerAttributes(m: Material) =
     var textureIndex : GLint = 0
 
     if not m.albedoTexture.isNil:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_AMBIENT_SAMPLER)
         else:
             if m.albedoTexture.isLoaded:
@@ -301,7 +301,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1i(gl.getUniformLocation(m.shader, "texUnit"), textureIndex)
                 inc textureIndex
     if not m.glossTexture.isNil:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_GLOSS_SAMPLER)
         else:
             if m.glossTexture.isLoaded:
@@ -311,7 +311,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1i(gl.getUniformLocation(m.shader, "glossMapUnit"), textureIndex)
                 inc textureIndex
     if not m.specularTexture.isNil:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_SPECULAR_SAMPLER)
         else:
             if m.specularTexture.isLoaded:
@@ -321,7 +321,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1i(gl.getUniformLocation(m.shader, "specularMapUnit"), textureIndex)
                 inc textureIndex
     if not m.normalTexture.isNil:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_NORMAL_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
@@ -332,7 +332,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1i(gl.getUniformLocation(m.shader, "normalMapUnit"), textureIndex)
                 inc textureIndex
     if not m.bumpTexture.isNil:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_BUMP_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
@@ -343,7 +343,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1i(gl.getUniformLocation(m.shader, "bumpMapUnit"), textureIndex)
                 inc textureIndex
     if not m.reflectionTexture.isNil:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_REFLECTION_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
@@ -355,7 +355,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uReflectivity"), m.color.reflectivity)
                 inc textureIndex
     if not m.falloffTexture.isNil:
-        if m.shader == 0:
+        if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_FALLOF_SAMPLER)
             m.shaderMacroFlags.incl(WITH_V_POSITION)
         else:
@@ -372,31 +372,31 @@ proc setupMaterialAttributes(m: Material, n: Node) =
         let gl = c.gl
 
         if m.color.ambientInited:
-            if m.shader == 0:
+            if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
             else:
                 c.setColorUniform(m.shader, "uMaterialAmbient", newColor(m.color.ambient[0], m.color.ambient[1], m.color.ambient[2], m.color.ambient[3]))
         if m.color.emissionInited:
-            if m.shader == 0:
+            if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
             else:
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialEmission"), m.color.emission)
         if m.color.diffuseInited:
-            if m.shader == 0:
+            if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
             else:
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialDiffuse"), m.color.diffuse)
         if m.color.specularInited:
-            if m.shader == 0:
+            if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
             else:
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialSpecular"), m.color.specular)
         if m.color.shininessInited:
-            if m.shader == 0:
+            if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
             else:
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialShininess"), m.color.shininess)
-        if m.shader != 0:
+        if m.shader != invalidProgram:
             gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialTransparency"), n.alpha)
 
 proc setupLightAttributes(m: Material, v: SceneView) =
@@ -407,34 +407,34 @@ proc setupLightAttributes(m: Material, v: SceneView) =
         let gl = c.gl
 
         for ls in values v.lightSources:
-            if m.shader == 0:
+            if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
             else:
                 let lightWorldPos = ls.node.worldPos()
                 let lightPosition = v.viewMatrixCached * newVector4(lightWorldPos.x, lightWorldPos.y, lightWorldPos.z, 1.0)
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uLightPosition" & $lightsCount), lightPosition)
             if ls.lightAmbientInited:
-                if m.shader == 0:
+                if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uLightAmbient" & $lightsCount), ls.lightAmbient)
             if ls.lightDiffuseInited:
-                if m.shader == 0:
+                if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uLightDiffuse" & $lightsCount), ls.lightDiffuse)
             if ls.lightSpecularInited:
-                if m.shader == 0:
+                if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uLightSpecular" & $lightsCount), ls.lightSpecular)
             if ls.lightAttenuationInited:
-                if m.shader == 0:
+                if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uAttenuation" & $lightsCount), ls.lightAttenuation)
             elif ls.lightConstantInited and ls.lightLinearInited and ls.lightQuadraticInited:
-                if m.shader == 0:
+                if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uLightConstant" & $lightsCount), ls.lightConstant)
@@ -495,10 +495,10 @@ proc createShader(m: Material) =
     let c = currentContext()
     let gl = c.gl
 
-    if m.shader != 0:
+    if m.shader != invalidProgram:
         if not m.bUserDefinedShader:
             gl.deleteProgram(m.shader)
-            m.shader = 0
+            m.shader = invalidProgram
             m.vertexShader = ""
             m.fragmentShader = ""
 
@@ -561,7 +561,7 @@ method updateSetup*(m: Material, n: Node) {.base.} =
     let c = currentContext()
     let gl = c.gl
 
-    if m.shader == 0 or m.bShaderNeedUpdate:
+    if m.shader == invalidProgram or m.bShaderNeedUpdate:
         m.setupSamplerAttributes()
         m.setupMaterialAttributes(n)
         if m.isLightReceiver:
