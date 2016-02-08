@@ -13,10 +13,7 @@ import rod.property_visitor
 type ChannelLevels* = ref object of Component
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: ColorComponent
 
-var levelsComposition = newComposition """
-uniform Image uForeground;
-uniform vec2 viewportSize;
-
+var levelsPostEffect = newPostEffect("""
 uniform float inWhite;
 uniform float inBlack;
 uniform float inGamma;
@@ -27,18 +24,13 @@ vec4 colorPow(vec4 i, float p) {
     return vec4(pow(i.r, p), pow(i.g, p), pow(i.b, p), i.a);
 }
 
-vec2 fbUv(vec4 imgTexCoords) {
-    return imgTexCoords.xy + (imgTexCoords.zw - imgTexCoords.xy) * (vPos / viewportSize);
-}
-
-void compose() {
-    vec2 uv = fbUv(uForeground.texCoords);
-    vec4 inPixel = texture2D(uForeground.tex, uv);
+void channelLevels() {
+    vec4 inPixel = gl_FragColor;
     gl_FragColor = (colorPow(((inPixel) - inBlack) / (inWhite - inBlack),
                     inGamma) * (outWhite - outBlack) + outBlack);
     gl_FragColor.a = inPixel.a;
 }
-"""
+""", "channelLevels")
 
 # Dirty hack to optimize out extra drawing:
 template `~==`(f1, f2: float): bool = (f1 > f2 - 0.2 and f1 < f2 + 0.2)
@@ -63,36 +55,14 @@ method deserialize*(c: ChannelLevels, j: JsonNode) =
 
 method draw*(cl: ChannelLevels) =
     if not cl.areValuesNormal():
-        #echo "GAMMA: ", cl.inWhite, ", ", cl.inBlack, ", ", cl.inGamma, ", ", cl.outWhite, ", ", cl.outBlack
-        let vp = cl.node.sceneView
-        let c = currentContext()
-        let gl = c.gl
-        let oldBuf = gl.boundFramebuffer()
-
-        let tmpBuf = vp.aquireTempFramebuffer()
-
-        gl.bindFramebuffer(tmpBuf, false)
-        gl.clearWithColor(0, 0, 0, 0)
+        pushPostEffect levelsPostEffect:
+            setUniform("inWhite", cl.inWhite)
+            setUniform("inBlack", cl.inBlack)
+            setUniform("inGamma", cl.inGamma)
+            setUniform("outWhite", cl.outWhite)
+            setUniform("outBlack", cl.outBlack)
         for c in cl.node.children: c.recursiveDraw()
-
-        gl.bindFramebuffer(gl.FRAMEBUFFER, oldBuf)
-
-        let vpbounds = gl.getViewport()
-        let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
-
-        let o = ortho(vpbounds[0].Coord, vpbounds[2].Coord, vpbounds[3].Coord, vpbounds[1].Coord, -1, 1)
-
-        c.withTransform o:
-            levelsComposition.draw newRect(0, 0, vpbounds[2].Coord, vpbounds[3].Coord):
-                setUniform("inWhite", cl.inWhite)
-                setUniform("inBlack", cl.inBlack)
-                setUniform("inGamma", cl.inGamma)
-                setUniform("outWhite", cl.outWhite)
-                setUniform("outBlack", cl.outBlack)
-                setUniform("uForeground", tmpBuf)
-                setUniform("viewportSize", vpSize)
-
-        vp.releaseTempFramebuffer(tmpBuf)
+        popPostEffect()
 
 method isPosteffectComponent*(c: ChannelLevels): bool = not c.areValuesNormal()
 

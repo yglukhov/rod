@@ -12,46 +12,42 @@ import rod.component
 
 type Overlay* = ref object of OverlayComponent
 
-var overlayComposition = newComposition """
+var overlayPostEffect = newPostEffect("""
 uniform Image uBackground;
-uniform Image uForeground;
 uniform vec2 viewportSize;
 
 vec2 fbUv(vec4 imgTexCoords) {
-    return imgTexCoords.xy + (imgTexCoords.zw - imgTexCoords.xy) * (vPos / viewportSize);
+    vec2 pos = gl_FragCoord.xy;
+    pos.y = viewportSize.y - pos.y;
+    return imgTexCoords.xy + (imgTexCoords.zw - imgTexCoords.xy) * (pos / viewportSize);
 }
 
-void compose() {
+void overlay() {
     vec2 bgUv = fbUv(uBackground.texCoords);
-    vec2 fgUv = fbUv(uForeground.texCoords);
     vec4 burnColor = texture2D(uBackground.tex, bgUv);
-    vec4 maskColor = texture2D(uForeground.tex, fgUv);
+    vec4 maskColor = gl_FragColor;
     gl_FragColor = burnColor * (1.0 + maskColor.a * 2.0);
 }
-"""
+""", "overlay")
 
 method draw*(o: Overlay) =
     let vp = o.node.sceneView
-    let tmpBuf = vp.aquireTempFramebuffer()
-
-    let c = currentContext()
-    c.gl.bindFramebuffer(tmpBuf, false)
-    c.gl.clearWithColor(0, 0, 0, 0)
-    for c in o.node.children: c.recursiveDraw()
 
     vp.swapCompositingBuffers()
+    let c = currentContext()
+
+    let bfb = vp.mBackupFrameBuffer
+
     let vpbounds = c.gl.getViewport()
     let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
 
-    let o = ortho(vpbounds[0].Coord, vpbounds[2].Coord, vpbounds[3].Coord, vpbounds[1].Coord, -1, 1)
+    pushPostEffect overlayPostEffect:
+        setUniform("uBackground", bfb)
+        setUniform("viewportSize", vpSize)
 
-    c.withTransform o:
-        overlayComposition.draw newRect(0, 0, vpbounds[2].Coord, vpbounds[3].Coord):
-            setUniform("uBackground", vp.mBackupFrameBuffer)
-            setUniform("uForeground", tmpBuf)
-            setUniform("viewportSize", vpSize)
+    for c in o.node.children: c.recursiveDraw()
 
-    vp.releaseTempFramebuffer(tmpBuf)
+    popPostEffect()
 
 method isPosteffectComponent*(c: Overlay): bool = true
 
