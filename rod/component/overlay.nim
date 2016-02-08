@@ -26,7 +26,7 @@ void overlay() {
     vec2 bgUv = fbUv(uBackground.texCoords);
     vec4 burnColor = texture2D(uBackground.tex, bgUv);
     vec4 maskColor = gl_FragColor;
-    gl_FragColor = burnColor * (1.0 + maskColor.a * 2.0);
+    gl_FragColor.rgb = burnColor.rgb * (1.0 + maskColor.a * 2.0);
 }
 """, "overlay")
 
