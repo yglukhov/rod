@@ -161,6 +161,6 @@ method onMouseDown*(v: OutlineView, e: var Event): bool =
             v.selectedIndexPath.setLen(0)
             v.selectionChanged()
         else:
-            v.selectedIndexPath = v.tempIndexPath
+            v.selectedIndexPath = @(v.tempIndexPath)
             v.selectionChanged()
         v.setNeedsDisplay()
