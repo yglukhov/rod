@@ -5,9 +5,11 @@ description   = "Graphics engine"
 license       = "MIT"
 #bin           = "editor/rodedit"
 
+skipDirs = @["editor/android/com.mycompany.MyGame"]
+
 # Dependencies
 requires "nimx"
-requires "https://github.com/SSPKrolik/nimasset"
+# requires "https://github.com/SSPKrolik/nimasset"
 requires "variant"
 requires "native_dialogs"
 requires "nimPNG"

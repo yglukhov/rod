@@ -211,6 +211,7 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("specular", m.material.specular)
     p.visitProperty("shininess", m.material.shininess)
     p.visitProperty("reflectivity", m.material.reflectivity)
+    p.visitProperty("rim density", m.material.rimDensity)
 
     p.visitProperty("culling", m.material.bEnableBackfaceCulling)
     p.visitProperty("light", m.material.isLightReceiver)

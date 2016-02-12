@@ -268,26 +268,24 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
 
         loadResourceAsync resourceName, proc(s: Stream) =
             pushParentResource(resourceName)
-            defer: popParentResource()
 
             let colladaScene = loadColladaFromStream(s, resourceName)
             gScenesResCache[resourceName] = colladaScene
 
             let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
-            #var animations: seq[Animation] = @[]
             for anim in colladaScene.animations:
                 discard animationWithCollada(res, anim)
 
+            popParentResource()
             handler(res)
     else:
         pushParentResource(resourceName)
-        defer: popParentResource()
 
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
-        #var animations: seq[Animation] = @[]
         for anim in colladaScene.animations:
             discard animationWithCollada(res, anim)
 
+        popParentResource()
         handler(res)
 
 # registerResourcePreloader(["dae"], proc(name: string, callback: proc(n: Node3D)) =

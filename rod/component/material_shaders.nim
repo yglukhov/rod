@@ -94,6 +94,10 @@ uniform float uReflectivity;
 uniform sampler2D falloffMapUnit;
 uniform vec4 uFallofUnitCoords;
 #endif
+#ifdef WITH_MASK_SAMPLER
+uniform sampler2D maskMapUnit;
+uniform vec4 uMaskUnitCoords;
+#endif
 
 #ifdef WITH_MATERIAL_AMBIENT
 uniform vec4 uMaterialAmbient;
@@ -111,6 +115,10 @@ uniform vec4 uMaterialSpecular;
 uniform float uMaterialShininess;
 #endif
 uniform float uMaterialTransparency;
+
+#ifdef WITH_RIM_LIGHT
+uniform float uRimDensity;
+#endif
 
 #ifdef WITH_LIGHT_0
 uniform vec4 uLightPosition0;
@@ -192,10 +200,9 @@ uniform float uLightLinear7;
 uniform float uLightQuadratic7;
 uniform float uAttenuation7;
 #endif
-
 // uniform vec4 uCamPosition;
 
-const float mipBias = -1.0;
+const float mipBias = -1000.0;
 
 mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
     vec3 dp1 = vec3(dFdx(p.x),dFdx(p.y),dFdx(p.z));
@@ -301,6 +308,13 @@ vec3 toSRGB(vec3 c) {
 }
 
 vec4 computeTexel() {
+    #ifdef WITH_MASK_SAMPLER
+        float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a;
+        if ( mask < 0.001 ) {
+            discard;
+        }
+    #endif
+
     vec4 emission = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 ambient = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 diffuse = vec4(0.0, 0.0, 0.0, 0.0);
@@ -438,8 +452,8 @@ vec4 computeTexel() {
                 vec3 R4 = normalize(-reflect(L4, normal));
                 float distance4 = length(bivector4);
                 float attenuation4 = computeAttenuation(uLightConstant4, uLightLinear4, uLightQuadratic4, distance4, uAttenuation4);
-                ambient += computeAmbient(uLightAmbient4);
-                diffuse += computeDiffuse(uLightDiffuse4, attenuation4, L4, normal);
+                ambCoef += computeAmbient(uLightAmbient4);
+                diffCoef += computeDiffuse(uLightDiffuse4, attenuation4, L4, normal);
                 #ifdef WITH_MATERIAL_SHININESS
                     specular += computeSpecular(uLightSpecular4, attenuation4, uMaterialShininess, R4, E);
                 #endif
@@ -486,8 +500,7 @@ vec4 computeTexel() {
 
         #ifdef WITH_RIM_LIGHT
            float vdn = 1.0 - max(dot(normalize(-vPosition), normal), 0.0);
-           vec4 rim = vec4(smoothstep(0.5, 1.0, vdn));
-
+           vec4 rim = vec4(smoothstep(uRimDensity, 1.0, vdn));
            texel += rim * diffCoef;
         #endif
     #else
