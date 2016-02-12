@@ -401,9 +401,16 @@ proc isSequenceLayer(layer: Layer): bool =
         result = true
 
 proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float): int =
-    let relTime = t - layer.startTime # TODO: Account for scale
-    if relTime > 0 and relTime <= f.duration:
-        result = int(relTime / f.frameDuration)
+    let timeRemap = layer.property("Time Remap", float)
+    var relTime = t - layer.startTime
+    if not timeRemap.isNil:
+        relTime = timeRemap.valueAtTime(t)
+
+    # Clamp relTime to layer duration
+    if relTime < 0: relTime = 0
+    if relTime >= f.duration: relTime = f.duration - 0.01
+
+    result = int(relTime / f.frameDuration)
 
 proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var animationStartTime = marker.time
@@ -518,7 +525,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
         compExportPath = c.exportPath
         let fullExportPath = folderPath & "/" & c.exportPath
         if not newFolder(fullExportPath).create():
-            logi "ERROR: Could not create filder ", fullExportPath
+            logi "ERROR: Could not create folder ", fullExportPath
         let filePath = fullExportPath & "/" & $c.name & ".json"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)

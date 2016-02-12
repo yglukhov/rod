@@ -57,7 +57,7 @@ type Mesh* = ref object of RootObj
     red*: GLfloat
     vertexShader*: string
     fragmentShader*: string
-    shader*: GLuint
+    shader*: ProgramRef
 
 const componentsCount = 5
 
@@ -152,7 +152,7 @@ proc load(m: Mesh) =
 proc draw*(m: Mesh) =
     let c = currentContext()
     let gl = c.gl
-    if m.shader == 0:
+    if m.shader == invalidProgram:
         m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
 
     if m.indexBuffer == 0:

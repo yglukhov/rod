@@ -253,7 +253,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     for it in cn.children:
         result.addChild(setupFromColladaNode(it, colladaScene))
 
-var gScenesResCache = initTable[string, ColladaScene]()
+var gScenesResCache = initResourceCache[ColladaScene]()
 
 proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
     var loader: ColladaLoader
@@ -261,7 +261,7 @@ proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
     s.close()
 
 proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
-    let colladaScene = gScenesResCache.getOrDefault(resourceName)
+    let colladaScene = gScenesResCache.get(resourceName)
 
     if colladaScene.isNil:
         resourceNotCached(resourceName)
@@ -270,7 +270,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             pushParentResource(resourceName)
 
             let colladaScene = loadColladaFromStream(s, resourceName)
-            gScenesResCache[resourceName] = colladaScene
+            gScenesResCache.registerResource(resourceName, colladaScene)
 
             let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
             for anim in colladaScene.animations:
@@ -288,14 +288,13 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
         popParentResource()
         handler(res)
 
-# registerResourcePreloader(["dae"], proc(name: string, callback: proc(n: Node3D)) =
-#     loadResourceAsync(name, proc(s: Stream) =
-#         pushParentResource(name)
-#         defer: popParentResource()
-
-#         let colladaScene = loadColladaFromStream(s, name)
-#         gScenesResCache[name] = colladaScene
-#         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
-#         callback(res)
-#     )
-# )
+registerResourcePreloader(["dae"], proc(name: string, callback: proc()) =
+    loadResourceAsync(name, proc(s: Stream) =
+        pushParentResource(name)
+        let colladaScene = loadColladaFromStream(s, name)
+        gScenesResCache.registerResource(name, colladaScene)
+        let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+        popParentResource()
+        callback()
+    )
+)
