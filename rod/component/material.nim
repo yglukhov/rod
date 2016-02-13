@@ -530,13 +530,6 @@ proc createShader(m: Material) =
     let c = currentContext()
     let gl = c.gl
 
-    if m.shader != invalidProgram:
-        if not m.bUserDefinedShader:
-            gl.deleteProgram(m.shader)
-            m.shader = invalidProgram
-            m.vertexShader = ""
-            m.fragmentShader = ""
-
     var commonShaderDefines = ""
     for macros in m.shaderMacroFlags:
         commonShaderDefines &= """#define """ & $macros & "\n"
@@ -597,6 +590,13 @@ method updateSetup*(m: Material, n: Node) {.base.} =
     let gl = c.gl
 
     if (m.shader == invalidProgram or m.bShaderNeedUpdate) and not m.useManualShaderComposing:
+        if m.shader != invalidProgram:
+            if not m.bUserDefinedShader:
+                gl.deleteProgram(m.shader)
+                m.shader = invalidProgram
+                m.vertexShader = ""
+                m.fragmentShader = ""
+
         m.setupSamplerAttributes()
         m.setupMaterialAttributes(n)
         if m.isLightReceiver:
