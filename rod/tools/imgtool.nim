@@ -24,6 +24,8 @@ type
         targetSize: Size
         pos: Point
         png: PNGResult
+        parentComposition, parentNode, parentComponent: JsonNode
+        frameIndex: int
 
     SpriteSheet = ref object
         index: int # Index of sprite sheet in tool.images array
@@ -33,20 +35,6 @@ type
 proc newSpriteSheetImage(path: string): SpriteSheetImage =
     result.new()
     result.originalPath = path
-    result.png = loadPNG32(path)
-    if result.png.isNil:
-        echo "PNG NOT LOADED: ", path
-        return nil
-    result.actualBounds = imageBounds(result.png.data, result.png.width, result.png.height)
-
-    when consumeLessMemory:
-        result.png = nil
-
-    result.srcBounds.width = result.actualBounds.x + result.actualBounds.width
-    result.srcBounds.height = result.actualBounds.y + result.actualBounds.height
-
-    result.srcSize = (result.srcBounds.width, result.srcBounds.height)
-    result.targetSize = result.srcSize
 
 proc newSpriteSheet(minSize: Size): SpriteSheet =
     result.new()
@@ -57,16 +45,20 @@ proc newSpriteSheet(minSize: Size): SpriteSheet =
     result.packer.maxY = py.int32
     result.images = newSeq[SpriteSheetImage]()
 
-type ImgTool = ref object
-    compositionPaths: seq[string]
+type ImgTool* = ref object
+    compositionPaths*: seq[string]
     compositions: seq[JsonNode]
-    outPrefix: string
-    removeOriginals: bool
-    compressOutput: bool
+    outPrefix*: string #
+    originalResPath*: string #
+    resPath*: string #
+    compressOutput*: bool
     images: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
 
-proc newImgTool(): ImgTool =
+    latestOriginalModificationDate: Time
+
+
+proc newImgTool*(): ImgTool =
     result.new()
     result.images = initTable[string, SpriteSheetImage]()
     result.spriteSheets = newSeq[SpriteSheet]()
@@ -108,8 +100,6 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
                 im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
 
         im.png = nil # We no longer need the data in memory
-        if tool.removeOriginals:
-            removeFile(im.originalPath)
 
     discard savePNG32(path, data, ss.packer.width, ss.packer.height)
     if tool.compressOutput:
@@ -198,8 +188,8 @@ proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: strin
                 for ik, iv in v:
                     if ik == animName: return true
 
-proc recalculateSourceBounds(im: SpriteSheetImage, jComp, jNode, jSprite: JsonNode, frameIdx: int) =
-    if jComp.compositionContainsAnimationForNode(jNode, "curFrame"):
+proc recalculateSourceBounds(im: SpriteSheetImage) =
+    if im.parentComposition.compositionContainsAnimationForNode(im.parentNode, "curFrame"):
         im.srcBounds = im.actualBounds
         im.srcSize.width = im.srcBounds.width
         im.srcSize.height = im.srcBounds.height
@@ -215,19 +205,49 @@ proc betterDimension(d: int): int =
         else: r
     if result > 2048: result = 2048
 
-proc recalculateTargetSize(im: SpriteSheetImage, jComp, jNode, jSprite: JsonNode, frameIdx: int) =
+proc recalculateTargetSize(im: SpriteSheetImage) =
     im.targetSize.width = betterDimension(im.srcSize.width)
     im.targetSize.height = betterDimension(im.srcSize.height)
 
-proc run(tool: ImgTool) =
+proc readFile(im: SpriteSheetImage) =
+    im.png = loadPNG32(im.originalPath)
+    if im.png.isNil:
+        echo "PNG NOT LOADED: ", im.originalPath
+    im.actualBounds = imageBounds(im.png.data, im.png.width, im.png.height)
+
+    when consumeLessMemory:
+        im.png = nil
+
+    im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
+    im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
+
+    im.srcSize = (im.srcBounds.width, im.srcBounds.height)
+    im.targetSize = im.srcSize
+
+proc updateLastModificationDateWithFile(tool: ImgTool, path: string) =
+    let modDate = getLastModificationTime(path)
+    if modDate > tool.latestOriginalModificationDate:
+        tool.latestOriginalModificationDate = modDate
+
+proc destPath(tool: ImgTool, origPath: string): string =
+    let relPath = relativePathToPath(tool.originalResPath, origPath)
+    result = tool.resPath / relPath
+
+proc removeLeftoverFiles(tool: ImgTool) =
+    for imgPath in tool.images.keys:
+        removeFile(tool.destPath(imgPath))
+
+proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
 
     # Parse all compositions
     for i, c in tool.compositionPaths:
+        tool.updateLastModificationDateWithFile(c)
         tool.compositions[i] = parseFile(c)
 
     # Init original images
     for i, c in tool.compositions:
+        echo "curcomp: ", tool.compositionPaths[i]
         c.withSpriteNodes proc(n, s: JsonNode) =
             let fileNames = s["fileNames"]
             let compPath = tool.compositionPaths[i].parentDir
@@ -235,62 +255,86 @@ proc run(tool: ImgTool) =
                 let fn = fileNames[ifn]
                 var absPath = compPath / fn.str
                 absPath.normalizePath()
-                echo "Reading file: ", absPath
                 let im = newSpriteSheetImage(absPath)
                 if not im.isNil:
-                    im.recalculateSourceBounds(c, n, s, ifn)
-                    im.recalculateTargetSize(c, n, s, ifn)
+                    tool.updateLastModificationDateWithFile(absPath)
+                    im.parentComposition = c
+                    im.parentNode = n
+                    im.parentComponent = s
+                    im.frameIndex = ifn
                     im.imageIndex = tool.images.len
                     tool.images[absPath] = im
 
-    when consumeLessMemory:
-        GC_fullCollect()
+    # Check if destination files are newer than original files. If yes, we
+    # don't need to do anything.
 
-    # Sort images by area
-    var allImages = toSeq(values(tool.images))
-    allImages.sort(proc(x, y: SpriteSheetImage): int =
-        y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
-        )
+    echo "lost mod date: ", tool.latestOriginalModificationDate
+    var needsUpdate = not fileExists(tool.resPath / tool.outPrefix & "0.png")
+    if not needsUpdate:
+        for c in tool.compositionPaths:
+            let dstPath = tool.destPath(c)
+            echo dstPath, ": ", getLastModificationTime(dstPath)
+            if not fileExists(dstPath) or getLastModificationTime(dstPath) <= tool.latestOriginalModificationDate:
+                needsUpdate = true
+                break
 
-    # Allocate spritesheets for images
-    for i, im in allImages:
-        echo "Packing ", i + 1, " of ", tool.images.len
-        var done = false
-        for ss in tool.spriteSheets:
-            done = ss.tryPackImage(im)
-            if done: break
-        if not done:
-            let newSS = newSpriteSheet(im.targetSize)
-            done = newSS.tryPackImage(im)
-            if done:
-                newSS.index = tool.spriteSheets.len
-                tool.spriteSheets.add(newSS)
-            else:
-                echo "Could not pack image: ", im.originalPath
+    if needsUpdate:
+        for i in tool.images.values:
+            echo "Reading file: ", i.originalPath
+            i.readFile()
+            i.recalculateSourceBounds()
+            i.recalculateTargetSize()
 
-    # Blit images to spriteSheets and save them
-    for i, ss in tool.spriteSheets:
-        echo "Saving ", i + 1, " of ", tool.spriteSheets.len
-        tool.composeAndWrite(ss, tool.outPrefix & $i & ".png")
+        when consumeLessMemory:
+            GC_fullCollect()
 
-    # Readjust sprite nodes
-    for i, c in tool.compositions:
-        var changed = false
-        c.withSpriteNodes proc(n, s: JsonNode) =
-            let fileNames = s["fileNames"]
-            let compPath = tool.compositionPaths[i].parentDir
-            for ifn in 0 ..< fileNames.len:
-                let fn = fileNames[ifn]
-                var absPath = compPath / fn.str
-                absPath.normalizePath()
-                let im = tool.images.getOrDefault(absPath)
-                if not im.isNil and not im.spriteSheet.isNil:
-                    fileNames.elems[ifn] = tool.adjustImageNode(c, n, s, fn, im, compPath, ifn)
-                    changed = true
-            if changed:
-                writeFile(tool.compositionPaths[i], c.pretty().replace(" \n", "\n"))
+        # Sort images by area
+        var allImages = toSeq(values(tool.images))
+        allImages.sort(proc(x, y: SpriteSheetImage): int =
+            y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
+            )
 
-proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true, removeOriginals: bool = false) =
+        # Allocate spritesheets for images
+        for i, im in allImages:
+            echo "Packing ", i + 1, " of ", tool.images.len
+            var done = false
+            for ss in tool.spriteSheets:
+                done = ss.tryPackImage(im)
+                if done: break
+            if not done:
+                let newSS = newSpriteSheet(im.targetSize)
+                done = newSS.tryPackImage(im)
+                if done:
+                    newSS.index = tool.spriteSheets.len
+                    tool.spriteSheets.add(newSS)
+                else:
+                    echo "Could not pack image: ", im.originalPath
+
+        # Blit images to spriteSheets and save them
+        for i, ss in tool.spriteSheets:
+            echo "Saving ", i + 1, " of ", tool.spriteSheets.len
+            tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & ".png")
+
+        # Readjust sprite nodes
+        for i, c in tool.compositions:
+            c.withSpriteNodes proc(n, s: JsonNode) =
+                let fileNames = s["fileNames"]
+                let compPath = tool.compositionPaths[i].parentDir
+                for ifn in 0 ..< fileNames.len:
+                    let fn = fileNames[ifn]
+                    var absPath = compPath / fn.str
+                    absPath.normalizePath()
+                    let im = tool.images.getOrDefault(absPath)
+                    if not im.isNil and not im.spriteSheet.isNil:
+                        fileNames.elems[ifn] = tool.adjustImageNode(c, n, s, fn, im, compPath, ifn)
+
+            let dstPath = tool.destPath(tool.compositionPaths[i])
+            writeFile(dstPath, c.pretty().replace(" \n", "\n"))
+    else:
+        echo "Everyting up to date"
+    tool.removeLeftoverFiles()
+
+proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =
     var tool = newImgTool()
 
     var compositions = newSeq[string]()
@@ -300,23 +344,7 @@ proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefi
 
     tool.compositionPaths = compositions
     tool.outPrefix = outPrefix
-    tool.removeOriginals = removeOriginals
     tool.compressOutput = compressOutput
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime
-
-
-proc imgtool(outPrefix: string = ".", compressOutput: bool = true, removeOriginals: bool = false, compositions: seq[string]): int =
-    var tool = newImgTool()
-    tool.compositionPaths = compositions
-    tool.outPrefix = outPrefix
-    tool.removeOriginals = removeOriginals
-    tool.compressOutput = compressOutput
-    let startTime = epochTime()
-    tool.run()
-    echo "Done. Time: ", epochTime() - startTime
-
-when isMainModule:
-    import cligen
-    dispatch(imgtool)

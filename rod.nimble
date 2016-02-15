@@ -3,7 +3,8 @@ version       = "0.1.0"
 author        = "Anonymous"
 description   = "Graphics engine"
 license       = "MIT"
-#bin           = "editor/rodedit"
+
+bin           = @["rod/tools/rodimgtool"]
 
 # Dependencies
 requires "nimx"
