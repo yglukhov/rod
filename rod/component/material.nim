@@ -17,6 +17,8 @@ import rod.quaternion
 import rod.vertex_data_info
 import rod.viewport
 
+import rod.animated_image
+
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
 
@@ -39,6 +41,7 @@ type ShaderMacro = enum
     WITH_REFLECTION_SAMPLER
     WITH_NORMAL_SAMPLER
     WITH_BUMP_SAMPLER
+    WITH_MASK_SAMPLER
     WITH_FALLOF_SAMPLER
     WITH_MATERIAL_AMBIENT
     WITH_MATERIAL_EMISSION
@@ -62,6 +65,7 @@ type ShaderMacro = enum
     WITH_TBN_FROM_NORMALS
     WITH_RIM_LIGHT
     WITH_NORMALMAP_TO_SRGB
+    WITH_MOTION_BLUR
 
 type
     MaterialColor* = ref object
@@ -87,8 +91,10 @@ type
         bumpTexture*: Image
         reflectionTexture*: Image
         falloffTexture*: Image
+        maskTexture*: Image
 
-        color: MaterialColor
+        color*: MaterialColor
+        rimDensity: Coord
 
         currentLightSourcesCount: int
         isLightReceiver: bool
@@ -106,6 +112,7 @@ type
         bUserDefinedShader: bool
         bShaderNeedUpdate: bool
         shaderMacroFlags: set[ShaderMacro]
+        useManualShaderComposing*: bool
 
 template shaderNeedUpdate(m: Material) = m.bShaderNeedUpdate = true
 
@@ -115,6 +122,7 @@ proc diffuse*(m: Material): Vector4 = result = m.color.diffuse
 proc specular*(m: Material): Vector4 = result = m.color.specular
 proc shininess*(m: Material): Coord = result = m.color.shininess
 proc reflectivity*(m: Material): Coord = result = m.color.reflectivity
+proc rimDensity*(m: Material): Coord = result = m.rimDensity
 
 template `emission=`*(m: Material, v: Vector4) =
     if not m.color.emissionInited:
@@ -149,6 +157,8 @@ template `shininess=`*(m: Material, s: Coord) =
 template `reflectivity=`*(m: Material, r: Coord) =
     m.color.reflectivity = r
     m.color.reflectivityInited = true
+template `rimDensity=`*(m: Material, val: Coord) =
+    m.rimDensity = val
 
 template removeEmissionColor*(m: Material) =
     m.color.emissionInited = false
@@ -172,6 +182,13 @@ template removeShininess*(m: Material) =
     m.bShaderNeedUpdate = true
 template removeReflectivity*(m: Material) =
     m.color.reflectivityInited = false
+
+# proc maskTexture*(m: Material): AnimatedImage = result = m.maskTexture
+# template `maskTexture=`*(m: Material, ai: AnimatedImage) =
+#     if not m.maskTexture.isNil:
+#         m.shaderMacroFlags.incl(WITH_MASK_SAMPLER)
+#         m.bShaderNeedUpdate = true
+#     m.maskTexture = ai
 
 proc isLightReceiver*(m: Material): bool =
     result = m.isLightReceiver
@@ -216,6 +233,8 @@ template `isRIM=`*(m: Material, val: bool) =
 template setupRIMLightTechnique*(m: Material) =
     if m.shader == invalidProgram:
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
+    else:
+        gl.uniform1f(gl.getUniformLocation(m.shader, "uRimDensity"), m.rimDensity.GLfloat)
 
 template setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
     if m.shader == invalidProgram:
@@ -365,6 +384,17 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uFallofUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "falloffMapUnit"), textureIndex)
                 inc textureIndex
+    if not m.maskTexture.isNil:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MASK_SAMPLER)
+            m.shaderMacroFlags.incl(WITH_V_POSITION)
+        else:
+            if m.maskTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.maskTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaskUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "maskMapUnit"), textureIndex)
+                inc textureIndex
 
 proc setupMaterialAttributes(m: Material, n: Node) =
     if not m.color.isNil:
@@ -495,13 +525,6 @@ proc createShader(m: Material) =
     let c = currentContext()
     let gl = c.gl
 
-    if m.shader != invalidProgram:
-        if not m.bUserDefinedShader:
-            gl.deleteProgram(m.shader)
-            m.shader = invalidProgram
-            m.vertexShader = ""
-            m.fragmentShader = ""
-
     var commonShaderDefines = ""
     for macros in m.shaderMacroFlags:
         commonShaderDefines &= """#define """ & $macros & "\n"
@@ -522,10 +545,10 @@ proc createShader(m: Material) =
 
     # echo("\n", m.shaderMacroFlags, "\n")
 
-template assignShaders*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
+proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
     m.vertexShader = vertexShader
     m.fragmentShader = fragmentShader
-    m.shaderNeedUpdate = true
+    m.shaderNeedUpdate()
 
 proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
     m.bUserDefinedShader = true
@@ -561,7 +584,14 @@ method updateSetup*(m: Material, n: Node) {.base.} =
     let c = currentContext()
     let gl = c.gl
 
-    if m.shader == invalidProgram or m.bShaderNeedUpdate:
+    if (m.shader == invalidProgram or m.bShaderNeedUpdate) and not m.useManualShaderComposing:
+        if m.shader != invalidProgram:
+            if not m.bUserDefinedShader:
+                gl.deleteProgram(m.shader)
+                m.shader = invalidProgram
+                m.vertexShader = ""
+                m.fragmentShader = ""
+
         m.setupSamplerAttributes()
         m.setupMaterialAttributes(n)
         if m.isLightReceiver:
@@ -579,6 +609,8 @@ method updateSetup*(m: Material, n: Node) {.base.} =
     m.setupMaterialAttributes(n)
     if m.isLightReceiver:
         m.setupLightAttributes(n.sceneView)
+    if m.isRIM:
+        m.setupRIMLightTechnique()
     m.setupTransform(n)
 
     if n.alpha < 1.0 or m.blendEnable:
