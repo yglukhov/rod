@@ -91,7 +91,7 @@ type
         bumpTexture*: Image
         reflectionTexture*: Image
         falloffTexture*: Image
-        maskTexture*: AnimatedImage
+        maskTexture*: Image
 
         color*: MaterialColor
         rimDensity: Coord
@@ -113,10 +113,6 @@ type
         bShaderNeedUpdate: bool
         shaderMacroFlags: set[ShaderMacro]
         useManualShaderComposing*: bool
-
-        prevMVPMatrix: Matrix4
-        counter: int
-        velocityScale*: float32
 
 template shaderNeedUpdate(m: Material) = m.bShaderNeedUpdate = true
 
@@ -269,7 +265,6 @@ proc newDefaultMaterial*(): Material =
     result.isLightReceiver = true
     result.bEnableBackfaceCulling = true
     result.color.new()
-    result.velocityScale = 1.0
 
 proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
     let c = currentContext()

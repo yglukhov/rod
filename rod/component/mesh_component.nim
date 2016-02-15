@@ -29,8 +29,10 @@ type MeshComponent* = ref object of Component
     vertInfo*: VertexDataInfo
     material*: Material
     bShowObjectSelection*: bool
+    bProccesPostEffects*: bool
 
 method init*(m: MeshComponent) =
+    m.bProccesPostEffects = true
     m.material = newDefaultMaterial()
     procCall m.Component.init()
 
@@ -204,6 +206,16 @@ method draw*(m: MeshComponent) =
     gl.activeTexture(gl.TEXTURE0)
     gl.enable(gl.BLEND)
 
+method tryGetShader*(m: MeshComponent, shader: var ProgramRef): bool =
+    if m.bProccesPostEffects:
+        shader = m.material.shader
+        if shader != invalidProgram:
+            result = true
+
+method setShader*(m: MeshComponent, shader: ProgramRef) =
+    if shader != invalidProgram:
+        m.material.shader = shader
+
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("emission", m.material.emission)
     p.visitProperty("ambient", m.material.ambient)
@@ -211,7 +223,7 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("specular", m.material.specular)
     p.visitProperty("shininess", m.material.shininess)
     p.visitProperty("reflectivity", m.material.reflectivity)
-    p.visitProperty("rim density", m.material.rimDensity)
+    p.visitProperty("rim_density", m.material.rimDensity)
 
     p.visitProperty("culling", m.material.bEnableBackfaceCulling)
     p.visitProperty("light", m.material.isLightReceiver)

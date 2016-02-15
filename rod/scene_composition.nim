@@ -293,7 +293,7 @@ registerResourcePreloader(["dae"], proc(name: string, callback: proc()) =
         pushParentResource(name)
         let colladaScene = loadColladaFromStream(s, name)
         gScenesResCache.registerResource(name, colladaScene)
-        let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+        # let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
         popParentResource()
         callback()
     )

@@ -1,8 +1,9 @@
+import nimx.types
 import nimx.image
 import nimx.animation
 import nimx.portable_gl
 
-type AnimatedImage* = ref object
+type AnimatedImage* = ref object of Image
     images*: seq[Image]
     currentFrame*: int
     anim*: Animation
@@ -42,9 +43,11 @@ proc frameAnimation*(ai: AnimatedImage, desiredFramerate: int = 30): Animation =
         ai.anim = a
     result = ai.anim
 
-proc isLoaded*(ai: AnimatedImage): bool =
+method isLoaded*(ai: AnimatedImage): bool =
     if not ai.images.isNil:
         result = ai.images[ai.currentFrame].isLoaded()
 
-proc getTextureQuad*(ai: AnimatedImage, gl: GL, texCoords: var array[4, GLfloat]): TextureRef =
+method getTextureQuad*(ai: AnimatedImage, gl: GL, texCoords: var array[4, GLfloat]): TextureRef =
     result = getTextureQuad(ai.images[ai.currentFrame], gl, texCoords)
+
+method size*(ai: AnimatedImage): Size = ai.images[ai.currentFrame].size()
