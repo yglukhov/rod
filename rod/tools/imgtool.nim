@@ -140,24 +140,29 @@ proc translationAnimFromFrameAnim(node, frameAnim: JsonNode): JsonNode =
     if not numLoops.isNil:
         result["numberOfLoops"] = numLoops
 
-proc adjustImageNode(tool: ImgTool, jComp, jNode, jSprite, jFileName: JsonNode,
-        im: SpriteSheetImage, compPath: string, frameIdx: int): JsonNode =
+proc destPath(tool: ImgTool, origPath: string): string =
+    let relPath = relativePathToPath(tool.originalResPath, origPath)
+    result = tool.resPath / relPath
+
+proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, compPath: string): JsonNode =
     # Fixup the fileName node to contain spritesheet filename and texCoords
     result = newJObject()
     doAssert(not im.spriteSheet.isNil)
-    result["file"] = %relativePathToPath(compPath, tool.outPrefix & $im.spriteSheet.index & ".png")
+    result["file"] = %relativePathToPath(tool.destPath(compPath), tool.resPath / tool.outPrefix & $im.spriteSheet.index & ".png")
     let w = im.spriteSheet.packer.width.float
     let h = im.spriteSheet.packer.height.float
     result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float + 0.5) / w, ((im.pos.y + im.targetSize.height).float + 0.5) / h]
     result["size"] = %*[im.srcSize.width, im.srcSize.height]
 
+    let jNode = im.parentNode
+
     if im.srcBounds.x > 0 or im.srcBounds.y > 0:
         # Node position has changed
-        if frameIdx == 0:
+        if im.frameIndex == 0:
             jNode["translation"] = adjustTranslationValueForFrame(jNode["translation"], im)
 
         # Adjust translation animations
-        let allAnimations = jComp["animations"]
+        let allAnimations = im.parentComposition["animations"]
         let nodeName = jNode["name"].getStr(nil)
         if not nodeName.isNil and not allAnimations.isNil:
             let translationAnimName = nodeName & ".translation"
@@ -172,7 +177,7 @@ proc adjustImageNode(tool: ImgTool, jComp, jNode, jSprite, jFileName: JsonNode,
 
                     let frameValues = frameAnim["values"]
                     for iVal in 0 ..< frameValues.len:
-                        if frameValues[iVal].num == frameIdx:
+                        if frameValues[iVal].num == im.frameIndex:
                             let transValues = translationAnim["values"]
                             transValues.elems[iVal] = adjustTranslationValueForFrame(transValues.elems[iVal], im)
                 else:
@@ -229,10 +234,6 @@ proc updateLastModificationDateWithFile(tool: ImgTool, path: string) =
     if modDate > tool.latestOriginalModificationDate:
         tool.latestOriginalModificationDate = modDate
 
-proc destPath(tool: ImgTool, origPath: string): string =
-    let relPath = relativePathToPath(tool.originalResPath, origPath)
-    result = tool.resPath / relPath
-
 proc removeLeftoverFiles(tool: ImgTool) =
     for imgPath in tool.images.keys:
         removeFile(tool.destPath(imgPath))
@@ -247,7 +248,6 @@ proc run*(tool: ImgTool) =
 
     # Init original images
     for i, c in tool.compositions:
-        echo "curcomp: ", tool.compositionPaths[i]
         c.withSpriteNodes proc(n, s: JsonNode) =
             let fileNames = s["fileNames"]
             let compPath = tool.compositionPaths[i].parentDir
@@ -267,13 +267,10 @@ proc run*(tool: ImgTool) =
 
     # Check if destination files are newer than original files. If yes, we
     # don't need to do anything.
-
-    echo "lost mod date: ", tool.latestOriginalModificationDate
     var needsUpdate = not fileExists(tool.resPath / tool.outPrefix & "0.png")
     if not needsUpdate:
         for c in tool.compositionPaths:
             let dstPath = tool.destPath(c)
-            echo dstPath, ": ", getLastModificationTime(dstPath)
             if not fileExists(dstPath) or getLastModificationTime(dstPath) <= tool.latestOriginalModificationDate:
                 needsUpdate = true
                 break
@@ -295,8 +292,8 @@ proc run*(tool: ImgTool) =
             )
 
         # Allocate spritesheets for images
+        echo "Packing images..."
         for i, im in allImages:
-            echo "Packing ", i + 1, " of ", tool.images.len
             var done = false
             for ss in tool.spriteSheets:
                 done = ss.tryPackImage(im)
@@ -326,7 +323,7 @@ proc run*(tool: ImgTool) =
                     absPath.normalizePath()
                     let im = tool.images.getOrDefault(absPath)
                     if not im.isNil and not im.spriteSheet.isNil:
-                        fileNames.elems[ifn] = tool.adjustImageNode(c, n, s, fn, im, compPath, ifn)
+                        fileNames.elems[ifn] = tool.adjustImageNode(im, compPath)
 
             let dstPath = tool.destPath(tool.compositionPaths[i])
             writeFile(dstPath, c.pretty().replace(" \n", "\n"))
