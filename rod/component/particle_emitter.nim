@@ -21,10 +21,12 @@ type ParticleData = tuple
     velocity: Vector3
     rotVelocity: Quaternion
     initialLifetime, remainingLifetime: float
+    pid: float
 
 type
     Particle* = ref object of Component
         initialLifetime*, remainingLifetime*: float
+        pid*: float
 
     ParticleEmitter* = ref object of Component
         lifetime*: float
@@ -63,6 +65,7 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
     part.coord = newVector3(0, 0)
     part.scale = newVector3(1, 1, 1)
     part.rotation = newQuaternion()
+    part.pid = random(1.0)
 
     let velocityLen = p.velocity + p.velocity * pmRandom(p.velocityRandom)
     part.velocity = aroundZ(p.direction + p.direction * pmRandom(p.directionRandom)) * newVector3(velocityLen, 0, 0)
@@ -88,6 +91,7 @@ template drawParticle(p: ParticleEmitter, part: ParticleData) =
     let pc = proto.component(Particle)
     pc.remainingLifetime = part.remainingLifetime
     pc.initialLifetime = part.initialLifetime
+    pc.pid = part.pid
     proto.recursiveUpdate()
     proto.recursiveDraw()
 
