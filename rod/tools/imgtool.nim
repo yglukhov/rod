@@ -242,9 +242,23 @@ proc updateLastModificationDateWithFile(tool: ImgTool, path: string) =
     if modDate > tool.latestOriginalModificationDate:
         tool.latestOriginalModificationDate = modDate
 
+proc isDirEmpty(d: string): bool =
+    result = true
+    for k, p in walkDir(d):
+        result = false
+        break
+
+proc pruneEmptyDir(d: string) =
+    var p = d
+    while isDirEmpty(p):
+        removeDir(p)
+        p = p.parentDir()
+
 proc removeLeftoverFiles(tool: ImgTool) =
     for imgPath in tool.images.keys:
-        removeFile(tool.destPath(imgPath))
+        let p = tool.destPath(imgPath)
+        removeFile(p)
+        pruneEmptyDir(p.parentDir())
 
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
