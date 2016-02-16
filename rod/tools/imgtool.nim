@@ -154,15 +154,10 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
 
     let jNode = o.parentNode
 
-    echo "ADJUST IM NODE: ", im.originalPath
-
     if im.srcBounds.x > 0 or im.srcBounds.y > 0:
         # Node position has changed
         if o.frameIndex == 0:
-            echo "Adjust ", im.originalPath
-            echo im.srcBounds
             jNode["translation"] = adjustTranslationValueForFrame(jNode["translation"], im)
-            echo "new trans: ", jNode["translation"]
 
         # Adjust translation animations
         let allAnimations = o.parentComposition["animations"]
