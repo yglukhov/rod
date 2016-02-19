@@ -289,6 +289,40 @@ proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
     result.loadComposition("compositions/" & name & ".json")
 
+proc getDepth*(n: Node): int =
+    result = 0
+
+    var p = n.parent
+    while not p.isNil:
+        inc result
+        p = p.parent
+
+proc getTreeDistance*(x, y: Node): int =
+    var xLevel = x.getDepth()
+    var yLevel = y.getDepth()
+    var px = x.parent
+    var py = y.parent
+
+    while xLevel > yLevel:
+        dec xLevel
+        px = px.parent
+
+    while yLevel > xLevel:
+        dec yLevel
+        py = py.parent
+
+    var cx = px
+    var cy = py
+
+    while px != py:
+        cx = px
+        cy = py
+        px = px.parent
+        py = py.parent
+
+    let ix = px.children.find(cx)
+    let iy = px.children.find(cy)
+    result = iy - ix
 
 # Debugging
 proc recursiveChildrenCount*(n: Node): int =
