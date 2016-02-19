@@ -8,18 +8,24 @@ import rod.ray
 import rod.viewport
 import rod.rod_types
 import rod.node
-
 export UIComponent
 
 type UICompView = ref object of View
     node: Node
 
-proc intersectsWithUINode(r: Ray, n: Node, res: var Vector3): bool =
+proc intersectsWithUINode*(r: Ray, n: Node, res: var Vector3, cv: UICompView = nil): bool =
     let worldPointOnPlane = n.localToWorld(newVector3())
     var worldNormal = n.localToWorld(newVector3(0, 0, 1))
     worldNormal -= worldPointOnPlane
     worldNormal.normalize()
-    r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
+    let isIntersect = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
+    result = isIntersect
+
+    if isIntersect and not cv.isNil:
+        let v = cv.subviews[0]
+        var localres : Vector3
+        if n.tryWorldToLocal(res, localres):
+            result = localres.x >= v.frame.x and localres.x <= v.frame.maxX and localres.y >= v.frame.y and localres.y <= v.frame.maxY
 
 method convertPointToParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
@@ -51,14 +57,12 @@ proc moveToWindow(v: View, w: Window) =
     for s in v.subviews:
         s.moveToWindow(w)
 
-proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event): bool =
-    if not c.mView.isNil:
-        var res : Vector3
-        if r.intersectsWithUINode(c.node, res):
-            if c.node.tryWorldToLocal(res, res):
-                let v = c.mView.subviews[0]
-                e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
-                result = v.recursiveHandleMouseEvent(e)
+proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
+    var res : Vector3
+    if c.node.tryWorldToLocal(intersection, res):
+        let v = c.mView.subviews[0]
+        e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
+        result = v.recursiveHandleMouseEvent(e)
 
 proc sceneViewWillMoveToWindow*(c: UIComponent, w: Window) =
     if not c.mView.isNil:
