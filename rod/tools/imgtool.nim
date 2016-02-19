@@ -5,7 +5,7 @@ import nimx.rect_packer
 import nimx.types
 import nimx.pathutils
 
-import imgtools.imgtools
+import imgtools.imgtools, imgtools.texcompress
 
 type Rect = imgtools.Rect
 type Point = tuple[x, y: int32]
@@ -57,6 +57,8 @@ type ImgTool* = ref object
     originalResPath*: string #
     resPath*: string #
     compressOutput*: bool
+    compressToPVR*: bool
+    downsampleRatio*: float
     images: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
 
@@ -67,6 +69,7 @@ proc newImgTool*(): ImgTool =
     result.new()
     result.images = initTable[string, SpriteSheetImage]()
     result.spriteSheets = newSeq[SpriteSheet]()
+    result.downsampleRatio = 1.0
 
 proc withSpriteNodes(n: JsonNode, p: proc(j, s: JsonNode)) =
     let components = n["components"]
@@ -85,6 +88,12 @@ proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
     if result:
         ss.images.add(im)
         im.spriteSheet = ss
+
+proc outImgExt(tool: ImgTool): string =
+    if tool.compressToPVR:
+        result = ".pvr"
+    else:
+        result = ".png"
 
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
@@ -106,9 +115,15 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
 
         im.png = nil # We no longer need the data in memory
 
-    discard savePNG32(path, data, ss.packer.width, ss.packer.height)
-    if tool.compressOutput:
-        discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
+    if tool.compressToPVR:
+        let tmpPath = path & ".png"
+        discard savePNG32(tmpPath, data, ss.packer.width, ss.packer.height)
+        convertToETC2(tmpPath, path, false)
+        removeFile(tmpPath)
+    else:
+        discard savePNG32(path, data, ss.packer.width, ss.packer.height)
+        if tool.compressOutput:
+            discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
 
     when consumeLessMemory:
         GC_fullCollect()
@@ -146,7 +161,7 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
     let result = newJObject()
     o.parentComponent["fileNames"].elems[o.frameIndex] = result
     doAssert(not im.spriteSheet.isNil)
-    result["file"] = %relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & ".png")
+    result["file"] = %relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt)
     let w = im.spriteSheet.packer.width.float
     let h = im.spriteSheet.packer.height.float
     result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float + 0.5) / w, ((im.pos.y + im.targetSize.height).float + 0.5) / h]
@@ -202,10 +217,8 @@ proc recalculateSourceBounds(im: SpriteSheetImage) =
         im.srcSize.width = im.srcBounds.width
         im.srcSize.height = im.srcBounds.height
 
-const forceDownsampleRatio = 1
-
-proc betterDimension(d: int): int =
-    let r = int(d / forceDownsampleRatio)
+proc betterDimension(tool: ImgTool, d: int): int =
+    let r = int(d.float / tool.downsampleRatio)
     result = case r
         of 257 .. 400: 256
         of 513 .. 700: 512
@@ -213,9 +226,9 @@ proc betterDimension(d: int): int =
         else: r
     if result > 2048: result = 2048
 
-proc recalculateTargetSize(im: SpriteSheetImage) =
-    im.targetSize.width = betterDimension(im.srcSize.width)
-    im.targetSize.height = betterDimension(im.srcSize.height)
+proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
+    im.targetSize.width = tool.betterDimension(im.srcSize.width)
+    im.targetSize.height = tool.betterDimension(im.srcSize.height)
 
 proc readFile(im: SpriteSheetImage) =
     im.png = loadPNG32(im.originalPath)
@@ -288,7 +301,7 @@ proc run*(tool: ImgTool) =
 
     # Check if destination files are newer than original files. If yes, we
     # don't need to do anything.
-    var needsUpdate = not fileExists(tool.resPath / tool.outPrefix & "0.png")
+    var needsUpdate = not fileExists(tool.resPath / tool.outPrefix & "0" & tool.outImgExt)
     if not needsUpdate:
         for c in tool.compositionPaths:
             let dstPath = tool.destPath(c)
@@ -301,7 +314,7 @@ proc run*(tool: ImgTool) =
             echo "Reading file: ", i.originalPath
             i.readFile()
             i.recalculateSourceBounds()
-            i.recalculateTargetSize()
+            tool.recalculateTargetSize(i)
 
         when consumeLessMemory:
             GC_fullCollect()
@@ -331,7 +344,7 @@ proc run*(tool: ImgTool) =
         # Blit images to spriteSheets and save them
         for i, ss in tool.spriteSheets:
             echo "Saving ", i + 1, " of ", tool.spriteSheets.len
-            tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & ".png")
+            tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
 
         for im in tool.images.values:
             for o in im.occurences:
