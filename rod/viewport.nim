@@ -184,41 +184,6 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
 
 import component.ui_component, algorithm
 
-proc getNodeOrder(x, y: Node): int =
-    var xLevel = 0
-    var yLevel = 0
-    var p = x.parent
-    while not p.isNil:
-        inc xLevel
-        p = p.parent
-
-    p = y.parent
-    while not p.isNil:
-        inc yLevel
-        p = p.parent
-
-    var px = x.parent
-    var py = y.parent
-    while xLevel > yLevel:
-        dec xLevel
-        px = px.parent
-
-    while yLevel > xLevel:
-        dec yLevel
-        py = py.parent
-
-    var cx = px
-    var cy = py
-
-    while px != py:
-        cx = px
-        cy = py
-        px = px.parent
-        py = py.parent
-
-    let ix = px.children.find(cx)
-    let iy = px.children.find(cy)
-    result = iy - ix
 
 method handleMouseEvent*(v: SceneView, e: var Event): bool =
     result = procCall v.View.handleMouseEvent(e)
@@ -239,7 +204,7 @@ method handleMouseEvent*(v: SceneView, e: var Event): bool =
             intersections.sort(proc (x, y: Inter): int =
                 result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
                 if result == 0:
-                    result = getNodeOrder(x.c.node, y.c.node)
+                    result = getTreeDistance(x.c.node, y.c.node)
             )
 
             for i in intersections:

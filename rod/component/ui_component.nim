@@ -18,10 +18,9 @@ proc intersectsWithUINode*(r: Ray, n: Node, res: var Vector3, cv: UICompView = n
     var worldNormal = n.localToWorld(newVector3(0, 0, 1))
     worldNormal -= worldPointOnPlane
     worldNormal.normalize()
-    let isIntersect = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
-    result = isIntersect
+    result = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
 
-    if isIntersect and not cv.isNil:
+    if result and not cv.isNil:
         let v = cv.subviews[0]
         var localres : Vector3
         if n.tryWorldToLocal(res, localres):
