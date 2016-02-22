@@ -31,6 +31,11 @@ type
     Component* = ref object of RootObj
         node*: Node3D
 
+    PostprocessContext* = ref object
+        shader*: ProgramRef
+        setupProc*: proc()
+        drawProc*: proc()
+
     SceneView* = ref object of View
         viewMatrixCached*: Matrix4
         mCamera*: Camera
@@ -43,6 +48,7 @@ type
         tempFramebuffers*: seq[SelfContainedImage]
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]
+        postprocessContext*: PostprocessContext
 
     Viewport* {.deprecated.} = SceneView
 
