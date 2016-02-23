@@ -64,6 +64,7 @@ type
         isNameSet*: bool
         isTrackMatte*: bool
         hasTrackMatte*: bool
+        timeRemapEnabled*: bool
 
         ## The start time of the layer, expressed in composition time (seconds).
         ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.

@@ -401,9 +401,10 @@ proc isSequenceLayer(layer: Layer): bool =
         result = true
 
 proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float): int =
-    let timeRemap = layer.property("Time Remap", float)
     var relTime = t - layer.startTime
-    if not timeRemap.isNil:
+
+    if layer.timeRemapEnabled:
+        let timeRemap = layer.property("Time Remap", float)
         relTime = timeRemap.valueAtTime(t)
 
     # Clamp relTime to layer duration
