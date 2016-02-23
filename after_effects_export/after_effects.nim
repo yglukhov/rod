@@ -1,4 +1,4 @@
-import strutils
+import strutils, algorithm, future
 import adobe_tools
 export adobe_tools
 
@@ -252,8 +252,6 @@ proc newRegex*(pattern: cstring): JSRegExp {.importc: "new RegExp".}
 proc match*(str: cstring, reg: JSRegExp): seq[cstring] {.importcpp.}
 
 proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
-    result = newSeq[File]()
-
     var allFilesInDir = newFolder(source.file.path).getFiles()
     var pattern = newRegex("""(.*)\[(\d+)-(\d+)\](.*)""")
 
@@ -266,6 +264,9 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
 
     var pattern2 = newRegex("""([^\d]*)(\d+)(.*)""")
 
+    type E = tuple[index: int, f: File]
+    var filesWithIndexes = newSeq[E]()
+
     for i in allFilesInDir:
         var fMatches = i.name.match(pattern2)
         if not fMatches.isNil and fMatches.len >= 2:
@@ -273,7 +274,20 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
             if (matches[1] == fMatches[1] and
                     matches[^1] == fMatches[^1] and
                     index >= startIndex and index <= endIndex):
+                filesWithIndexes.add((index, i))
                 result.add(i)
+
+    {.emit: """
+    `filesWithIndexes` = `filesWithIndexes`.sort(function(a, b) {
+        return a.Field0 - b.Field0;
+        });
+    """.}
+
+    #filesWithIndexes.sort(proc (a, b: E): int = a.index - b.index)
+    result = newSeq[File](filesWithIndexes.len)
+
+    for i, f in filesWithIndexes:
+        result[i] = f.f
 
 proc justification*(td: TextDocument): TextJustification =
     {.emit: """
