@@ -2,29 +2,35 @@ import nimx.types
 import nimx.context
 import nimx.composition
 import nimx.portable_gl
+import nimx.view
 
 import rod.node
 import rod.component
 
+import opengl
+
+const clippingRectWithScissors = true
+
 type ClippingRectComponent* = ref object of Component
     clippingRect*: Rect
 
-var clippingRectPostEffect = newPostEffect("""
-uniform vec2 uTopLeft;
-uniform vec2 uBottomRight;
-uniform vec2 viewportSize;
+when not clippingRectWithScissors:
+    var clippingRectPostEffect = newPostEffect("""
+    uniform vec2 uTopLeft;
+    uniform vec2 uBottomRight;
+    uniform vec2 viewportSize;
 
-float insideBox(vec2 v, vec2 bottomLeft, vec2 topRight) {
-    vec2 s = step(bottomLeft, v) - step(topRight, v);
-    return s.x * s.y;
-}
+    float insideBox(vec2 v, vec2 bottomLeft, vec2 topRight) {
+        vec2 s = step(bottomLeft, v) - step(topRight, v);
+        return s.x * s.y;
+    }
 
-void clipRect() {
-    vec2 pos = gl_FragCoord.xy;
-    pos.y = viewportSize.y - pos.y;
-    gl_FragColor.a *= insideBox(pos, uTopLeft, uBottomRight);
-}
-""", "clipRect")
+    void clipRect() {
+        vec2 pos = gl_FragCoord.xy;
+        pos.y = viewportSize.y - pos.y;
+        gl_FragColor.a *= insideBox(pos, uTopLeft, uBottomRight);
+    }
+    """, "clipRect")
 
 proc project(p: Vector3, mat: Matrix4, vp: Size): Point =
     let point3D = mat * p
@@ -44,13 +50,21 @@ method draw*(cl: ClippingRectComponent) =
     let tl2 = project(tlv, c.transform, vpSize)
     let br2 = project(brv, c.transform, vpSize)
 
-    pushPostEffect clippingRectPostEffect:
-        setUniform("uTopLeft", tl2)
-        setUniform("uBottomRight", br2)
-        setUniform("viewportSize", vpSize)
+    when clippingRectWithScissors:
+        let gl = c.gl
+        gl.enable(gl.SCISSOR_TEST)
+        gl.scissor(GLint(tl2.x), GLint(cl.node.sceneView.bounds.height - br2.y), GLsizei(br2.x - tl2.x), GLSizei(br2.y - tl2.y))
+        for c in cl.node.children: c.recursiveDraw()
+        gl.disable(gl.SCISSOR_TEST)
+    else:
+        pushPostEffect clippingRectPostEffect:
+           setUniform("uTopLeft", tl2)
+           setUniform("uBottomRight", br2)
+           setUniform("viewportSize", vpSize)
 
-    for c in cl.node.children: c.recursiveDraw()
-    popPostEffect()
+        for c in cl.node.children: c.recursiveDraw()
+
+        popPostEffect()
 
 method isPosteffectComponent*(c: ClippingRectComponent): bool = true
 
