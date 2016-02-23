@@ -5,7 +5,7 @@ import nimx.rect_packer
 import nimx.types
 import nimx.pathutils
 
-import imgtools.imgtools
+import imgtools.imgtools, imgtools.texcompress
 
 type Rect = imgtools.Rect
 type Point = tuple[x, y: int32]
@@ -14,8 +14,13 @@ type Size = tuple[width, height: int]
 const consumeLessMemory = defined(windows)
 
 type
+    ImageOccurence = object
+        parentComposition, parentNode, parentComponent: JsonNode
+        frameIndex: int
+        compPath: string
+        originalTranslationInNode: tuple[x, y: float]
+
     SpriteSheetImage = ref object
-        imageIndex: int # Index of this image in tool.images array
         spriteSheet: SpriteSheet # Index of sprite sheet in tool.images array
         srcBounds: Rect
         actualBounds: Rect
@@ -24,8 +29,7 @@ type
         targetSize: Size
         pos: Point
         png: PNGResult
-        parentComposition, parentNode, parentComponent: JsonNode
-        frameIndex: int
+        occurences: seq[ImageOccurence]
 
     SpriteSheet = ref object
         index: int # Index of sprite sheet in tool.images array
@@ -35,6 +39,7 @@ type
 proc newSpriteSheetImage(path: string): SpriteSheetImage =
     result.new()
     result.originalPath = path
+    result.occurences = @[]
 
 proc newSpriteSheet(minSize: Size): SpriteSheet =
     result.new()
@@ -52,6 +57,8 @@ type ImgTool* = ref object
     originalResPath*: string #
     resPath*: string #
     compressOutput*: bool
+    compressToPVR*: bool
+    downsampleRatio*: float
     images: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
 
@@ -62,6 +69,7 @@ proc newImgTool*(): ImgTool =
     result.new()
     result.images = initTable[string, SpriteSheetImage]()
     result.spriteSheets = newSeq[SpriteSheet]()
+    result.downsampleRatio = 1.0
 
 proc withSpriteNodes(n: JsonNode, p: proc(j, s: JsonNode)) =
     let components = n["components"]
@@ -80,6 +88,12 @@ proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
     if result:
         ss.images.add(im)
         im.spriteSheet = ss
+
+proc outImgExt(tool: ImgTool): string =
+    if tool.compressToPVR:
+        result = ".pvr"
+    else:
+        result = ".png"
 
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
@@ -101,9 +115,15 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
 
         im.png = nil # We no longer need the data in memory
 
-    discard savePNG32(path, data, ss.packer.width, ss.packer.height)
-    if tool.compressOutput:
-        discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
+    if tool.compressToPVR:
+        let tmpPath = path & ".png"
+        discard savePNG32(tmpPath, data, ss.packer.width, ss.packer.height)
+        convertToETC2(tmpPath, path, false)
+        removeFile(tmpPath)
+    else:
+        discard savePNG32(path, data, ss.packer.width, ss.packer.height)
+        if tool.compressOutput:
+            discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
 
     when consumeLessMemory:
         GC_fullCollect()
@@ -116,21 +136,13 @@ proc adjustTranslationValueForFrame(trans: JsonNode, im: SpriteSheetImage): Json
         result.elems[0] = %(result[0].getFNum() + im.srcBounds.x.float)
         result.elems[1] = %(result[1].getFNum() + im.srcBounds.y.float)
 
-proc translationAnimFromFrameAnim(node, frameAnim: JsonNode): JsonNode =
+proc translationAnimFromFrameAnim(im: SpriteSheetImage, frameAnim: JsonNode, o: ImageOccurence): JsonNode =
     result = newJObject()
     let values = newJArray()
     let vl = frameAnim["values"].len
 
-    let translation = node["translation"]
-    var tx, ty, tz: float
-    if not translation.isNil:
-        tx = translation[0].getFNum()
-        ty = translation[1].getFNum()
-        tz = translation[2].getFNum()
-
     for i in 0 ..< vl:
-        #values.add(%*[tx, ty, tz]) # TODO: Fix this
-        values.add(%*[0, 0, 0])
+        values.add(%*[o.originalTranslationInNode.x, o.originalTranslationInNode.y, 0])
 
     result["values"] = values
 
@@ -144,25 +156,26 @@ proc destPath(tool: ImgTool, origPath: string): string =
     let relPath = relativePathToPath(tool.originalResPath, origPath)
     result = tool.resPath / relPath
 
-proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, compPath: string): JsonNode =
+proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
     # Fixup the fileName node to contain spritesheet filename and texCoords
-    result = newJObject()
+    let result = newJObject()
+    o.parentComponent["fileNames"].elems[o.frameIndex] = result
     doAssert(not im.spriteSheet.isNil)
-    result["file"] = %relativePathToPath(tool.destPath(compPath), tool.resPath / tool.outPrefix & $im.spriteSheet.index & ".png")
+    result["file"] = %relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt)
     let w = im.spriteSheet.packer.width.float
     let h = im.spriteSheet.packer.height.float
     result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float + 0.5) / w, ((im.pos.y + im.targetSize.height).float + 0.5) / h]
     result["size"] = %*[im.srcSize.width, im.srcSize.height]
 
-    let jNode = im.parentNode
+    let jNode = o.parentNode
 
     if im.srcBounds.x > 0 or im.srcBounds.y > 0:
         # Node position has changed
-        if im.frameIndex == 0:
+        if o.frameIndex == 0:
             jNode["translation"] = adjustTranslationValueForFrame(jNode["translation"], im)
 
         # Adjust translation animations
-        let allAnimations = im.parentComposition["animations"]
+        let allAnimations = o.parentComposition["animations"]
         let nodeName = jNode["name"].getStr(nil)
         if not nodeName.isNil and not allAnimations.isNil:
             let translationAnimName = nodeName & ".translation"
@@ -172,12 +185,12 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, compPath: string): Jso
                 if not frameAnim.isNil:
                     var translationAnim = v[translationAnimName]
                     if translationAnim.isNil:
-                        translationAnim = translationAnimFromFrameAnim(jNode, frameAnim)
+                        translationAnim = translationAnimFromFrameAnim(im, frameAnim, o)
                         v[translationAnimName] = translationAnim
 
                     let frameValues = frameAnim["values"]
                     for iVal in 0 ..< frameValues.len:
-                        if frameValues[iVal].num == im.frameIndex:
+                        if frameValues[iVal].num == o.frameIndex:
                             let transValues = translationAnim["values"]
                             transValues.elems[iVal] = adjustTranslationValueForFrame(transValues.elems[iVal], im)
                 else:
@@ -194,15 +207,18 @@ proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: strin
                     if ik == animName: return true
 
 proc recalculateSourceBounds(im: SpriteSheetImage) =
-    if im.parentComposition.compositionContainsAnimationForNode(im.parentNode, "curFrame"):
+    var allowBoundsRecalc = false
+    for o in im.occurences:
+        if o.parentComposition.compositionContainsAnimationForNode(o.parentNode, "curFrame"):
+            allowBoundsRecalc = true
+
+    if allowBoundsRecalc:
         im.srcBounds = im.actualBounds
         im.srcSize.width = im.srcBounds.width
         im.srcSize.height = im.srcBounds.height
 
-const forceDownsampleRatio = 1
-
-proc betterDimension(d: int): int =
-    let r = int(d / forceDownsampleRatio)
+proc betterDimension(tool: ImgTool, d: int): int =
+    let r = int(d.float / tool.downsampleRatio)
     result = case r
         of 257 .. 400: 256
         of 513 .. 700: 512
@@ -210,9 +226,9 @@ proc betterDimension(d: int): int =
         else: r
     if result > 2048: result = 2048
 
-proc recalculateTargetSize(im: SpriteSheetImage) =
-    im.targetSize.width = betterDimension(im.srcSize.width)
-    im.targetSize.height = betterDimension(im.srcSize.height)
+proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
+    im.targetSize.width = tool.betterDimension(im.srcSize.width)
+    im.targetSize.height = tool.betterDimension(im.srcSize.height)
 
 proc readFile(im: SpriteSheetImage) =
     im.png = loadPNG32(im.originalPath)
@@ -229,14 +245,33 @@ proc readFile(im: SpriteSheetImage) =
     im.srcSize = (im.srcBounds.width, im.srcBounds.height)
     im.targetSize = im.srcSize
 
+    for o in im.occurences.mitems:
+        let tr = o.parentNode["translation"]
+        o.originalTranslationInNode.x = tr[0].getFNum()
+        o.originalTranslationInNode.y = tr[1].getFNum()
+
 proc updateLastModificationDateWithFile(tool: ImgTool, path: string) =
     let modDate = getLastModificationTime(path)
     if modDate > tool.latestOriginalModificationDate:
         tool.latestOriginalModificationDate = modDate
 
+proc isDirEmpty(d: string): bool =
+    result = true
+    for k, p in walkDir(d):
+        result = false
+        break
+
+proc pruneEmptyDir(d: string) =
+    var p = d
+    while isDirEmpty(p):
+        removeDir(p)
+        p = p.parentDir()
+
 proc removeLeftoverFiles(tool: ImgTool) =
     for imgPath in tool.images.keys:
-        removeFile(tool.destPath(imgPath))
+        let p = tool.destPath(imgPath)
+        removeFile(p)
+        pruneEmptyDir(p.parentDir())
 
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
@@ -255,19 +290,18 @@ proc run*(tool: ImgTool) =
                 let fn = fileNames[ifn]
                 var absPath = compPath / fn.str
                 absPath.normalizePath()
-                let im = newSpriteSheetImage(absPath)
-                if not im.isNil:
+                var im = tool.images.getOrDefault(absPath)
+                if im.isNil:
+                    im = newSpriteSheetImage(absPath)
                     tool.updateLastModificationDateWithFile(absPath)
-                    im.parentComposition = c
-                    im.parentNode = n
-                    im.parentComponent = s
-                    im.frameIndex = ifn
-                    im.imageIndex = tool.images.len
                     tool.images[absPath] = im
+                im.occurences.add(ImageOccurence(parentComposition: c,
+                        parentNode: n, parentComponent: s, frameIndex: ifn,
+                        compPath: tool.compositionPaths[i]))
 
     # Check if destination files are newer than original files. If yes, we
     # don't need to do anything.
-    var needsUpdate = not fileExists(tool.resPath / tool.outPrefix & "0.png")
+    var needsUpdate = not fileExists(tool.resPath / tool.outPrefix & "0" & tool.outImgExt)
     if not needsUpdate:
         for c in tool.compositionPaths:
             let dstPath = tool.destPath(c)
@@ -280,7 +314,7 @@ proc run*(tool: ImgTool) =
             echo "Reading file: ", i.originalPath
             i.readFile()
             i.recalculateSourceBounds()
-            i.recalculateTargetSize()
+            tool.recalculateTargetSize(i)
 
         when consumeLessMemory:
             GC_fullCollect()
@@ -310,21 +344,14 @@ proc run*(tool: ImgTool) =
         # Blit images to spriteSheets and save them
         for i, ss in tool.spriteSheets:
             echo "Saving ", i + 1, " of ", tool.spriteSheets.len
-            tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & ".png")
+            tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
+
+        for im in tool.images.values:
+            for o in im.occurences:
+                tool.adjustImageNode(im, o)
 
         # Readjust sprite nodes
         for i, c in tool.compositions:
-            c.withSpriteNodes proc(n, s: JsonNode) =
-                let fileNames = s["fileNames"]
-                let compPath = tool.compositionPaths[i].parentDir
-                for ifn in 0 ..< fileNames.len:
-                    let fn = fileNames[ifn]
-                    var absPath = compPath / fn.str
-                    absPath.normalizePath()
-                    let im = tool.images.getOrDefault(absPath)
-                    if not im.isNil and not im.spriteSheet.isNil:
-                        fileNames.elems[ifn] = tool.adjustImageNode(im, compPath)
-
             let dstPath = tool.destPath(tool.compositionPaths[i])
             writeFile(dstPath, c.pretty().replace(" \n", "\n"))
     else:
