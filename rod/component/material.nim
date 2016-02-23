@@ -7,6 +7,7 @@ import nimx.system_logger
 import nimx.matrixes
 
 import tables
+import hashes
 import streams
 import rod.node
 import rod.component.mesh_component
@@ -110,9 +111,19 @@ type
         vertexShader: string
         fragmentShader: string
         bUserDefinedShader: bool
-        bShaderNeedUpdate: bool
+        bShaderNeedUpdate*: bool
+        tempShaderMacroFlags: set[ShaderMacro]
         shaderMacroFlags: set[ShaderMacro]
         useManualShaderComposing*: bool
+
+var shadersCache = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
+
+proc hash(sm: set[ShaderMacro]): Hash =
+    var sum = ""
+    for macros in sm:
+        sum &= $macros
+    result = sum.hash()
+    result = !$result
 
 template shaderNeedUpdate(m: Material) = m.bShaderNeedUpdate = true
 
@@ -182,13 +193,6 @@ template removeShininess*(m: Material) =
     m.bShaderNeedUpdate = true
 template removeReflectivity*(m: Material) =
     m.color.reflectivityInited = false
-
-# proc maskTexture*(m: Material): AnimatedImage = result = m.maskTexture
-# template `maskTexture=`*(m: Material, ai: AnimatedImage) =
-#     if not m.maskTexture.isNil:
-#         m.shaderMacroFlags.incl(WITH_MASK_SAMPLER)
-#         m.bShaderNeedUpdate = true
-#     m.maskTexture = ai
 
 proc isLightReceiver*(m: Material): bool =
     result = m.isLightReceiver
@@ -525,25 +529,33 @@ proc createShader(m: Material) =
     let c = currentContext()
     let gl = c.gl
 
-    var commonShaderDefines = ""
-    for macros in m.shaderMacroFlags:
-        commonShaderDefines &= """#define """ & $macros & "\n"
+    if not shadersCache.contains(m.shaderMacroFlags):
+        var commonShaderDefines = ""
 
-    if m.vertexShader.len == 0:
-        m.vertexShader = commonShaderDefines & materialVertexShaderDefault
+        for mcrs in m.shaderMacroFlags:
+            commonShaderDefines &= """#define """ & $mcrs & "\n"
+
+        if m.vertexShader.len == 0:
+            m.vertexShader = commonShaderDefines & materialVertexShaderDefault
+        else:
+            m.vertexShader = commonShaderDefines & m.vertexShader
+
+        if m.fragmentShader.len == 0:
+            m.fragmentShader = commonShaderDefines & materialFragmentShaderDefault
+        else:
+            m.fragmentShader = commonShaderDefines & m.fragmentShader
+
+        m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord),
+                                        (aNormal.GLuint, $aNormal), (aTangent.GLuint, $aTangent), (aBinormal.GLuint, $aBinormal)])
+        m.bShaderNeedUpdate = false
+
+        shadersCache[m.shaderMacroFlags] = (m.shader, 1)
     else:
-        m.vertexShader = commonShaderDefines & m.vertexShader
+        m.shader = shadersCache[m.shaderMacroFlags].shader
+        shadersCache[m.shaderMacroFlags].refCount += 1
+        m.bShaderNeedUpdate = false
 
-    if m.fragmentShader.len == 0:
-        m.fragmentShader = commonShaderDefines & materialFragmentShaderDefault
-    else:
-        m.fragmentShader = commonShaderDefines & m.fragmentShader
-
-    m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord),
-                                    (aNormal.GLuint, $aNormal), (aTangent.GLuint, $aTangent), (aBinormal.GLuint, $aBinormal)])
-    m.bShaderNeedUpdate = false
-
-    # echo("\n", m.shaderMacroFlags, "\n")
+    m.tempShaderMacroFlags = m.shaderMacroFlags
 
 proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
     m.vertexShader = vertexShader
@@ -587,7 +599,16 @@ method updateSetup*(m: Material, n: Node) {.base.} =
     if (m.shader == invalidProgram or m.bShaderNeedUpdate) and not m.useManualShaderComposing:
         if m.shader != invalidProgram:
             if not m.bUserDefinedShader:
-                gl.deleteProgram(m.shader)
+                if shadersCache.contains(m.tempShaderMacroFlags):
+                    if shadersCache[m.tempShaderMacroFlags].refCount <= 1:
+                        shadersCache.del(m.tempShaderMacroFlags)
+                        gl.deleteProgram(m.shader)
+                    else:
+                        shadersCache[m.tempShaderMacroFlags].refCount -= 1
+
+                var s: set[ShaderMacro]
+                m.tempShaderMacroFlags = s
+
                 m.shader = invalidProgram
                 m.vertexShader = ""
                 m.fragmentShader = ""

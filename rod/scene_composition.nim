@@ -29,6 +29,8 @@ import algorithm
 import tables
 import hashes
 
+import math
+
 proc parseVector4(source: string): Vector4 =
   var i = 0
   for it in split(source):
@@ -42,7 +44,6 @@ proc parseMatrix4(source: string): Matrix4 =
         nodeMarix[i] = parseFloat(it)
         inc(i)
     result = nodeMarix
-
 
 proc isNear(v1, v2: float32): bool =
     result = abs( v1 - v2 ) < 0.01.float32
@@ -168,6 +169,126 @@ proc getTextureLocationByName(cs: ColladaScene, texName: string): string =
         if texName.contains(img.name):
             result = img.location
 
+type DecomposedType = ref object
+    scaleX, scaleY, scaleZ: float32
+    skewXY, skewXZ, skewYZ: float32
+    quaternionX, quaternionY, quaternionZ, quaternionW: float32
+    translateX, translateY, translateZ: float32
+
+proc isZeroNear(val: float32): bool =
+    if val >= -0.001 and val <= 0.001:
+        return true
+    else:
+        return false
+
+proc v3Scale(v: var Vector3, desiredLength: float32) =
+    let length = v.length()
+    if not isZeroNear(length):
+        let dl = desiredLength / length
+        v *= dl
+
+proc v3Combine(a, b: Vector3, rslt: var Vector3, ascl, bscl: float32) =
+    rslt.x = (ascl * a.x) + (bscl * b.x)
+    rslt.y = (ascl * a.y) + (bscl * b.y)
+    rslt.z = (ascl * a.z) + (bscl * b.z)
+
+proc tryDecompose(mat: Matrix4, rslt: var DecomposedType): bool =
+    var localMatrix = mat
+    if isZeroNear(localMatrix[15]):
+        return false
+
+    for i in 0..14:
+        localMatrix[i] /= localMatrix[15];
+
+    # extract translation
+    rslt.translateX = localMatrix[3]
+    rslt.translateY = localMatrix[7]
+    rslt.translateZ = localMatrix[11]
+
+    #extract skew scale rotation
+    localMatrix.transpose()
+    var pdum3: Vector3
+    var row0 = newVector3(localMatrix[0], localMatrix[1], localMatrix[2])
+    var row1 = newVector3(localMatrix[4], localMatrix[5], localMatrix[6])
+    var row2 = newVector3(localMatrix[8], localMatrix[9], localMatrix[10])
+
+    # scale skew
+    rslt.scaleX = row0.length()
+    v3Scale(row0, 1.0)
+
+    rslt.skewXY = dot(row0, row1)
+    v3Combine(row1, row0, row1, 1.0, -rslt.skewXY)
+
+    rslt.scaleY = row1.length()
+    v3Scale(row1, 1.0)
+    rslt.skewXY /= rslt.scaleY
+
+    rslt.skewXZ = dot(row0, row2)
+    v3Combine(row2, row0, row2, 1.0, -rslt.skewXZ)
+    rslt.skewYZ = dot(row1, row2)
+    v3Combine(row2, row1, row2, 1.0, -rslt.skewYZ)
+
+    rslt.scaleZ = row2.length()
+    v3Scale(row2, 1.0)
+    rslt.skewXZ /= rslt.scaleZ
+    rslt.skewYZ /= rslt.scaleZ
+
+    pdum3 = cross(row1, row2)
+    if dot(row0, pdum3) < 0:
+        rslt.scaleX *= -1
+        row0 *= -1
+        row1 *= -1
+        row2 *= -1
+
+    # rotation
+    var s, t, x, y, z, w: float64
+
+    t = row0[0] + row1[1] + row2[2] + 1.0
+
+    if t > 0.0001 :
+        s = 0.5 / sqrt(t)
+        w = 0.25 / s
+        x = (row2[1] - row1[2]) * s
+        y = (row0[2] - row2[0]) * s
+        z = (row1[0] - row0[1]) * s
+    elif row0[0] > row1[1] and row0[0] > row2[2] :
+        s = sqrt(1.0 + row0[0] - row1[1] - row2[2]) * 2.0
+        x = 0.25 * s
+        y = (row0[1] + row1[0]) / s
+        z = (row0[2] + row2[0]) / s
+        w = (row2[1] - row1[2]) / s
+    elif row1[1] > row2[2] :
+        s = sqrt (1.0 + row1[1] - row0[0] - row2[2]) * 2.0
+        x = (row0[1] + row1[0]) / s
+        y = 0.25 * s
+        z = (row1[2] + row2[1]) / s
+        w = (row0[2] - row2[0]) / s
+    else :
+        s = sqrt(1.0 + row2[2] - row0[0] - row1[1]) * 2.0
+        x = (row0[2] + row2[0]) / s
+        y = (row1[2] + row2[1]) / s
+        z = 0.25 * s
+        w = (row1[0] - row0[1]) / s
+
+    rslt.quaternionX = x
+    rslt.quaternionY = y
+    rslt.quaternionZ = z
+    rslt.quaternionW = w
+
+    return true
+
+proc parseArray4(source: string): array[0 .. 3, float32] =
+    var i = 0
+    for it in split(source):
+        result[i] = parseFloat(it)
+        inc(i)
+
+proc parseArray3(source: string): array[0 .. 2, float32] =
+    var i = 0
+    for it in split(source):
+        result[i] = parseFloat(it)
+        inc(i)
+
 proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     result = newNode(cn.name)
     var materialInited = false
@@ -177,8 +298,37 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     var nodeMesh: MeshComponent
 
     if cn.matrix != nil:
-        let nodeTranslation = parseMatrix4(cn.matrix)
-        result.translation = newVector(nodeTranslation[3], nodeTranslation[7], nodeTranslation[11])
+        let modelMatrix = parseMatrix4(cn.matrix)
+
+        var decomposition: DecomposedType
+        decomposition.new()
+        discard tryDecompose(modelMatrix, decomposition)
+
+        result.scale = newVector3(decomposition.scaleX, decomposition.scaleY, decomposition.scaleZ)
+        result.rotation = newQuaternion(decomposition.quaternionX, decomposition.quaternionY, decomposition.quaternionZ, decomposition.quaternionW)
+        result.translation = newVector3(decomposition.translateX, decomposition.translateY, decomposition.translateZ)
+    else:
+        if cn.scale != nil:
+            let scale = parseArray3(cn.scale)
+            result.scale = newVector3(scale[0], scale[1], scale[2])
+
+        if cn.translation != nil:
+            let translation = parseArray3(cn.translation)
+            result.translation = newVector3(translation[0], translation[1], translation[2])
+
+        var finalRotation = newQuaternion(0, 0, 0, 1)
+
+        if cn.rotationX != nil:
+            let rotationX = parseArray4(cn.rotationX)
+            finalRotation *= aroundX(rotationX[3])
+        if cn.rotationY != nil:
+            let rotationY = parseArray4(cn.rotationY)
+            finalRotation *= aroundY(rotationY[3])
+        if cn.rotationZ != nil:
+            let rotationZ = parseArray4(cn.rotationZ)
+            finalRotation *= aroundZ(rotationZ[3])
+
+        result.rotation = finalRotation
 
     if cn.geometry != nil:
         for geom in colladaScene.childNodesGeometry:
@@ -233,22 +383,45 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
             var texName = colladaScene.getTextureLocationByName(childColladaMaterial.normalmapTextureName)
             if texName != nil:
                 nodeMesh.material.normalTexture = imageWithResource(texName)
-    # else:
-    #     echo("material does not inited for ", cn.name, " node")
 
     if geometryInited:
-        let bNeedComputeTangentData = if nodeMesh.material.normalTexture.isNil(): false else: true
+        nodeMesh.resourceName = childColladaGeometry.name
 
-        var vertexAttrData = newSeq[GLfloat]()
-        var indexData = newSeq[GLushort]()
+        var instanceWrd = "instance"
+        if childColladaGeometry.name.contains(instanceWrd):
+            var instanceName = ""
+            var j = 0
+            while j < childColladaGeometry.name.len:
+                var i = 0
+                while i < instanceWrd.len:
+                    if childColladaGeometry.name[j+i] == instanceWrd[i]:
+                        inc i
+                    else:
+                        break
+                if i != instanceWrd.len:
+                    instanceName &= $childColladaGeometry.name[j]
+                    inc j
+                else:
+                    break
+            instanceName &= instanceWrd
+            nodeMesh.resourceName = instanceName
 
-        prepareVBO(childColladaGeometry.vertices, childColladaGeometry.texcoords, childColladaGeometry.normals, childColladaGeometry.triangles, vertexAttrData, indexData,
-                   childColladaGeometry.faceAccessor.vertexOfset, childColladaGeometry.faceAccessor.normalOfset, childColladaGeometry.faceAccessor.texcoordOfset, bNeedComputeTangentData)
+        if not vboCache.contains(nodeMesh.resourceName):
 
-        nodeMesh.vertInfo = newVertexInfoWithVertexData(childColladaGeometry.vertices.len, childColladaGeometry.texcoords.len, childColladaGeometry.normals.len, if bNeedComputeTangentData: 3 else: 0)
-        nodeMesh.createVBO(indexData, vertexAttrData)
-    # else:
-    #     echo("geometry does not inited for ", cn.name, " node")
+            let bNeedComputeTangentData = if nodeMesh.material.normalTexture.isNil(): false else: true
+
+            var vertexAttrData = newSeq[GLfloat]()
+            var indexData = newSeq[GLushort]()
+
+            prepareVBO(childColladaGeometry.vertices, childColladaGeometry.texcoords, childColladaGeometry.normals, childColladaGeometry.triangles, vertexAttrData, indexData,
+                       childColladaGeometry.faceAccessor.vertexOfset, childColladaGeometry.faceAccessor.normalOfset, childColladaGeometry.faceAccessor.texcoordOfset, bNeedComputeTangentData)
+
+            nodeMesh.vboData.vertInfo = newVertexInfoWithVertexData(childColladaGeometry.vertices.len, childColladaGeometry.texcoords.len, childColladaGeometry.normals.len, if bNeedComputeTangentData: 3 else: 0)
+            nodeMesh.createVBO(indexData, vertexAttrData)
+
+            vboCache[nodeMesh.resourceName] = nodeMesh.vboData
+        else:
+            nodeMesh.vboData = vboCache[nodeMesh.resourceName]
 
     for it in cn.children:
         result.addChild(setupFromColladaNode(it, colladaScene))
