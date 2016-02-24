@@ -2,3 +2,6 @@ nimcache/
 editor/main
 editor/nakefile
 build
+nvcompatlog.txt
+rod/tools/rodimgtool
+
