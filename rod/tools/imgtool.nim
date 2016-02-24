@@ -11,7 +11,7 @@ type Rect = imgtools.Rect
 type Point = tuple[x, y: int32]
 type Size = tuple[width, height: int]
 
-const consumeLessMemory = defined(windows)
+let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
 
 type
     ImageOccurence = object
@@ -125,7 +125,7 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
         if tool.compressOutput:
             discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
 
-    when consumeLessMemory:
+    if consumeLessMemory:
         GC_fullCollect()
 
 proc adjustTranslationValueForFrame(trans: JsonNode, im: SpriteSheetImage): JsonNode =
@@ -236,7 +236,7 @@ proc readFile(im: SpriteSheetImage) =
         echo "PNG NOT LOADED: ", im.originalPath
     im.actualBounds = imageBounds(im.png.data, im.png.width, im.png.height)
 
-    when consumeLessMemory:
+    if consumeLessMemory:
         im.png = nil
 
     im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
@@ -316,7 +316,7 @@ proc run*(tool: ImgTool) =
             i.recalculateSourceBounds()
             tool.recalculateTargetSize(i)
 
-        when consumeLessMemory:
+        if consumeLessMemory:
             GC_fullCollect()
 
         # Sort images by area
