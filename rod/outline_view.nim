@@ -13,6 +13,8 @@ import variant
 
 # Quick and dirty implementation of outline view
 
+const offsetOutline = 6
+
 type ItemNode = ref object
     expanded: bool
     expandable: bool
@@ -53,7 +55,7 @@ proc drawDisclosureTriangle(disclosed: bool, r: Rect) =
     discard
 
 template xOffsetBasedOnTempIndexPath(v: OutlineView): Coord =
-    Coord(3 + v.tempIndexPath.len * 3)
+    Coord(offsetOutline + v.tempIndexPath.len * offsetOutline * 2)
 
 proc drawNode(v: OutlineView, n: ItemNode, y: var Coord) =
     let c = currentContext()
@@ -64,8 +66,8 @@ proc drawNode(v: OutlineView, n: ItemNode, y: var Coord) =
     n.cell.setFrame(newRect(indent, y, v.bounds.width - indent, rowHeight))
     v.configureCell(n.cell, v.tempIndexPath)
     n.cell.drawWithinSuperview()
-    if n.expandable:
-        drawDisclosureTriangle(n.expanded, newRect(indent - 6, y, 6, rowHeight))
+    if n.expandable and n.children.len > 0:
+        drawDisclosureTriangle(n.expanded, newRect(indent - offsetOutline * 2, y, offsetOutline * 2, rowHeight))
 
     y += rowHeight
     if n.expanded and not n.children.isNil:
