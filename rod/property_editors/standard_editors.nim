@@ -16,7 +16,7 @@ when defined(js):
 elif not defined(android) and not defined(ios):
     import native_dialogs
 
-template toStr(v: SomeReal): string = formatFloat(v, ffDecimal, 2)
+template toStr(v: SomeReal, precision: uint): string = formatFloat(v, ffDecimal, precision)
 template toStr(v: SomeInteger): string = $v
 
 template fromStr(v: string, t: var SomeReal) = t = v.parseFloat()
@@ -24,11 +24,17 @@ template fromStr(v: string, t: var SomeInteger) = t = v.parseInt()
 
 proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
     let tf = newNumericTextField(newRect(0, 0, 300, 20))
-    tf.text = toStr(getter())
+    when T is SomeReal:
+        tf.text = toStr(getter(), tf.precision)
+    else:
+        tf.text = toStr(getter())
     tf.onAction do():
         var v: T
-        fromStr(tf.text, v)
-        setter(v)
+        try:
+            fromStr(tf.text, v)
+            setter(v)
+        except ValueError:
+            discard
     result = tf
 
 proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): View =
@@ -49,7 +55,10 @@ proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
     proc complexSetter() =
         var val : TVector[vecLen, Coord]
         for i in 0 ..< pv.subviews.len:
-            val[i] = TextField(pv.subviews[i]).text.parseFloat()
+            try:
+                val[i] = TextField(pv.subviews[i]).text.parseFloat()
+            except ValueError:
+                return
         setter(val)
 
     let val = getter()
@@ -60,7 +69,7 @@ proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
             textField.autoresizingMask = {afFlexibleMaxX, afFlexibleMaxY}
         else:
             textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
-        textField.text = formatFloat(val[i], ffDecimal, 2)
+        textField.text = toStr(val[i], textField.precision)
         textField.onAction complexSetter
         result.addSubview(textField)
 
@@ -77,14 +86,17 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
 
     let pv = result
     proc complexSetter() =
-        let c = newColor(
-            TextField(pv.subviews[1]).text.parseFloat(),
-            TextField(pv.subviews[2]).text.parseFloat(),
-            TextField(pv.subviews[3]).text.parseFloat(),
-            TextField(pv.subviews[4]).text.parseFloat(),
-            )
-        setter(c)
-        colorView.backgroundColor = c
+        try:
+            let c = newColor(
+                TextField(pv.subviews[1]).text.parseFloat(),
+                TextField(pv.subviews[2]).text.parseFloat(),
+                TextField(pv.subviews[3]).text.parseFloat(),
+                TextField(pv.subviews[4]).text.parseFloat(),
+                )
+            setter(c)
+            colorView.backgroundColor = c
+        except ValueError:
+            discard
 
     template toVector(c: Color): Vector4 = newVector4(c.r, c.g, c.b, c.a)
 
@@ -95,7 +107,7 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
             textField.autoresizingMask = {afFlexibleMaxX, afFlexibleMaxY}
         else:
             textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
-        textField.text = formatFloat(getter().toVector[i], ffDecimal, 2)
+        textField.text = toStr(getter().toVector[i], textField.precision)
         textField.onAction complexSetter
         result.addSubview(textField)
 
