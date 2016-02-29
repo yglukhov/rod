@@ -2,6 +2,7 @@ import nimx.view
 import nimx.matrixes
 import nimx.event
 import nimx.view_event_handling
+import nimx.view_event_handling_new
 import nimx.system_logger
 import rod.component
 import rod.ray
@@ -62,6 +63,14 @@ proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event, intersection: Vecto
         let v = c.mView.subviews[0]
         e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
         result = v.recursiveHandleMouseEvent(e)
+
+proc handleTouchEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
+    var res : Vector3
+    if c.node.tryWorldToLocal(intersection, res):
+        let v = c.mView.subviews[0]
+        e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
+        if e.localPosition.inRect(v.bounds):
+            result = v.processTouchEvent(e)
 
 proc sceneViewWillMoveToWindow*(c: UIComponent, w: Window) =
     if not c.mView.isNil:

@@ -6,6 +6,7 @@ import nimx.portable_gl
 import nimx.animation
 import nimx.window
 import nimx.view_event_handling
+import nimx.view_event_handling_new
 
 import tables
 import rod_types
@@ -184,6 +185,30 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
 
 import component.ui_component, algorithm
 
+method name*(v: SceneView): string =
+    result = "SceneView"
+
+method onTouchEv(v: SceneView, e: var Event): bool =
+    if v.uiComponents.len > 0:
+        let r = v.rayWithScreenCoords(e.localPosition)
+        type Inter = tuple[i: Vector3, c: UIComponent]
+        var intersections = newSeq[Inter]()
+        for c in v.uiComponents:
+            var inter : Vector3
+            if intersectsWithUINode(r, c.node, inter):
+                intersections.add((inter, c))
+        template dist(a, b): expr = (b - a).length
+        if intersections.len > 0:
+            intersections.sort(proc (x, y: Inter): int =
+                result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
+                if result == 0:
+                    result = getTreeDistance(x.c.node, y.c.node)
+            )
+            for i in intersections:
+                result = i.c.handleTouchEv(r, e, i.i)
+                if result: break
+    if not result:
+        result = procCall v.View.onTouchEv(e)
 
 method handleMouseEvent*(v: SceneView, e: var Event): bool =
     result = procCall v.View.handleMouseEvent(e)
