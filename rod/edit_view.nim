@@ -30,11 +30,15 @@ type Editor* = ref object
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 700))
-    let title = newLabel(newRect(2, 2, 100, 15))
-    title.text = "Tree view"
+    result.collapsible = true
+
+    let title = newLabel(newRect(22, 6, 108, 15))
+    title.textColor = newGrayColor(1.0)
+    title.text = "Scene"
+
     result.addSubview(title)
 
-    let outlineView = OutlineView.new(newRect(0, 20, result.bounds.width, result.bounds.height - 40))
+    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 40))
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
         if indexPath.len == 0:
@@ -58,6 +62,10 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     outlineView.configureCell = proc (cell: TableViewCell, indexPath: openarray[int]) =
         let n = outlineView.itemAtIndexPath(indexPath).get(Node3D)
         let textField = TextField(cell.subviews[0])
+        if not cell.selected:
+            textField.textColor = newGrayColor(0.9)
+        else:
+            textField.textColor = newGrayColor(0.0)
         textField.text = if n.name.isNil: "(nil)" else: n.name
 
     outlineView.onSelectionChanged = proc() =
@@ -66,6 +74,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
                 outlineView.itemAtIndexPath(ip).get(Node3D)
             else:
                 nil
+
 
         if not e.selectedNode.isNil:
             let mesh = e.selectedNode.componentIfAvailable(MeshComponent)
@@ -85,7 +94,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result.addSubview(outlineView)
 
     let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
-    createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    # createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     createNodeButton.title = "+"
     createNodeButton.onAction do():
         var sip = outlineView.selectedIndexPath
@@ -103,7 +112,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result.addSubview(createNodeButton)
 
     let deleteNodeButton = Button.new(newRect(24, result.bounds.height - 20, 20, 20))
-    deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    # deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     deleteNodeButton.title = "-"
     deleteNodeButton.onAction do():
         if outlineView.selectedIndexPath.len != 0:
@@ -116,7 +125,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result.addSubview(deleteNodeButton)
 
     let refreshButton = Button.new(newRect(46, result.bounds.height - 20, 60, 20))
-    refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    # refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     refreshButton.title = "Refresh"
     refreshButton.onAction do():
         outlineView.reloadData()
@@ -124,7 +133,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
     when not defined(android) and not defined(ios):
         let loadButton = Button.new(newRect(110, result.bounds.height - 20, 60, 20))
-        loadButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+        # loadButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
         loadButton.title = "Load"
         loadButton.onAction do():
             when defined(js):
@@ -148,7 +157,7 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
 
-    let inspectorView = InspectorView.new(newRect(200, 0, 200, 700))
+    let inspectorView = InspectorView.new(newRect(200, 0, 240, 700))
     result.treeView = newTreeView(result, inspectorView)
     v.window.addSubview(result.treeView)
     v.window.addSubview(inspectorView)

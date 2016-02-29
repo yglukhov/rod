@@ -24,6 +24,7 @@ template fromStr(v: string, t: var SomeInteger) = t = v.parseInt()
 
 proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
     let tf = newNumericTextField(newRect(0, 0, 300, 20))
+    tf.textColor = newGrayColor(0.0)
     when T is SomeReal:
         tf.text = toStr(getter(), tf.precision)
     else:
@@ -40,12 +41,13 @@ proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
 proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): View =
     let textField = newTextField(newRect(0, 0, 200, 17))
     textField.text = getter()
+    textField.textColor = newGrayColor(0.0)
     textField.onAction do():
         setter(textField.text)
     result = textField
 
 proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
-    result = View.new(newRect(0, 0, 130, 17))
+    result = View.new(newRect(0, 0, 140, 17))
     const vecLen = high(T) + 1
 
     var x = 0.Coord
@@ -70,11 +72,12 @@ proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
         else:
             textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
         textField.text = toStr(val[i], textField.precision)
+        textField.textColor = newGrayColor(0.0)
         textField.onAction complexSetter
         result.addSubview(textField)
 
 proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
-    result = View.new(newRect(0, 0, 130, 17))
+    result = View.new(newRect(0, 0, 140, 17))
     const vecLen = 3 + 1
 
     let colorView = View.new(newRect(0, 0, 17, 17))
@@ -108,6 +111,7 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
         else:
             textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
         textField.text = toStr(getter().toVector[i], textField.precision)
+        textField.textColor = newGrayColor(0.0)
         textField.onAction complexSetter
         result.addSubview(textField)
 
@@ -145,6 +149,7 @@ when not defined(android) and not defined(ios):
 proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): View =
     let textField = newTextField(newRect(0, 0, 200, 17))
     let n = getter()
+    textField.textColor = newGrayColor(0.0)
     if n.isNil or n.name.isNil:
         textField.text = "nil"
     else:

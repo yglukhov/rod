@@ -7,6 +7,8 @@ import nimx.event
 import nimx.table_view_cell
 import nimx.view_event_handling
 
+import panel_view
+
 import typetraits
 import math
 import variant
@@ -63,7 +65,7 @@ proc drawNode(v: OutlineView, n: ItemNode, y: var Coord) =
         n.cell = v.createCell()
     n.cell.selected = v.tempIndexPath == v.selectedIndexPath
     let indent = v.xOffsetBasedOnTempIndexPath
-    n.cell.setFrame(newRect(indent, y, v.bounds.width - indent, rowHeight))
+    n.cell.setFrame(newRect(indent + 6, y, v.bounds.width - indent - 6, rowHeight))
     v.configureCell(n.cell, v.tempIndexPath)
     n.cell.drawWithinSuperview()
     if n.expandable and n.children.len > 0:
