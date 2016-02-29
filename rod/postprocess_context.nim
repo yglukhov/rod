@@ -10,8 +10,6 @@ export PostprocessContext
 proc newPostprocessContext*(): PostprocessContext =
     result.new()
     result.shader = invalidProgram
-    # result.vertexShader = ""
-    # result.fragmentShader = ""
     result.setupProc = proc() = discard
     result.drawProc = proc() = discard
 

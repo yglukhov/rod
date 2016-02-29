@@ -8,8 +8,8 @@ import rod.component
 import rod.postprocess_context
 
 type BlendMode * = enum
-    ONE = GL_ONE
-    ONE_MINUS_SRC_ALPHA = GL_ONE_MINUS_SRC_ALPHA
+    COLOR_ADD = GL_ONE
+    COLOR_MULTIPLY = GL_ONE_MINUS_SRC_ALPHA
 
 # MULTIPLY
 # glBlendFunc(GL_ZERO, GL_SRC_COLOR)
@@ -28,7 +28,7 @@ type VisualModifier* = ref object of Component
 method init*(vm: VisualModifier) =
     procCall vm.Component.init()
 
-    vm.blendMode = ONE_MINUS_SRC_ALPHA
+    vm.blendMode = COLOR_MULTIPLY
 
 method draw*(vm: VisualModifier) =
     let c = currentContext()
@@ -38,7 +38,7 @@ method draw*(vm: VisualModifier) =
 
     for n in vm.node.children: n.recursiveDraw()
 
-    gl.blendFunc(gl.SRC_ALPHA, ONE_MINUS_SRC_ALPHA.GLenum)
+    gl.blendFunc(gl.SRC_ALPHA, COLOR_MULTIPLY.GLenum)
 
 method isPosteffectComponent*(vm: VisualModifier): bool = true
 
