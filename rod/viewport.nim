@@ -188,7 +188,7 @@ import component.ui_component, algorithm
 method name*(v: SceneView): string =
     result = "SceneView"
 
-method onTouchEv(v: SceneView, e: var Event): bool =
+method onTouchEv*(v: SceneView, e: var Event): bool =
     if v.uiComponents.len > 0:
         let r = v.rayWithScreenCoords(e.localPosition)
         type Inter = tuple[i: Vector3, c: UIComponent]
