@@ -96,5 +96,5 @@ method onTouchEv*(v: PanelView, e: var Event): bool =
                 c = efcBreak
                 result = true
             of bsDown:
-                return true
+                return false
     return true

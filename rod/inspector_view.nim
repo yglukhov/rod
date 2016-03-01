@@ -37,7 +37,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
     if i.subviews.len > 1:
         i.subviews[1].removeFromSuperview()
     if not n.isNil:
-        let propView = View.new(newRect(1, 29, i.bounds.width - 3, i.bounds.height - 40))
+        let propView = View.new(newRect(1, 29, i.bounds.width, i.bounds.height - 40))
         propView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
 
         var y = Coord(0)
@@ -49,7 +49,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
             pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter)
-            pv.setFrameOrigin(newPoint(0, y))
+            pv.setFrameOrigin(newPoint(6, y))
             y += pv.frame.height
             propView.addSubview(pv)
 
@@ -57,6 +57,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
 
         if not n.components.isNil:
             for k, v in n.components:
+                y += 12
                 pv = newSectionTitle(y, i, n, k)
                 y += pv.frame.height
                 propView.addSubview(pv)
@@ -84,13 +85,13 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                 i.setNeedsDisplay()
 
 proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string): View =
-    result = View.new(newRect(0, y, 240, 17))
-    let v = newLabel(newRect(5, 0, 100, 15))
+    result = View.new(newRect(0, y, 324, 17))
+    let v = newLabel(newRect(120, 0, 100, 15))
     v.text = name
-    v.textColor = newGrayColor(0.9)
+    v.textColor = newColor(1.0, 1.0, 0.5)
     result.addSubview(v)
 
-    let removeButton = newButton(newRect(result.bounds.width - 20, 0, 20, 17))
+    let removeButton = newButton(newRect(result.bounds.width - 24, -2, 24, 24))
     removeButton.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
     removeButton.title = "-"
     removeButton.onAction do():
@@ -99,7 +100,7 @@ proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string
     result.addSubview(removeButton)
 
 proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): View =
-    let b = Button.new(newRect(0, y, 120, 20))
+    let b = Button.new(newRect(6, y + 24, inspector.frame.width - 12, 24))
     b.title = "New component"
     b.onAction do():
         var menu : Menu
