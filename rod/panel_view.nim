@@ -74,25 +74,27 @@ method draw(v: PanelView, r: Rect) =
 
 method clipType*(v: PanelView): ClipType = ctDefaultClip
 
-method onMouseDown*(v: PanelView, e: var Event): bool =
-    let origPos = v.superview.convertPointToWindow(v.frame.origin)
-    let dp = e.position - origPos
+method onTouchEv*(v: PanelView, e: var Event): bool =
+    # Handle PanelView Floating and Collapsible States
+    let
+        origPos = v.frame.origin
+        dp = e.position - origPos
 
-    mainApplication().pushEventFilter do(e: var Event, c: var EventFilterControl) -> bool:
-        result = true
-        if e.kind == etMouse:
+    if e.buttonState == bsDown:
+        mainApplication().pushEventFilter do(e: var Event, c: var EventFilterControl) -> bool:
             e.localPosition = v.convertPointFromWindow(e.position)
-            if e.localPosition.x > 0 and e.localPosition.x < 27 and e.localPosition. y > 0 and e.localPosition.y < 27 and e.isButtonUpEvent():
-                if v.collapsible:
-                    v.collapsed = not v.collapsed
-                    v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
-                    v.setNeedsDisplay()
-                    c = efcBreak
-            else:
-                if e.isButtonUpEvent():
-                    c = efcBreak
-                    result = v.onMouseUp(e)
-                elif e.isMouseMoveEvent():
-                    let newPos = v.superview.convertPointFromWindow(e.position - dp)
-                    v.setFrameOrigin(newPos)
-                    v.setNeedsDisplay()
+            case e.buttonState
+            of bsUnknown:
+                v.setFrameOrigin(e.position - dp)
+                v.setNeedsDisplay()
+            of bsUp:
+                if e.localPosition.x > 0 and e.localPosition.x < 27 and e.localPosition. y > 0 and e.localPosition.y < 27:
+                    if v.collapsible:
+                        v.collapsed = not v.collapsed
+                        v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
+                        v.setNeedsDisplay()
+                c = efcBreak
+                result = true
+            of bsDown:
+                return true
+    return true
