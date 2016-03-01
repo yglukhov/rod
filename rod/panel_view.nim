@@ -25,8 +25,8 @@ uniform float uAngle;
 
 void compose() {
     vec2 center = vec2(bounds.x + bounds.z / 2.0, bounds.y + bounds.w / 2.0 - 1.0);
-    float triangle = sdRegularPolygon(center, 4.0, 3, uAngle);
-    drawShape(triangle, vec4(0.5, 0.5, 0.5, 1));
+    float triangle = sdRegularPolygon(center, 5.0, 3, uAngle);
+    drawShape(triangle, vec4(0.7, 0.7, 0.7, 1));
 }
 """
 
@@ -40,7 +40,7 @@ void compose() {
     vec4 color = gradient(
         smoothstep(bounds.y, 27.0, vPos.y),
         newGrayColor(0.5),
-        newGrayColor(0.2)
+        newGrayColor(0.1)
     );
     drawShape(sdRoundedRect(bounds, 6.0), color);
 }
@@ -51,16 +51,16 @@ method draw(v: PanelView, r: Rect) =
     let c = currentContext()
 
     # Top label
-    c.fillColor = newGrayColor(0.15)
-    c.strokeColor = newGrayColor(0.15)
+    c.fillColor = newGrayColor(0.05, 0.8)
+    c.strokeColor = newGrayColor(0.05, 0.8)
 
     c.drawRoundedRect(newRect(r.x, r.y, r.width, r.height), 6)
 
     if v.collapsible:
         if not v.collapsed:
             # Main panel
-            c.fillColor = newGrayColor(0.35)
-            c.strokeColor = newGrayColor(0.35)
+            c.fillColor = newGrayColor(0.4, 0.6)
+            c.strokeColor = newGrayColor(0.4, 0.6)
             c.drawRect(newRect(r.x, r.y + 27, r.width, r.height - 27))
 
             # Collapse button open

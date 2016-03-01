@@ -154,17 +154,18 @@ proc selectItemAtIndexPath*(v: OutlineView, ip: seq[int]) =
     v.selectedIndexPath = ip
     v.selectionChanged()
 
-method onMouseDown*(v: OutlineView, e: var Event): bool =
+method onTouchEv*(v: OutlineView, e: var Event): bool =
+    if e.buttonState == bsUp:
+        let pos = e.localPosition
+        let i = v.itemAtPos(pos)
+        if not i.isNil:
+            if pos.x < v.xOffsetBasedOnTempIndexPath and i.expandable:
+                i.expanded = not i.expanded
+            elif v.tempIndexPath == v.selectedIndexPath:
+                v.selectedIndexPath.setLen(0)
+                v.selectionChanged()
+            else:
+                v.selectedIndexPath = @(v.tempIndexPath)
+                v.selectionChanged()
+            v.setNeedsDisplay()
     result = true
-    let pos = e.localPosition
-    let i = v.itemAtPos(pos)
-    if not i.isNil:
-        if pos.x < v.xOffsetBasedOnTempIndexPath and i.expandable:
-            i.expanded = not i.expanded
-        elif v.tempIndexPath == v.selectedIndexPath:
-            v.selectedIndexPath.setLen(0)
-            v.selectionChanged()
-        else:
-            v.selectedIndexPath = @(v.tempIndexPath)
-            v.selectionChanged()
-        v.setNeedsDisplay()
