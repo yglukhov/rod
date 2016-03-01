@@ -20,8 +20,9 @@ proc registerPropertyEditor*[T](createView: proc(setter: proc(s: T), getter: pro
 
 proc propertyEditorForProperty*(n: Node, title: string, v: Variant): View =
     let creator = propEditors.getOrDefault(v.typeId)
-    result = View.new(newRect(0, 0, 200, 20))
-    let label = newLabel(newRect(0, 0, 70, 20))
+    result = View.new(newRect(0, 0, 240, 20))
+    let label = newLabel(newRect(0, 0, 90, 20))
+    label.textColor = newGrayColor(0.9)
     label.text = title & ":"
     result.addSubview(label)
     if creator.isNil:
