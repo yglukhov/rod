@@ -157,7 +157,7 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
 
-    let inspectorView = InspectorView.new(newRect(200, 0, 240, 700))
+    let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
     result.treeView = newTreeView(result, inspectorView)
     v.window.addSubview(result.treeView)
     v.window.addSubview(inspectorView)

@@ -20,8 +20,8 @@ proc registerPropertyEditor*[T](createView: proc(setter: proc(s: T), getter: pro
 
 proc propertyEditorForProperty*(n: Node, title: string, v: Variant): View =
     let creator = propEditors.getOrDefault(v.typeId)
-    result = View.new(newRect(0, 0, 240, 20))
-    let label = newLabel(newRect(0, 0, 90, 20))
+    result = View.new(newRect(6, 6, 328, 36))
+    let label = newLabel(newRect(6, 6, 90, 36))
     label.textColor = newGrayColor(0.9)
     label.text = title & ":"
     result.addSubview(label)
@@ -31,9 +31,9 @@ proc propertyEditorForProperty*(n: Node, title: string, v: Variant): View =
         let editor = creator(n, v)
         var sz = result.frame.size
         sz.height = editor.frame.height
-        editor.setFrameOrigin(newPoint(label.frame.width, 0))
+        editor.setFrameOrigin(newPoint(label.frame.width, 12))
         editor.setFrameSize(sz)
-        sz = newSize(result.bounds.width - label.frame.width, editor.frame.height)
+        sz = newSize(result.bounds.width - label.frame.width - 12, editor.frame.height)
         editor.setFrameSize(sz)
         editor.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
         result.addSubview(editor)
