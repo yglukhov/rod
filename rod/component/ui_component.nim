@@ -15,16 +15,17 @@ type UICompView = ref object of View
     uiComp: UIComponent
 
 proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool =
-    let worldPointOnPlane = uiComp.node.localToWorld(newVector3())
-    var worldNormal = uiComp.node.localToWorld(newVector3(0, 0, 1))
+    let n = uiComp.node
+    let worldPointOnPlane = n.localToWorld(newVector3())
+    var worldNormal = n.localToWorld(newVector3(0, 0, 1))
     worldNormal -= worldPointOnPlane
     worldNormal.normalize()
     result = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
 
-    if result:
+    if result and not uiComp.mView.isNil:
         let v = uiComp.mView.subviews[0]
         var localres : Vector3
-        if uiComp.node.tryWorldToLocal(res, localres):
+        if n.tryWorldToLocal(res, localres):
             result = localres.x >= v.frame.x and localres.x <= v.frame.maxX and localres.y >= v.frame.y and localres.y <= v.frame.maxY
 
 method convertPointToParent*(v: UICompView, p: Point): Point =

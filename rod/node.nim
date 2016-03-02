@@ -310,7 +310,7 @@ proc getTreeDistance*(x, y: Node): int =
         dec yLevel
         py = py.parent
 
-    doAssert(px != py)
+    assert(px != py)
     var cx, cy : Node
     while px != py:
         cx = px
@@ -318,7 +318,7 @@ proc getTreeDistance*(x, y: Node): int =
         px = px.parent
         py = py.parent
 
-    doAssert(not cx.isNil and not cy.isNil)
+    assert(not cx.isNil and not cy.isNil)
 
     let ix = px.children.find(cx)
     let iy = px.children.find(cy)
