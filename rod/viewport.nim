@@ -195,7 +195,7 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
         var intersections = newSeq[Inter]()
         for c in v.uiComponents:
             var inter : Vector3
-            if intersectsWithUINode(r, c.node, inter):
+            if c.intersectsWithUINode(r, inter):
                 intersections.add((inter, c))
         template dist(a, b): expr = (b - a).length
         if intersections.len > 0:
@@ -204,6 +204,7 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
                 if result == 0:
                     result = getTreeDistance(x.c.node, y.c.node)
             )
+
             for i in intersections:
                 result = i.c.handleTouchEv(r, e, i.i)
                 if result: break
@@ -220,7 +221,7 @@ method handleMouseEvent*(v: SceneView, e: var Event): bool =
 
         for c in v.uiComponents:
             var inter : Vector3
-            if intersectsWithUINode(r, c.node, inter):
+            if c.intersectsWithUINode(r, inter):
                 intersections.add((inter, c))
 
         template dist(a, b): expr = (b - a).length

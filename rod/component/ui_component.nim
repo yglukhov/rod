@@ -12,19 +12,19 @@ import rod.node
 export UIComponent
 
 type UICompView = ref object of View
-    node: Node
+    uiComp: UIComponent
 
-proc intersectsWithUINode*(r: Ray, n: Node, res: var Vector3, cv: UICompView = nil): bool =
-    let worldPointOnPlane = n.localToWorld(newVector3())
-    var worldNormal = n.localToWorld(newVector3(0, 0, 1))
+proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool =
+    let worldPointOnPlane = uiComp.node.localToWorld(newVector3())
+    var worldNormal = uiComp.node.localToWorld(newVector3(0, 0, 1))
     worldNormal -= worldPointOnPlane
     worldNormal.normalize()
     result = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
 
-    if result and not cv.isNil:
-        let v = cv.subviews[0]
+    if result:
+        let v = uiComp.mView.subviews[0]
         var localres : Vector3
-        if n.tryWorldToLocal(res, localres):
+        if uiComp.node.tryWorldToLocal(res, localres):
             result = localres.x >= v.frame.x and localres.x <= v.frame.maxX and localres.y >= v.frame.y and localres.y <= v.frame.maxY
 
 method convertPointToParent*(v: UICompView, p: Point): Point =
@@ -33,10 +33,10 @@ method convertPointToParent*(v: UICompView, p: Point): Point =
 
 method convertPointFromParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
-    let r = v.node.sceneView.rayWithScreenCoords(p)
+    let r = v.uiComp.node.sceneView.rayWithScreenCoords(p)
     var res : Vector3
-    if r.intersectsWithUINode(v.node, res):
-        if v.node.tryWorldToLocal(res, res):
+    if v.uiComp.intersectsWithUINode(r, res):
+        if v.uiComp.node.tryWorldToLocal(res, res):
             result = newPoint(res.x, res.y)
 
 method draw*(c: UIComponent) =
@@ -47,7 +47,7 @@ proc `view=`*(c: UIComponent, v: View) =
     let cv = UICompView.new(newRect(0, 0, 20, 20))
     cv.window = c.node.sceneView.window
     cv.backgroundColor = clearColor()
-    cv.node = c.node
+    cv.uiComp = c
     cv.superview = c.node.sceneView
     c.mView = cv
     cv.addSubview(v)

@@ -300,28 +300,29 @@ proc getDepth*(n: Node): int =
 proc getTreeDistance*(x, y: Node): int =
     var xLevel = x.getDepth()
     var yLevel = y.getDepth()
-    var px = x.parent
-    var py = y.parent
+    var px = x
+    var py = y
 
     while xLevel > yLevel:
         dec xLevel
         px = px.parent
-
     while yLevel > xLevel:
         dec yLevel
         py = py.parent
 
-    var cx = px
-    var cy = py
-
+    doAssert(px != py)
+    var cx, cy : Node
     while px != py:
         cx = px
         cy = py
         px = px.parent
         py = py.parent
 
+    doAssert(not cx.isNil and not cy.isNil)
+
     let ix = px.children.find(cx)
     let iy = px.children.find(cy)
+
     result = iy - ix
 
 # Debugging
