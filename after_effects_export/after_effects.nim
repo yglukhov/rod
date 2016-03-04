@@ -269,7 +269,7 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
     var filesWithIndexes = newSeq[E]()
 
     for i in allFilesInDir:
-        let str = $decodeURIComponent(i.name)
+        let str = decodeURIComponent(i.name)
         var fMatches = str.match(pattern2)
         if not fMatches.isNil and fMatches.len >= 2:
             var index = parseInt($fMatches[2])
