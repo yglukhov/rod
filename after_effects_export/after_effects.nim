@@ -1,5 +1,6 @@
 import strutils, algorithm, future
 import adobe_tools
+import dom
 export adobe_tools
 
 type File = adobe_tools.File
@@ -255,7 +256,6 @@ proc match*(str: cstring, reg: JSRegExp): seq[cstring] {.importcpp.}
 proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
     var allFilesInDir = newFolder(source.file.path).getFiles()
     var pattern = newRegex("""(.*)\[(\d+)-(\d+)\](.*)""")
-
     var matches = source.name.match(pattern)
     if matches.isNil:
         return nil
@@ -269,7 +269,8 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
     var filesWithIndexes = newSeq[E]()
 
     for i in allFilesInDir:
-        var fMatches = i.name.match(pattern2)
+        let str = decodeURIComponent(i.name)
+        var fMatches = str.match(pattern2)
         if not fMatches.isNil and fMatches.len >= 2:
             var index = parseInt($fMatches[2])
             if (matches[1] == fMatches[1] and
