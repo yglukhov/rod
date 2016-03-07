@@ -14,6 +14,7 @@ import nimx.table_view_cell
 
 import rod.scene_composition
 import rod.component.mesh_component
+import rod.component.node_selector
 
 import variant
 
@@ -26,7 +27,7 @@ type Editor* = ref object
     rootNode*: Node3D
     eventCatchingView*: View
     treeView*: View
-    selectedNode*: Node3D
+    nodeSelector*: Node3D
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 700))
@@ -75,20 +76,11 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
             else:
                 nil
 
-
-        if not e.selectedNode.isNil:
-            let mesh = e.selectedNode.componentIfAvailable(MeshComponent)
-            if not mesh.isNil:
-                mesh.bShowObjectSelection = false
+        if not e.nodeSelector.isNil:
+            # test impl for mesh_component objects
+            e.nodeSelector.componentIfAvailable(NodeSelector).selectedNode = n
 
         inspector.inspectedNode = n
-
-        e.selectedNode = n
-
-        if not e.selectedNode.isNil:
-            let mesh = e.selectedNode.componentIfAvailable(MeshComponent)
-            if not mesh.isNil:
-                mesh.bShowObjectSelection = true
 
     outlineView.reloadData()
     result.addSubview(outlineView)
@@ -156,6 +148,9 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
+    let nodeSelector = n.newChild("selector")
+    let selectorComponent = nodeSelector.component(NodeSelector)
+    result.nodeSelector = nodeSelector
 
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
     result.treeView = newTreeView(result, inspectorView)

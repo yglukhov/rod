@@ -33,8 +33,8 @@ type
 
     PostprocessContext* = ref object
         shader*: ProgramRef
-        setupProc*: proc()
-        drawProc*: proc()
+        setupProc*: proc(c: Component)
+        drawProc*: proc(c: Component)
 
     SceneView* = ref object of View
         viewMatrixCached*: Matrix4

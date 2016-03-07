@@ -13,6 +13,7 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.component.camera
+import rod.component.mesh_component
 import rod.postprocess_context
 
 type BlurComponent* = ref object of Component
@@ -148,6 +149,38 @@ proc createAndSetup(bc: BlurComponent, width, height: float32) =
 
     if bc.node.sceneView.postprocessContext.isNil:
         bc.node.sceneView.postprocessContext = newPostprocessContext()
+
+        bc.node.sceneView.postprocessContext.drawProc = proc(c: Component) =
+
+            let m = c.node.componentIfAvailable(MeshComponent)
+            if not m.isNil:
+                let postprocShader = m.node.sceneView.postprocessContext.shader
+                if m.material.shader == invalidProgram or m.material.bShaderNeedUpdate:
+                    m.setupAndDraw()
+                let oldShader = m.material.shader
+
+                let vp = m.node.sceneView
+                let cam = vp.camera
+                var projTransform : Transform3D
+                cam.getProjectionMatrix(vp.bounds, projTransform)
+
+                let mvpMatrix = projTransform * vp.viewMatrixCached * m.node.worldTransform
+
+                if postprocShader != invalidProgram:
+                    m.material.shader = postprocShader
+
+                gl.useProgram(m.material.shader)
+                gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uCurrMVPMatrix"), false, mvpMatrix)
+                gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uPrevMVPMatrix"), false, m.prevTransform)
+
+                let velocityScale = 0.5
+
+                gl.uniform1f(gl.getUniformLocation(m.material.shader, "uVelocityScale"), velocityScale)
+
+                m.prevTransform = mvpMatrix
+
+                m.setupAndDraw()
+                m.material.shader = oldShader
 
 method init*(bc: BlurComponent) =
     procCall bc.Component.init()

@@ -58,7 +58,7 @@ proc hash(v: VertexNormal): Hash =
     result = v.vx.hash() !& v.vy.hash() !& v.vz.hash() !& v.nx.hash() !& v.ny.hash() !& v.nz.hash() !& v.tx.hash() !& v.ty.hash()
     result = !$result
 
-proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ni, ti: int,
+proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ni, ti: int,
                   vertexesHash: var Table[VertexNormal, GLushort], tgX = 0.0, tgY = 0.0, tgZ: float32 = 0.0, bNeedTangent: bool = false): GLushort =
     var v: VertexNormal
     v.vx = vertexData[vi * 3 + 0]
@@ -77,6 +77,8 @@ proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vert
         v.nz = normalData[ni * 3 + 2]
 
     if not vertexesHash.contains(v):
+        m.checkMinMax(vertexData[vi * 3 + 0], vertexData[vi * 3 + 1], vertexData[vi * 3 + 2])
+
         vertexAttrData.add(vertexData[vi * 3 + 0])
         vertexAttrData.add(vertexData[vi * 3 + 1])
         vertexAttrData.add(vertexData[vi * 3 + 2])
@@ -109,7 +111,7 @@ proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vert
     else:
         result = vertexesHash[v]
 
-proc prepareVBO(vertexData, texCoordData, normalData: openarray[GLfloat], faces: seq[int],
+proc prepareVBO(m: MeshComponent, vertexData, texCoordData, normalData: openarray[GLfloat], faces: seq[int],
                 vertexAttrData: var seq[GLfloat], indexData: var seq[GLushort],
                 vertexOfset, normalOfset, texcoordOfset: int, bNeedComputeTangentData: bool = false) =
     var i = 0
@@ -154,13 +156,13 @@ proc prepareVBO(vertexData, texCoordData, normalData: openarray[GLfloat], faces:
             tangent.normalize()
             # bitangent.normalize()
 
-            indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0, vertexesHash, tangent.x, tangent.y, tangent.z, true))
-            indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1, vertexesHash, tangent.x, tangent.y, tangent.z, true))
-            indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2, vertexesHash, tangent.x, tangent.y, tangent.z, true))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0, vertexesHash, tangent.x, tangent.y, tangent.z, true))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1, vertexesHash, tangent.x, tangent.y, tangent.z, true))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2, vertexesHash, tangent.x, tangent.y, tangent.z, true))
         else:
-            indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0, vertexesHash))
-            indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1, vertexesHash))
-            indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2, vertexesHash))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0, vertexesHash))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1, vertexesHash))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2, vertexesHash))
 
         i += faceStep
 
@@ -413,9 +415,8 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
             var vertexAttrData = newSeq[GLfloat]()
             var indexData = newSeq[GLushort]()
 
-            prepareVBO(childColladaGeometry.vertices, childColladaGeometry.texcoords, childColladaGeometry.normals, childColladaGeometry.triangles, vertexAttrData, indexData,
-                       childColladaGeometry.faceAccessor.vertexOfset, childColladaGeometry.faceAccessor.normalOfset, childColladaGeometry.faceAccessor.texcoordOfset, bNeedComputeTangentData)
-
+            nodeMesh.prepareVBO(childColladaGeometry.vertices, childColladaGeometry.texcoords, childColladaGeometry.normals, childColladaGeometry.triangles, vertexAttrData, indexData,
+                                childColladaGeometry.faceAccessor.vertexOfset, childColladaGeometry.faceAccessor.normalOfset, childColladaGeometry.faceAccessor.texcoordOfset, bNeedComputeTangentData)
             nodeMesh.vboData.vertInfo = newVertexInfoWithVertexData(childColladaGeometry.vertices.len, childColladaGeometry.texcoords.len, childColladaGeometry.normals.len, if bNeedComputeTangentData: 3 else: 0)
             nodeMesh.createVBO(indexData, vertexAttrData)
 

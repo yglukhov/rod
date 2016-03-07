@@ -4,6 +4,7 @@ import nimx.types
 import nimx.matrixes
 
 import rod.component
+import rod.component.mesh_component
 import rod.component.material
 import rod.component.light
 import rod.component.camera
@@ -15,113 +16,116 @@ type Attrib = enum
     aPosition
 
 type NodeSelector* = ref object of Component
-    selectedNodes*: seq[Node]
+    selectedNode: Node
 
     indexBuffer*: GLuint
     vertexBuffer*: GLuint
     numberOfIndices*: GLsizei
+    shader*: ProgramRef
 
-    currScale*: Vector3
+    color*: Vector4
 
+proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
+    if not n.isNil:
+        let mesh = n.componentIfAvailable(MeshComponent)
+        if not mesh.isNil:
+            ns.node.translation = n.translation
+            ns.node.scale = (mesh.maxCoord - mesh.minCoord) * n.scale
+            ns.node.rotation = n.rotation
+            result = true
 
+template selectedNode*(ns: NodeSelector): Node = ns.selectedNode
+proc `selectedNode=`*(ns: NodeSelector, n: Node) =
+    ns.selectedNode = n
+
+const vertexShader = """
+attribute vec4 aPosition;
+uniform mat4 modelViewProjectionMatrix;
+void main() { gl_Position = modelViewProjectionMatrix * vec4(aPosition.xyz, 1.0); }
+"""
+const fragmentShader = """
+#ifdef GL_ES
+#extension GL_OES_standard_derivatives : enable
+precision mediump float;
+#endif
+uniform vec4 uColor;
+void main() { gl_FragColor = uColor; }
+"""
 proc createVBO(ns: NodeSelector) =
+    let c = currentContext()
+    let gl = c.gl
 
+    let vertexData = [
+        -0.5.GLfloat,-0.5,0.5,
+        0.5,-0.5,0.5,
+        0.5,0.5,0.5,
+        -0.5,0.5,0.5,
+        -0.5,-0.5,-0.5,
+        0.5,-0.5,-0.5,
+        0.5,0.5,-0.5,
+        -0.5,0.5,-0.5,
+        ]
+    let indexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
 
-# method init*(m: MeshComponent) =
-#     m.bProccesPostEffects = true
-#     m.material = newDefaultMaterial()
-#     m.prevTransform.loadIdentity()
-#     m.vboData.new()
-#     procCall m.Component.init()
-# proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[GLfloat]) =
-#     let loadFunc = proc() =
-#         let gl = currentContext().gl
-#         m.vboData.indexBuffer = gl.createBuffer()
-#         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
-#         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
+    ns.indexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ns.indexBuffer)
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
 
-#         m.vboData.vertexBuffer = gl.createBuffer()
-#         gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
-#         gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
-#         m.vboData.numberOfIndices = indexData.len.GLsizei
+    ns.vertexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, ns.vertexBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
+    ns.numberOfIndices = indexData.len.GLsizei
 
-#     if currentContext().isNil:
-#         m.loadFunc = loadFunc
-#     else:
-#         loadFunc()
-# method draw*(m: MeshComponent) =
-#     let c = currentContext()
-#     let gl = c.gl
+proc createShader(ns: NodeSelector) =
+    let c = currentContext()
+    let gl = c.gl
+    ns.shader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition)])
 
-#     if m.vboData.indexBuffer == 0:
-#         m.load()
-#         if m.vboData.indexBuffer == 0:
-#             return
+method init*(ns: NodeSelector) =
+    ns.color = newVector4(0, 0, 0, 1)
+    procCall ns.Component.init()
 
-#     gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
-#     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
+method draw*(ns: NodeSelector) =
+    let c = currentContext()
+    let gl = c.gl
 
-#     template setupAndDraw(m: MeshComponent) =
-#         m.material.setupVertexAttributes(m.vboData.vertInfo)
-#         m.material.updateSetup(m.node)
-#         if m.material.bEnableBackfaceCulling:
-#             gl.enable(gl.CULL_FACE)
+    if ns.indexBuffer == 0:
+        ns.createVBO()
+        if ns.indexBuffer == 0:
+            return
 
-#         if m.bShowObjectSelection:
-#             gl.enable(gl.BLEND)
-#             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-#             gl.uniform1f(gl.getUniformLocation(m.material.shader, "uMaterialTransparency"), 0.5)
+    if ns.shader == invalidProgram:
+        ns.createShader()
+        if ns.shader == invalidProgram:
+            return
 
-#         gl.drawElements(gl.TRIANGLES, m.vboData.numberOfIndices, gl.UNSIGNED_SHORT)
+    if ns.trySetupTransformfromNode(ns.selectedNode):
 
-#     if m.node.sceneView.isNil or m.node.sceneView.postprocessContext.isNil or m.node.sceneView.postprocessContext.shader == invalidProgram:
-#         m.setupAndDraw()
-#     else:
-#         let postprocShader = m.node.sceneView.postprocessContext.shader
-#         if m.material.shader == invalidProgram or m.material.bShaderNeedUpdate:
-#             m.setupAndDraw()
-#         let oldShader = m.material.shader
+        gl.enable(gl.DEPTH_TEST)
 
-#         let vp = m.node.sceneView
-#         let cam = vp.camera
-#         var projTransform : Transform3D
-#         cam.getProjectionMatrix(vp.bounds, projTransform)
+        gl.bindBuffer(gl.ARRAY_BUFFER, ns.vertexBuffer)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ns.indexBuffer)
 
-#         let mvpMatrix = projTransform * vp.viewMatrixCached * m.node.worldTransform
+        gl.enableVertexAttribArray(aPosition.GLuint)
+        gl.vertexAttribPointer(aPosition.GLuint, 3.GLint, gl.FLOAT, false, (3 * sizeof(GLfloat)).GLsizei , 0)
 
-#         if postprocShader != invalidProgram:
-#             m.material.shader = postprocShader
+        gl.useProgram(ns.shader)
 
-#         gl.useProgram(m.material.shader)
-#         gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uCurrMVPMatrix"), false, mvpMatrix)
-#         gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uPrevMVPMatrix"), false, m.prevTransform)
+        gl.uniform4fv(gl.getUniformLocation(ns.shader, "uColor"), ns.color)
+        c.setTransformUniform(ns.shader)
 
-#         m.velocityScale = 0.5
+        gl.drawElements(gl.LINES, ns.numberOfIndices, gl.UNSIGNED_SHORT)
 
-#         gl.uniform1f(gl.getUniformLocation(m.material.shader, "uVelocityScale"), m.velocityScale)
+        when defined(js):
+            {.emit: """
+            `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
+            `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
+            """.}
+        else:
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
+            gl.bindBuffer(gl.ARRAY_BUFFER, 0)
 
-#         m.prevTransform = mvpMatrix
-
-#         m.setupAndDraw()
-#         m.material.shader = oldShader
-
-#     if m.material.bEnableBackfaceCulling:
-#         gl.disable(gl.CULL_FACE)
-
-#     when defined(js):
-#         {.emit: """
-#         `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
-#         `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
-#         """.}
-#     else:
-#         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
-#         gl.bindBuffer(gl.ARRAY_BUFFER, 0)
-#     when not defined(ios) and not defined(android) and not defined(js):
-#         glPolygonMode(gl.FRONT_AND_BACK, GL_FILL)
-
-#     #TODO to default settings
-#     gl.disable(gl.DEPTH_TEST)
-#     gl.activeTexture(gl.TEXTURE0)
-#     gl.enable(gl.BLEND)
+        #TODO to default settings
+        gl.disable(gl.DEPTH_TEST)
 
 registerComponent[NodeSelector]()

@@ -38,11 +38,10 @@ type
         vboData*: VBOData
         loadFunc: proc()
         material*: Material
-        bShowObjectSelection*: bool
         bProccesPostEffects*: bool
-        prevTransform: Matrix4
-        velocityScale: float32
-        updateCount: int
+        prevTransform*: Matrix4
+        minCoord*: Vector3
+        maxCoord*: Vector3
 
 var vboCache* = initTable[string, VBOData]()
 
@@ -51,10 +50,30 @@ method init*(m: MeshComponent) =
     m.material = newDefaultMaterial()
     m.prevTransform.loadIdentity()
     m.vboData.new()
+    m.minCoord = newVector3(100000000, 100000000, 100000000)
+    m.maxCoord = newVector3(-100000000, -100000000, -100000000)
     procCall m.Component.init()
 
-proc mergeIndexes(vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ti, ni: int): GLushort =
+proc checkMinMax*(m: MeshComponent, x, y, z: float32) =
+
+    if x < m.minCoord[0]:
+        m.minCoord[0] = x
+    if y < m.minCoord[1]:
+        m.minCoord[1] = y
+    if z < m.minCoord[2]:
+        m.minCoord[2] = z
+
+    if x > m.maxCoord[0]:
+        m.maxCoord[0] = x
+    if y > m.maxCoord[1]:
+        m.maxCoord[1] = y
+    if z > m.maxCoord[2]:
+        m.maxCoord[2] = z
+
+proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ti, ni: int): GLushort =
     var attributesPerVertex: int = 0
+
+    m.checkMinMax(vertexData[vi * 3 + 0], vertexData[vi * 3 + 1], vertexData[vi * 3 + 2])
 
     vertexAttrData.add(vertexData[vi * 3 + 0])
     vertexAttrData.add(vertexData[vi * 3 + 1])
@@ -120,9 +139,9 @@ proc loadMeshComponent(m: MeshComponent, resourceName: string) =
                     if t == 0: (v - 1) else: (t - 1)
 
                 template addFace(vi0, vi1, vi2, ti0, ti1, ti2, ni0, ni1, ni2: int) =
-                    indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi0 - 1, uvIndex(ti0, vi0), ni0 - 1))
-                    indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi1 - 1, uvIndex(ti1, vi1), ni1 - 1))
-                    indexData.add(mergeIndexes(vertexData, texCoordData, normalData, vertexAttrData, vi2 - 1, uvIndex(ti2, vi2), ni2 - 1))
+                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0 - 1, uvIndex(ti0, vi0), ni0 - 1))
+                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1 - 1, uvIndex(ti1, vi1), ni1 - 1))
+                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2 - 1, uvIndex(ti2, vi2), ni2 - 1))
 
                 loader.loadMeshData(s, addVertex, addTexCoord, addNormal, addFace)
                 s.close()
@@ -178,6 +197,17 @@ proc load(m: MeshComponent) =
         m.loadFunc()
         m.loadFunc = nil
 
+proc setupAndDraw*(m: MeshComponent) =
+    let c = currentContext()
+    let gl = c.gl
+
+    m.material.setupVertexAttributes(m.vboData.vertInfo)
+    m.material.updateSetup(m.node)
+    if m.material.bEnableBackfaceCulling:
+        gl.enable(gl.CULL_FACE)
+
+    gl.drawElements(gl.TRIANGLES, m.vboData.numberOfIndices, gl.UNSIGNED_SHORT)
+
 method draw*(m: MeshComponent) =
     let c = currentContext()
     let gl = c.gl
@@ -190,49 +220,10 @@ method draw*(m: MeshComponent) =
     gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
 
-    template setupAndDraw(m: MeshComponent) =
-        m.material.setupVertexAttributes(m.vboData.vertInfo)
-        m.material.updateSetup(m.node)
-        if m.material.bEnableBackfaceCulling:
-            gl.enable(gl.CULL_FACE)
-
-        if m.bShowObjectSelection:
-            gl.enable(gl.BLEND)
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-            gl.uniform1f(gl.getUniformLocation(m.material.shader, "uMaterialTransparency"), 0.5)
-
-        gl.drawElements(gl.TRIANGLES, m.vboData.numberOfIndices, gl.UNSIGNED_SHORT)
-
     if m.node.sceneView.isNil or m.node.sceneView.postprocessContext.isNil or m.node.sceneView.postprocessContext.shader == invalidProgram:
         m.setupAndDraw()
     else:
-        let postprocShader = m.node.sceneView.postprocessContext.shader
-        if m.material.shader == invalidProgram or m.material.bShaderNeedUpdate:
-            m.setupAndDraw()
-        let oldShader = m.material.shader
-
-        let vp = m.node.sceneView
-        let cam = vp.camera
-        var projTransform : Transform3D
-        cam.getProjectionMatrix(vp.bounds, projTransform)
-
-        let mvpMatrix = projTransform * vp.viewMatrixCached * m.node.worldTransform
-
-        if postprocShader != invalidProgram:
-            m.material.shader = postprocShader
-
-        gl.useProgram(m.material.shader)
-        gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uCurrMVPMatrix"), false, mvpMatrix)
-        gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uPrevMVPMatrix"), false, m.prevTransform)
-
-        m.velocityScale = 0.5
-
-        gl.uniform1f(gl.getUniformLocation(m.material.shader, "uVelocityScale"), m.velocityScale)
-
-        m.prevTransform = mvpMatrix
-
-        m.setupAndDraw()
-        m.material.shader = oldShader
+        m.node.sceneView.postprocessContext.drawProc(m)
 
     if m.material.bEnableBackfaceCulling:
         gl.disable(gl.CULL_FACE)
