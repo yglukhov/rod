@@ -139,7 +139,7 @@ proc swapCompositingBuffers*(v: SceneView) =
     let c = currentContext()
     let gl = c.gl
     let vp = gl.getViewport()
-    when defined(js):
+    when defined(js) or defined(gles2only):
         #proc ortho*(dest: var Matrix4, left, right, bottom, top, near, far: Coord) =
         var mat = ortho(0, Coord(vp[2]), Coord(vp[3]), 0, -1, 1)
 
