@@ -9,6 +9,9 @@ import inspector_view
 import rod_types
 
 import nimx.animation
+import nimx.color_picker
+import nimx.context
+import nimx.portable_gl
 import nimx.scroll_view
 import nimx.text_field
 import nimx.table_view_cell
@@ -40,11 +43,24 @@ proc newSettingsView(e: Editor, r: Rect): PanelView =
 
     result.addSubview(title)
 
-    let bgColorLabel = newLabel(newRect(6, 6 + 24 + 6, 50, 20))
+    var y: Coord = 36
+    let bgColorLabel = newLabel(newRect(6, y, 50, 20))
     bgColorLabel.textColor = newGrayColor(0.78)
     bgColorLabel.text = "Background:"
 
     result.addSubview(bgColorLabel)
+
+    let bgColorButton = newButton(result, newPoint(102, y), newSize(40, 20), "...")
+    let pv = result
+    bgColorbutton.onAction do():
+        let cPicker = newColorPickerView(newRect(0, 0, 300, 200))
+        cPicker.onColorSelected = proc(c: Color) =
+            currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
+            cPicker.removeFromSuperview()
+        cPicker.setFrameOrigin(newPoint(pv.frame.x - 300, pv.frame.y))
+        pv.window.addSubview(cPicker)
+
+    y += bgColorLabel.frame.height + 6
 
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
@@ -168,9 +184,10 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
                 outlineView.expandRow(sip)
                 let path = callDialogFileOpen("Select file")
-                loadSceneAsync path, proc(n: Node) =
-                    p.addChild(n)
-                    outlineView.reloadData()
+                if not isNil(path) and path != "":
+                    loadSceneAsync path, proc(n: Node) =
+                        p.addChild(n)
+                        outlineView.reloadData()
         result.addSubview(loadButton)
 
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
