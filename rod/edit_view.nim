@@ -9,6 +9,7 @@ import inspector_view
 import rod_types
 
 import nimx.animation
+import nimx.scroll_view
 import nimx.text_field
 import nimx.table_view_cell
 
@@ -29,12 +30,29 @@ type Editor* = ref object
     treeView*: View
     selectedNode*: Node
 
+proc newSettingsView(e: Editor, r: Rect): PanelView =
+    result = PanelView.new(r)
+    result.collapsible = true
+
+    let title = newLabel(newRect(22, 6, 108, 15))
+    title.textColor = whiteColor()
+    title.text = "Editor Settings"
+
+    result.addSubview(title)
+
+    let bgColorLabel = newLabel(newRect(6, 6 + 24 + 6, 50, 20))
+    bgColorLabel.textColor = newGrayColor(0.78)
+    bgColorLabel.text = "Background:"
+
+    result.addSubview(bgColorLabel)
+
+
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 700))
     result.collapsible = true
 
     let title = newLabel(newRect(22, 6, 108, 15))
-    title.textColor = newGrayColor(1.0)
+    title.textColor = whiteColor()
     title.text = "Scene"
 
     result.addSubview(title)
@@ -160,9 +178,13 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.rootNode = n
 
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
+    let settingsView = result.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
+
     result.treeView = newTreeView(result, inspectorView)
     v.window.addSubview(result.treeView)
+
     v.window.addSubview(inspectorView)
+    v.window.addSubview(settingsView)
 
 proc endEditing*(e: Editor) =
     discard

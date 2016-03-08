@@ -47,11 +47,11 @@ proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): View 
     result = textField
 
 proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
-    result = View.new(newRect(0, 0, 224, 24))
+    result = View.new(newRect(0, 0, 208, 24))
     const vecLen = high(T) + 1
 
     var x = 0.Coord
-    let width = (result.bounds.width - x) / vecLen - 3
+    let width = (result.bounds.width - x) / vecLen - vecLen
 
     let pv = result
     proc complexSetter() =
