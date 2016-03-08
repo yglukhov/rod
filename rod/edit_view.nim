@@ -27,7 +27,7 @@ type Editor* = ref object
     rootNode*: Node3D
     eventCatchingView*: View
     treeView*: View
-    nodeSelector*: Node3D
+    selectedNode*: Node
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 700))
@@ -76,9 +76,19 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
             else:
                 nil
 
-        if not e.nodeSelector.isNil:
-            # test impl for mesh_component objects
-            e.nodeSelector.componentIfAvailable(NodeSelector).selectedNode = n
+        if not n.isNil:
+            if not e.selectedNode.isNil:
+                e.selectedNode.removeComponent(NodeSelector)
+                if e.selectedNode != n:
+                    discard n.component(NodeSelector)
+                    e.selectedNode = n
+            else:
+                discard n.component(NodeSelector)
+                e.selectedNode = n
+        else:
+            if not e.selectedNode.isNil:
+                e.selectedNode.removeComponent(NodeSelector)
+                e.selectedNode = nil
 
         inspector.inspectedNode = n
 
@@ -148,9 +158,6 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     result.new()
     result.rootNode = n
-    let nodeSelector = n.newChild("selector")
-    let selectorComponent = nodeSelector.component(NodeSelector)
-    result.nodeSelector = nodeSelector
 
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
     result.treeView = newTreeView(result, inspectorView)

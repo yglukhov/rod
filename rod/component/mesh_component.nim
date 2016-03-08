@@ -1,7 +1,6 @@
 import tables
 import hashes
-
-import rod.component
+import strutils
 
 import nimx.image
 import nimx.resource
@@ -10,9 +9,10 @@ import nimx.portable_gl
 import nimx.types
 import nimx.view
 import nimx.system_logger
-import nimasset.obj
-import strutils
 
+import nimasset.obj
+
+import rod.component
 import rod.component.material
 import rod.component.light
 import rod.vertex_data_info
@@ -32,6 +32,8 @@ type
         vertexBuffer*: GLuint
         numberOfIndices*: GLsizei
         vertInfo*: VertexDataInfo
+        minCoord*: Vector3
+        maxCoord*: Vector3
 
     MeshComponent* = ref object of Component
         resourceName*: string
@@ -40,8 +42,6 @@ type
         material*: Material
         bProccesPostEffects*: bool
         prevTransform*: Matrix4
-        minCoord*: Vector3
-        maxCoord*: Vector3
 
 var vboCache* = initTable[string, VBOData]()
 
@@ -50,25 +50,24 @@ method init*(m: MeshComponent) =
     m.material = newDefaultMaterial()
     m.prevTransform.loadIdentity()
     m.vboData.new()
-    m.minCoord = newVector3(100000000, 100000000, 100000000)
-    m.maxCoord = newVector3(-100000000, -100000000, -100000000)
+    m.vboData.minCoord = newVector3(high(int).Coord, high(int).Coord, high(int).Coord)
+    m.vboData.maxCoord = newVector3(low(int).Coord, low(int).Coord, low(int).Coord)
     procCall m.Component.init()
 
 proc checkMinMax*(m: MeshComponent, x, y, z: float32) =
+    if x < m.vboData.minCoord[0]:
+        m.vboData.minCoord[0] = x
+    if y < m.vboData.minCoord[1]:
+        m.vboData.minCoord[1] = y
+    if z < m.vboData.minCoord[2]:
+        m.vboData.minCoord[2] = z
 
-    if x < m.minCoord[0]:
-        m.minCoord[0] = x
-    if y < m.minCoord[1]:
-        m.minCoord[1] = y
-    if z < m.minCoord[2]:
-        m.minCoord[2] = z
-
-    if x > m.maxCoord[0]:
-        m.maxCoord[0] = x
-    if y > m.maxCoord[1]:
-        m.maxCoord[1] = y
-    if z > m.maxCoord[2]:
-        m.maxCoord[2] = z
+    if x > m.vboData.maxCoord[0]:
+        m.vboData.maxCoord[0] = x
+    if y > m.vboData.maxCoord[1]:
+        m.vboData.maxCoord[1] = y
+    if z > m.vboData.maxCoord[2]:
+        m.vboData.maxCoord[2] = z
 
 proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ti, ni: int): GLushort =
     var attributesPerVertex: int = 0
@@ -173,6 +172,11 @@ proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Poi
         v4[0], v4[1], v4[2], t4.x, t4.y
         ]
     let indexData = [0.GLushort, 1, 2, 2, 3, 0]
+
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
 
     m.vboData.vertInfo = newVertexInfoWithVertexData(3, 2)
 
