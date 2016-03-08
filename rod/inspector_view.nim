@@ -4,6 +4,8 @@ import nimx.text_field
 import nimx.button
 import nimx.matrixes
 import nimx.menu
+import nimx.scroll_view
+
 import variant
 
 export view
@@ -24,7 +26,7 @@ method init*(i: InspectorView, r: Rect) =
     procCall i.PanelView.init(r)
     i.collapsible = true
     i.collapsed = true
-    let title = newLabel(newRect(22, 6, 100, 15))
+    let title = newLabel(newRect(22, 6, 96, 15))
     title.textColor = whiteColor()
     title.text = "Properties"
     i.addSubview(title)
@@ -36,8 +38,9 @@ proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): Vi
 proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
     if i.subviews.len > 1:
         i.subviews[1].removeFromSuperview()
+
     if not n.isNil:
-        let propView = View.new(newRect(1, 29, i.bounds.width, i.bounds.height - 40))
+        let propView = View.new(newRect(1, 29, i.bounds.width - 6, i.bounds.height - 40))
         propView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
 
         var y = Coord(0)
@@ -50,6 +53,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.commit = proc() =
             pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter)
             pv.setFrameOrigin(newPoint(6, y))
+            pv.setFrameSize(newSize(pv.frame.width - 16.Coord, pv.frame.height))
             y += pv.frame.height
             propView.addSubview(pv)
 
@@ -64,19 +68,31 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                 v.visitProperties(visitor)
 
         pv = createNewComponentButton(y + 24, i, n)
+        pv.setFrameSize(newSize(pv.frame.width - 16, pv.frame.height))
         y += pv.frame.height
         propView.addSubview(pv)
 
         var fs = propView.frame.size
-        fs.height = y
+        fs.height = y + 79
         propView.setFrameSize(fs)
         i.addSubview(propView)
+
+        i.fullHeight = if fs.height < 600: fs.height else: 600
+        i.setFrameSize(newSize(i.frame.size.width, if i.collapsed: 27.Coord else: i.fullHeight))
 
         if i.collapsible:
             if i.collapsed:
                 i.collapsed = false
+                i.fullHeight = if fs.height < 600: fs.height else: 600
                 i.setFrameSize(newSize(i.frame.size.width, if i.collapsed: 27.Coord else: i.fullHeight))
                 i.setNeedsDisplay()
+
+        let scPos = newPoint(6, 27)
+        i.subviews[1].setFrameOrigin(scPos)
+        let scView = newScrollView(i.subviews[1])
+        scView.setFrameSize(newSize(i.frame.size.width - 6, i.frame.height - 27))
+        i.addSubview(scView)
+
     else:
         if i.collapsible:
             if not i.collapsed:
@@ -91,7 +107,7 @@ proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string
     v.textColor = newColor(1.0, 1.0, 0.5)
     result.addSubview(v)
 
-    let removeButton = newButton(newRect(result.bounds.width - 24, -2, 24, 24))
+    let removeButton = newButton(newRect(result.bounds.width - 40, -2, 24, 24))
     removeButton.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
     removeButton.title = "-"
     removeButton.onAction do():
@@ -117,5 +133,5 @@ proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): Vi
             items.add(menuItem)
 
         menu.items = items
-        menu.popupAtPoint(b, newPoint(0, b.bounds.height))
+        menu.popupAtPoint(inspector, newPoint(0, 27))
     result = b

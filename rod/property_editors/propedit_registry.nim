@@ -21,7 +21,7 @@ proc registerPropertyEditor*[T](createView: proc(setter: proc(s: T), getter: pro
 proc propertyEditorForProperty*(n: Node, title: string, v: Variant): View =
     let creator = propEditors.getOrDefault(v.typeId)
     result = View.new(newRect(6, 6, 328, 36))
-    let label = newLabel(newRect(6, 6, 90, 36))
+    let label = newLabel(newRect(6, 6, 100, 36))
     label.textColor = newGrayColor(0.9)
     label.text = title & ":"
     result.addSubview(label)
