@@ -67,7 +67,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                 propView.addSubview(pv)
                 v.visitProperties(visitor)
 
-        pv = createNewComponentButton(y, i, n)
+        pv = createNewComponentButton(y + 24, i, n)
         pv.setFrameSize(newSize(pv.frame.width - 16, pv.frame.height))
         y += pv.frame.height
         propView.addSubview(pv)
@@ -116,7 +116,7 @@ proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string
     result.addSubview(removeButton)
 
 proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): View =
-    let b = Button.new(newRect(6, y + 24, inspector.frame.width - 12, 24))
+    let b = Button.new(newRect(6, y, inspector.frame.width - 12, 24))
     b.title = "New component"
     b.onAction do():
         var menu : Menu

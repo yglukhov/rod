@@ -2,16 +2,36 @@ import math
 import nimx.view
 import nimx.app
 import nimx.event
-import nimx.view_event_handling
+import nimx.view_event_handling_new
 import nimx.context
 import nimx.types
 import nimx.composition
+import nimx.gesture_detector_newtouch
+import nimx.view
 
 type PanelView* = ref object of View
     collapsible*: bool
     collapsed*: bool
-
     fullHeight*: Coord
+
+# PanelView drag implementation
+
+type PanelScrollListener = ref object of OnScrollListener
+    panel: PanelView
+    diff: Point
+
+proc newPanelScrollListener(v: PanelView): PanelScrollListener =
+    result.new
+    result.panel = v
+
+method onTapDown(ls: PanelScrollListener, e: var Event) =
+    ls.diff = e.localPosition
+
+method onScrollProgress(ls: PanelScrollListener, dx, dy : float32, e : var Event) =
+    ls.panel.setFrameOrigin(e.position - ls.diff)
+    ls.panel.setNeedsDisplay()
+
+# PanelView implementation
 
 method init*(v: PanelView, r: Rect) =
     procCall v.View.init(r)
@@ -19,6 +39,19 @@ method init*(v: PanelView, r: Rect) =
     v.collapsed = false
     v.collapsible = false
     v.fullHeight = r.height
+
+    # Enable dragging
+    v.addGestureDetector(newScrollGestureDetector(newPanelScrollListener(v)))
+
+    # Enable collapsibility
+    v.addGestureDetector(newTapGestureDetector(proc(tapPoint: Point) =
+        let innerPoint = tapPoint - v.frame.origin
+        if innerPoint.x > 0 and innerPoint.x < 27 and innerPoint.y > 0 and innerPoint.y < 27:
+            if v.collapsible:
+                v.collapsed = not v.collapsed
+                v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
+                v.setNeedsDisplay()
+    ))
 
 var disclosureTriangleComposition = newComposition """
 uniform float uAngle;
@@ -73,28 +106,3 @@ method draw(v: PanelView, r: Rect) =
             drawDisclosureTriangle(false, newRect(r.x, r.y, 27, 27))
 
 method clipType*(v: PanelView): ClipType = ctDefaultClip
-
-method onTouchEv*(v: PanelView, e: var Event): bool =
-    # Handle PanelView Floating and Collapsible States
-    let
-        origPos = v.frame.origin
-        dp = e.position - origPos
-
-    if e.buttonState == bsDown:
-        mainApplication().pushEventFilter do(e: var Event, c: var EventFilterControl) -> bool:
-            e.localPosition = v.convertPointFromWindow(e.position)
-            case e.buttonState
-            of bsUnknown:
-                v.setFrameOrigin(e.position - dp)
-                v.setNeedsDisplay()
-            of bsUp:
-                if e.localPosition.x > 0 and e.localPosition.x < 27 and e.localPosition. y > 0 and e.localPosition.y < 27:
-                    if v.collapsible:
-                        v.collapsed = not v.collapsed
-                        v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
-                        v.setNeedsDisplay()
-                c = efcBreak
-                result = true
-            of bsDown:
-                return false
-    return true
