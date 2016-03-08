@@ -181,9 +181,10 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
                 outlineView.expandRow(sip)
                 let path = callDialogFileOpen("Select file")
-                loadSceneAsync path, proc(n: Node) =
-                    p.addChild(n)
-                    outlineView.reloadData()
+                if not isNil(path) and path != "":
+                    loadSceneAsync path, proc(n: Node) =
+                        p.addChild(n)
+                        outlineView.reloadData()
         result.addSubview(loadButton)
 
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
