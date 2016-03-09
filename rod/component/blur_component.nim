@@ -1,4 +1,5 @@
 import streams
+import tables
 
 import nimx.types
 import nimx.context
@@ -15,6 +16,7 @@ import rod.component
 import rod.component.camera
 import rod.component.mesh_component
 import rod.postprocess_context
+import rod.property_visitor
 
 type BlurComponent* = ref object of Component
     motionMap: SelfContainedImage
@@ -24,6 +26,12 @@ type BlurComponent* = ref object of Component
     postShader: ProgramRef
 
     vbo, ibo: GLuint
+
+    bShowMotionMap*: bool
+    velocityScale*: float32
+    frameShift*: int
+    frameCounter: int
+
 
 type Attrib = enum
     aPosition
@@ -173,9 +181,7 @@ proc createAndSetup(bc: BlurComponent, width, height: float32) =
                 gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uCurrMVPMatrix"), false, mvpMatrix)
                 gl.uniformMatrix4fv(gl.getUniformLocation(m.material.shader, "uPrevMVPMatrix"), false, m.prevTransform)
 
-                let velocityScale = 0.5
-
-                gl.uniform1f(gl.getUniformLocation(m.material.shader, "uVelocityScale"), velocityScale)
+                gl.uniform1f(gl.getUniformLocation(m.material.shader, "uVelocityScale"), bc.velocityScale)
 
                 m.prevTransform = mvpMatrix
 
@@ -184,6 +190,27 @@ proc createAndSetup(bc: BlurComponent, width, height: float32) =
 
 method init*(bc: BlurComponent) =
     procCall bc.Component.init()
+    bc.velocityScale = 50.0
+    bc.frameShift = 5
+
+proc recursiveDrawPost(n: Node) =
+    if n.alpha < 0.0000001: return
+    let c = currentContext()
+    var tr = c.transform
+    let oldAlpha = c.alpha
+    c.alpha *= n.alpha
+    n.getTransform(tr)
+    c.withTransform tr:
+        var hasPosteffectComponent = false
+        if not n.components.isNil:
+            # for v in values(n.components):
+            let v = n.component(MeshComponent)
+            if not v.isNil:
+                v.draw()
+                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
+        if not hasPosteffectComponent:
+            for c in n.children: c.recursiveDrawPost()
+    c.alpha = oldAlpha
 
 method draw*(bc: BlurComponent) =
     let vp = bc.node.sceneView
@@ -204,16 +231,23 @@ method draw*(bc: BlurComponent) =
     let mvpMatrix = vp.getViewProjectionMatrix() * bc.node.worldTransform
 
     if bc.motionShader != invalidProgram:
-        bc.node.sceneView.postprocessContext.shader = bc.motionShader # bind
-        gl.useProgram(bc.motionShader)
 
-        bc.motionMap.flipVertically()
-        bc.motionMap.draw( proc() =
-            c.withTransform mvpMatrix:
-                for n in bc.node.children: n.recursiveDraw()
-        )
-        bc.node.sceneView.postprocessContext.shader = invalidProgram # release
-        gl.useProgram(invalidProgram)
+
+        if bc.frameCounter == bc.frameShift:
+            bc.frameCounter = 0
+
+            bc.node.sceneView.postprocessContext.shader = bc.motionShader # bind
+            gl.useProgram(bc.motionShader)
+            bc.motionMap.flipVertically()
+            bc.motionMap.draw( proc() =
+                c.withTransform mvpMatrix:
+                    for n in bc.node.children: n.recursiveDrawPost()
+            )
+            bc.node.sceneView.postprocessContext.shader = invalidProgram # release
+            gl.useProgram(invalidProgram)
+
+        bc.frameCounter += 1
+
 
         bc.postMap.flipVertically()
         bc.postMap.draw( proc() =
@@ -262,6 +296,17 @@ method draw*(bc: BlurComponent) =
             gl.bindBuffer(gl.ARRAY_BUFFER, 0)
         gl.useProgram(invalidProgram)
 
+    if bc.bShowMotionMap:
+        # c: GraphicsContext, i: Image, toRect: Rect, fromRect: Rect = zeroRect, alpha: ColorComponent = 1.0
+        # type Rect* = tuple[origin: Point, size: Size]
+        let r = vp.bounds
+        c.drawImage(bc.motionMap, newRect(newPoint(-r.size.width,-r.size.height), newSize(r.size.width,r.size.height)) )
+
 method isPosteffectComponent*(bc: BlurComponent): bool = true
+
+method visitProperties*(bc: BlurComponent, p: var PropertyVisitor) =
+    p.visitProperty("shift", bc.frameShift)
+    p.visitProperty("velo_scale", bc.velocityScale)
+    p.visitProperty("show_motion", bc.bShowMotionMap)
 
 registerComponent[BlurComponent]()

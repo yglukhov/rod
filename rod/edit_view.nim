@@ -114,15 +114,11 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
             if not e.selectedNode.isNil:
                 e.selectedNode.removeComponent(NodeSelector)
                 if e.selectedNode != n:
-                    discard n.component(NodeSelector)
                     e.selectedNode = n
+                    discard e.selectedNode.component(NodeSelector)
             else:
-                discard n.component(NodeSelector)
                 e.selectedNode = n
-        else:
-            if not e.selectedNode.isNil:
-                e.selectedNode.removeComponent(NodeSelector)
-                e.selectedNode = nil
+                discard e.selectedNode.component(NodeSelector)
 
         inspector.inspectedNode = n
 

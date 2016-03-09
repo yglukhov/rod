@@ -224,7 +224,7 @@ method draw*(m: MeshComponent) =
     gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
 
-    if m.node.sceneView.isNil or m.node.sceneView.postprocessContext.isNil or m.node.sceneView.postprocessContext.shader == invalidProgram:
+    if not m.bProccesPostEffects or m.node.sceneView.isNil or m.node.sceneView.postprocessContext.isNil or m.node.sceneView.postprocessContext.shader == invalidProgram:
         m.setupAndDraw()
     else:
         m.node.sceneView.postprocessContext.drawProc(m)
