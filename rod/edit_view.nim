@@ -31,7 +31,7 @@ type Editor* = ref object
     rootNode*: Node3D
     eventCatchingView*: View
     treeView*: View
-    selectedNode*: Node
+    selectedNode*: Node3D
 
 proc newSettingsView(e: Editor, r: Rect): PanelView =
     result = PanelView.new(r)
