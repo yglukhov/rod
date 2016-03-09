@@ -30,8 +30,7 @@ type EditView = ref object of SceneView
 proc runAutoTestsIfNeeded() =
     uiTest generalUITest:
         discard
-        when not defined(js):
-            quit()
+        quitApplication()
 
     registerTest(generalUITest)
     when defined(runAutoTests):
@@ -80,7 +79,7 @@ proc startApplication() =
 
 when defined js:
     import dom
-    dom.window.onload = proc (e: ref TEvent) =
+    dom.window.onload = proc (e: Event) =
         startApplication()
 else:
     try:

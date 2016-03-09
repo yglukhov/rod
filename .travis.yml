@@ -4,4 +4,5 @@ services:
 before_install:
   - docker pull yglukhov/devel
 script:
-  - docker run -v "$(pwd):/project" -w /project yglukhov/devel run "nimble install -y && nim -r tests rod.nims"
+  - docker run -v "$(pwd):/project" -w /project yglukhov/devel run "nimble install -y && nake tests && nake tests -d:js && nake js --norun && nake docs"
+  - ./deployGHPages.sh ./doc
