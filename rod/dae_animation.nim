@@ -19,26 +19,6 @@ import quaternion
 
 type AnimProcSetter = proc(progress: float)
 
-proc getAnimTranslation(m: var seq[float32]): Vector3 =
-    newVector3(m[3], m[7], m[11])
-
-proc getAnimRotation(m: var seq[float32]): Quaternion =
-    ## Return quaternion from transform matrix
-    let w = sqrt(1 + m[0] + m[5] + m[10]) / 2
-    return newQuaternion(
-        (m[9] - m[6]) / (4 * w),
-        (m[2] - m[8]) / (4 * w),
-        (m[4] - m[1]) / (4 * w),
-        w
-    )
-
-proc getAnimScale(m: var seq[float32]): Vector3 =
-    newVector3(
-        newVector3(m[0], m[4], m[8]).length().float32,
-        newVector3(m[1], m[5], m[9]).length().float32,
-        newVector3(m[2], m[6], m[10]).length().float32
-    )
-
 proc findAnimatableProperty(n: Node, propName: string): Variant =
     var res : Variant
     var visitor : PropertyVisitor
@@ -68,7 +48,8 @@ proc createProgressSetterWithPropSetter[T](setter: proc(v: T), parsedValues: seq
     result = proc(p: float) =
         let i = interpolate(fromValue, toValue - 1, p)
         let index = floor(i).int
-        setter(propValues[index])
+        let m = i mod 1.0
+        setter(interpolate(propValues[index], propValues[index + 1], m))
 
 proc createProgressSetter[T](propName: string, node: Node3D, parsedValues: seq[T]): AnimProcSetter =
     let ap = node.findAnimatableProperty(propName)
@@ -120,14 +101,22 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation, duration: var float32
 
         for i in 0 ..< dataX.dataFloat.len:
             var
-                transMatrix: seq[float32] = @[]
+                model: Matrix4
                 time = dataX.dataFloat[i]
-            for j in i * 16 ..< (i + 1) * 16:
-                transMatrix.add(dataY.dataFloat[j])
+                index = 0
+                scale, translation: Vector3
+                rotation: Vector4
 
-            parsedTranslations.add(getAnimTranslation(transMatrix))
-            parsedRotations.add(getAnimRotation(transMatrix))
-            parsedScales.add(getAnimScale(transMatrix))
+            for j in i * 16 ..< (i + 1) * 16:
+                model[index] = dataY.dataFloat[j]
+                inc index
+
+            discard model.tryGetTranslationFromModel(translation)
+            discard model.tryGetScaleRotationFromModel(scale, rotation)
+
+            parsedTranslations.add(translation)
+            parsedRotations.add(newQuaternion(rotation[0], rotation[1], rotation[2], rotation[3]))
+            parsedScales.add(scale)
 
         return @[
             createProgressSetter("translation", node, parsedTranslations),
@@ -169,7 +158,7 @@ proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
             ps(progress)
 
     if anim.id != "":
-        echo "Attaching $# to $#" % [anim.id, nodeToAttach.name]
+        # echo "Attaching $# to $#" % [anim.id, nodeToAttach.name]
         nodeToAttach.registerAnimation(anim.id, result)
 
     result.loopDuration = animDuration
