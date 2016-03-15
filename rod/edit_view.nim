@@ -35,7 +35,7 @@ type Editor* = ref object
     treeView*: View
     selectedNode*: Node3D
 
-proc focusOnNode*(cameraNode: Node, focusNode: Node) =
+proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
     cameraNode.translation = newVector3(
         focusNode.translation.x,
