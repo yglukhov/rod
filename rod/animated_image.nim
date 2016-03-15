@@ -1,3 +1,5 @@
+import math
+
 import nimx.types
 import nimx.image
 import nimx.animation
@@ -39,7 +41,7 @@ proc frameAnimation*(ai: AnimatedImage, desiredFramerate: int = 30): Animation =
         a.loopDuration = float(ai.images.len) * fps
         a.continueUntilEndOfLoopOnCancel = true
         a.onAnimate = proc(p: float) =
-            ai.currentFrame = int(float(ai.images.len - 1) * p)
+            ai.currentFrame = round(float(ai.images.len - 1) * p)
         ai.anim = a
     result = ai.anim
 
