@@ -13,6 +13,7 @@ method init*(c: Camera) =
     c.projectionMode = cpPerspective
     c.zNear = 1
     c.zFar = 10000
+    c.focusOnSelection = false
 
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
     case c.projectionMode
@@ -31,5 +32,6 @@ proc `manualGetProjectionMatrix=`*(c: Camera, p: proc(viewportBounds: Rect, mat:
 method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("zNear", c.zNear)
     p.visitProperty("zFar", c.zFar)
+    p.visitProperty("focusOnSelection", c.focusOnSelection)
 
 registerComponent[Camera]()
