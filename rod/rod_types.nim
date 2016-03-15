@@ -61,6 +61,7 @@ type
         projectionMode*: CameraProjection
         zNear*, zFar*: Coord
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
+        focusOnSelection*: bool
 
     UIComponent* = ref object of Component
         mView*: View

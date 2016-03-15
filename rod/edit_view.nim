@@ -1,3 +1,5 @@
+import math
+
 import nimx.view
 import nimx.types
 import nimx.button
@@ -63,6 +65,15 @@ proc newSettingsView(e: Editor, r: Rect): PanelView =
     y += bgColorLabel.frame.height + 6
 
 
+proc focusOnNode*(cameraNode: Node, focusNode: Node) =
+    if cameraNode.component(Camera).focusOnSelection:
+        let distance = 100.Coord
+        cameraNode.translation = newVector3(
+            focusNode.translation.x,
+            focusNode.translation.y,
+            focusNode.translation.z + distance
+        )
+
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 700))
     result.collapsible = true
@@ -119,6 +130,8 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
             else:
                 e.selectedNode = n
                 discard e.selectedNode.component(NodeSelector)
+
+            e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
 
         inspector.inspectedNode = n
 
