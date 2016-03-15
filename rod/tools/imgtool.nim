@@ -101,6 +101,8 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
         if im.png.isNil:
             im.png = loadPNG32(im.originalPath)
 
+        zeroColorIfZeroAlpha(im.png.data)
+
         if im.srcSize == im.targetSize:
             blitImage(
                 data, ss.packer.width, ss.packer.height, # Target image
@@ -234,6 +236,7 @@ proc readFile(im: SpriteSheetImage) =
     im.png = loadPNG32(im.originalPath)
     if im.png.isNil:
         echo "PNG NOT LOADED: ", im.originalPath
+
     im.actualBounds = imageBounds(im.png.data, im.png.width, im.png.height)
 
     if consumeLessMemory:
