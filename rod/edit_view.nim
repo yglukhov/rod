@@ -141,7 +141,10 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         inspector.inspectedNode = n
 
     outlineView.reloadData()
-    result.addSubview(outlineView)
+
+    let outlineScrollView = newScrollView(outlineView)
+    outlineScrollView.setFrameSize(newSize(outlineScrollView.frame.size.width, outlineScrollView.frame.size.height - 7))
+    result.addSubview(outlineScrollView)
 
     let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
     # createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }

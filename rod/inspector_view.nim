@@ -67,30 +67,30 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                 propView.addSubview(pv)
                 v.visitProperties(visitor)
 
-        pv = createNewComponentButton(y + 24, i, n)
+        y += 24
+        pv = createNewComponentButton(y, i, n)
         pv.setFrameSize(newSize(pv.frame.width - 16, pv.frame.height))
         y += pv.frame.height
         propView.addSubview(pv)
 
         var fs = propView.frame.size
-        fs.height = y + 79
+        fs.height = y + 27 + 6 + 12
         propView.setFrameSize(fs)
         i.addSubview(propView)
 
-        i.fullHeight = if fs.height < 600: fs.height else: 600
+        echo "Y: ", y, " FS: ", i.frame.size
+
+        i.fullHeight = if fs.height <= i.window.frame.height: fs.height else: i.window.frame.height
         i.setFrameSize(newSize(i.frame.size.width, if i.collapsed: 27.Coord else: i.fullHeight))
 
         if i.collapsible:
             if i.collapsed:
                 i.collapsed = false
-                i.fullHeight = if fs.height < 600: fs.height else: 600
-                i.setFrameSize(newSize(i.frame.size.width, if i.collapsed: 27.Coord else: i.fullHeight))
+                i.setFrameSize(newSize(i.frame.size.width, i.fullHeight))
                 i.setNeedsDisplay()
 
-        let scPos = newPoint(6, 27)
-        i.subviews[1].setFrameOrigin(scPos)
-        let scView = newScrollView(i.subviews[1])
-        scView.setFrameSize(newSize(i.frame.size.width - 6, i.frame.height - 27))
+        let scView = newScrollView(propView)
+        scView.setFrameSize(newSize(i.frame.width, i.fullHeight))
         i.addSubview(scView)
 
     else:
