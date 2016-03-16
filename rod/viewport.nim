@@ -88,7 +88,7 @@ method draw*(v: SceneView, r: Rect) =
         v.swapCompositingBuffers()
 
 proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
-    result.origin = v.camera.node.translation
+    result.origin = v.camera.node.localToWorld(newVector3())
     let x = (2.0 * coords.x) / v.bounds.width - 1.0
     let y = 1.0 - (2.0 * coords.y) / v.bounds.height
     let rayClip = newVector4(x, y, -1, 1)
