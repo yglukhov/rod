@@ -190,8 +190,8 @@ proc createAndSetup(bc: BlurComponent, width, height: float32) =
 
 method init*(bc: BlurComponent) =
     procCall bc.Component.init()
-    bc.velocityScale = 50.0
-    bc.frameShift = 5
+    bc.velocityScale = 20.0
+    bc.frameShift = 3
 
 proc recursiveDrawPost(n: Node) =
     if n.alpha < 0.0000001: return
