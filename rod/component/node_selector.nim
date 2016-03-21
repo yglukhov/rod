@@ -33,8 +33,8 @@ let vertexData = [-0.5.GLfloat,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0
                   -0.5        ,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5]
 let indexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
 
-var selectorSharedIndexBuffer: GLuint
-var selectorSharedVertexBuffer: GLuint
+var selectorSharedIndexBuffer: BufferRef
+var selectorSharedVertexBuffer: BufferRef
 var selectorSharedNumberOfIndexes: GLsizei
 var selectorSharedShader: ProgramRef
 
@@ -84,9 +84,9 @@ method draw*(ns: NodeSelector) =
         let c = currentContext()
         let gl = c.gl
 
-        if selectorSharedIndexBuffer == 0:
+        if selectorSharedIndexBuffer == invalidBuffer:
             createVBO()
-            if selectorSharedIndexBuffer == 0:
+            if selectorSharedIndexBuffer == invalidBuffer:
                 return
 
         if selectorSharedShader == invalidProgram:
@@ -112,14 +112,8 @@ method draw*(ns: NodeSelector) =
 
         gl.drawElements(gl.LINES, selectorSharedNumberOfIndexes, gl.UNSIGNED_SHORT)
 
-        when defined(js):
-            {.emit: """
-            `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
-            `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
-            """.}
-        else:
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
-            gl.bindBuffer(gl.ARRAY_BUFFER, 0)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+        gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
 
         #TODO to default settings
         gl.disable(gl.DEPTH_TEST)

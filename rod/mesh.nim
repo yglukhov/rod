@@ -48,8 +48,8 @@ void main() {
 type Mesh* = ref object of RootObj
     texture*: Image
     resourceName: string
-    indexBuffer: GLuint
-    vertexBuffer: GLuint
+    indexBuffer: BufferRef
+    vertexBuffer: BufferRef
     numberOfIndices: GLsizei
     loadFunc: proc()
     isWireframe*: bool
@@ -155,9 +155,9 @@ proc draw*(m: Mesh) =
     if m.shader == invalidProgram:
         m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
 
-    if m.indexBuffer == 0:
+    if m.indexBuffer == invalidBuffer:
         m.load()
-        if m.indexBuffer == 0:
+        if m.indexBuffer == invalidBuffer:
             return
 
     var texCoords : array[4, GLfloat]
@@ -186,13 +186,7 @@ proc draw*(m: Mesh) =
     gl.enable(gl.BLEND)
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
-    when defined(js):
-        {.emit: """
-        `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
-        `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
-        """.}
-    else:
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
-        gl.bindBuffer(gl.ARRAY_BUFFER, 0)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+    gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
     when not defined(ios) and not defined(android) and not defined(js):
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)

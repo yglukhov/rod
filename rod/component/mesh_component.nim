@@ -28,8 +28,8 @@ import streams
 
 type
     VBOData* = ref object
-        indexBuffer*: GLuint
-        vertexBuffer*: GLuint
+        indexBuffer*: BufferRef
+        vertexBuffer*: BufferRef
         numberOfIndices*: GLsizei
         vertInfo*: VertexDataInfo
         minCoord*: Vector3
@@ -216,9 +216,9 @@ method draw*(m: MeshComponent) =
     let c = currentContext()
     let gl = c.gl
 
-    if m.vboData.indexBuffer == 0:
+    if m.vboData.indexBuffer == invalidBuffer:
         m.load()
-        if m.vboData.indexBuffer == 0:
+        if m.vboData.indexBuffer == invalidBuffer:
             return
 
     gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
@@ -232,14 +232,8 @@ method draw*(m: MeshComponent) =
     if m.material.bEnableBackfaceCulling:
         gl.disable(gl.CULL_FACE)
 
-    when defined(js):
-        {.emit: """
-        `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
-        `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
-        """.}
-    else:
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
-        gl.bindBuffer(gl.ARRAY_BUFFER, 0)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+    gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
     when not defined(ios) and not defined(android) and not defined(js):
         glPolygonMode(gl.FRONT_AND_BACK, GL_FILL)
 
