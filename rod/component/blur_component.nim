@@ -286,14 +286,8 @@ method draw*(bc: BlurComponent) =
         gl.uniform4fv(gl.getUniformLocation(bc.postShader, "uResolution"), resolution)
 
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT)
-        when defined(js):
-            {.emit: """
-            `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
-            `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
-            """.}
-        else:
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
-            gl.bindBuffer(gl.ARRAY_BUFFER, 0)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+        gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
         gl.useProgram(invalidProgram)
 
     if bc.bShowMotionMap:

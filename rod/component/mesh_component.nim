@@ -232,14 +232,8 @@ method draw*(m: MeshComponent) =
     if m.material.bEnableBackfaceCulling:
         gl.disable(gl.CULL_FACE)
 
-    when defined(js):
-        {.emit: """
-        `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
-        `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
-        """.}
-    else:
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
-        gl.bindBuffer(gl.ARRAY_BUFFER, 0)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+    gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
     when not defined(ios) and not defined(android) and not defined(js):
         glPolygonMode(gl.FRONT_AND_BACK, GL_FILL)
 
