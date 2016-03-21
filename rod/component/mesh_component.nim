@@ -28,8 +28,8 @@ import streams
 
 type
     VBOData* = ref object
-        indexBuffer*: GLuint
-        vertexBuffer*: GLuint
+        indexBuffer*: BufferRef
+        vertexBuffer*: BufferRef
         numberOfIndices*: GLsizei
         vertInfo*: VertexDataInfo
         minCoord*: Vector3
@@ -216,9 +216,9 @@ method draw*(m: MeshComponent) =
     let c = currentContext()
     let gl = c.gl
 
-    if m.vboData.indexBuffer == 0:
+    if m.vboData.indexBuffer == invalidBuffer:
         m.load()
-        if m.vboData.indexBuffer == 0:
+        if m.vboData.indexBuffer == invalidBuffer:
             return
 
     gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)

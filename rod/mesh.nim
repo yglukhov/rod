@@ -48,8 +48,8 @@ void main() {
 type Mesh* = ref object of RootObj
     texture*: Image
     resourceName: string
-    indexBuffer: GLuint
-    vertexBuffer: GLuint
+    indexBuffer: BufferRef
+    vertexBuffer: BufferRef
     numberOfIndices: GLsizei
     loadFunc: proc()
     isWireframe*: bool
@@ -155,9 +155,9 @@ proc draw*(m: Mesh) =
     if m.shader == invalidProgram:
         m.shader = gl.newShaderProgram(m.vertexShader, m.fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
 
-    if m.indexBuffer == 0:
+    if m.indexBuffer == invalidBuffer:
         m.load()
-        if m.indexBuffer == 0:
+        if m.indexBuffer == invalidBuffer:
             return
 
     var texCoords : array[4, GLfloat]

@@ -25,7 +25,7 @@ type BlurComponent* = ref object of Component
     motionShader: ProgramRef
     postShader: ProgramRef
 
-    vbo, ibo: GLuint
+    vbo, ibo: BufferRef
 
     bShowMotionMap*: bool
     velocityScale*: float32
@@ -127,7 +127,7 @@ proc createAndSetup(bc: BlurComponent, width, height: float32) =
         bc.motionShader = c.gl.newShaderProgram(vertexShaderMotion, fragmentShaderMotion, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
     if bc.postShader == invalidProgram:
         bc.postShader = c.gl.newShaderProgram(vertexShaderPost, fragmentShaderPost, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
-    if bc.vbo == 0:
+    if bc.vbo == invalidBuffer:
         let frameWidth = width/2.0
         let frameHeight = height/2.0
         let frameZ = 0.0
@@ -142,7 +142,7 @@ proc createAndSetup(bc: BlurComponent, width, height: float32) =
         gl.bindBuffer(gl.ARRAY_BUFFER, bc.vbo)
         gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
 
-    if bc.ibo == 0:
+    if bc.ibo == invalidBuffer:
         let indexData = [0.GLushort, 1, 2, 2, 3, 0]
 
         bc.ibo = gl.createBuffer()
