@@ -23,8 +23,6 @@ import nimx.image
 import nimx.window
 import nimx.autotest
 
-import math
-
 const isMobile = defined(ios) or defined(android)
 
 type EditView = ref object of SceneView
@@ -60,27 +58,15 @@ proc startApplication() =
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
-    cameraNode.translation.z = 500
+    cameraNode.translation.z = 100
 
     let light = editView.rootNode.newChild("point_light")
     light.translation = newVector3(-100,100,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    # for i in 0..11:
-    #     let n = editView.rootNode.newChild("sprite1")
 
-    #     let sp = n.component(Sprite)
-
-    #     sp.image = imageWithResource("TestOverdawImage.png")
-
-    #     n.translation.x -= sp.image.size.width / 2.0 + float(random(100))
-    #     n.translation.y -= sp.image.size.height / 2.0 + float((random(100) - 50))
-
-    mainWindow.addSubview(editView)
-    mainWindow.addAnimation(newAnimation())
-
-    loadSceneAsync "collada/single_intro.dae", proc(n: Node) =
+    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
         editView.rootNode.addChild(n)
 
         mainWindow.addSubview(editView)

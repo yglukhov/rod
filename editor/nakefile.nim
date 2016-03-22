@@ -1,13 +1,31 @@
-
 import nimx.naketools
+import osproc
 
 beforeBuild = proc(b: Builder) =
-    b.disableClosureCompiler = true
+    b.disableClosureCompiler = false
+    b.mainFile = "editor/rodedit"
+    b.originalResourcePath = "editor/res"
 
-    if b.platform == "android":
-        b.additionalLinkerFlags.add(["-lGLESv3", "-lOpenSLES"])
-        b.additionalCompilerFlags.add("-g")
-        b.targetArchitectures = @["armeabi"]
-        b.androidPermissions.add("INTERNET")
-        b.screenOrientation = "sensorLandscape"
+task "tests", "Build and run autotests":
+    let b = newBuilder()
 
+    if b.platform == "js":
+        b.runAfterBuild = false
+
+    b.additionalNimFlags.add "-d:runAutoTests"
+    b.build()
+
+    if b.platform == "js":
+        b.runAutotestsInFirefox()
+
+task "docs", "Build documentation":
+    withDir "./doc":
+        for t, f in walkDir "../rod":
+            if f.endsWith(".nim"):
+                shell "nim doc2 -d:js " & f
+
+        for t, f in walkDir ".":
+            if f.endsWith(".rst"):
+                direShell "nim rst2html " & f
+
+        copyDir "../build/js", "./livedemo"
