@@ -33,8 +33,6 @@ var tracerShader: ProgramRef
 const initialIndicesCount = 2000
 const initialVerticesCount = 2000
 
-{.experimental.}
-
 type
     Attrib = enum
         aPosition
@@ -48,21 +46,28 @@ type
         prevTransform: Vector3
         traceStep*: int32
         traceStepCounter: int32
-        index: int32
 
-var globalIndexer: int32 = 0
+proc newTracer(): Tracer =
+    new(result, proc(t: Tracer) =
+        let c = currentContext()
+        let gl = c.gl
+        gl.bindBuffer(gl.ARRAY_BUFFER, t.indexBuffer)
+        gl.deleteBuffer(t.indexBuffer)
+        gl.bindBuffer(gl.ARRAY_BUFFER, t.vertexBuffer)
+        gl.deleteBuffer(t.vertexBuffer)
+        t.indexBuffer = invalidBuffer
+        t.vertexBuffer = invalidBuffer
+    )
 
 method init*(t: Tracer) =
     procCall t.Component.init()
+
     t.color = newVector4(0, 0, 0, 1)
     t.numberOfIndexes = 0.GLsizei
     t.traceStep = 5
     t.vertexOffset = 0
     t.traceStepCounter = 0
     t.indexOffset = 0
-
-    t.index = globalIndexer
-    inc globalIndexer
 
 proc addTraceLine(t: Tracer, point: Vector3) =
     let c = currentContext()
@@ -136,18 +141,18 @@ method draw*(t: Tracer) =
     let c = currentContext()
     let gl = c.gl
 
-    if t.indexBuffer == 0:
+    if t.indexBuffer == invalidBuffer:
         t.indexBuffer = gl.createBuffer()
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.indexBuffer)
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, (initialIndicesCount * sizeof(GLushort)).int32, gl.STREAM_DRAW)
-        if t.indexBuffer == 0:
+        if t.indexBuffer == invalidBuffer:
             return
 
-    if t.vertexBuffer == 0:
+    if t.vertexBuffer == invalidBuffer:
         t.vertexBuffer = gl.createBuffer()
         gl.bindBuffer(gl.ARRAY_BUFFER, t.vertexBuffer)
         gl.bufferData(gl.ARRAY_BUFFER, (initialVerticesCount * sizeof(GLfloat)).int32, gl.STREAM_DRAW)
-        if t.vertexBuffer == 0:
+        if t.vertexBuffer == invalidBuffer:
             return
         else:
             var pos = t.node.worldPos()
@@ -172,7 +177,7 @@ method draw*(t: Tracer) =
         gl.vertexAttribPointer(aPosition.GLuint, 3.GLint, gl.FLOAT, false, (3 * sizeof(GLfloat)).GLsizei , 0)
         gl.useProgram(tracerShader)
 
-        if t.color[3] < 1.0 or true:
+        if t.color[3] < 1.0:
             gl.enable(gl.BLEND)
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
@@ -185,31 +190,17 @@ method draw*(t: Tracer) =
 
         gl.drawElements(gl.LINES, t.numberOfIndexes * 2 - 1, gl.UNSIGNED_SHORT)
 
-        when defined(js):
-            {.emit: """
-            `gl`.bindBuffer(`gl`.ELEMENT_ARRAY_BUFFER, null);
-            `gl`.bindBuffer(`gl`.ARRAY_BUFFER, null);
-            """.}
-        else:
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, 0)
-            gl.bindBuffer(gl.ARRAY_BUFFER, 0)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+        gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
 
         #TODO to default settings
         gl.disable(gl.DEPTH_TEST)
-
-proc `=destroy`(t: var Tracer) =
-    let c = currentContext()
-    let gl = c.gl
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, t.indexBuffer)
-    gl.deleteBuffer(t.indexBuffer)
-    gl.bindBuffer(gl.ARRAY_BUFFER, t.vertexBuffer)
-    gl.deleteBuffer(t.vertexBuffer)
-
-    echo "tracer ", t.index, " destroyed!"
 
 method visitProperties*(t: Tracer, p: var PropertyVisitor) =
     p.visitProperty("color", t.color)
     p.visitProperty("trace_step", t.traceStep)
 
-registerComponent[Tracer]()
+# registerComponent[Tracer]()
+registerComponent[Tracer](proc(): Component =
+    result = newTracer()
+    )
