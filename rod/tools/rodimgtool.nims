@@ -1,4 +1,3 @@
 --d:release
 --opt:speed
---stackTrace:on
---lineTrace:on
+--passC:"-O3"
