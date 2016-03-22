@@ -59,7 +59,7 @@ method visitProperties*(ls: LightSource, p: var PropertyVisitor) =
     p.visitProperty("diffuse", ls.lightDiffuse)
     p.visitProperty("specular", ls.lightSpecular)
     p.visitProperty("constant", ls.lightConstant)
-    p.visitProperty("linear", ls.lightLinear)
-    p.visitProperty("quadratic", ls.lightQuadratic)
+    # p.visitProperty("linear", ls.lightLinear)
+    # p.visitProperty("quadratic", ls.lightQuadratic)
 
 registerComponent[LightSource]()
