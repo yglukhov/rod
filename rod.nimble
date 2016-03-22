@@ -6,9 +6,11 @@ license       = "MIT"
 
 bin           = @["rod/tools/rodimgtool"]
 
+skipDirs    = @["editor/build"]
+
 # Dependencies
 requires "nimx"
-requires "https://github.com/SSPKrolik/nimasset"
+# requires "https://github.com/SSPKrolik/nimasset"
 requires "variant"
 requires "native_dialogs"
 requires "nimPNG"

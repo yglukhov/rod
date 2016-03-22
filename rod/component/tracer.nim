@@ -85,8 +85,8 @@ proc addTraceLine(t: Tracer, point: Vector3) =
         # recreate index_buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, t.indexBuffer)
         gl.deleteBuffer(t.indexBuffer)
-        t.indexBuffer = 0
-        t.indexOffset = 0
+        t.indexBuffer = invalidBuffer
+        t.indexOffset = invalidBuffer
         t.numberOfIndexes = 0.GLsizei
 
         t.indexBuffer = gl.createBuffer()
