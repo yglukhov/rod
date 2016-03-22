@@ -271,7 +271,8 @@ float computeDiffuse(float lDif, float lAttenuation, vec3 L, vec3 normal) {
 float computeSpecular(float lSpec, float lAttenuation, float mShin, vec3 R, vec3 E) {
     float result = 1.0;
     #ifdef WITH_SPECULAR_SAMPLER
-        float specularity = texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r * 255.0;
+        //float specularity = texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r * 255.0;
+        float specularity = mShin;
     #else
         float specularity = mShin;
     #endif
@@ -494,6 +495,10 @@ vec4 computeTexel() {
                     specCoef += computeSpecular(uLightSpecular7, attenuation7, uMaterialShininess, R7, E);
                 #endif
             #endif
+        #endif
+
+        #ifdef WITH_SPECULAR_SAMPLER
+            specCoef += texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r;
         #endif
 
         vec4 texel = emission + ambient*ambCoef + diffuse*diffCoef + specular*specCoef;

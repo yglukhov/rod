@@ -20,6 +20,9 @@ proc registerComponent*[T]() =
     componentRegistry.add T.name, proc(): Component =
         result = T.new()
 
+proc registerComponent*[T](creator: proc(): Component) =
+    componentRegistry.add T.name, creator
+
 proc createComponent*(name: string): Component =
     let p = componentRegistry.getOrDefault(name)
     if not p.isNil:
