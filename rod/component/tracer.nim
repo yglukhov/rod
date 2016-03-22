@@ -38,8 +38,8 @@ type
         aPosition
     Tracer* = ref object of Component
         color*: Vector4
-        indexBuffer: GLuint
-        vertexBuffer: GLuint
+        indexBuffer: BufferRef
+        vertexBuffer: BufferRef
         numberOfIndexes: GLsizei
         vertexOffset: int32
         indexOffset: int32
