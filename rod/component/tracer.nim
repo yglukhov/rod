@@ -86,7 +86,7 @@ proc addTraceLine(t: Tracer, point: Vector3) =
         gl.bindBuffer(gl.ARRAY_BUFFER, t.indexBuffer)
         gl.deleteBuffer(t.indexBuffer)
         t.indexBuffer = invalidBuffer
-        t.indexOffset = invalidBuffer
+        t.indexOffset = 0
         t.numberOfIndexes = 0.GLsizei
 
         t.indexBuffer = gl.createBuffer()
@@ -96,7 +96,7 @@ proc addTraceLine(t: Tracer, point: Vector3) =
         # recreate array_buffer
         gl.bindBuffer(gl.ARRAY_BUFFER, t.vertexBuffer)
         gl.deleteBuffer(t.vertexBuffer)
-        t.vertexBuffer = 0
+        t.vertexBuffer = invalidBuffer
         t.vertexOffset = 0
 
         t.vertexBuffer = gl.createBuffer()
