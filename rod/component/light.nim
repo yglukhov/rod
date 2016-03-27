@@ -48,6 +48,10 @@ proc setDefaultLightSource*(ls: LightSource) =
     ls.lightQuadratic = 0.00000007
     ls.lightAttenuationInited = false
 
+method init*(ls: LightSource) =
+    procCall ls.Component.init()
+    ls.setDefaultLightSource()
+
 method componentNodeWasAddedToSceneView*(ls: LightSource) =
     ls.node.sceneView.addLightSource(ls)
 

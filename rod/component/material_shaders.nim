@@ -320,6 +320,7 @@ vec4 computeTexel() {
     vec4 ambient = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 diffuse = vec4(0.0, 0.0, 0.0, 0.0);
     vec4 specular = vec4(0.0, 0.0, 0.0, 0.0);
+    vec4 reflection = vec4(0.0, 0.0, 0.0, 0.0);
 
     #ifdef WITH_MATERIAL_EMISSION
         emission += uMaterialEmission;
@@ -367,14 +368,30 @@ vec4 computeTexel() {
             #endif
         #endif
 
+        float ambCoef = 1.0;
+        float diffCoef = 1.0;
+        float specCoef = 1.0;
+
+        #ifdef WITH_SPECULAR_SAMPLER
+            float texSpec = texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r;
+            specCoef += texSpec;
+        #endif
 
         #ifdef WITH_REFLECTION_SAMPLER
+            float reflCoef = uReflectivity;
+
+            #ifdef WITH_SPECULAR_SAMPLER
+                reflCoef += clamp(texSpec, 0.0, 1.0);
+            #endif
+
             vec3 r = reflect( normalize(-vPosition.xyz), normal );
             float m = 2.0 * sqrt( r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0) );
             vec2 vReflCoord = vec2(r.x/m + 0.5, r.y/m + 0.5);
-            vec4 reflectColor = texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord, mipBias) * uReflectivity;
+            vec4 reflectColor = texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord, mipBias) * reflCoef;
 
-            ambient += reflectColor;
+            // ambient += reflectColor;
+
+            reflection += reflectColor;
 
             // #ifdef WITH_FALLOF_SAMPLER
             //     float rampPercent = 0.0;
@@ -388,16 +405,12 @@ vec4 computeTexel() {
             // #endif
         #endif
 
-        vec3 E = normalize(-vPosition.xyz);
-
-        float ambCoef = 1.0;
-        float diffCoef = 1.0;
-        float specCoef = 1.0;
-
         #ifdef WITH_LIGHT_POSITION
             ambCoef = 0.0;
             diffCoef = 0.0;
             specCoef = 0.0;
+
+            vec3 E = normalize(-vPosition.xyz);
 
             #ifdef WITH_LIGHT_0
                 vec3 bivector0 = uLightPosition0.xyz - vPosition.xyz;
@@ -497,11 +510,7 @@ vec4 computeTexel() {
             #endif
         #endif
 
-        #ifdef WITH_SPECULAR_SAMPLER
-            specCoef += texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r;
-        #endif
-
-        vec4 texel = emission + ambient*ambCoef + diffuse*diffCoef + specular*specCoef;
+        vec4 texel = emission + ambient*ambCoef + diffuse*diffCoef + specular*specCoef + reflection;
 
         #ifdef WITH_RIM_LIGHT
            float vdn = 1.0 - max(dot(normalize(-vPosition), normal), 0.0);
@@ -509,7 +518,7 @@ vec4 computeTexel() {
            texel += rim * diffCoef;
         #endif
     #else
-        vec4 texel = emission + ambient + diffuse + specular;
+        vec4 texel = emission + ambient + diffuse + specular + reflection;
     #endif
 
     texel.a = diffuse.a;
