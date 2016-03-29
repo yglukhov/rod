@@ -2,7 +2,7 @@ import nimPNG
 import os, osproc, json, strutils, times, sequtils, tables, algorithm, math
 
 import nimx.rect_packer
-import nimx.types
+import nimx.types except Point, Size, Rect
 import nimx.pathutils
 
 import imgtools.imgtools, imgtools.texcompress
@@ -30,16 +30,18 @@ type
         pos: Point
         png: PNGResult
         occurences: seq[ImageOccurence]
+        extrusion: int
 
     SpriteSheet = ref object
         index: int # Index of sprite sheet in tool.images array
         images: seq[SpriteSheetImage]
         packer: RectPacker
 
-proc newSpriteSheetImage(path: string): SpriteSheetImage =
+proc newSpriteSheetImage(path: string, extrusion: int = 1): SpriteSheetImage =
     result.new()
     result.originalPath = path
     result.occurences = @[]
+    result.extrusion = extrusion
 
 proc newSpriteSheet(minSize: Size): SpriteSheet =
     result.new()
@@ -59,6 +61,7 @@ type ImgTool* = ref object
     compressOutput*: bool
     compressToPVR*: bool
     downsampleRatio*: float
+    extrusion*: int
     images: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
 
@@ -70,6 +73,7 @@ proc newImgTool*(): ImgTool =
     result.images = initTable[string, SpriteSheetImage]()
     result.spriteSheets = newSeq[SpriteSheet]()
     result.downsampleRatio = 1.0
+    result.extrusion = 1
 
 proc withSpriteNodes(n: JsonNode, p: proc(j, s: JsonNode)) =
     let components = n["components"]
@@ -83,9 +87,10 @@ proc withSpriteNodes(n: JsonNode, p: proc(j, s: JsonNode)) =
             withSpriteNodes(c, p)
 
 proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
-    im.pos = ss.packer.packAndGrow(im.targetSize.width.int32, im.targetSize.height.int32)
+    im.pos = ss.packer.packAndGrow(im.targetSize.width.int32 + im.extrusion.int32 * 2, im.targetSize.height.int32 + im.extrusion.int32 * 2)
     result = im.pos.hasSpace
     if result:
+        im.pos = (im.pos.x.int32 + im.extrusion.int32, im.pos.y.int32 + im.extrusion.int32)
         ss.images.add(im)
         im.spriteSheet = ss
 
@@ -114,6 +119,17 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
                 data, ss.packer.width, ss.packer.height,
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height,
                 im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
+
+        extrudeBorderPixels(
+            data,
+            ss.packer.width,
+            ss.packer.height,
+            im.pos.x - im.extrusion,
+            im.pos.y - im.extrusion,
+            im.targetSize.width + im.extrusion * 2,
+            im.targetSize.height + im.extrusion * 2,
+            im.extrusion
+        )
 
         im.png = nil # We no longer need the data in memory
 
@@ -166,7 +182,7 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
     result["file"] = %relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt)
     let w = im.spriteSheet.packer.width.float
     let h = im.spriteSheet.packer.height.float
-    result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float + 0.5) / w, ((im.pos.y + im.targetSize.height).float + 0.5) / h]
+    result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float - 0.5) / w, ((im.pos.y + im.targetSize.height).float - 0.5) / h]
     result["size"] = %*[im.srcSize.width, im.srcSize.height]
 
     let jNode = o.parentNode
@@ -229,8 +245,8 @@ proc betterDimension(tool: ImgTool, d: int): int =
     if result > 2048: result = 2048
 
 proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
-    im.targetSize.width = tool.betterDimension(im.srcSize.width)
-    im.targetSize.height = tool.betterDimension(im.srcSize.height)
+    im.targetSize.width = tool.betterDimension(im.srcSize.width + im.extrusion * 2)
+    im.targetSize.height = tool.betterDimension(im.srcSize.height + im.extrusion * 2)
 
 proc readFile(im: SpriteSheetImage) =
     im.png = loadPNG32(im.originalPath)
@@ -295,7 +311,7 @@ proc run*(tool: ImgTool) =
                 absPath.normalizePath()
                 var im = tool.images.getOrDefault(absPath)
                 if im.isNil:
-                    im = newSpriteSheetImage(absPath)
+                    im = newSpriteSheetImage(absPath, tool.extrusion)
                     tool.updateLastModificationDateWithFile(absPath)
                     tool.images[absPath] = im
                 im.occurences.add(ImageOccurence(parentComposition: c,
@@ -336,7 +352,7 @@ proc run*(tool: ImgTool) =
                 done = ss.tryPackImage(im)
                 if done: break
             if not done:
-                let newSS = newSpriteSheet(im.targetSize)
+                let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
                 done = newSS.tryPackImage(im)
                 if done:
                     newSS.index = tool.spriteSheets.len
