@@ -237,9 +237,9 @@ proc addNull*(col: Collection[Layer]): Layer {.importcpp.}
 
 proc newTextDocument*(text: cstring = ""): TextDocument {.importc: "new TextDocument".}
 
-proc getProtoName*(y): cstring {.importc: "Object.prototype.toString.call".}
+proc getProtoName*(y: ref object): cstring {.importc: "Object.prototype.toString.call".}
 
-proc jsObjectType*(y): string =
+proc jsObjectType*(y: ref object): string =
     var protoName = $getProtoName(y)
     const start = "[object "
     assert(protoName.startsWith(start))
