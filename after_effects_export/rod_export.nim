@@ -511,10 +511,10 @@ proc replacer(n: JsonNode): ref RootObj {.exportc.} =
         {.emit: "`result` = `e`;".}
     of JObject:
         {.emit: "`result` = {};"}
-        for v in n.fields:
-            let k : cstring = v.key
-            let val = replacer(v.val)
-            {.emit: "`result`[`k`] = `val`;".}
+        for k, v in n:
+            let ck : cstring = k
+            let val = replacer(v)
+            {.emit: "`result`[`ck`] = `val`;".}
 
 proc fastJsonStringify(n: JsonNode): cstring =
     {.emit: "`result` = JSON.stringify(`replacer`(`n`), null, 2);".}
