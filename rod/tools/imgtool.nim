@@ -311,6 +311,8 @@ proc run*(tool: ImgTool) =
                 absPath.normalizePath()
                 var im = tool.images.getOrDefault(absPath)
                 if im.isNil:
+                    if not fileExists(absPath):
+                        echo "Error: file not found: ", absPath, " (reffered from ", tool.compositionPaths[i], ")"
                     im = newSpriteSheetImage(absPath, tool.extrusion)
                     tool.updateLastModificationDateWithFile(absPath)
                     tool.images[absPath] = im
