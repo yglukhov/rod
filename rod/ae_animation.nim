@@ -113,7 +113,7 @@ proc animationWithAEJson*(n: Node2D, j: JsonNode): Animation =
 
     for k, v in j:
         result.loopDuration = max(v["duration"].getFNum(), result.loopDuration)
-        result.numberOfLoops = v["numberOfLoops"].getNum(1).int
+        result.numberOfLoops = v{"numberOfLoops"}.getNum(1).int
         let progressSetter = createProgressSetter(k, n, v)
         if not progressSetter.isNil:
             animProgressSetters.add(progressSetter)
