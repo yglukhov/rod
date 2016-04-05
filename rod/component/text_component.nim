@@ -27,30 +27,30 @@ method init*(t: Text) =
     t.shadowColor = newGrayColor(0.0, 0.5)
 
 method deserialize*(t: Text, j: JsonNode) =
-    var v = j["text"]
+    var v = j{"text"}
     if not v.isNil:
         t.text = v.getStr()
 
-    v = j["color"]
+    v = j{"color"}
     if not v.isNil:
         t.color = newColor(v[0].getFnum(), v[1].getFnum(), v[2].getFnum())
         if v.len > 3: # Deprecated
             t.node.alpha = v[3].getFnum()
 
-    v = j["shadowOff"]
+    v = j{"shadowOff"}
     if not v.isNil:
         t.shadowX = v[0].getFnum()
         t.shadowY = v[1].getFnum()
 
-    v = j["shadowColor"]
+    v = j{"shadowColor"}
     if not v.isNil:
         t.shadowColor = newColor(v[0].getFnum(), v[1].getFnum(), v[2].getFnum(), v[3].getFnum())
 
-    v = j["fontSize"]
+    v = j{"fontSize"}
     if not v.isNil:
         t.font = systemFontOfSize(v.getFNum())
 
-    v = j["justification"]
+    v = j{"justification"}
     if not v.isNil:
         case v.getStr()
         of "left": t.justification = tjLeft

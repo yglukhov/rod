@@ -245,35 +245,35 @@ import ae_animation
 proc deserialize*(n: Node, j: JsonNode) =
     if n.name.isNil:
         n.name = j["name"].getStr(nil)
-    var v = j["translation"]
+    var v = j{"translation"}
     if not v.isNil:
         n.translation = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j["scale"]
+    v = j{"scale"}
     if not v.isNil:
         n.scale = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j["rotation"]
+    v = j{"rotation"}
     if not v.isNil:
         n.rotation = newQuaternion(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
-    v = j["alpha"]
+    v = j{"alpha"}
     if not v.isNil:
         n.alpha = v.getFNum()
-    v = j["children"]
+    v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
             n.addChild(newNodeFromJson(v[i]))
-    v = j["components"]
+    v = j{"components"}
     if not v.isNil:
         for k, c in v:
             let comp = n.component(k)
             comp.deserialize(c)
-    let animations = j["animations"]
+    let animations = j{"animations"}
 
     if not animations.isNil and animations.len > 0:
         n.animations = newTable[string, Animation]()
         for k, v in animations:
             n.animations[k] = animationWithAEJson(n, v)
 
-    let compositionRef = j["compositionRef"].getStr(nil)
+    let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 

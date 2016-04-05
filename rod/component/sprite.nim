@@ -68,11 +68,11 @@ proc createFrameAnimation(s: Sprite) =
     s.node.registerAnimation("sprite", a)
 
 method deserialize*(s: Sprite, j: JsonNode) =
-    var v = j["alpha"] # Deprecated
+    var v = j{"alpha"} # Deprecated
     if not v.isNil:
         s.node.alpha = v.getFNum(1.0)
 
-    v = j["fileNames"]
+    v = j{"fileNames"}
     if v.isNil:
         s.image = imageWithResource(j["name"].getStr())
     else:
