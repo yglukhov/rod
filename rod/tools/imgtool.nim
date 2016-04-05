@@ -76,12 +76,10 @@ proc newImgTool*(): ImgTool =
     result.extrusion = 1
 
 proc withSpriteNodes(n: JsonNode, p: proc(j, s: JsonNode)) =
-    let components = n["components"]
-    if not components.isNil:
-        let sprite = components["Sprite"]
-        if not sprite.isNil:
-            p(n, sprite)
-    let children = n["children"]
+    let sprite = n{"components", "Sprite"}
+    if not sprite.isNil:
+        p(n, sprite)
+    let children = n{"children"}
     if not children.isNil:
         for c in children:
             withSpriteNodes(c, p)
@@ -166,7 +164,7 @@ proc translationAnimFromFrameAnim(im: SpriteSheetImage, frameAnim: JsonNode, o: 
 
     result["duration"] = frameAnim["duration"]
     result["frameLerp"] = %false
-    let numLoops = frameAnim["numberOfLoops"]
+    let numLoops = frameAnim{"numberOfLoops"}
     if not numLoops.isNil:
         result["numberOfLoops"] = numLoops
 
@@ -190,18 +188,18 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
     if im.srcBounds.x > 0 or im.srcBounds.y > 0:
         # Node position has changed
         if o.frameIndex == 0:
-            jNode["translation"] = adjustTranslationValueForFrame(jNode["translation"], im)
+            jNode["translation"] = adjustTranslationValueForFrame(jNode{"translation"}, im)
 
         # Adjust translation animations
-        let allAnimations = o.parentComposition["animations"]
-        let nodeName = jNode["name"].getStr(nil)
+        let allAnimations = o.parentComposition{"animations"}
+        let nodeName = jNode{"name"}.getStr(nil)
         if not nodeName.isNil and not allAnimations.isNil:
             let translationAnimName = nodeName & ".translation"
             let frameAnimName = nodeName & ".curFrame"
             for k, v in allAnimations:
-                let frameAnim = v[frameAnimName]
+                let frameAnim = v{frameAnimName}
                 if not frameAnim.isNil:
-                    var translationAnim = v[translationAnimName]
+                    var translationAnim = v{translationAnimName}
                     if translationAnim.isNil:
                         translationAnim = translationAnimFromFrameAnim(im, frameAnim, o)
                         v[translationAnimName] = translationAnim
@@ -215,9 +213,9 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
                     echo "WARNING: Something is wrong..."
 
 proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: string): bool =
-    let name = jNode["name"]
+    let name = jNode{"name"}
     if not name.isNil:
-        let animations = jComp["animations"]
+        let animations = jComp{"animations"}
         if not animations.isNil:
             let animName = name.str & "." & propName
             for k, v in animations:
@@ -245,8 +243,8 @@ proc betterDimension(tool: ImgTool, d: int): int =
     if result > 2048: result = 2048
 
 proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
-    im.targetSize.width = tool.betterDimension(im.srcSize.width + im.extrusion * 2)
-    im.targetSize.height = tool.betterDimension(im.srcSize.height + im.extrusion * 2)
+    im.targetSize.width = tool.betterDimension(im.srcSize.width) - im.extrusion * 2
+    im.targetSize.height = tool.betterDimension(im.srcSize.height) - im.extrusion * 2
 
 proc readFile(im: SpriteSheetImage) =
     im.png = loadPNG32(im.originalPath)
