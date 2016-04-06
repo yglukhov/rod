@@ -70,10 +70,10 @@ type ShaderMacro = enum
 
 type
     MaterialColor* = ref object
-        emission: Vector4
-        ambient: Vector4
-        diffuse: Vector4
-        specular: Vector4
+        emission: Color
+        ambient: Color
+        diffuse: Color
+        specular: Color
         shininess: float32
         reflectivity: float32
 
@@ -127,33 +127,33 @@ proc hash(sm: set[ShaderMacro]): Hash =
 
 template shaderNeedUpdate(m: Material) = m.bShaderNeedUpdate = true
 
-proc emission*(m: Material): Vector4 = result = m.color.emission
-proc ambient*(m: Material): Vector4 = result = m.color.ambient
-proc diffuse*(m: Material): Vector4 = result = m.color.diffuse
-proc specular*(m: Material): Vector4 = result = m.color.specular
+proc emission*(m: Material): Color = result = m.color.emission
+proc ambient*(m: Material): Color = result = m.color.ambient
+proc diffuse*(m: Material): Color = result = m.color.diffuse
+proc specular*(m: Material): Color = result = m.color.specular
 proc shininess*(m: Material): Coord = result = m.color.shininess
 proc reflectivity*(m: Material): Coord = result = m.color.reflectivity
 proc rimDensity*(m: Material): Coord = result = m.rimDensity
 
-template `emission=`*(m: Material, v: Vector4) =
+template `emission=`*(m: Material, v: Color) =
     if not m.color.emissionInited:
         m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
         m.bShaderNeedUpdate = true
     m.color.emission = v
     m.color.emissionInited = true
-template `ambient=`*(m: Material, v: Vector4) =
+template `ambient=`*(m: Material, v: Color) =
     if not m.color.ambientInited:
         m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
         m.bShaderNeedUpdate = true
     m.color.ambient = v
     m.color.ambientInited = true
-template `diffuse=`*(m: Material, v: Vector4) =
+template `diffuse=`*(m: Material, v: Color) =
     if not m.color.diffuseInited:
         m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
         m.bShaderNeedUpdate = true
     m.color.diffuse = v
     m.color.diffuseInited = true
-template `specular=`*(m: Material, v: Vector4) =
+template `specular=`*(m: Material, v: Color) =
     if not m.color.specularInited:
         m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
         m.bShaderNeedUpdate = true
@@ -409,22 +409,22 @@ proc setupMaterialAttributes(m: Material, n: Node) =
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
             else:
-                c.setColorUniform(m.shader, "uMaterialAmbient", newColor(m.color.ambient[0], m.color.ambient[1], m.color.ambient[2], m.color.ambient[3]))
+                c.setColorUniform(m.shader, "uMaterialAmbient", m.color.ambient)
         if m.color.emissionInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
             else:
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialEmission"), m.color.emission)
+                c.setColorUniform(m.shader, "uMaterialEmission", m.color.emission)
         if m.color.diffuseInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
             else:
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialDiffuse"), m.color.diffuse)
+                c.setColorUniform(m.shader, "uMaterialDiffuse", m.color.diffuse)
         if m.color.specularInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
             else:
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaterialSpecular"), m.color.specular)
+                c.setColorUniform(m.shader, "uMaterialSpecular", m.color.specular)
         if m.color.shininessInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)

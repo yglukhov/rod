@@ -5,6 +5,7 @@ import nimx.text_field
 import nimx.matrixes
 import nimx.image
 import nimx.button
+import nimx.color_picker
 
 import rod.property_editors.propedit_registry
 import rod.numeric_text_field
@@ -15,6 +16,8 @@ when defined(js):
     from dom import alert
 elif not defined(android) and not defined(ios):
     import native_dialogs
+
+var gColorPicker*: ColorPickerView
 
 template toStr(v: SomeReal, precision: uint): string = formatFloat(v, ffDecimal, precision)
 template toStr(v: SomeInteger): string = $v
@@ -87,6 +90,8 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
     var x = 18.Coord
     let width = (result.bounds.width - x) / vecLen
 
+    var prevColor: Color
+
     let pv = result
     proc complexSetter() =
         try:
@@ -98,6 +103,48 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
                 )
             setter(c)
             colorView.backgroundColor = c
+
+            prevColor = c
+
+            if not gColorPicker.isNil:
+                gColorPicker.colorHasChanged(rgbToHSV(c.r, c.g, c.b))
+                gColorPicker.removeFromSuperview()
+                gColorPicker = nil
+
+            if gColorPicker.isNil:
+                gColorPicker = newColorPickerView(newRect(0, 0, 300, 200))
+                gColorPicker.setFrameOrigin(newPoint(pv.frame.x+140+300, 0))
+
+                let pickerCloseButton = Button.new(newRect(0, 0, 25, 25))
+                pickerCloseButton.title = "x"
+                pickerCloseButton.onAction do():
+                    gColorPicker.removeFromSuperview()
+                    gColorPicker = nil
+                let pickerCancelButton = Button.new(newRect(0, 25, 25, 25))
+                pickerCancelButton.title = "c"
+                pickerCancelButton.onAction do():
+                    TextField(pv.subviews[1]).text = $prevColor.r
+                    TextField(pv.subviews[2]).text = $prevColor.g
+                    TextField(pv.subviews[3]).text = $prevColor.b
+                    TextField(pv.subviews[4]).text = $prevColor.a
+
+                    setter(prevColor)
+                    colorView.backgroundColor = prevColor
+                    gColorPicker.colorHasChanged(rgbToHSV(prevColor.r, prevColor.g, prevColor.b))
+
+                gColorPicker.addSubview(pickerCloseButton)
+                gColorPicker.addSubview(pickerCancelButton)
+                pv.window.addSubview(gColorPicker)
+
+                gColorPicker.colorHasChanged(rgbToHSV(c.r, c.g, c.b))
+                gColorPicker.onColorSelected = proc(pc: Color) =
+                    TextField(pv.subviews[1]).text = $pc.r
+                    TextField(pv.subviews[2]).text = $pc.g
+                    TextField(pv.subviews[3]).text = $pc.b
+                    TextField(pv.subviews[4]).text = $pc.a
+
+                    setter(pc)
+                    colorView.backgroundColor = pc
         except ValueError:
             discard
 
