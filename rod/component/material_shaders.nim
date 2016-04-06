@@ -328,11 +328,15 @@ vec4 computeTexel() {
     #ifdef WITH_MATERIAL_AMBIENT
         ambient += uMaterialAmbient;
     #endif
-    #ifdef WITH_AMBIENT_SAMPLER
-        diffuse += texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * vTexCoord, mipBias);
-    #endif
+
     #ifdef WITH_MATERIAL_DIFFUSE
-        diffuse += uMaterialDiffuse;
+        #ifdef WITH_AMBIENT_SAMPLER
+            vec4 diffTextureTexel = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * vTexCoord, mipBias);
+            diffTextureTexel *= uMaterialDiffuse;
+            diffuse += diffTextureTexel;
+        #else
+            diffuse += uMaterialDiffuse;
+        #endif
     #endif
     #ifdef WITH_MATERIAL_SPECULAR
         specular += uMaterialSpecular;
@@ -515,7 +519,8 @@ vec4 computeTexel() {
         #ifdef WITH_RIM_LIGHT
            float vdn = 1.0 - max(dot(normalize(-vPosition), normal), 0.0);
            vec4 rim = vec4(smoothstep(uRimDensity, 1.0, vdn));
-           texel += rim * diffCoef;
+           // texel += rim * diffCoef;
+           texel += rim;
         #endif
     #else
         vec4 texel = emission + ambient + diffuse + specular + reflection;

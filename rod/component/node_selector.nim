@@ -43,14 +43,14 @@ type Attrib = enum
 
 type NodeSelector* = ref object of Component
     modelMatrix*: Matrix4
-    color*: Vector4
+    color*: Color
 
 proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
     if not n.isNil:
         let mesh = n.componentIfAvailable(MeshComponent)
         if not mesh.isNil:
             ns.modelMatrix = n.worldTransform()
-            ns.modelMatrix.scale((mesh.vboData.maxCoord - mesh.vboData.minCoord))
+            ns.modelMatrix.scale(mesh.vboData.maxCoord - mesh.vboData.minCoord)
             return true
         let sprite = n.componentIfAvailable(Sprite)
         if not sprite.isNil:
@@ -59,6 +59,13 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
             ns.modelMatrix = n.worldTransform()
             ns.modelMatrix.translate(newVector3(w/2.0, h/2.0, 0.0) )
             ns.modelMatrix.scale(newVector3(w, h, 0.Coord))
+            return true
+        let light = n.componentIfAvailable(LightSource)
+        if not light.isNil:
+            let size = 10.0
+            ns.modelMatrix = n.worldTransform()
+            # ns.modelMatrix.translate(newVector3(size/2.0, size/2.0, size/2.0) )
+            ns.modelMatrix.scale(newVector3(size, size, size))
             return true
 
 proc createVBO() =
@@ -75,7 +82,7 @@ proc createVBO() =
     selectorSharedNumberOfIndexes = indexData.len.GLsizei
 
 method init*(ns: NodeSelector) =
-    ns.color = newVector4(0, 0, 0, 1)
+    ns.color = newColor(0, 0, 0, 1)
     ns.modelMatrix.loadIdentity()
     procCall ns.Component.init()
 
@@ -104,7 +111,7 @@ method draw*(ns: NodeSelector) =
 
         gl.useProgram(selectorSharedShader)
 
-        gl.uniform4fv(gl.getUniformLocation(selectorSharedShader, "uColor"), ns.color)
+        c.setColorUniform(selectorSharedShader, "uColor", ns.color)
 
         let vp = ns.node.sceneView
         let mvpMatrix = vp.getViewProjectionMatrix() * ns.modelMatrix
@@ -118,7 +125,7 @@ method draw*(ns: NodeSelector) =
         #TODO to default settings
         gl.disable(gl.DEPTH_TEST)
 
-method visitProperties*(nc: NodeSelector, p: var PropertyVisitor) =
-    p.visitProperty("color", nc.color)
+method visitProperties*(ns: NodeSelector, p: var PropertyVisitor) =
+    p.visitProperty("color", ns.color)
 
 registerComponent[NodeSelector]()

@@ -242,10 +242,10 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
         var transparency = childColladaMaterial.transparency
         if transparency < 1.0:
             nodeMesh.material.blendEnable = true
-        nodeMesh.material.emission = newVector4(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
-        nodeMesh.material.ambient = newVector4(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
-        nodeMesh.material.diffuse = newVector4(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
-        nodeMesh.material.specular = newVector4(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
+        nodeMesh.material.emission = newColor(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
+        nodeMesh.material.ambient = newColor(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
+        nodeMesh.material.diffuse = newColor(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
+        nodeMesh.material.specular = newColor(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
         if childColladaMaterial.shininess > 1.0:
             nodeMesh.material.shininess = childColladaMaterial.shininess
         else:
@@ -262,6 +262,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
             var texName = colladaScene.getTextureLocationByName(childColladaMaterial.diffuseTextureName)
             if texName != nil:
                 nodeMesh.material.albedoTexture = imageWithResource(texName)
+                nodeMesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
 
         if childColladaMaterial.reflectiveTextureName != nil:
             var texName = colladaScene.getTextureLocationByName(childColladaMaterial.reflectiveTextureName)
