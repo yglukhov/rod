@@ -332,12 +332,7 @@ vec4 computeTexel() {
     #ifdef WITH_MATERIAL_DIFFUSE
         #ifdef WITH_AMBIENT_SAMPLER
             vec4 diffTextureTexel = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * vTexCoord, mipBias);
-
-            diffTextureTexel.x *= uMaterialDiffuse.x;
-            diffTextureTexel.y *= uMaterialDiffuse.y;
-            diffTextureTexel.z *= uMaterialDiffuse.z;
-            diffTextureTexel.w *= uMaterialDiffuse.w;
-
+            diffTextureTexel *= uMaterialDiffuse;
             diffuse += diffTextureTexel;
         #else
             diffuse += uMaterialDiffuse;
