@@ -30,34 +30,10 @@ type
 
     ParticleAttractor* = ref object of Component
         center*: Vector3
-        hole: float
+        radius*: float
         gravity*: float
-        radius: float
+        resetRadius*: float
 
-method init(pa: ParticleAttractor)=
-    procCall pa.Component.init()
-
-method setRadius*(pa: ParticleAttractor, rad: float, hol: float = 0.1) =
-    pa.radius = rad
-    pa.hole = hol
-
-method applyGravity(pa: ParticleAttractor, particle_pos: Vector3) : tuple [upd_velocity: Vector3, need_reset: bool] =
-    var destination = pa.center - particle_pos
-    const rad = 1.0.float
-    let rad_m_hole = 1.01
-    var dest_len = destination.length
-    var dist = if dest_len > 0: dest_len / pa.radius
-                          else: 0.0
-    result.need_reset =  dist < pa.hole
-
-    if dist <= rad:
-        var force = (rad_m_hole - dist) * pa.gravity
-        destination.normalize()
-        result.upd_velocity = destination * force
-    else:
-        result.upd_velocity = newVector3(0, 0, 0)
-
-type
     ParticleEmitter* = ref object of Component
         lifetime*: float
         birthRate*: float
@@ -89,9 +65,10 @@ method init(p: ParticleEmitter) =
     p.currentParticles = 0
     p.oneShot = false
 
-method setAttractor*(pe: ParticleEmitter, pa: ParticleAttractor) =
+method setAttractor*(pe: ParticleEmitter, pa: ParticleAttractor) {.base.}=
     if pe.attractor != pa:
         pe.attractor = pa
+        pa.center = pe.node.worldToLocal(pa.node.worldPos())
 
 template stop*(e: ParticleEmitter) = e.birthRate = 999999999.0
 
@@ -115,17 +92,24 @@ template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: fl
     part.remainingLifetime -= timeDiff
     
     if p.attractor != nil:
-        var (upd_velocity, need_reset) = p.attractor.applyGravity(part.coord)
+        var destination = p.attractor.center - part.coord
+        const rad = 1.0.float
+        let rad_m_resetRadius = 1.01
+        var dest_len = destination.length
+        var dist = if dest_len > 0: dest_len / p.attractor.radius
+                              else: 0.0
 
-        if need_reset:
-            part.remainingLifetime = -1
-        
-        if upd_velocity.length == 0 :
-            upd_velocity = p.gravity
+        if dist <= rad:
+            if dist < p.attractor.resetRadius:
+                part.remainingLifetime = -1
+            else:
+                var force = (rad_m_resetRadius - dist) * p.attractor.gravity
+                destination.normalize()
+                var upd_velocity = destination * force
+                part.velocity *= 0.9
+                part.velocity += upd_velocity
         else:
-            part.velocity *= 0.9
-
-        part.velocity += upd_velocity
+            part.velocity += p.gravity
 
     else:    
         part.velocity += p.gravity
@@ -208,7 +192,7 @@ method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
 
 method visitProperties*(pa:ParticleAttractor, p: var PropertyVisitor) =
     p.visitProperty("center", pa.center)
-    p.visitProperty("hole", pa.hole)
+    p.visitProperty("resetRadius", pa.resetRadius)
     p.visitProperty("gravity", pa.gravity)
     p.visitProperty("radius", pa.radius)
 
