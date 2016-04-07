@@ -28,15 +28,22 @@ type
         initialLifetime*, remainingLifetime*: float
         pid*: float
 
+    ParticleAttractor* = ref object of Component
+        origin*: Vector3
+        radius*: float
+        gravity*: float
+        resetRadius*: float
+
     ParticleEmitter* = ref object of Component
         lifetime*: float
         birthRate*: float
         particlePrototype*: Node2D
         numberOfParticles*: int
+        currentParticles: int
         gravity*: Vector3
         particles: seq[ParticleData]
         drawDebug*: bool
-
+        oneShot: bool
         direction*: Coord
         directionRandom*: float
 
@@ -45,8 +52,8 @@ type
 
         lastDrawTime: float
         lastBirthTime: float
-
         animation*: Animation
+        attractor: ParticleAttractor
 
 method init(p: ParticleEmitter) =
     procCall p.Component.init()
@@ -54,6 +61,13 @@ method init(p: ParticleEmitter) =
     p.animation = newAnimation()
     p.animation.numberOfLoops = -1
     p.drawDebug = false
+    p.attractor = nil
+    p.currentParticles = 0
+    p.oneShot = false
+
+method setAttractor*(pe: ParticleEmitter, pa: ParticleAttractor) {.base.}=
+    if pe.attractor != pa:
+        pe.attractor = pa
 
 template stop*(e: ParticleEmitter) = e.birthRate = 999999999.0
 
@@ -75,9 +89,31 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
 
 template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: float) =
     part.remainingLifetime -= timeDiff
-    part.velocity += p.gravity
+    
+    if p.attractor != nil:
+        var destination = p.attractor.origin - part.coord
+        const rad = 1.0.float
+        let rad_m_resetRadius = 1.01
+        var dest_len = destination.length
+        var dist = if dest_len > 0: dest_len / p.attractor.radius
+                              else: 0.0
 
-    let velDiff = part.velocity * timeDiff / 0.01
+        if dist <= rad:
+            if dist < p.attractor.resetRadius:
+                part.remainingLifetime = -1
+            else:
+                var force = (rad_m_resetRadius - dist) * p.attractor.gravity
+                destination.normalize()
+                var upd_velocity = destination * force
+                part.velocity *= 0.9
+                part.velocity += upd_velocity
+        else:
+            part.velocity += p.gravity
+
+    else:    
+        part.velocity += p.gravity
+
+    let velDiff = (part.velocity * timeDiff) / 0.01
     part.coord += velDiff
 
     let newRotation = (part.rotation * part.rotVelocity).normalized() * timeDiff / 0.01
@@ -95,23 +131,38 @@ template drawParticle(p: ParticleEmitter, part: ParticleData) =
     proto.recursiveUpdate()
     proto.recursiveDraw()
 
+method `oneShot=`*(p:ParticleEmitter, value: bool) {.inline.}=
+    if value != p.oneShot:
+        p.oneShot = value
+        p.currentParticles = 0
+
 method draw*(p: ParticleEmitter) =
     if p.particlePrototype.isNil: return
     if p.particles.isNil:
         p.particles = newSeq[ParticleData](p.numberOfParticles)
     elif p.particles.len != p.numberOfParticles:
         p.particles.setLen(p.numberOfParticles)
+        p.currentParticles = 0
+
+    if p.attractor != nil and p.node != nil:
+        p.attractor.origin = p.node.worldToLocal(p.attractor.node.worldPos())
+
+    if not p.oneShot:
+        p.currentParticles = 0
 
     let curTime = epochTime()
     let timeDiff = curTime - p.lastDrawTime
+
     for i in 0 ..< p.particles.len:
         var needsToDraw = false
         if p.particles[i].remainingLifetime <= 0:
             if curTime - p.lastBirthTime >= p.birthRate:
                 # Create new particle
-                p.lastBirthTime = curTime
-                p.createParticle(p.particles[i])
-                needsToDraw = true
+                if p.currentParticles < p.numberOfParticles:
+                    needsToDraw = true
+                    p.currentParticles.inc()
+                    p.lastBirthTime = curTime
+                    p.createParticle(p.particles[i])
         else:
             p.updateParticle(p.particles[i], timeDiff)
             needsToDraw = true
@@ -131,12 +182,23 @@ method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
     p.visitProperty("birthRate", pe.birthRate)
     p.visitProperty("particlePrototype", pe.particlePrototype)
     p.visitProperty("numberOfParticles", pe.numberOfParticles)
+    p.visitProperty("currentParticles", pe.currentParticles)
     p.visitProperty("gravity", pe.gravity)
-
+    p.visitProperty("oneShot", pe.oneShot)
     p.visitProperty("direction", pe.direction)
     p.visitProperty("directionRandom", pe.directionRandom)
     p.visitProperty("velocity", pe.velocity)
     p.visitProperty("velocityRandom", pe.velocityRandom)
+    p.visitProperty("particleAttractor", pe.attractor)
+
+
+method visitProperties*(pa:ParticleAttractor, p: var PropertyVisitor) =
+    p.visitProperty("origin", pa.origin)
+    p.visitProperty("resetRadius", pa.resetRadius)
+    p.visitProperty("gravity", pa.gravity)
+    p.visitProperty("radius", pa.radius)
 
 registerComponent[ParticleEmitter]()
 registerComponent[Particle]()
+registerComponent[ParticleAttractor]()
+
