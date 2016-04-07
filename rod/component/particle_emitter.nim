@@ -29,7 +29,7 @@ type
         pid*: float
 
     ParticleAttractor* = ref object of Component
-        center*: Vector3
+        origin*: Vector3
         radius*: float
         gravity*: float
         resetRadius*: float
@@ -68,7 +68,6 @@ method init(p: ParticleEmitter) =
 method setAttractor*(pe: ParticleEmitter, pa: ParticleAttractor) {.base.}=
     if pe.attractor != pa:
         pe.attractor = pa
-        pa.center = pe.node.worldToLocal(pa.node.worldPos())
 
 template stop*(e: ParticleEmitter) = e.birthRate = 999999999.0
 
@@ -92,7 +91,7 @@ template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: fl
     part.remainingLifetime -= timeDiff
     
     if p.attractor != nil:
-        var destination = p.attractor.center - part.coord
+        var destination = p.attractor.origin - part.coord
         const rad = 1.0.float
         let rad_m_resetRadius = 1.01
         var dest_len = destination.length
@@ -145,6 +144,9 @@ method draw*(p: ParticleEmitter) =
         p.particles.setLen(p.numberOfParticles)
         p.currentParticles = 0
 
+    if p.attractor != nil and p.node != nil:
+        p.attractor.origin = p.node.worldToLocal(p.attractor.node.worldPos())
+
     if not p.oneShot:
         p.currentParticles = 0
 
@@ -191,7 +193,7 @@ method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
 
 
 method visitProperties*(pa:ParticleAttractor, p: var PropertyVisitor) =
-    p.visitProperty("center", pa.center)
+    p.visitProperty("origin", pa.origin)
     p.visitProperty("resetRadius", pa.resetRadius)
     p.visitProperty("gravity", pa.gravity)
     p.visitProperty("radius", pa.radius)
