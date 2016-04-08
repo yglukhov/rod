@@ -193,7 +193,6 @@ method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
 
 
 method visitProperties*(pa:ParticleAttractor, p: var PropertyVisitor) =
-    p.visitProperty("origin", pa.origin)
     p.visitProperty("resetRadius", pa.resetRadius)
     p.visitProperty("gravity", pa.gravity)
     p.visitProperty("radius", pa.radius)
