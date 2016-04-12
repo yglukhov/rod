@@ -6,12 +6,12 @@ type
         name*: cstring
         path*: cstring
         lineFeed*: cstring # lfWindows, lfUnix or lfMacintosh
+        parent*: Folder
 
     Folder* = ref FolderObj
     FolderObj {.importc.} = object of RootObj
         name*: cstring
         exists*: bool
-        parent*: Folder
 
 const lfWindows*: cstring = "Windows"
 const lfUnix*: cstring = "Unix"
@@ -22,6 +22,8 @@ proc open*(f: File, mode: cstring) {.importcpp.}
 template openForWriting*(f: File) = f.open("w")
 proc write*(f: File, content: cstring) {.importcpp.}
 proc close*(f: File) {.importcpp.}
+proc copy*(src, target: File): bool {.importcpp.}
+proc copy*(src: File, targetPath: cstring): bool {.importcpp.}
 
 proc newFolder*(path: cstring): Folder {.importc: "new Folder".}
 proc getFiles*(f: Folder): seq[File] {.importcpp.}
