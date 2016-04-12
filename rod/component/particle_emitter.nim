@@ -29,11 +29,10 @@ type
         pid*: float
 
     ParticleAttractor* = ref object of Component
-        origin*: Vector3
         radius*: float
         gravity*: float
         resetRadius*: float
-
+        
     ParticleEmitter* = ref object of Component
         lifetime*: float
         birthRate*: float
@@ -44,7 +43,7 @@ type
         particles: seq[ParticleData]
         drawDebug*: bool
         oneShot: bool
-        direction*: Coord
+        direction*: Coord 
         directionRandom*: float
 
         velocity*: Coord
@@ -87,11 +86,11 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
     part.remainingLifetime = part.initialLifetime
     part.rotVelocity = newQuaternion(pmRandom(3.0), ForwardVector)
 
-template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: float) =
+template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) =
     part.remainingLifetime -= timeDiff
     
     if p.attractor != nil:
-        var destination = p.attractor.origin - part.coord
+        var destination = origin - part.coord
         const rad = 1.0.float
         let rad_m_resetRadius = 1.01
         var dest_len = destination.length
@@ -144,8 +143,9 @@ method draw*(p: ParticleEmitter) =
         p.particles.setLen(p.numberOfParticles)
         p.currentParticles = 0
 
+    var attractorOrigin : Vector3
     if p.attractor != nil and p.node != nil:
-        p.attractor.origin = p.node.worldToLocal(p.attractor.node.worldPos())
+        attractorOrigin = p.node.worldToLocal(p.attractor.node.worldPos())
 
     if not p.oneShot:
         p.currentParticles = 0
@@ -164,7 +164,7 @@ method draw*(p: ParticleEmitter) =
                     p.lastBirthTime = curTime
                     p.createParticle(p.particles[i])
         else:
-            p.updateParticle(p.particles[i], timeDiff)
+            p.updateParticle(p.particles[i], timeDiff, attractorOrigin)
             needsToDraw = true
 
         if needsToDraw:
@@ -193,7 +193,6 @@ method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
 
 
 method visitProperties*(pa:ParticleAttractor, p: var PropertyVisitor) =
-    p.visitProperty("origin", pa.origin)
     p.visitProperty("resetRadius", pa.resetRadius)
     p.visitProperty("gravity", pa.gravity)
     p.visitProperty("radius", pa.radius)
