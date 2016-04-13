@@ -75,5 +75,5 @@ method componentNodeWasAddedToSceneView*(c: OverlayComponent) =
 method componentNodeWillBeRemovedFromSceneView*(c: OverlayComponent) =
     dec c.node.sceneView.numberOfNodesWithBackComposition
 
-method rayCast*(c: Component, r: Ray, distance: var float32): bool =
+method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
     result = false

@@ -328,12 +328,12 @@ proc getTreeDistance*(x, y: Node): int =
 
 
 proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
-    if not n.components.isNil :
-        for name, component in n.components :
+    if not n.components.isNil:
+        for name, component in n.components:
             var distance: float32
             let res = component.rayCast(r, distance)
 
-            if res == true :
+            if res:
                 var castInfo: RayCastInfo
                 castInfo.node = n
                 castInfo.distance = distance

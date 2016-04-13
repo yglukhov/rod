@@ -24,7 +24,6 @@ import rod.component.mesh_component
 import rod.component.node_selector
 
 import ray
-import nimx.view_event_handling
 import nimx.view_event_handling_new
 import viewport
 
@@ -100,23 +99,17 @@ proc newSettingsView(e: Editor, r: Rect): PanelView =
                 e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
     result.addSubview(cameraFocusButton)
 
-proc getTreeViewIndexPathForNode(treeView: OutlineView, n: Node3D, indexPath: var seq[int]) =
-    # бежим рекурсивно вверх и считаем путь к ноде в дереве
+proc getTreeViewIndexPathForNode(editor: Editor, n: Node3D, indexPath: var seq[int]) =
+    # running up and calculate the path to the node in the tree
     let parent = n.parent
-    var rootPath = newSeq[int]()
-    rootPath.add(0)
-    let rootTreeViewNode = treeView.itemAtIndexPath( rootPath ).get(Node3D)
+    indexPath.insert(parent.children.find(n), 0)
 
-    for i, v in parent.children :
-        if n == v :
-            indexPath.insert(i, 0)
-
-    # поскольку всегда есть рутовая нода, надо бы прибавить 0
-    if parent.isNil or parent == rootTreeViewNode:
+    # because there is the root node, it's necessary to add 0
+    if parent.isNil or parent == editor.rootNode:
         indexPath.insert(0, 0)
         return
 
-    treeView.getTreeViewIndexPathForNode(parent, indexPath)
+    editor.getTreeViewIndexPathForNode(parent, indexPath)
 
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
@@ -251,14 +244,14 @@ proc onTouch*(editor: Editor, e: var Event) =
     var castResult = newSeq[RayCastInfo]()
     editor.sceneView.rootNode().rayCast(r, castResult)
 
-    castResult.sort( proc (x, y: RayCastInfo): int =
-        result = int(x.distance - y.distance) )
+    if castResult.len > 0:
+        castResult.sort( proc (x, y: RayCastInfo): int =
+            result = int(x.distance - y.distance) )
 
-    if castResult.len > 0 :
         var indexPath = newSeq[int]()
-        editor.outlineView.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
+        editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
 
-        if indexPath.len > 1 :
+        if indexPath.len > 1:
             editor.outlineView.selectItemAtIndexPath(indexPath)
             editor.outlineView.expandBranch(indexPath)
 

@@ -106,19 +106,18 @@ proc collapseRow*(v: OutlineView, indexPath: openarray[int]) =
 proc itemAtIndexPath*(v: OutlineView, indexPath: openarray[int]): Variant =
     v.nodeAtIndexPath(indexPath).item
 
-proc expandBranch*(v: OutlineView, indexPath: openarray[int]) =
+proc setBranchExpanded*(v: OutlineView, expanded: bool, indexPath: openarray[int]) =
     var path = newSeq[int]()
 
     for i, index in indexPath:
         path.add(index)
-        v.expandRow(path)
+        v.setRowExpanded(expanded, path)
+
+proc expandBranch*(v: OutlineView, indexPath: openarray[int]) =
+    v.setBranchExpanded(true, indexPath)
 
 proc collapseBranch*(v: OutlineView, indexPath: openarray[int]) =
-    var path = newSeq[int]()
-
-    for i, index in indexPath:
-        path.add(index)
-        v.collapseRow(path)
+    v.setBranchExpanded(false, indexPath)
 
 proc itemAtPos(v: OutlineView, n: ItemNode, p: Point, y: var Coord): ItemNode =
     y += rowHeight

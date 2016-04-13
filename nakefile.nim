@@ -1,9 +1,6 @@
 import nimx.naketools
 import osproc
 
-withDir "..":
-    direShell "nimble install -y"
-
 beforeBuild = proc(b: Builder) =
     b.disableClosureCompiler = false
     b.mainFile = "editor/rodedit"

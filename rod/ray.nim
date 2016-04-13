@@ -64,13 +64,12 @@ proc intersectWithAABB*(r: Ray, minCoord, maxCoord: Vector3, distance: var float
     return true
 
 proc intersectWithTriangle(r: Ray, v0, v1, v2: Vector3, distance: var float32): bool =
-    var edge1 = v1 - v0
-    var edge2 = v2 - v0
-    var pvec = newVector3(0.0)
+    let edge1 = v1 - v0
+    let edge2 = v2 - v0
+    let pvec = cross(r.direction, edge2)
     var u, v: float32
 
-    pvec = cross(r.direction, edge2)
-    var det = dot(edge1, pvec) #edge1.x * pvec.x + edge1.y * pvec.y + edge1.z * pvec.z #edge1 & pvec;
+    let det = dot(edge1, pvec) #edge1.x * pvec.x + edge1.y * pvec.y + edge1.z * pvec.z #edge1 & pvec;
     var tvec = newVector3(0.0)
     var qvec = newVector3(0.0)
 
