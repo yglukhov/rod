@@ -7,6 +7,7 @@ import nimx.types
 import node
 import property_visitor
 import rod_types
+import ray
 
 export Component
 
@@ -73,3 +74,6 @@ method componentNodeWasAddedToSceneView*(c: OverlayComponent) =
 
 method componentNodeWillBeRemovedFromSceneView*(c: OverlayComponent) =
     dec c.node.sceneView.numberOfNodesWithBackComposition
+
+method rayCast*(c: Component, r: Ray, distance: var float32): bool =
+    result = false

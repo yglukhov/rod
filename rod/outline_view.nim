@@ -12,6 +12,7 @@ import panel_view
 import typetraits
 import math
 import variant
+import rod_types
 
 # Quick and dirty implementation of outline view
 
@@ -105,6 +106,20 @@ proc collapseRow*(v: OutlineView, indexPath: openarray[int]) =
 proc itemAtIndexPath*(v: OutlineView, indexPath: openarray[int]): Variant =
     v.nodeAtIndexPath(indexPath).item
 
+proc expandBranch*(v: OutlineView, indexPath: openarray[int]) =
+    var path = newSeq[int]()
+
+    for i, index in indexPath:
+        path.add(index)
+        v.expandRow(path)
+
+proc collapseBranch*(v: OutlineView, indexPath: openarray[int]) =
+    var path = newSeq[int]()
+
+    for i, index in indexPath:
+        path.add(index)
+        v.collapseRow(path)
+
 proc itemAtPos(v: OutlineView, n: ItemNode, p: Point, y: var Coord): ItemNode =
     y += rowHeight
     if p.y < y: return n
@@ -169,3 +184,27 @@ method onTouchEv*(v: OutlineView, e: var Event): bool =
                 v.selectionChanged()
             v.setNeedsDisplay()
     result = true
+
+# TODO набросок для посторения IndexPath по ноде. На текущий момент работает, если такое нужно, то доведу до ума
+# proc findNodeRecursiveInChildren(v: OutlineView, n: Node3D, itemNode: ItemNode, curentIndex: int, indexpath: var seq[int]): bool =
+#     var node:Node3D
+#     if not itemNode.item.isEmpty :
+#         node = itemNode.item.get(Node3D)
+
+#     indexpath.add(curentIndex)
+#     if node == n :
+#         return true
+
+#     for i, c in itemNode.children:
+#         let res = v.findNodeRecursiveInChildren(n, c, i, indexpath)
+#         if res:
+#             return true
+
+#     indexpath.delete(indexpath.len - 1)
+#     return false
+
+# proc IndexPathForNode*(v: OutlineView, n: Node3D): seq[int] =
+#     var path = newSeq[int]()
+#     let res = v.findNodeRecursiveInChildren(n, v.rootItem.children[0], int(0), path)
+
+#     return path

@@ -14,6 +14,7 @@ import nimx.view
 
 import quaternion
 import property_visitor
+import ray
 
 import rod_types
 export Node
@@ -324,6 +325,23 @@ proc getTreeDistance*(x, y: Node): int =
     let iy = px.children.find(cy)
 
     result = iy - ix
+
+
+proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
+    if not n.components.isNil :
+        for name, component in n.components :
+            var distance: float32
+            let res = component.rayCast(r, distance)
+
+            if res == true :
+                var castInfo: RayCastInfo
+                castInfo.node = n
+                castInfo.distance = distance
+                castResult.add(castInfo)
+
+    for c in n.children:
+        c.rayCast(r, castResult)
+
 
 # Debugging
 proc recursiveChildrenCount*(n: Node): int =

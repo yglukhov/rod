@@ -1,4 +1,5 @@
 import math
+import algorithm
 
 import nimx.view
 import nimx.types
@@ -22,18 +23,36 @@ import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
 
+import ray
+import nimx.view_event_handling
+import nimx.view_event_handling_new
+import viewport
+
 import variant
 
 when defined(js):
-    import dom
+    import dom except Event
 elif not defined(android) and not defined(ios):
     import native_dialogs
 
+type EventCatchingView* = ref object of View
+    onTouchCallBack*: proc (e: var Event)
+
+
+method onTouchEv*(v: EventCatchingView, e: var Event): bool =
+    if not v.onTouchCallBack.isNil :
+        v.onTouchCallBack(e)
+
+    if not result:
+        result = procCall v.View.onTouchEv(e)
+
 type Editor* = ref object
     rootNode*: Node3D
-    eventCatchingView*: View
+    eventCatchingView*: EventCatchingView
     treeView*: View
+    sceneView*: SceneView
     selectedNode*: Node3D
+    outlineView*:OutlineView
 
 proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
@@ -81,6 +100,25 @@ proc newSettingsView(e: Editor, r: Rect): PanelView =
                 e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
     result.addSubview(cameraFocusButton)
 
+proc getTreeViewIndexPathForNode(treeView: OutlineView, n: Node3D, indexPath: var seq[int]) =
+    # бежим рекурсивно вверх и считаем путь к ноде в дереве
+    let parent = n.parent
+    var rootPath = newSeq[int]()
+    rootPath.add(0)
+    let rootTreeViewNode = treeView.itemAtIndexPath( rootPath ).get(Node3D)
+
+    for i, v in parent.children :
+        if n == v :
+            indexPath.insert(i, 0)
+
+    # поскольку всегда есть рутовая нода, надо бы прибавить 0
+    if parent.isNil or parent == rootTreeViewNode:
+        indexPath.insert(0, 0)
+        return
+
+    treeView.getTreeViewIndexPathForNode(parent, indexPath)
+
+
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 700))
     result.collapsible = true
@@ -92,6 +130,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result.addSubview(title)
 
     let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 40))
+    e.outlineView = outlineView
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
         if indexPath.len == 0:
@@ -207,18 +246,44 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
                         outlineView.reloadData()
         result.addSubview(loadButton)
 
+proc onTouch*(editor: Editor, e: var Event) =
+    let r = editor.sceneView.rayWithScreenCoords(e.localPosition)
+    var castResult = newSeq[RayCastInfo]()
+    editor.sceneView.rootNode().rayCast(r, castResult)
+
+    castResult.sort( proc (x, y: RayCastInfo): int =
+        result = int(x.distance - y.distance) )
+
+    if castResult.len > 0 :
+        var indexPath = newSeq[int]()
+        editor.outlineView.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
+
+        if indexPath.len > 1 :
+            editor.outlineView.selectItemAtIndexPath(indexPath)
+            editor.outlineView.expandBranch(indexPath)
+
+
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
-    result.new()
-    result.rootNode = n
+    var editor = Editor.new()
+    editor.rootNode = n
+    editor.sceneView = n.sceneView # Warning!
 
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
-    let settingsView = result.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
+    let settingsView = editor.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
 
-    result.treeView = newTreeView(result, inspectorView)
-    v.window.addSubview(result.treeView)
+    editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
+    editor.eventCatchingView.onTouchCallBack = proc (event: var Event) =
+        onTouch(editor, event)
+
+    v.window.addSubview(editor.eventCatchingView)
+
+    editor.treeView = newTreeView(editor, inspectorView)
+    v.window.addSubview(editor.treeView)
 
     v.window.addSubview(inspectorView)
     v.window.addSubview(settingsView)
+
+    return editor
 
 proc endEditing*(e: Editor) =
     discard
