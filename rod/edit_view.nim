@@ -240,6 +240,9 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         result.addSubview(loadButton)
 
 proc onTouch*(editor: Editor, e: var Event) =
+    #TODO Hack to sync node tree and treeView
+    editor.outlineView.reloadData()
+
     let r = editor.sceneView.rayWithScreenCoords(e.localPosition)
     var castResult = newSeq[RayCastInfo]()
     editor.sceneView.rootNode().rayCast(r, castResult)

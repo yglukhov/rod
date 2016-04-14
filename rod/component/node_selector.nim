@@ -50,6 +50,8 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
         let mesh = n.componentIfAvailable(MeshComponent)
         if not mesh.isNil:
             ns.modelMatrix = n.worldTransform()
+            # translete selection to bounding box position
+            ns.modelMatrix.translate((mesh.vboData.minCoord + mesh.vboData.maxCoord)/2.0)
             ns.modelMatrix.scale(mesh.vboData.maxCoord - mesh.vboData.minCoord)
             return true
         let sprite = n.componentIfAvailable(Sprite)
