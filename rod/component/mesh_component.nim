@@ -20,6 +20,8 @@ import rod.node
 import rod.property_visitor
 import rod.component.camera
 import rod.viewport
+import rod.ray
+import rod.rod_types
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
@@ -241,6 +243,14 @@ method draw*(m: MeshComponent) =
     gl.disable(gl.DEPTH_TEST)
     gl.activeTexture(gl.TEXTURE0)
     gl.enable(gl.BLEND)
+
+method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
+    var inv_mat: Matrix4
+    if tryInverse (c.node.worldTransform(), inv_mat) == false:
+        return false
+
+    let localRay = r.transform(inv_mat)
+    result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("emission", m.material.emission)

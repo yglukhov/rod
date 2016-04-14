@@ -14,7 +14,7 @@ proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item],
         if i.jsObjectType == typeName:
             result.add(cast[t](i))
 
-proc getSelectedCompositions(): seq[Composition] {.exportc.} =
+proc getSelectedCompositions(): seq[Composition] =
     getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
 
 var logTextField: EditText
@@ -46,21 +46,13 @@ var propertyNameMap = {
 
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
 
-var compExportPath = ""
+var gCompExportPath = ""
+var gExportFolderPath = ""
 
-proc getResourceNameFromSourceFile(file: File): string {.exportc.} =
-    const footageToken = "(Footage)/"
-    let p = $decodeURIComponent(file.path)
-    let n = p.find(footageToken)
-    var path = ""
-    if n != -1:
-        path = p.substr(n + footageToken.len) & "/"
-    result = relativePathToPath(compExportPath, path & $decodeURIComponent(file.name))
-
-proc getSequenceFileNamesFromSource(f: FootageItem): seq[string] =
-    result = newSeq[string]()
-    for c in getSequenceFilesFromSource(f):
-        result.add(getResourceNameFromSourceFile(c))
+proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string =
+    var path = $footageSource.projectPath
+    if path[^1] != '/': path &= "/"
+    result = relativePathToPath(gCompExportPath, path & $decodeURIComponent(file.name))
 
 proc `%`[T: string | SomeNumber](s: openarray[T]): JsonNode =
     result = newJArray()
@@ -73,11 +65,29 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         if source.jsObjectType == "FootageItem":
             let footageSource = FootageItem(source)
             if not footageSource.file.isNil:
+                var imageFiles = if footageSource.duration > 0:
+                        getSequenceFilesFromSource(footageSource)
+                    else:
+                        @[footageSource.file]
+
+                # Paths relative to currently exported composition
+                let imageFileRelativeExportPaths = newJArray()
+
+                let footagePath = $footageSource.projectPath
+                for i, f in imageFiles:
+                    imageFileRelativeExportPaths.add(%getExportPathFromSourceFile(footageSource, f))
+
+                    # Copy the file to the resources
+                    let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
+                    logi "Copying: ", resourcePath
+                    let targetFile = newFile(resourcePath)
+                    if not targetFile.parent.create():
+                        logi "ERROR: Could not create folder for ", resourcePath
+                    if not f.copy(targetFile):
+                        logi "ERROR: Could not copy ", resourcePath
+
                 var sprite = newJObject()
-                if footageSource.duration > 0:
-                    sprite["fileNames"] = % getSequenceFileNamesFromSource(footageSource)
-                else:
-                    sprite["fileNames"] = % [getResourceNameFromSourceFile(footageSource.file)]
+                sprite["fileNames"] = imageFileRelativeExportPaths
                 result["Sprite"] = sprite
             elif ($source.name).find("Null") != 0 and
                     not footageSource.mainSource.isNil and
@@ -193,7 +203,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         result["children"] = chres
 
     if layer.layerIsCompositionRef():
-        result["compositionRef"] = %relativePathToPath(compExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
+        result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
 
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
@@ -204,11 +214,11 @@ proc serializeLayer(layer: Layer): JsonNode =
         auxNode["name"] = % layer.auxLayerName
         let pos = layer.property("Position", Vector3).valueAtTime(0)
         auxNode["translation"] = % pos
-        if not result["scale"].isNil:
+        if not result{"scale"}.isNil:
             auxNode["scale"] = result["scale"]
             result.delete("scale")
 
-        if not result["rotation"].isNil:
+        if not result{"rotation"}.isNil:
             auxNode["rotation"] = result["rotation"]
             result.delete("rotation")
 
@@ -521,10 +531,10 @@ proc fastJsonStringify(n: JsonNode): cstring =
 
 proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     let compositions = getSelectedCompositions()
-    let folderPath = $exportFolderPath
+    gExportFolderPath = $exportFolderPath
     for c in compositions:
-        compExportPath = c.exportPath
-        let fullExportPath = folderPath & "/" & c.exportPath
+        gCompExportPath = c.exportPath
+        let fullExportPath = gExportFolderPath & "/" & gCompExportPath
         if not newFolder(fullExportPath).create():
             logi "ERROR: Could not create folder ", fullExportPath
         let filePath = fullExportPath & "/" & $c.name & ".json"

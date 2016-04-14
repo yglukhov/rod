@@ -14,6 +14,10 @@ export UIComponent
 type UICompView = ref object of View
     uiComp: UIComponent
 
+proc view*(c: UIComponent): View =
+    if not c.mView.isNil:
+        result = c.mView.subviews[0]
+
 proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool =
     let n = uiComp.node
     let worldPointOnPlane = n.localToWorld(newVector3())
@@ -23,10 +27,12 @@ proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool 
     result = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
 
     if result and not uiComp.mView.isNil:
-        let v = uiComp.mView.subviews[0]
-        var localres : Vector3
-        if n.tryWorldToLocal(res, localres):
-            result = localres.x >= v.frame.x and localres.x <= v.frame.maxX and localres.y >= v.frame.y and localres.y <= v.frame.maxY
+        let v = uiComp.view
+        if not v.isNil:
+            var localres : Vector3
+            if n.tryWorldToLocal(res, localres):
+                result = localres.x >= v.frame.x and localres.x <= v.frame.maxX and
+                    localres.y >= v.frame.y and localres.y <= v.frame.maxY
 
 method convertPointToParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
@@ -61,14 +67,14 @@ proc moveToWindow(v: View, w: Window) =
 proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
     var res : Vector3
     if c.node.tryWorldToLocal(intersection, res):
-        let v = c.mView.subviews[0]
+        let v = c.view
         e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
         result = v.recursiveHandleMouseEvent(e)
 
 proc handleTouchEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
     var res : Vector3
     if c.node.tryWorldToLocal(intersection, res):
-        let v = c.mView.subviews[0]
+        let v = c.view
         e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
         if e.localPosition.inRect(v.bounds):
             result = v.processTouchEvent(e)
