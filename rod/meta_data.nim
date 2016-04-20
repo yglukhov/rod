@@ -1,6 +1,7 @@
 import json
 import strutils
-import os
+when not defined(js) and not defined(android) and not defined(ios):
+    import os
 
 import nimx.resource
 import nimx.pathutils
@@ -45,14 +46,15 @@ proc validateRecursive(md: MetaData, jn: JsonNode) =
         pushParentResource(md.resourcePath)
         # validate image pathes (make relative)
         if not v{"image"}.isNil:
-            var imgPath = pathForResource(v{"image"}.getStr())
-            var resourcePath = parentDir(md.resourcePath)
-            var relPath = relativePathToPath(resourcePath, imgPath)
-            v.add("image", %relPath)
+            when not defined(js) and not defined(android) and not defined(ios):
+                var imgPath = pathForResource(v{"image"}.getStr())
+                var resourcePath = parentDir(md.resourcePath)
+                var relPath = relativePathToPath(resourcePath, imgPath)
+                v.add("image", %relPath)
 
-            echo "json path ", resourcePath
-            echo "img path ", imgPath
-            echo "relPath ", relPath
+                echo "json path ", resourcePath
+                echo "img path ", imgPath
+                echo "relPath ", relPath
 
         if v.kind == JObject:
             md.validateRecursive(v)
