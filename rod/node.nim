@@ -15,6 +15,7 @@ import nimx.view
 import quaternion
 import property_visitor
 import ray
+import meta_data
 
 import rod_types
 export Node
@@ -31,9 +32,19 @@ proc newNode*(name: string = nil): Node =
     result.name = name
     result.alpha = 1.0
 
+proc metaData*(n: Node): MetaData =
+    if n.mMetaData.isNil:
+        n.mMetaData = MetaData.new
+        n.mMetaData.jsonNode = newJObject()
+        result = n.mMetaData
+    else:
+        result = n.mMetaData
+
 proc createComponentForNode(n: Node, name: string): Component =
     result = createComponent(name)
     result.node = n
+    n.metaData.validateComponent(name)
+
     if not n.mSceneView.isNil:
         result.componentNodeWasAddedToSceneView()
 
@@ -71,6 +82,11 @@ proc removeComponent*(n: Node, name: string) =
         if not c.isNil:
             c.componentNodeWillBeRemovedFromSceneView()
             n.components.del(name)
+
+            if not n.mMetaData.isNil:
+                var jnode = n.metaData.getJsonNodeAtKeyPath("components")
+                if not jnode.isNil and jnode.hasKey(name):
+                    jnode.delete(name)
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
@@ -232,18 +248,36 @@ proc registerAnimation*(n: Node, name: string, a: Animation) =
     n.animations[name] = a
 
 # Serialization
-proc newNodeFromJson*(j: JsonNode): Node
-proc deserialize*(n: Node, j: JsonNode)
+proc newNodeFromJson*(j: JsonNode, useMetaData: bool = false): Node
+proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false)
 
-proc loadComposition*(n: Node, resourceName: string) =
+proc updateMetaData*(n: Node, attrName: string, jn: JsonNode) =
+    echo "Update node ", attrName
+
+
+proc getJsonNode*(n: Node, path: string): JsonNode =
+    n.metaData.resourcePath = path
+    n.metaData.validate()
+    result = n.metaData.jsonNode
+
+    if n.children.len > 0:
+        var arr = newJArray()
+        result.add("children", arr)
+
+        for i, v in n.children:
+            arr.add(v.getJsonNode(path))
+
+proc loadComposition*(n: Node, resourceName: string, useMetaData: bool = false) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(resourceName)
-        n.deserialize(j)
+        n.deserialize(j, useMetaData)
+        if useMetaData:
+            n.metaData.resourcePath = resourceName
         popParentResource()
 
 import ae_animation
 
-proc deserialize*(n: Node, j: JsonNode) =
+proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false) =
     if n.name.isNil:
         n.name = j["name"].getStr(nil)
     var v = j{"translation"}
@@ -261,14 +295,14 @@ proc deserialize*(n: Node, j: JsonNode) =
     v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
-            n.addChild(newNodeFromJson(v[i]))
+            n.addChild(newNodeFromJson(v[i], useMetaData))
     v = j{"components"}
     if not v.isNil:
         for k, c in v:
             let comp = n.component(k)
             comp.deserialize(c)
-    let animations = j{"animations"}
 
+    let animations = j{"animations"}
     if not animations.isNil and animations.len > 0:
         n.animations = newTable[string, Animation]()
         for k, v in animations:
@@ -278,13 +312,18 @@ proc deserialize*(n: Node, j: JsonNode) =
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 
-proc newNodeFromJson*(j: JsonNode): Node =
-    result = newNode()
-    result.deserialize(j)
+    if useMetaData:
+        n.metaData.jsonNode = j.copy()
+        if n.metaData.jsonNode.existsKey("children"):
+            n.metaData.jsonNode.delete("children")
 
-proc newNodeWithResource*(name: string): Node =
+proc newNodeFromJson*(j: JsonNode, useMetaData: bool = false): Node =
     result = newNode()
-    result.loadComposition(name)
+    result.deserialize(j, useMetaData)
+
+proc newNodeWithResource*(name: string, useMetaData: bool = false): Node =
+    result = newNode()
+    result.loadComposition(name, useMetaData)
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()

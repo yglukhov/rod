@@ -111,9 +111,41 @@ proc getTreeViewIndexPathForNode(editor: Editor, n: Node3D, indexPath: var seq[i
 
     editor.getTreeViewIndexPathForNode(parent, indexPath)
 
+when not defined(js) and not defined(android) and not defined(ios):
+    import os
+import streams
+import json
+proc saveNode(editor: Editor, selectedNode: Node3D): bool =
+    when not defined(js) and not defined(android) and not defined(ios):
+        let path = callDialogFileSave("Save Json")
+        if not path.isNil:
+            var json = selectedNode.getJsonNode(path)
+            var res = json.pretty()
+
+            var fs = newFileStream(path, fmWrite)
+            if fs.isNil:
+                echo "WARNING: Resource can not open: ", path
+            else:
+                fs.write(res)
+                fs.close()
+                echo "save at path ", path
+                return true
+
+    return false
+
+proc loadNode(editor: Editor): bool =
+    when not defined(js) and not defined(android) and not defined(ios):
+        let n = editor.rootNode.findNode("Bottom")
+        let path = callDialogFileOpen("Select Json")
+        if not path.isNil:
+            let rn = newNodeWithResource(path, true)
+            editor.rootNode.addChild(rn)
+            return true
+
+    return false
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
-    result = PanelView.new(newRect(0, 0, 200, 700))
+    result = PanelView.new(newRect(0, 0, 200, 600)) #700
     result.collapsible = true
 
     let title = newLabel(newRect(22, 6, 108, 15))
@@ -122,7 +154,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
     result.addSubview(title)
 
-    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 40))
+    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 60)) #-40
     e.outlineView = outlineView
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
@@ -238,6 +270,21 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
                         p.addChild(n)
                         outlineView.reloadData()
         result.addSubview(loadButton)
+
+        when not defined(js) and not defined(android) and not defined(ios):
+            let saveButton = Button.new(newRect(110, result.bounds.height - 40, 60, 20))
+            saveButton.title = "Save"
+            saveButton.onAction do():
+                var selectedNode = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+                if not selectedNode.isNil:
+                    discard e.saveNode(selectedNode)
+            result.addSubview(saveButton)
+
+            let loadJButton = Button.new(newRect(50, result.bounds.height - 40, 60, 20))
+            loadJButton.title = "Load J"
+            loadJButton.onAction do():
+                discard e.loadNode()
+            result.addSubview(loadJButton)
 
 proc onTouch*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
