@@ -83,9 +83,10 @@ proc removeComponent*(n: Node, name: string) =
             c.componentNodeWillBeRemovedFromSceneView()
             n.components.del(name)
 
-            var jnode = n.metaData.getJsonNodeAtKeyPath("components")
-            if not jnode.isNil:
-                jnode.delete(name)
+            if not n.mMetaData.isNil:
+                var jnode = n.metaData.getJsonNodeAtKeyPath("components")
+                if not jnode.isNil and jnode.hasKey(name):
+                    jnode.delete(name)
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
@@ -247,8 +248,8 @@ proc registerAnimation*(n: Node, name: string, a: Animation) =
     n.animations[name] = a
 
 # Serialization
-proc newNodeFromJson*(j: JsonNode): Node
-proc deserialize*(n: Node, j: JsonNode)
+proc newNodeFromJson*(j: JsonNode, useMetaData: bool = false): Node
+proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false)
 
 proc updateMetaData*(n: Node, attrName: string, jn: JsonNode) =
     echo "Update node ", attrName
@@ -259,13 +260,6 @@ proc getJsonNode*(n: Node, path: string): JsonNode =
     n.metaData.validate()
     result = n.metaData.jsonNode
 
-    # if not n.components.isNil:
-    #     let componentNode = newJObject()
-    #    result.add("components", componentNode)
-    #     for i, v in n.components:
-    #         if v.metaData.componentName.len > 0:
-    #             componentNode.add(v.metaData.componentName, v.metaData.jsonNode)
-
     if n.children.len > 0:
         var arr = newJArray()
         result.add("children", arr)
@@ -273,17 +267,17 @@ proc getJsonNode*(n: Node, path: string): JsonNode =
         for i, v in n.children:
             arr.add(v.getJsonNode(path))
 
-proc loadComposition*(n: Node, resourceName: string) =
+proc loadComposition*(n: Node, resourceName: string, useMetaData: bool = false) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(resourceName)
-        n.deserialize(j)
-        n.metaData.resourcePath = resourceName
-        echo "load json at path ", n.metaData.resourcePath
+        n.deserialize(j, useMetaData)
+        if useMetaData:
+            n.metaData.resourcePath = resourceName
         popParentResource()
 
 import ae_animation
 
-proc deserialize*(n: Node, j: JsonNode) =
+proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false) =
     if n.name.isNil:
         n.name = j["name"].getStr(nil)
     var v = j{"translation"}
@@ -301,7 +295,7 @@ proc deserialize*(n: Node, j: JsonNode) =
     v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
-            n.addChild(newNodeFromJson(v[i]))
+            n.addChild(newNodeFromJson(v[i], useMetaData))
     v = j{"components"}
     if not v.isNil:
         for k, c in v:
@@ -318,17 +312,18 @@ proc deserialize*(n: Node, j: JsonNode) =
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 
-    n.metaData.jsonNode = j.copy()
-    if n.metaData.jsonNode.existsKey("children"):
-        n.metaData.jsonNode.delete("children")
+    if useMetaData:
+        n.metaData.jsonNode = j.copy()
+        if n.metaData.jsonNode.existsKey("children"):
+            n.metaData.jsonNode.delete("children")
 
-proc newNodeFromJson*(j: JsonNode): Node =
+proc newNodeFromJson*(j: JsonNode, useMetaData: bool = false): Node =
     result = newNode()
-    result.deserialize(j)
+    result.deserialize(j, useMetaData)
 
-proc newNodeWithResource*(name: string): Node =
+proc newNodeWithResource*(name: string, useMetaData: bool = false): Node =
     result = newNode()
-    result.loadComposition(name)
+    result.loadComposition(name, useMetaData)
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()

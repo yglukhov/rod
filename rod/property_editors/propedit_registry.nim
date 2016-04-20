@@ -8,18 +8,18 @@ import variant
 import tables
 import rod.meta_data
 
-type PropertieView* = ref object of View
+type PropertyEditorView* = ref object of View
     onActionGetJson*: proc(j: JsonNode)
 
-var propEditors = initTable[TypeId, proc(n: Node, v: Variant): PropertieView]()
+var propEditors = initTable[TypeId, proc(n: Node, v: Variant): PropertyEditorView]()
 
-proc registerPropertyEditor*[T](createView: proc(n: Node, setter: proc(s: T), getter: proc(): T): PropertieView) =
-    propEditors[getTypeId(SetterAndGetter[T])] = proc(n: Node, v: Variant): PropertieView =
+proc registerPropertyEditor*[T](createView: proc(n: Node, setter: proc(s: T), getter: proc(): T): PropertyEditorView) =
+    propEditors[getTypeId(SetterAndGetter[T])] = proc(n: Node, v: Variant): PropertyEditorView =
         let sng = v.get(SetterAndGetter[T])
         result = createView(n, sng.setter, sng.getter)
 
-proc registerPropertyEditor*[T](createView: proc(setter: proc(s: T), getter: proc(): T): PropertieView) =
-    propEditors[getTypeId(SetterAndGetter[T])] = proc(n: Node, v: Variant): PropertieView =
+proc registerPropertyEditor*[T](createView: proc(setter: proc(s: T), getter: proc(): T): PropertyEditorView) =
+    propEditors[getTypeId(SetterAndGetter[T])] = proc(n: Node, v: Variant): PropertyEditorView =
         let sng = v.get(SetterAndGetter[T])
         result = createView(sng.setter, sng.getter)
 

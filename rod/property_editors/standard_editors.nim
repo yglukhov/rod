@@ -26,8 +26,8 @@ template toStr(v: SomeInteger): string = $v
 template fromStr(v: string, t: var SomeReal) = t = v.parseFloat()
 template fromStr(v: string, t: var SomeInteger) = t = v.parseInt()
 
-proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertieView =
-    let pv = PropertieView.new(newRect(0, 0, 208, 24))
+proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertyEditorView =
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
     let tf = newNumericTextField(newRect(0, 0, 300, 24))
     tf.textColor = newGrayColor(0.0)
     when T is SomeReal:
@@ -48,8 +48,8 @@ proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertieV
     result = pv
     result.addSubview(tf)
 
-proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): PropertieView =
-    let pv = PropertieView.new(newRect(0, 0, 208, 24))
+proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): PropertyEditorView =
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
     let textField = newTextField(newRect(0, 0, 200, 24))
     textField.text = getter()
     textField.textColor = newGrayColor(0.0)
@@ -63,8 +63,8 @@ proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): Prope
     result = pv
     result.addSubview(textField)
 
-proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertieView =
-    result = PropertieView.new(newRect(0, 0, 208, 24))
+proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertyEditorView =
+    result = PropertyEditorView.new(newRect(0, 0, 208, 24))
     const vecLen = high(T) + 1
 
     var x = 0.Coord
@@ -98,8 +98,8 @@ proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertieView
         textField.onAction complexSetter
         result.addSubview(textField)
 
-proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): PropertieView =
-    result = PropertieView.new(newRect(0, 0, 140, 24))
+proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): PropertyEditorView =
+    result = PropertyEditorView.new(newRect(0, 0, 140, 24))
     const vecLen = 3 + 1
 
     let colorView = View.new(newRect(0, 0, 24, 24))
@@ -188,7 +188,7 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): Proper
         textField.onAction complexSetter
         result.addSubview(textField)
 
-proc newSizePropertyView(setter: proc(s: Size), getter: proc(): Size): PropertieView =
+proc newSizePropertyView(setter: proc(s: Size), getter: proc(): Size): PropertyEditorView =
     newVecPropertyView(
         proc(v: Vector2) = setter(newSize(v.x, v.y)),
         proc(): Vector2 =
@@ -196,7 +196,7 @@ proc newSizePropertyView(setter: proc(s: Size), getter: proc(): Size): Propertie
             result = newVector2(s.width, s.height)
             )
 
-proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): PropertieView =
+proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): PropertyEditorView =
     newVecPropertyView(
         proc(v: Vector2) = setter(newPoint(v.x, v.y)),
         proc(): Vector2 =
@@ -205,8 +205,8 @@ proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): Proper
             )
 
 when not defined(android) and not defined(ios):
-    proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): PropertieView =
-        let pv = PropertieView.new(newRect(0, 0, 208, 24))
+    proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): PropertyEditorView =
+        let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
         let b = Button.new(newRect(0, 0, 200, 24))
         b.title = "Open image..."
         b.onAction do():
@@ -224,7 +224,7 @@ when not defined(android) and not defined(ios):
 
     registerPropertyEditor(newImagePropertyView)
 
-proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): PropertieView =
+proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): PropertyEditorView =
     let textField = newTextField(newRect(0, 0, 200, 24))
     let n = getter()
     textField.textColor = newGrayColor(0.0)
@@ -234,11 +234,11 @@ proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc()
         textField.text = n.name
     textField.onAction do():
         setter(editedNode.sceneView.rootNode.findNode(textField.text))
-    result = PropertieView.new(newRect(0, 0, 208, 24))
+    result = PropertyEditorView.new(newRect(0, 0, 208, 24))
     result.addSubview(textField)
 
-proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc(): bool): PropertieView =
-    let pv = PropertieView.new(newRect(0, 0, 208, 24))
+proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc(): bool): PropertyEditorView =
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
     let cb = newCheckbox(newRect(0, 0, 200, 24))
     cb.value = if getter(): 1 else: 0
     cb.onAction do():

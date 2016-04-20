@@ -135,7 +135,7 @@ proc loadNode(editor: Editor): bool =
     let n = editor.rootNode.findNode("Bottom")
     let path = callDialogFileOpen("Select Json")
     if not path.isNil:
-        let rn = newNodeWithResource(path)
+        let rn = newNodeWithResource(path, true)
         editor.rootNode.addChild(rn)
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
