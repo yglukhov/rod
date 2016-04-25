@@ -2,10 +2,10 @@ import nimx.portable_gl
 
 type VertexDataInfo* = object
     numOfCoordPerVert*: GLint
-    numOfCoordPerNormal*: GLint
     numOfCoordPerTexCoord*: GLint
-    numOfCoordPerBinormal*: GLint
+    numOfCoordPerNormal*: GLint
     numOfCoordPerTangent*: GLint
+    numOfCoordPerBinormal*: GLint
     stride*: int
 
 proc newVertexInfoWithVertexData*(vertexDataLen = 0, texCoordDataLen = 0, normalDataLen = 0, tangentDataLen = 0, binormalDataLen: int = 0): VertexDataInfo =
