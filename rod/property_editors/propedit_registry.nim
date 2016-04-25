@@ -44,6 +44,5 @@ proc propertyEditorForProperty*(n: Node, keyPath, title: string, v: Variant): Vi
         result.addSubview(editor)
 
         editor.onActionGetJson= proc(j: JsonNode) =
-            echo "keyPath ", $keyPath
             n.metaData.updateMetaData(keyPath, title, j)
 
