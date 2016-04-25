@@ -115,27 +115,18 @@ when not defined(js) and not defined(android) and not defined(ios):
     import os
 import streams
 import json
+import tools.serializer
 proc saveNode(editor: Editor, selectedNode: Node3D): bool =
     when not defined(js) and not defined(android) and not defined(ios):
         let path = callDialogFileSave("Save Json")
         if not path.isNil:
-            var json = selectedNode.getJsonNode(path)
-            var res = json.pretty()
-
-            var fs = newFileStream(path, fmWrite)
-            if fs.isNil:
-                echo "WARNING: Resource can not open: ", path
-            else:
-                fs.write(res)
-                fs.close()
-                echo "save at path ", path
-                return true
+            var s = Serializer.new()
+            s.save(selectedNode, path)
 
     return false
 
 proc loadNode(editor: Editor): bool =
     when not defined(js) and not defined(android) and not defined(ios):
-        let n = editor.rootNode.findNode("Bottom")
         let path = callDialogFileOpen("Select Json")
         if not path.isNil:
             let rn = newNodeWithResource(path, true)
@@ -275,9 +266,10 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
             let saveButton = Button.new(newRect(110, result.bounds.height - 40, 60, 20))
             saveButton.title = "Save"
             saveButton.onAction do():
-                var selectedNode = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
-                if not selectedNode.isNil:
-                    discard e.saveNode(selectedNode)
+                if outlineView.selectedIndexPath.len > 0:
+                    var selectedNode = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+                    if not selectedNode.isNil:
+                        discard e.saveNode(selectedNode)
             result.addSubview(saveButton)
 
             let loadJButton = Button.new(newRect(50, result.bounds.height - 40, 60, 20))

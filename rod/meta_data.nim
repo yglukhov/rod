@@ -14,7 +14,6 @@ type MetaData* = ref object
     componentName*: string
 
 proc getJsonNodeAtKeyPath*(md: MetaData, kp: string): JsonNode =
-    echo "MetaData", $md.jsonNode
     var jn = md.jsonNode
     for key in kp.split("."):
         jn = jn{key}
