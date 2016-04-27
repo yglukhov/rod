@@ -400,7 +400,7 @@ proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
     let size = int(bufSize / sizeof(GLushort))
     var data = newSeq[GLushort](size)
 
-    gl.getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, data)
+    #gl.getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, data)
     result = data
 
 proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
@@ -411,7 +411,7 @@ proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
     let size = int(bufSize / sizeof(float32))
     var data = newSeq[float32](size)
 
-    gl.getBufferSubData(gl.ARRAY_BUFFER, 0, data)
+    #gl.getBufferSubData(gl.ARRAY_BUFFER, 0, data)
     result = data
 
 proc extractVertexData*(c: MeshComponent, size, offset: int32, data: seq[float32]): seq[float32] =
