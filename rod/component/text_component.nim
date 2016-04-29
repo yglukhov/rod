@@ -2,6 +2,7 @@ import json
 import nimx.types
 import nimx.font
 import nimx.context
+import nimx.view
 
 import rod.node
 import rod.component
@@ -13,7 +14,7 @@ type TextJustification* = enum
     tjRight
 
 type Text* = ref object of Component
-    text*: string
+    mText*: string
     color*: Color
     font*: Font
     trackingAmount*: Coord
@@ -26,10 +27,18 @@ method init*(t: Text) =
     t.font = systemFont()
     t.shadowColor = newGrayColor(0.0, 0.5)
 
+proc `text=`*(t: Text, text: string) =
+    t.mText = text
+    if not t.node.isNil and not t.node.sceneView.isNil:
+        t.node.sceneView.setNeedsDisplay()
+
+proc text*(t: Text) : string =
+    result = t.mText
+
 method deserialize*(t: Text, j: JsonNode) =
     var v = j{"text"}
     if not v.isNil:
-        t.text = v.getStr()
+        t.mText = v.getStr()
 
     v = j{"color"}
     if not v.isNil:
@@ -59,13 +68,13 @@ method deserialize*(t: Text, j: JsonNode) =
         else: discard
 
 method draw*(t: Text) =
-    if not t.text.isNil:
+    if not t.mText.isNil:
         let c = currentContext()
         var p: Point
         let hs = t.font.horizontalSpacing
         t.font.horizontalSpacing = t.trackingAmount
         if t.justification != tjLeft:
-            var textSize = t.font.sizeOfString(t.text)
+            var textSize = t.font.sizeOfString(t.mText)
             if t.justification == tjCenter:
                 p.x -= textSize.width / 2
             else:
@@ -87,12 +96,12 @@ method draw*(t: Text) =
 
             p.x = px + wsv.x
             p.y = py + wsv.y
-            c.drawText(t.font, p, t.text)
+            c.drawText(t.font, p, t.mText)
             p.x = px
             p.y = py
 
         c.fillColor = t.color
-        c.drawText(t.font, p, t.text)
+        c.drawText(t.font, p, t.mText)
         t.font.horizontalSpacing = hs
 
 method visitProperties*(t: Text, p: var PropertyVisitor) =
