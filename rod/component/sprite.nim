@@ -94,7 +94,6 @@ method deserialize*(s: Sprite, j: JsonNode) =
                 let realName = v[i]["file"].getStr()
                 let uv = v[i]["tex"]
                 let sz = v[i]["size"]
-                echo "load image at path ", realName
                 let ss = imageWithResource(realName)
                 s.images[i] = ss.subimageWithTexCoords(
                                 newSize(sz[0].getFNum(), sz[1].getFNum()),

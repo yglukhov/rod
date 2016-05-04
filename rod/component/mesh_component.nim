@@ -2,6 +2,7 @@ import tables
 import hashes
 import strutils
 import json
+import opengl
 
 import nimx.image
 import nimx.resource
@@ -124,20 +125,41 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     if j.isNil:
         return
 
-    # proc toValue(j: JsonNode, s: var string) =
-    #     s = j.str
+    proc getValue(name: string, val: var Color) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = jN.jNodeToColor()
 
-    # proc toValue(j: JsonNode, s: var string) =
-    #     s = j.str
+    proc getValue(name: string, val: var float32) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = jN.getFnum()
 
-    # proc jsonNameForPropName(s: string): string =
-    #     case s
-    #     of "bEnableBackfaceCulling": "culling"
-    #     else: s
+    proc getValue(name: string, val: var bool) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = jN.getBVal()
 
-    # for k, v in m.material.fieldPairs:
-    #     if needsSerialize(k):
-    #         jNode{jsonNameForPropName(k)}.toValue(v)
+    proc getValue(name: string, val: var Image) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = imageWithResource(jN.getStr())
+
+    # getValue("emission", m.material.emission)
+    # getValue("ambient", m.material.ambient)
+    # getValue("diffuse", m.material.diffuse)
+    # getValue("specular", m.material.specular)
+    # getValue("shininess", m.material.shininess)
+    # getValue("reflectivity", m.material.reflectivity)
+    # getValue("rim_density", m.material.rim_density)
+
+    # getValue("culling", m.material.bEnableBackfaceCulling)
+    # getValue("light", m.material.isLightReceiver)
+    # getValue("blend", m.material.blendEnable)
+    # getValue("depth_test", m.material.depthEnable)
+    # getValue("wireframe", m.material.isWireframe)
+    # getValue("RIM", m.material.isRIM)
+    # getValue("sRGB_normal", m.material.isNormalSRGB)
 
     var jNode = j{"emission"}
     m.material.emission = jNode.jNodeToColor()
@@ -169,56 +191,31 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     jNode = j{"sRGB_normal"}
     m.material.isNormalSRGB = jNode.getBVal()
 
+    proc getTexture(name: string): Image =
+        let jNode = j{name}
+        if not jNode.isNil:
+            result = imageWithResource(jNode.getStr())
 
-    jNode = j{"albedoTexture"}
-    if not jNode.isNil:
-        m.material.albedoTexture = imageWithResource(jNode.getStr())
-    jNode = j{"glossTexture"}
-    if not jNode.isNil:
-        m.material.glossTexture = imageWithResource(jNode.getStr())
-    jNode = j{"specularTexture"}
-    if not jNode.isNil:
-        m.material.specularTexture = imageWithResource(jNode.getStr())
-    jNode = j{"normalTexture"}
-    if not jNode.isNil:
-        m.material.normalTexture = imageWithResource(jNode.getStr())
-    jNode = j{"bumpTexture"}
-    if not jNode.isNil:
-        m.material.bumpTexture = imageWithResource(jNode.getStr())
-    jNode = j{"reflectionTexture"}
-    if not jNode.isNil:
-        m.material.reflectionTexture = imageWithResource(jNode.getStr())
-    jNode = j{"falloffTexture"}
-    if not jNode.isNil:
-        m.material.falloffTexture = imageWithResource(jNode.getStr())
-    jNode = j{"maskTexture"}
-    if not jNode.isNil:
-        m.material.maskTexture = imageWithResource(jNode.getStr())
+    m.material.albedoTexture = getTexture("albedoTexture")
+    m.material.glossTexture = getTexture("glossTexture")
+    m.material.specularTexture = getTexture("specularTexture")
+    m.material.normalTexture = getTexture("normalTexture")
+    m.material.bumpTexture = getTexture("bumpTexture")
+    m.material.reflectionTexture = getTexture("reflectionTexture")
+    m.material.falloffTexture = getTexture("falloffTexture")
+    m.material.maskTexture = getTexture("maskTexture")
 
+    proc getAttribs(name: string): seq[float32] =
+        result = newSeq[float32]()
+        jNode = j{name}
+        if not jNode.isNil:
+            for v in jNode:
+                result.add(v.getFNum())
 
-    jNode = j{"vertex_coords"}
-    var vertCoords = newSeq[float32]()
-    if not jNode.isNil:
-        for v in jNode:
-            vertCoords.add(v.getFNum())
-
-    jNode = j{"tex_coords"}
-    var texCoords = newSeq[float32]()
-    if not jNode.isNil:
-        for v in jNode:
-            texCoords.add(v.getFNum())
-
-    jNode = j{"normals"}
-    var normals = newSeq[float32]()
-    if not jNode.isNil:
-        for v in jNode:
-            normals.add(v.getFNum())
-
-    jNode = j{"tangents"}
-    var tangents = newSeq[float32]()
-    if not jNode.isNil:
-        for v in jNode:
-            tangents.add(v.getFNum())
+    var vertCoords = getAttribs("vertex_coords")
+    var texCoords = getAttribs("tex_coords")
+    var normals = getAttribs("normals")
+    var tangents = getAttribs("tangents")
 
     jNode = j{"indices"}
     var indices = newSeq[GLushort]()
@@ -393,54 +390,62 @@ method draw*(m: MeshComponent) =
     gl.enable(gl.BLEND)
 
 proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
+    proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
+        when defined(js):
+            asm "`gl`.BufferSubData(`target`, `offset`, new Uint16Array(`data`));"
+        else:
+            glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
+
     let gl = currentContext().gl
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.vboData.indexBuffer)
     let bufSize = gl.getBufferParameteriv(gl.ELEMENT_ARRAY_BUFFER, gl.BUFFER_SIZE)
     let size = int(bufSize / sizeof(GLushort))
-    var data = newSeq[GLushort](size)
+    result = newSeq[GLushort](size)
 
-    #gl.getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, data)
-    result = data
+    getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
 
 proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
+    proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLfloat]) =
+        when defined(js):
+            asm "`gl`.BufferSubData(`target`, `offset`, new Float32Array(`data`));"
+        else:
+            glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
+
     let gl = currentContext().gl
 
     gl.bindBuffer(gl.ARRAY_BUFFER, c.vboData.vertexBuffer)
     let bufSize = gl.getBufferParameteriv(gl.ARRAY_BUFFER, gl.BUFFER_SIZE)
     let size = int(bufSize / sizeof(float32))
-    var data = newSeq[float32](size)
+    result = newSeq[float32](size)
 
-    #gl.getBufferSubData(gl.ARRAY_BUFFER, 0, data)
-    result = data
+    getBufferSubData(gl.ARRAY_BUFFER, 0, result)
 
 proc extractVertexData*(c: MeshComponent, size, offset: int32, data: seq[float32]): seq[float32] =
     let dataStride = int(c.vboData.vertInfo.stride / sizeof(float32))
     let vertCount = int (data.len / dataStride)
 
-    var vertData = newSeq[float32](vertCount * size)
+    result = newSeq[float32](vertCount * size)
     for i in 0 ..< vertCount:
         for j in 0 ..< size:
-            vertData[ size*i + j ] = data[ dataStride*i + j + offset ]
+            result[ size*i + j ] = data[ dataStride*i + j + offset ]
 
-    result = vertData
-
-proc extractVertCoords*(c: MeshComponent, data: seq[float32]): seq[float32] =
+proc extractVertCoords*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.} =
     let size = (int32)c.vboData.vertInfo.numOfCoordPerVert
     let offset = (int32)0
     result = c.extractVertexData(size, offset, data)
 
-proc extractTexCoords*(c: MeshComponent, data: seq[float32]): seq[float32] =
+proc extractTexCoords*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
     let size = (int32)c.vboData.vertInfo.numOfCoordPerTexCoord
     let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert
     result = c.extractVertexData(size, offset, data)
 
-proc extractNormals*(c: MeshComponent, data: seq[float32]): seq[float32] =
+proc extractNormals*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
     let size = (int32)c.vboData.vertInfo.numOfCoordPerNormal
     let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord
     result = c.extractVertexData(size, offset, data)
 
-proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] =
+proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
     let size = (int32)c.vboData.vertInfo.numOfCoordPerTangent
     let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord + c.vboData.vertInfo.numOfCoordPerNormal
     result = c.extractVertexData(size, offset, data)

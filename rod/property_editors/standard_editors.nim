@@ -1,5 +1,4 @@
 import strutils
-import json
 
 import nimx.view
 import nimx.text_field
@@ -40,9 +39,6 @@ proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertyEd
             fromStr(tf.text, v)
             setter(v)
 
-            # if not pv.onActionGetJson.isNil:
-            #     pv.onActionGetJson(%v)
-
         except ValueError:
             discard
     result = pv
@@ -56,10 +52,6 @@ proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): Prope
     textField.onAction do():
         setter(textField.text)
 
-        # if not pv.onActionGetJson.isNil:
-        #     let jn = newJString("test")
-        #     pv.onActionGetJson(jn)
-
     result = pv
     result.addSubview(textField)
 
@@ -72,18 +64,13 @@ proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertyEdito
 
     let pv = result
     proc complexSetter() =
-        let jn = newJArray()
         var val : TVector[vecLen, Coord]
         for i in 0 ..< pv.subviews.len:
             try:
                 val[i] = TextField(pv.subviews[i]).text.parseFloat()
-                jn.add(newJFloat(val[i]))
             except ValueError:
                 return
         setter(val)
-
-        # if not pv.onActionGetJson.isNil:
-        #     pv.onActionGetJson(jn)
 
     let val = getter()
     for i in 0 ..< vecLen:
@@ -165,12 +152,6 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): Proper
                     setter(pc)
                     colorView.backgroundColor = pc
 
-                # if not pv.onActionGetJson.isNil:
-                #     var jn = newJObject()
-                #     for k, v in colorView.backgroundColor.fieldPairs:
-                #         jn.add( %v )
-                #     pv.onActionGetJson(jn)
-
         except ValueError:
             discard
 
@@ -216,8 +197,6 @@ when not defined(android) and not defined(ios):
                 let path = callDialogFileOpen("Select Image")
                 if not path.isNil:
                     setter(imageWithContentsOfFile(path))
-                    # if not pv.onActionGetJson.isNil:
-                    #     pv.onActionGetJson(%path)
 
         result = pv
         result.addSubview(b)
@@ -243,8 +222,6 @@ proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc()
     cb.value = if getter(): 1 else: 0
     cb.onAction do():
         setter(cb.boolValue)
-        # if not pv.onActionGetJson.isNil:
-        #     pv.onActionGetJson(%cb.boolValue)
 
     result = pv
     result.addSubview(cb)

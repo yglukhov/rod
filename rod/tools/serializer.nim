@@ -20,13 +20,10 @@ import rod.component.mesh_component
 type Serializer* = ref object
     savePath*: string
 
-proc checkComponentType(c: Component, T: typedesc): bool =
-    try:
-        type TT = T
-        discard TT(c)
-        result = true
-    except:
-        result = false
+proc `%`*[T](elements: openArray[T]): JsonNode =
+    result = newJArray()
+    for elem in elements:
+        result.add(%elem)
 
 proc vectorToJNode[T](vec: T): JsonNode =
     result = newJArray()
@@ -46,10 +43,10 @@ proc getRelativeResourcePath(s: Serializer, path: string): string =
     result = relativePathToPath(resourcePath, path)
     echo "save path = ", resourcePath, "  relative = ", result
 
-proc getComponentData(s: Serializer, c: Component): JsonNode =
+method getComponentData(s: Serializer, c: Component): JsonNode =
     result = newJObject()
 
-proc getComponentData(s: Serializer, c: Text): JsonNode =
+method getComponentData(s: Serializer, c: Text): JsonNode =
     result = newJObject()
     result.add("text", %c.text)
     result.add("color", colorToJNode(c.color))
@@ -58,7 +55,7 @@ proc getComponentData(s: Serializer, c: Text): JsonNode =
     result.add("shadowColor", colorToJNode(c.shadowColor))
     result.add("Tracking Amount", %c.trackingAmount)
 
-proc getComponentData(s: Serializer, c: Sprite): JsonNode =
+method getComponentData(s: Serializer, c: Sprite): JsonNode =
     result = newJObject()
     result.add("currentFrame", %c.currentFrame)
 
@@ -68,7 +65,7 @@ proc getComponentData(s: Serializer, c: Sprite): JsonNode =
         imagesNode.add( %s.getRelativeResourcePath(img.filePath()) )
 
 
-proc getComponentData(s: Serializer, c: LightSource): JsonNode =
+method getComponentData(s: Serializer, c: LightSource): JsonNode =
     result = newJObject()
     result.add("ambient", %c.lightAmbient)
     result.add("diffuse", %c.lightDiffuse)
@@ -76,7 +73,7 @@ proc getComponentData(s: Serializer, c: LightSource): JsonNode =
     result.add("constant", %c.lightConstant)
 
 
-proc getComponentData(s: Serializer, c: MeshComponent): JsonNode =
+method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result = newJObject()
 
     result.add("emission", colorToJNode(c.material.emission))
@@ -113,29 +110,22 @@ proc getComponentData(s: Serializer, c: MeshComponent): JsonNode =
         result.add("maskTexture",  %s.getRelativeResourcePath(c.material.maskTexture.filePath()))
 
     var data = c.getVBDataFromVRAM()
-    var vc =  c.extractVertCoords(data)
-    var vcNode = newJArray()
-    result.add("vertex_coords", vcNode)
-    for v in vc:
-        vcNode.add(%v)
 
-    var tc = c.extractTexCoords(data)
-    var tcNode = newJArray()
-    result.add("tex_coords", tcNode)
-    for v in tc:
-        tcNode.add(%v)
+    proc needsKey(name: string): bool =
+        case name
+        of "vertex_coords": return c.vboData.vertInfo.numOfCoordPerVert > 0 or false
+        of "tex_coords": return c.vboData.vertInfo.numOfCoordPerTexCoord > 0  or false
+        of "normals": return c.vboData.vertInfo.numOfCoordPerNormal > 0  or false
+        of "tangents": return c.vboData.vertInfo.numOfCoordPerTangent > 0  or false
 
-    var norm = c.extractNormals(data)
-    var normNode = newJArray()
-    result.add("normals", normNode)
-    for v in norm:
-        normNode.add(%v)
+    template addInfo(name: string, f: typed) =
+        if needsKey(name):
+            result[name] = %f(c, data)
 
-    var tang = c.extractTangents(data)
-    var tangNode = newJArray()
-    result.add("tangents", tangNode)
-    for v in tang:
-        tangNode.add(%v)
+    addInfo("vertex_coords", extractVertCoords)
+    addInfo("tex_coords", extractTexCoords)
+    addInfo("normals", extractNormals)
+    addInfo("tangents", extractTangents)
 
     var ib = c.getIBDataFromVRAM()
     var ibNode = newJArray()
@@ -145,42 +135,28 @@ proc getComponentData(s: Serializer, c: MeshComponent): JsonNode =
 
 
 proc getNodeData(s: Serializer, n: Node): JsonNode =
-    var j = newJObject()
-    j.add("name", %n.name)
-    j.add("translation", vectorToJNode(n.translation))
-    j.add("scale", vectorToJNode(n.scale))
-    j.add("rotation", vectorToJNode(n.rotation))
-    j.add("alpha", %n.alpha)
+    result = newJObject()
+    result.add("name", %n.name)
+    result.add("translation", vectorToJNode(n.translation))
+    result.add("scale", vectorToJNode(n.scale))
+    result.add("rotation", vectorToJNode(n.rotation))
+    result.add("alpha", %n.alpha)
 
     if not n.components.isNil:
         var componentsNode = newJObject()
-        j.add("components", componentsNode)
+        result.add("components", componentsNode)
 
         for k, v in n.components:
             var jcomp: JsonNode
-
-            if v.checkComponentType(Sprite):
-                jcomp = s.getComponentData( Sprite(v) )
-
-            if v.checkComponentType(LightSource):
-                jcomp = s.getComponentData( LightSource(v) )
-
-            if v.checkComponentType(Text):
-                jcomp = s.getComponentData( Text(v) )
-
-            if v.checkComponentType(MeshComponent):
-                jcomp = s.getComponentData( MeshComponent(v) )
+            jcomp = s.getComponentData( v )
 
             if not jcomp.isNil:
                 componentsNode.add(k, jcomp)
 
     var childsNode = newJArray()
-    j.add("children", childsNode)
+    result.add("children", childsNode)
     for child in n.children:
         childsNode.add( s.getNodeData(child) )
-
-    # echo "nodeData = ", $j
-    return j
 
 
 proc save*(s: Serializer, n: Node, path: string) =

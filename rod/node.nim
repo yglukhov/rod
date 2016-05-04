@@ -32,18 +32,9 @@ proc newNode*(name: string = nil): Node =
     result.name = name
     result.alpha = 1.0
 
-proc metaData*(n: Node): MetaData =
-    if n.mMetaData.isNil:
-        n.mMetaData = MetaData.new
-        n.mMetaData.jsonNode = newJObject()
-        result = n.mMetaData
-    else:
-        result = n.mMetaData
-
 proc createComponentForNode(n: Node, name: string): Component =
     result = createComponent(name)
     result.node = n
-    n.metaData.validateComponent(name)
 
     if not n.mSceneView.isNil:
         result.componentNodeWasAddedToSceneView()
@@ -83,11 +74,6 @@ proc removeComponent*(n: Node, name: string) =
             c.componentNodeWillBeRemovedFromSceneView()
             n.components.del(name)
 
-            if not n.mMetaData.isNil:
-                var jnode = n.metaData.getJsonNodeAtKeyPath("components")
-                if not jnode.isNil and jnode.hasKey(name):
-                    jnode.delete(name)
-
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
 proc update(n: Node) =
@@ -99,10 +85,21 @@ proc recursiveUpdate*(n: Node) =
     n.update()
     for c in n.children: c.recursiveUpdate()
 
+proc makeTransform(n: Node): Matrix4 =
+    var rot = n.rotation.toMatrix4()
+
+    # // Set up final matrix with scale, rotation and translation
+    result[0] = n.scale.x * rot[0]; result[1] = n.scale.y * rot[1]; result[2] = n.scale.z * rot[2];
+    result[4] = n.scale.x * rot[4]; result[5] = n.scale.y * rot[5]; result[6] = n.scale.z * rot[6];
+    result[8] = n.scale.x * rot[8]; result[9] = n.scale.y * rot[9]; result[10] = n.scale.z * rot[10];
+    result[12] = n.translation.x;  result[13] = n.translation.y; result[14] = n.translation.z;
+
+    # // No projection term
+    result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
+
+
 proc getTransform*(n: Node, mat: var Matrix4) =
-    mat.translate(n.translation)
-    mat.multiply(n.rotation.toMatrix4(), mat)
-    mat.scale(n.scale)
+    mat.multiply(n.makeTransform(), mat)
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
@@ -116,6 +113,7 @@ proc recursiveDraw*(n: Node) =
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
     n.getTransform(tr)
+
     c.withTransform tr:
         var hasPosteffectComponent = false
         if not n.components.isNil:
@@ -248,36 +246,35 @@ proc registerAnimation*(n: Node, name: string, a: Animation) =
     n.animations[name] = a
 
 # Serialization
-proc newNodeFromJson*(j: JsonNode, useMetaData: bool = false): Node
-proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false)
+proc newNodeFromJson*(j: JsonNode): Node
+proc deserialize*(n: Node, j: JsonNode)
 
-proc updateMetaData*(n: Node, attrName: string, jn: JsonNode) =
-    echo "Update node ", attrName
-
-
-proc getJsonNode*(n: Node, path: string): JsonNode =
-    n.metaData.resourcePath = path
-    n.metaData.validate()
-    result = n.metaData.jsonNode
-
-    if n.children.len > 0:
-        var arr = newJArray()
-        result.add("children", arr)
-
-        for i, v in n.children:
-            arr.add(v.getJsonNode(path))
-
-proc loadComposition*(n: Node, resourceName: string, useMetaData: bool = false) =
+proc loadComposition*(n: Node, resourceName: string) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(resourceName)
-        n.deserialize(j, useMetaData)
-        if useMetaData:
-            n.metaData.resourcePath = resourceName
+        n.deserialize(j)
         popParentResource()
 
 import ae_animation
 
-proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false) =
+# proc deserialize*(n: Node, s: Serializer) =
+#     proc toValue(j: JsonNode, s: var string) =
+#         s = j.str
+
+#     proc toValue(j: JsonNode, s: var string) =
+#         s = j.str
+
+#     proc jsonNameForPropName(s: string): string =
+#         case s
+#         of "bEnableBackfaceCulling": "culling"
+#         else: s
+
+#     for k, v in n[].fieldPairs:
+#         echo "deserialize mesh = ", k
+#         jNode{jsonNameForPropName(k)}.toValue(v)
+
+
+proc deserialize*(n: Node, j: JsonNode) =
     if n.name.isNil:
         n.name = j["name"].getStr(nil)
     var v = j{"translation"}
@@ -295,7 +292,7 @@ proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false) =
     v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
-            n.addChild(newNodeFromJson(v[i], useMetaData))
+            n.addChild(newNodeFromJson(v[i]))
     v = j{"components"}
     if not v.isNil:
         for k, c in v:
@@ -312,18 +309,13 @@ proc deserialize*(n: Node, j: JsonNode, useMetaData: bool = false) =
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 
-    if useMetaData:
-        n.metaData.jsonNode = j.copy()
-        if n.metaData.jsonNode.existsKey("children"):
-            n.metaData.jsonNode.delete("children")
-
-proc newNodeFromJson*(j: JsonNode, useMetaData: bool = false): Node =
+proc newNodeFromJson*(j: JsonNode): Node =
     result = newNode()
-    result.deserialize(j, useMetaData)
+    result.deserialize(j)
 
-proc newNodeWithResource*(name: string, useMetaData: bool = false): Node =
+proc newNodeWithResource*(name: string): Node =
     result = newNode()
-    result.loadComposition(name, useMetaData)
+    result.loadComposition(name)
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()

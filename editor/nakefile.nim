@@ -7,3 +7,4 @@ withDir "..":
 beforeBuild = proc(b: Builder) =
     #b.disableClosureCompiler = true
     b.mainFile = "rodedit"
+    b.additionalCompilerFlags.add "-g"
