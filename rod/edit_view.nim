@@ -18,10 +18,12 @@ import nimx.portable_gl
 import nimx.scroll_view
 import nimx.text_field
 import nimx.table_view_cell
+import nimx.gesture_detector_newtouch
 
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
+import rod.editor_camera_controller
 
 import ray
 import nimx.view_event_handling_new
@@ -35,15 +37,23 @@ elif not defined(android) and not defined(ios):
     import native_dialogs
 
 type EventCatchingView* = ref object of View
-    onTouchCallBack*: proc (e: var Event)
 
+type EventCatchingListener = ref object of BaseScrollListener
+    view: EventCatchingView
 
-method onTouchEv*(v: EventCatchingView, e: var Event): bool =
-    if not v.onTouchCallBack.isNil :
-        v.onTouchCallBack(e)
+proc newEventCatchingListener(v: EventCatchingView): EventCatchingListener =
+    result.new
+    result.view = v
 
-    if not result:
-        result = procCall v.View.onTouchEv(e)
+method onTapDown*(ecl: EventCatchingListener, e : var Event) =
+    procCall ecl.BaseScrollListener.onTapDown(e)
+
+method onScrollProgress*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
+    procCall ecl.BaseScrollListener.onScrollProgress(dx, dy, e)
+
+method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
+    procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
+
 
 type Editor* = ref object
     rootNode*: Node3D
@@ -52,6 +62,7 @@ type Editor* = ref object
     sceneView*: SceneView
     selectedNode*: Node3D
     outlineView*:OutlineView
+    cameraController*: EditorCameraController
 
 proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
@@ -129,7 +140,7 @@ proc loadNode(editor: Editor): bool =
     when not defined(js) and not defined(android) and not defined(ios):
         let path = callDialogFileOpen("Select Json")
         if not path.isNil:
-            let rn = newNodeWithResource(path, true)
+            let rn = newNodeWithResource(path)
             editor.rootNode.addChild(rn)
             return true
 
@@ -306,9 +317,20 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
     let settingsView = editor.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
 
+    # let cam = editor.rootNode.findNode("camera")
+    # editor.cameraController = newEditorCameraController(cam)
+
     editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
-    editor.eventCatchingView.onTouchCallBack = proc (event: var Event) =
-        onTouch(editor, event)
+    let eventListner = editor.eventCatchingView.newEventCatchingListener()
+    editor.eventCatchingView.addGestureDetector(newScrollGestureDetector( eventListner ))
+
+    eventListner.tapDownDelegate = proc (event: var Event) =
+        editor.onTouch(event)
+    #     editor.cameraController.onTapDown(event)
+    # eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
+    #     editor.cameraController.onScrollProgress(dx, dy, e)
+    # eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
+    #     editor.cameraController.onTapUp(dx, dy, e)
 
     v.window.addSubview(editor.eventCatchingView)
 
