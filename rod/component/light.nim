@@ -1,3 +1,4 @@
+import json
 import nimx.types
 import nimx.matrixes
 
@@ -57,6 +58,24 @@ method componentNodeWasAddedToSceneView*(ls: LightSource) =
 
 method componentNodeWillBeRemovedFromSceneView(ls: LightSource) =
     ls.node.sceneView.removeLightSource(ls)
+
+method deserialize*(ls: LightSource, j: JsonNode) =
+    var v = j{"ambient"}
+    if not v.isNil:
+        ls.lightAmbient = v.getFNum()
+
+    v = j{"diffuse"}
+    if not v.isNil:
+        ls.lightDiffuse = v.getFNum()
+
+    v = j{"specular"}
+    if not v.isNil:
+        ls.lightSpecular = v.getFNum()
+
+    v = j{"constant"}
+    if not v.isNil:
+        ls.lightConstant = v.getFNum()
+
 
 method visitProperties*(ls: LightSource, p: var PropertyVisitor) =
     p.visitProperty("ambient", ls.lightAmbient)

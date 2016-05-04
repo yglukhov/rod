@@ -25,7 +25,8 @@ template toStr(v: SomeInteger): string = $v
 template fromStr(v: string, t: var SomeReal) = t = v.parseFloat()
 template fromStr(v: string, t: var SomeInteger) = t = v.parseInt()
 
-proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
+proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertyEditorView =
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
     let tf = newNumericTextField(newRect(0, 0, 300, 24))
     tf.textColor = newGrayColor(0.0)
     when T is SomeReal:
@@ -37,20 +38,25 @@ proc newScalarPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
         try:
             fromStr(tf.text, v)
             setter(v)
+
         except ValueError:
             discard
-    result = tf
+    result = pv
+    result.addSubview(tf)
 
-proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): View =
+proc newTextPropertyView(setter: proc(s: string), getter: proc(): string): PropertyEditorView =
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
     let textField = newTextField(newRect(0, 0, 200, 24))
     textField.text = getter()
     textField.textColor = newGrayColor(0.0)
     textField.onAction do():
         setter(textField.text)
-    result = textField
 
-proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
-    result = View.new(newRect(0, 0, 208, 24))
+    result = pv
+    result.addSubview(textField)
+
+proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): PropertyEditorView =
+    result = PropertyEditorView.new(newRect(0, 0, 208, 24))
     const vecLen = high(T) + 1
 
     var x = 0.Coord
@@ -79,8 +85,8 @@ proc newVecPropertyView[T](setter: proc(s: T), getter: proc(): T): View =
         textField.onAction complexSetter
         result.addSubview(textField)
 
-proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
-    result = View.new(newRect(0, 0, 140, 24))
+proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): PropertyEditorView =
+    result = PropertyEditorView.new(newRect(0, 0, 140, 24))
     const vecLen = 3 + 1
 
     let colorView = View.new(newRect(0, 0, 24, 24))
@@ -145,6 +151,7 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
 
                     setter(pc)
                     colorView.backgroundColor = pc
+
         except ValueError:
             discard
 
@@ -162,7 +169,7 @@ proc newColorPropertyView(setter: proc(s: Color), getter: proc(): Color): View =
         textField.onAction complexSetter
         result.addSubview(textField)
 
-proc newSizePropertyView(setter: proc(s: Size), getter: proc(): Size): View =
+proc newSizePropertyView(setter: proc(s: Size), getter: proc(): Size): PropertyEditorView =
     newVecPropertyView(
         proc(v: Vector2) = setter(newSize(v.x, v.y)),
         proc(): Vector2 =
@@ -170,7 +177,7 @@ proc newSizePropertyView(setter: proc(s: Size), getter: proc(): Size): View =
             result = newVector2(s.width, s.height)
             )
 
-proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): View =
+proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): PropertyEditorView =
     newVecPropertyView(
         proc(v: Vector2) = setter(newPoint(v.x, v.y)),
         proc(): Vector2 =
@@ -179,7 +186,8 @@ proc newPointPropertyView(setter: proc(s: Point), getter: proc(): Point): View =
             )
 
 when not defined(android) and not defined(ios):
-    proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): View =
+    proc newImagePropertyView(setter: proc(s: Image), getter: proc(): Image): PropertyEditorView =
+        let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
         let b = Button.new(newRect(0, 0, 200, 24))
         b.title = "Open image..."
         b.onAction do():
@@ -189,11 +197,13 @@ when not defined(android) and not defined(ios):
                 let path = callDialogFileOpen("Select Image")
                 if not path.isNil:
                     setter(imageWithContentsOfFile(path))
-        result = b
+
+        result = pv
+        result.addSubview(b)
 
     registerPropertyEditor(newImagePropertyView)
 
-proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): View =
+proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): PropertyEditorView =
     let textField = newTextField(newRect(0, 0, 200, 24))
     let n = getter()
     textField.textColor = newGrayColor(0.0)
@@ -203,14 +213,18 @@ proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc()
         textField.text = n.name
     textField.onAction do():
         setter(editedNode.sceneView.rootNode.findNode(textField.text))
-    result = textField
+    result = PropertyEditorView.new(newRect(0, 0, 208, 24))
+    result.addSubview(textField)
 
-proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc(): bool): View =
+proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc(): bool): PropertyEditorView =
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
     let cb = newCheckbox(newRect(0, 0, 200, 24))
     cb.value = if getter(): 1 else: 0
     cb.onAction do():
         setter(cb.boolValue)
-    result = cb
+
+    result = pv
+    result.addSubview(cb)
 
 registerPropertyEditor(newTextPropertyView)
 registerPropertyEditor(newScalarPropertyView[Coord])

@@ -1,4 +1,5 @@
 import math
+import algorithm
 
 import nimx.view
 import nimx.types
@@ -17,23 +18,51 @@ import nimx.portable_gl
 import nimx.scroll_view
 import nimx.text_field
 import nimx.table_view_cell
+import nimx.gesture_detector_newtouch
 
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
+import rod.editor_camera_controller
+
+import ray
+import nimx.view_event_handling_new
+import viewport
 
 import variant
 
 when defined(js):
-    import dom
+    import dom except Event
 elif not defined(android) and not defined(ios):
     import native_dialogs
 
+type EventCatchingView* = ref object of View
+
+type EventCatchingListener = ref object of BaseScrollListener
+    view: EventCatchingView
+
+proc newEventCatchingListener(v: EventCatchingView): EventCatchingListener =
+    result.new
+    result.view = v
+
+method onTapDown*(ecl: EventCatchingListener, e : var Event) =
+    procCall ecl.BaseScrollListener.onTapDown(e)
+
+method onScrollProgress*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
+    procCall ecl.BaseScrollListener.onScrollProgress(dx, dy, e)
+
+method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
+    procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
+
+
 type Editor* = ref object
     rootNode*: Node3D
-    eventCatchingView*: View
+    eventCatchingView*: EventCatchingView
     treeView*: View
+    sceneView*: SceneView
     selectedNode*: Node3D
+    outlineView*:OutlineView
+    cameraController*: EditorCameraController
 
 proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
@@ -81,8 +110,44 @@ proc newSettingsView(e: Editor, r: Rect): PanelView =
                 e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
     result.addSubview(cameraFocusButton)
 
+proc getTreeViewIndexPathForNode(editor: Editor, n: Node3D, indexPath: var seq[int]) =
+    # running up and calculate the path to the node in the tree
+    let parent = n.parent
+    indexPath.insert(parent.children.find(n), 0)
+
+    # because there is the root node, it's necessary to add 0
+    if parent.isNil or parent == editor.rootNode:
+        indexPath.insert(0, 0)
+        return
+
+    editor.getTreeViewIndexPathForNode(parent, indexPath)
+
+when not defined(js) and not defined(android) and not defined(ios):
+    import os
+import streams
+import json
+import tools.serializer
+proc saveNode(editor: Editor, selectedNode: Node3D): bool =
+    when not defined(js) and not defined(android) and not defined(ios):
+        let path = callDialogFileSave("Save Json")
+        if not path.isNil:
+            var s = Serializer.new()
+            s.save(selectedNode, path)
+
+    return false
+
+proc loadNode(editor: Editor): bool =
+    when not defined(js) and not defined(android) and not defined(ios):
+        let path = callDialogFileOpen("Select Json")
+        if not path.isNil:
+            let rn = newNodeWithResource(path)
+            editor.rootNode.addChild(rn)
+            return true
+
+    return false
+
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
-    result = PanelView.new(newRect(0, 0, 200, 700))
+    result = PanelView.new(newRect(0, 0, 200, 600)) #700
     result.collapsible = true
 
     let title = newLabel(newRect(22, 6, 108, 15))
@@ -91,7 +156,8 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
     result.addSubview(title)
 
-    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 40))
+    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 60)) #-40
+    e.outlineView = outlineView
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
         if indexPath.len == 0:
@@ -207,18 +273,74 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
                         outlineView.reloadData()
         result.addSubview(loadButton)
 
+        when not defined(js) and not defined(android) and not defined(ios):
+            let saveButton = Button.new(newRect(110, result.bounds.height - 40, 60, 20))
+            saveButton.title = "Save"
+            saveButton.onAction do():
+                if outlineView.selectedIndexPath.len > 0:
+                    var selectedNode = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+                    if not selectedNode.isNil:
+                        discard e.saveNode(selectedNode)
+            result.addSubview(saveButton)
+
+            let loadJButton = Button.new(newRect(50, result.bounds.height - 40, 60, 20))
+            loadJButton.title = "Load J"
+            loadJButton.onAction do():
+                discard e.loadNode()
+            result.addSubview(loadJButton)
+
+proc onTouch*(editor: Editor, e: var Event) =
+    #TODO Hack to sync node tree and treeView
+    editor.outlineView.reloadData()
+
+    let r = editor.sceneView.rayWithScreenCoords(e.localPosition)
+    var castResult = newSeq[RayCastInfo]()
+    editor.sceneView.rootNode().rayCast(r, castResult)
+
+    if castResult.len > 0:
+        castResult.sort( proc (x, y: RayCastInfo): int =
+            result = int(x.distance - y.distance) )
+
+        var indexPath = newSeq[int]()
+        editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
+
+        if indexPath.len > 1:
+            editor.outlineView.selectItemAtIndexPath(indexPath)
+            editor.outlineView.expandBranch(indexPath)
+
+
 proc startEditingNodeInView*(n: Node3D, v: View): Editor =
-    result.new()
-    result.rootNode = n
+    var editor = Editor.new()
+    editor.rootNode = n
+    editor.sceneView = n.sceneView # Warning!
 
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
-    let settingsView = result.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
+    let settingsView = editor.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
 
-    result.treeView = newTreeView(result, inspectorView)
-    v.window.addSubview(result.treeView)
+    # let cam = editor.rootNode.findNode("camera")
+    # editor.cameraController = newEditorCameraController(cam)
+
+    editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
+    let eventListner = editor.eventCatchingView.newEventCatchingListener()
+    editor.eventCatchingView.addGestureDetector(newScrollGestureDetector( eventListner ))
+
+    eventListner.tapDownDelegate = proc (event: var Event) =
+        editor.onTouch(event)
+    #     editor.cameraController.onTapDown(event)
+    # eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
+    #     editor.cameraController.onScrollProgress(dx, dy, e)
+    # eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
+    #     editor.cameraController.onTapUp(dx, dy, e)
+
+    v.window.addSubview(editor.eventCatchingView)
+
+    editor.treeView = newTreeView(editor, inspectorView)
+    v.window.addSubview(editor.treeView)
 
     v.window.addSubview(inspectorView)
     v.window.addSubview(settingsView)
+
+    return editor
 
 proc endEditing*(e: Editor) =
     discard
