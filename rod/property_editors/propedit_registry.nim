@@ -43,6 +43,3 @@ proc propertyEditorForProperty*(n: Node, keyPath, title: string, v: Variant): Vi
         editor.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
         result.addSubview(editor)
 
-        editor.onActionGetJson= proc(j: JsonNode) =
-            n.metaData.updateMetaData(keyPath, title, j)
-

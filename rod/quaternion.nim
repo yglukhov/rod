@@ -23,7 +23,7 @@ proc newQuaternion*(x, y, z, w: Coord): Quaternion =
 proc newQuaternion*(angle: Coord, axis: Vector3): Quaternion =
     var normAxis = axis
     normAxis.normalize()
-    let rangle = degToRad(angle) / 2
+    let rangle = -degToRad(angle) / 2
     let sinAngle = sin(rangle)
     let cosAngle = cos(rangle)
 
@@ -71,6 +71,17 @@ proc `*`*(lhs: Quaternion, rhs: Vector3): Vector3 =
 proc newQuaternionFromEulerZXY*(x, y, z: Coord): Quaternion = aroundZ(z) * aroundX(x) * aroundY(y)
 proc newQuaternionFromEulerXYZ*(x, y, z: Coord): Quaternion = aroundX(x) * aroundY(y) * aroundZ(z)
 proc newQuaternionFromEulerYXZ*(x, y, z: Coord): Quaternion = aroundY(y) * aroundX(x) * aroundZ(z)
+proc newQuaternionFromEulerYZX*(x, y, z: Coord): Quaternion = aroundY(y) * aroundZ(z) * aroundX(x)
+
+
+ #     |       2     2                                |
+ #     | 1 - 2Y  - 2Z    2XY - 2ZW      2XZ + 2YW     |
+ #     |                                              |
+ #     |                       2     2                |
+ # M = | 2XY + 2ZW       1 - 2X  - 2Z   2YZ - 2XW     |
+ #     |                                              |
+ #     |                                      2     2 |
+ #     | 2XZ - 2YW       2YZ + 2XW      1 - 2X  - 2Y  |
 
 proc toMatrix4*(q: Quaternion): Matrix4 =
     var qw = q.w;
@@ -90,28 +101,6 @@ proc toMatrix4*(q: Quaternion): Matrix4 =
         2.0f*qx*qz - 2.0f*qy*qw, 2.0f*qy*qz + 2.0f*qx*qw, 1.0f - 2.0f*qx*qx - 2.0f*qy*qy, 0.0f,
         0.0f, 0.0f, 0.0f, 1.0f]
 
-proc fromMatrix4*(mat: Matrix4): Quaternion =
-    var s, x, y, z, w: Coord
-    if mat[0] > mat[5] and mat[0] > mat[10]:
-        s = sqrt(1.0 + mat[0] - mat[5] - mat[10]) * 2.0
-        x = 0.25 * s
-        y = (mat[4] + mat[1]) / s
-        z = (mat[2] + mat[8]) / s
-        w = (mat[9] - mat[6]) / s
-    elif mat[5] > mat[10]:
-        s = sqrt(1.0 + mat[5] - mat[0] - mat[10]) * 2.0
-        x = (mat[4] + mat[1]) / s
-        y = 0.25 * s
-        z = (mat[9] + mat[6]) / s
-        w = (mat[2] - mat[8]) / s
-    else:
-        s = sqrt(1.0 + mat[10] - mat[0] - mat[5]) * 2.0
-        x = (mat[2] + mat[8]) / s
-        y = (mat[9] + mat[6]) / s
-        z = 0.25 * s
-        w = (mat[4] - mat[1]) / s
-    result = newQuaternion(x, y, z, w)
-
 proc lengthSquared*(q: Quaternion): Coord = q.w * q.w + q.x * q.x + q.y * q.y + q.z * q.z
 
 proc isAround(lhs, rhs: Coord): bool =
@@ -127,6 +116,98 @@ proc normalized*(q: Quaternion): Quaternion =
         return q
 
 proc conjugated*(q: Quaternion): Quaternion = [-q.x, -q.y, -q.z, q.w]
+
+proc fromMatrix4*(mtx: Matrix4): Quaternion =
+    var bigType: int32
+    var quat: Quaternion
+
+    # From the matrix diagonal element, calc (4q^2 - 1),
+    # where q is each of the quaternion components: w, x, y & z.
+    let fourWSqM1 =  mtx[0] + mtx[5] + mtx[10]
+    let fourXSqM1 =  mtx[0] - mtx[5] - mtx[10]
+    let fourYSqM1 = -mtx[0] + mtx[5] - mtx[10]
+    let fourZSqM1 = -mtx[0] - mtx[5] + mtx[10]
+    var bigFourSqM1: float32
+
+    # // Determine the biggest quaternion component from the above options.
+    bigType = 0
+    bigFourSqM1 = fourWSqM1
+    if fourXSqM1 > bigFourSqM1:
+        bigFourSqM1 = fourXSqM1
+        bigType = 1
+    if fourYSqM1 > bigFourSqM1:
+        bigFourSqM1 = fourYSqM1
+        bigType = 2
+    if fourZSqM1 > bigFourSqM1:
+        bigFourSqM1 = fourZSqM1
+        bigType = 3
+
+    # // Isolate that biggest component value, q from the above formula
+    # // (4q^2 - 1), and calculate the factor  (1 / 4q).
+    let bigVal = sqrt(bigFourSqM1 + 1.0f) * 0.5f
+    let oo4BigVal = 1.0f / (4.0f * bigVal)
+
+    case bigType
+    of 0:
+        quat.w = bigVal
+        quat.x = (mtx[6] - mtx[9]) * oo4BigVal
+        quat.y = (mtx[8] - mtx[2]) * oo4BigVal
+        quat.z = (mtx[1] - mtx[4]) * oo4BigVal
+
+    of 1:
+        quat.w = (mtx[6] - mtx[9]) * oo4BigVal
+        quat.x = bigVal
+        quat.y = (mtx[1] + mtx[4]) * oo4BigVal
+        quat.z = (mtx[8] + mtx[2]) * oo4BigVal
+
+    of 2:
+        quat.w = (mtx[8] - mtx[2]) * oo4BigVal
+        quat.x = (mtx[1] + mtx[4]) * oo4BigVal
+        quat.y = bigVal
+        quat.z = (mtx[6] + mtx[9]) * oo4BigVal
+
+    of 3:
+        quat.w = (mtx[1] - mtx[4]) * oo4BigVal
+        quat.x = (mtx[8] + mtx[2]) * oo4BigVal
+        quat.y = (mtx[6] + mtx[9]) * oo4BigVal
+        quat.z = bigVal
+
+    else:
+        raise newException(Exception, "wrong quaternion big type")
+
+    return normalized(quat)
+
+ #     |  cycz + sxsysz   cxsz   cysxsz - czsy  |
+ # M = |  czsxsy - cysz   cxcz   cyczsx + sysz  |
+ #     |  cxsy            -sx    cxcy           |
+proc Matrix4FromRotationYXZ*(aRotation: Vector3): Matrix4 =
+    let rotRads = newVector3(degToRad(aRotation.x), degToRad(aRotation.y), degToRad(aRotation.z))
+
+    let cx = cos(rotRads.x)
+    let sx = sin(rotRads.x)
+    let cy = cos(rotRads.y)
+    let sy = sin(rotRads.y)
+    let cz = cos(rotRads.z)
+    let sz = sin(rotRads.z)
+
+    result[0] = (cy * cz) + (sx * sy * sz)
+    result[1] = cx * sz;
+    result[2] = (cy * sx * sz) - (cz * sy)
+
+    result[4] = (cz * sx * sy) - (cy * sz)
+    result[5] = cx * cz
+    result[6] = (cy * cz * sx) + (sy * sz)
+
+    result[8] = cx * sy
+    result[9] = -sx
+    result[10] = cx * cy
+
+    result[15] = 1.0f
+
+# TODO Fix it. Looking like LeftHanded system
+proc newQuaternionFromEulerYXZ_EX*(x, y, z: Coord): Quaternion =
+    var rotMtx = Matrix4FromRotationYXZ(newVector3(x, y, z))
+    return rotMtx.fromMatrix4()
 
 proc eulerAngles*(q: Quaternion): Vector3 =
     # Derivation from http://www.geometrictools.com/Documentation/EulerAngles.pdf
@@ -151,3 +232,91 @@ proc eulerAngles*(q: Quaternion): Vector3 =
             radToDeg(arctan2(2.0f * (q.x * q.z + q.w * q.y), 1.0f - 2.0f * (q.x * q.x + q.y * q.y))),
             radToDeg(arctan2(2.0f * (q.x * q.y + q.w * q.z), 1.0f - 2.0f * (q.x * q.x + q.z * q.z)))
         )
+
+proc toPointTowards*(fwdDirection, upDirection: Vector3): Matrix4 =
+     # where f is the normalized Forward vector (the direction being pointed to)
+     # and u is the normalized Up vector in the rotated frame
+     # and r is the normalized Right vector in the rotated frame
+    var f = fwdDirection
+    f.normalize()
+    var r = cross(f, upDirection)
+    r.normalize()
+    var u = cross(r, f)
+
+    result[0] = r.x;
+    result[1] = r.y;
+    result[2] = r.z;
+    result[3] = 0.0;
+
+    result[4] = u.x;
+    result[5] = u.y;
+    result[6] = u.z;
+    result[7] = 0.0;
+
+    result[8]  = -f.x;
+    result[9]  = -f.y;
+    result[10] = -f.z;
+    result[11] = 0.0;
+
+    result[12] = 0.0;
+    result[13] = 0.0;
+    result[14] = 0.0;
+    result[15] = 1.0;
+
+proc toLookAt*(targetLocation, eyeLocation, upDirection: Vector3): Matrix4 =
+    var fwdDir = targetLocation - eyeLocation
+    var pt = toPointTowards(fwdDir, upDirection)
+    pt.transpose()
+
+    pt[12] += eyeLocation.x * pt[0] + eyeLocation.y * pt[4] + eyeLocation.z * pt[8];
+    pt[13] += eyeLocation.x * pt[1] + eyeLocation.y * pt[5] + eyeLocation.z * pt[9];
+    pt[14] += eyeLocation.x * pt[2] + eyeLocation.y * pt[6] + eyeLocation.z * pt[10];
+    pt[15] += eyeLocation.x * pt[3] + eyeLocation.y * pt[7] + eyeLocation.z * pt[11];
+
+    return pt
+
+# proc StabilizeLength*(quat: var Quaternion) =
+#    var cs = abs(quat.x) + abs(quat.y) + abs(quat.z) + abs(quat.w);
+#    if cs > 0.0:
+#        quat = newQuaternion(quat.x/cs, quat.y/cs, quat.z/cs, quat.w/cs)
+#    else:
+#        quat = newQuaternion()
+
+# proc Norm*(quat: Quaternion): float32 =
+#     return quat.x * quat.x + quat.y * quat.y + quat.z * quat.z + quat.w * quat.w
+
+# proc Normalize(quat: var Quaternion) =
+#     var m = sqrt(quat.Norm())
+#     if m < 0.000001:
+#         quat.StabilizeLength()
+#         m = sqrt(quat.Norm())
+
+#     quat.x = quat.x * (1.0 / m)
+#     quat.y = quat.y * (1.0 / m)
+#     quat.z = quat.z * (1.0 / m)
+#     quat.w = quat.w * (1.0 / m)
+
+# proc RotateVector*(quat: Quaternion, v: Vector3): Vector3 =
+#     var q = newQuaternion(  v.x * quat.w + v.z * quat.y - v.y * quat.z,
+#                             v.y * quat.w + v.x * quat.z - v.z * quat.x,
+#                             v.z * quat.w + v.y * quat.x - v.x * quat.y,
+#                             v.x * quat.x + v.y * quat.y + v.z * quat.z)
+#     var s = 1.0 / quat.Norm()
+#     result.x = (quat.w * q.x + quat.x * q.w + quat.y * q.z - quat.z * q.y) * s
+#     result.y = (quat.w * q.y + quat.y * q.w + quat.z * q.x - quat.x * q.z) * s
+#     result.z = (quat.w * q.z + quat.z * q.w + quat.x * q.y - quat.y * q.x) * s
+
+# proc ShortestArc*(quat: var Quaternion, src, to: Vector3) =
+#     var c = cross(src, to)
+#     quat = newQuaternion(c.x, c.y, c.z, dot(src, to))
+#     quat.Normalize()
+#     quat.w += 1.0
+
+#     if quat.w <= 0.00001:
+#         if (src.z * src.z) > (src.x * src.x):
+#             quat = newQuaternion(0, src.z, - src.y, quat.w)
+#         else:
+#             quat = newQuaternion(src.y, - src.x, 0, quat.w)
+
+#     quat.Normalize()
+

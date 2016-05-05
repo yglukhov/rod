@@ -11,7 +11,7 @@ import nimx.view
 
 type PanelView* = ref object of View
     collapsible*: bool
-    collapsed*: bool
+    mCollapsed: bool
     fullHeight*: Coord
 
 # PanelView drag implementation
@@ -19,6 +19,13 @@ type PanelView* = ref object of View
 type PanelScrollListener = ref object of OnScrollListener
     panel: PanelView
     diff: Point
+
+proc `collapsed=`*(v: PanelView, f: bool) =
+    v.mCollapsed = f
+    v.setFrameSize(newSize(v.frame.size.width, if v.mCollapsed: 27.Coord else: v.fullHeight))
+    v.setNeedsDisplay()
+
+template collapsed*(v: PanelView): bool = v.mCollapsed
 
 proc newPanelScrollListener(v: PanelView): PanelScrollListener =
     result.new
@@ -36,7 +43,7 @@ method onScrollProgress(ls: PanelScrollListener, dx, dy : float32, e : var Event
 method init*(v: PanelView, r: Rect) =
     procCall v.View.init(r)
     v.backgroundColor = newColor(0.5, 0.5, 0.5, 0.5)
-    v.collapsed = false
+    v.mCollapsed = false
     v.collapsible = false
     v.fullHeight = r.height
 
@@ -49,8 +56,6 @@ method init*(v: PanelView, r: Rect) =
         if innerPoint.x > 0 and innerPoint.x < 27 and innerPoint.y > 0 and innerPoint.y < 27:
             if v.collapsible:
                 v.collapsed = not v.collapsed
-                v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
-                v.setNeedsDisplay()
     ))
 
 var disclosureTriangleComposition = newComposition """
@@ -99,8 +104,8 @@ method draw(v: PanelView, r: Rect) =
             # Collapse button open
             drawDisclosureTriangle(true, newRect(r.x, r.y, 27, 27))
         else:
-            v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
-            v.setNeedsDisplay()
+            #v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
+            #v.setNeedsDisplay()
 
             # Collapse button close
             drawDisclosureTriangle(false, newRect(r.x, r.y, 27, 27))
