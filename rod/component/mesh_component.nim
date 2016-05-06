@@ -475,4 +475,6 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("RIM", m.material.isRIM)
     p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
+    p.visitProperty("matcap", m.material.matcapTexture)
+
 registerComponent[MeshComponent]()
