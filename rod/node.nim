@@ -14,6 +14,8 @@ import nimx.view
 
 import quaternion
 import property_visitor
+import ray
+import meta_data
 
 import rod_types
 export Node
@@ -33,6 +35,7 @@ proc newNode*(name: string = nil): Node =
 proc createComponentForNode(n: Node, name: string): Component =
     result = createComponent(name)
     result.node = n
+
     if not n.mSceneView.isNil:
         result.componentNodeWasAddedToSceneView()
 
@@ -82,10 +85,21 @@ proc recursiveUpdate*(n: Node) =
     n.update()
     for c in n.children: c.recursiveUpdate()
 
+proc makeTransform(n: Node): Matrix4 =
+    var rot = n.rotation.toMatrix4()
+
+    # // Set up final matrix with scale, rotation and translation
+    result[0] = n.scale.x * rot[0]; result[1] = n.scale.y * rot[1]; result[2] = n.scale.z * rot[2];
+    result[4] = n.scale.x * rot[4]; result[5] = n.scale.y * rot[5]; result[6] = n.scale.z * rot[6];
+    result[8] = n.scale.x * rot[8]; result[9] = n.scale.y * rot[9]; result[10] = n.scale.z * rot[10];
+    result[12] = n.translation.x;  result[13] = n.translation.y; result[14] = n.translation.z;
+
+    # // No projection term
+    result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
+
+
 proc getTransform*(n: Node, mat: var Matrix4) =
-    mat.translate(n.translation)
-    mat.multiply(n.rotation.toMatrix4(), mat)
-    mat.scale(n.scale)
+    mat.multiply(n.makeTransform(), mat)
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
@@ -99,6 +113,7 @@ proc recursiveDraw*(n: Node) =
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
     n.getTransform(tr)
+
     c.withTransform tr:
         var hasPosteffectComponent = false
         if not n.components.isNil:
@@ -242,38 +257,55 @@ proc loadComposition*(n: Node, resourceName: string) =
 
 import ae_animation
 
+# proc deserialize*(n: Node, s: Serializer) =
+#     proc toValue(j: JsonNode, s: var string) =
+#         s = j.str
+
+#     proc toValue(j: JsonNode, s: var string) =
+#         s = j.str
+
+#     proc jsonNameForPropName(s: string): string =
+#         case s
+#         of "bEnableBackfaceCulling": "culling"
+#         else: s
+
+#     for k, v in n[].fieldPairs:
+#         echo "deserialize mesh = ", k
+#         jNode{jsonNameForPropName(k)}.toValue(v)
+
+
 proc deserialize*(n: Node, j: JsonNode) =
     if n.name.isNil:
         n.name = j["name"].getStr(nil)
-    var v = j["translation"]
+    var v = j{"translation"}
     if not v.isNil:
         n.translation = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j["scale"]
+    v = j{"scale"}
     if not v.isNil:
         n.scale = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j["rotation"]
+    v = j{"rotation"}
     if not v.isNil:
         n.rotation = newQuaternion(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
-    v = j["alpha"]
+    v = j{"alpha"}
     if not v.isNil:
         n.alpha = v.getFNum()
-    v = j["children"]
+    v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
             n.addChild(newNodeFromJson(v[i]))
-    v = j["components"]
+    v = j{"components"}
     if not v.isNil:
         for k, c in v:
             let comp = n.component(k)
             comp.deserialize(c)
-    let animations = j["animations"]
 
+    let animations = j{"animations"}
     if not animations.isNil and animations.len > 0:
         n.animations = newTable[string, Animation]()
         for k, v in animations:
             n.animations[k] = animationWithAEJson(n, v)
 
-    let compositionRef = j["compositionRef"].getStr(nil)
+    let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 
@@ -324,6 +356,23 @@ proc getTreeDistance*(x, y: Node): int =
     let iy = px.children.find(cy)
 
     result = iy - ix
+
+
+proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
+    if not n.components.isNil:
+        for name, component in n.components:
+            var distance: float32
+            let res = component.rayCast(r, distance)
+
+            if res:
+                var castInfo: RayCastInfo
+                castInfo.node = n
+                castInfo.distance = distance
+                castResult.add(castInfo)
+
+    for c in n.children:
+        c.rayCast(r, castResult)
+
 
 # Debugging
 proc recursiveChildrenCount*(n: Node): int =

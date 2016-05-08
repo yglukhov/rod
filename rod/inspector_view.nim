@@ -45,13 +45,15 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
 
         var y = Coord(0)
         var pv: View
+        var KeyPath = ""
+
         var visitor : PropertyVisitor
         visitor.requireName = true
         visitor.requireSetter = true
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter)
+            pv = propertyEditorForProperty(n, KeyPath, visitor.name, visitor.setterAndGetter)
             pv.setFrameOrigin(newPoint(6, y))
             pv.setFrameSize(newSize(pv.frame.width - 16.Coord, pv.frame.height))
             y += pv.frame.height
@@ -61,6 +63,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
 
         if not n.components.isNil:
             for k, v in n.components:
+                KeyPath = "components." & k
                 y += 12
                 pv = newSectionTitle(y, i, n, k)
                 y += pv.frame.height

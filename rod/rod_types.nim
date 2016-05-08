@@ -8,6 +8,7 @@ import nimx.image
 import nimx.portable_gl
 
 import quaternion
+import meta_data
 
 const maxLightsCount* = 8
 
@@ -23,6 +24,7 @@ type
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
         alpha*: Coord
+        mMetaData*: MetaData
 
     Node2D* = Node3D
 

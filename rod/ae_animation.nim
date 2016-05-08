@@ -64,13 +64,14 @@ proc findAnimatableProperty(n: Node, propName: string): Variant =
     result = res
 
 proc createProgressSetterWithPropSetter[T](setter: proc(v: T), janim: JsonNode): AnimProcSetter =
-    var propValues = newSeq[T](janim["values"].len)
+    let jVals = janim["values"]
+    var propValues = newSeq[T](jVals.len)
     for i in 0 ..< propValues.len:
-        propValues[i] = elementFromJson(T, janim["values"][i])
+        propValues[i] = elementFromJson(T, jVals[i])
 
     let fromValue = 0.0
     let toValue = (propValues.len - 1).float
-    let doLerp = janim["frameLerp"].getBVal(true)
+    let doLerp = janim{"frameLerp"}.getBVal(true)
 
     result = proc(p: float) =
         let i = interpolate(fromValue, toValue, p)
@@ -112,7 +113,7 @@ proc animationWithAEJson*(n: Node2D, j: JsonNode): Animation =
 
     for k, v in j:
         result.loopDuration = max(v["duration"].getFNum(), result.loopDuration)
-        result.numberOfLoops = v["numberOfLoops"].getNum(1).int
+        result.numberOfLoops = v{"numberOfLoops"}.getNum(1).int
         let progressSetter = createProgressSetter(k, n, v)
         if not progressSetter.isNil:
             animProgressSetters.add(progressSetter)

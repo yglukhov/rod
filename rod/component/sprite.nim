@@ -7,6 +7,7 @@ import json, strutils
 
 import rod.node
 import rod.property_visitor
+import rod.ray
 
 #import image_blur
 
@@ -68,11 +69,11 @@ proc createFrameAnimation(s: Sprite) =
     s.node.registerAnimation("sprite", a)
 
 method deserialize*(s: Sprite, j: JsonNode) =
-    var v = j["alpha"] # Deprecated
+    var v = j{"alpha"} # Deprecated
     if not v.isNil:
         s.node.alpha = v.getFNum(1.0)
 
-    v = j["fileNames"]
+    v = j{"fileNames"}
     if v.isNil:
         s.image = imageWithResource(j["name"].getStr())
     else:
@@ -101,6 +102,21 @@ method deserialize*(s: Sprite, j: JsonNode) =
 
     if s.images.len > 1:
         s.createFrameAnimation()
+
+method rayCast*(s: Sprite, r: Ray, distance: var float32): bool =
+    let img = s.image
+    if img.isNil:
+        return false
+
+    var inv_mat: Matrix4
+    if tryInverse (s.node.worldTransform(), inv_mat) == false:
+        return false
+
+    let localRay = r.transform(inv_mat)
+    var minCoord = newVector3(-s.offset.x, -s.offset.y, 0.0)
+    var maxCoord = newVector3(img.size.width - s.offset.x, img.size.height - s.offset.y, 0.01)
+    result = localRay.intersectWithAABB(minCoord, maxCoord, distance)
+
 
 method visitProperties*(t: Sprite, p: var PropertyVisitor) =
     p.visitProperty("image", t.image)

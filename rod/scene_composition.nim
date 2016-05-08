@@ -262,6 +262,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
             var texName = colladaScene.getTextureLocationByName(childColladaMaterial.diffuseTextureName)
             if texName != nil:
                 nodeMesh.material.albedoTexture = imageWithResource(texName)
+                nodeMesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
 
         if childColladaMaterial.reflectiveTextureName != nil:
             var texName = colladaScene.getTextureLocationByName(childColladaMaterial.reflectiveTextureName)
