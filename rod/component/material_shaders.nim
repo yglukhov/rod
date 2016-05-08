@@ -65,6 +65,10 @@ varying vec3 vBinormal;
 varying vec2 vTexCoord;
 #endif
 
+#ifdef WITH_MATCAP_SAMPLER
+uniform sampler2D matcapUnit;
+uniform vec4 uMatcapUnitCoords;
+#endif
 #ifdef WITH_AMBIENT_SAMPLER
 uniform sampler2D texUnit;
 uniform vec4 uTexUnitCoords;
@@ -200,7 +204,8 @@ uniform float uLightLinear7;
 uniform float uLightQuadratic7;
 uniform float uAttenuation7;
 #endif
-// uniform vec4 uCamPosition;
+
+uniform vec4 uCamPosition;
 
 const float mipBias = -1000.0;
 
@@ -532,7 +537,58 @@ vec4 computeTexel() {
     return texel;
 }
 
+#ifdef WITH_MATCAP_SAMPLER
+vec4 computeTexelMatcap() {
+    #ifdef WITH_MASK_SAMPLER
+        float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a;
+        if ( mask < 0.001 ) {
+            discard;
+        }
+    #endif
+
+    #ifdef WITH_V_TANGENT
+        #ifdef WITH_NORMAL_SAMPLER
+            mat3 TBN = mat3(vTangent, vBinormal, vNormal);
+            vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
+            vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0;
+            vec3 normal = TBN * bumpNormal;
+            #ifdef WITH_NORMALMAP_TO_SRGB
+                normal = toSRGB(normal);
+            #endif
+            normal = normalize(normal);
+        #else
+            vec3 normal = normalize(vNormal);
+        #endif
+    #else
+        #ifdef WITH_V_NORMAL
+            vec3 normal = normalize(vNormal);
+            #ifdef WITH_NORMAL_SAMPLER
+                #ifdef WITH_TBN_FROM_NORMALS
+                    normal = perturb_normal(normal, vPosition, uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
+                #endif
+            #endif
+        #endif
+    #endif
+
+    vec3 bivector = uCamPosition.xyz - vPosition.xyz;
+    vec3 L = normalize(bivector);
+    vec3 reflected = normalize(-reflect(L, normal));
+    float m = 2.0 * sqrt( pow(reflected.x, 2.0) + pow(reflected.y, 2.0) + pow(reflected.z + 1.0, 2.0) );
+    vec2 uv = reflected.xy / m + 0.5;
+    uv = vec2(uv.x, 1.0 - uv.y);
+
+    return vec4(texture2D(matcapUnit, uMatcapUnitCoords.xy + (uMatcapUnitCoords.zw - uMatcapUnitCoords.xy) * uv, mipBias).rgb, uMaterialTransparency);
+}
+#endif
+
+
 void main() {
-    gl_FragColor = computeTexel();
+    #ifdef WITH_MATCAP_SAMPLER
+        vec4 result = computeTexelMatcap();
+    #else
+        vec4 result = computeTexel();
+    #endif
+
+    gl_FragColor = result;
 }
 """
