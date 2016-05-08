@@ -7,8 +7,6 @@ import rod.node
 import rod.component
 import rod.postprocess_context
 
-import tables
-
 type BlendMode * = enum
     COLOR_ADD = GL_ONE
     COLOR_SCREEN = GL_ONE_MINUS_SRC_COLOR
