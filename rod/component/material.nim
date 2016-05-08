@@ -36,6 +36,7 @@ type ShaderMacro = enum
     WITH_V_NORMAL
     WITH_V_BINORMAL
     WITH_V_TANGENT
+    WITH_MATCAP_SAMPLER
     WITH_AMBIENT_SAMPLER
     WITH_GLOSS_SAMPLER
     WITH_SPECULAR_SAMPLER
@@ -85,6 +86,8 @@ type
         reflectivityInited: bool
 
     Material* = ref object of RootObj
+        matcapTexture: Image
+
         albedoTexture*: Image
         glossTexture*: Image
         specularTexture*: Image
@@ -96,6 +99,7 @@ type
 
         color*: MaterialColor
         rimDensity: Coord
+        rimColor: Color
 
         currentLightSourcesCount: int
         isLightReceiver: bool
@@ -134,6 +138,8 @@ proc specular*(m: Material): Color = result = m.color.specular
 proc shininess*(m: Material): Coord = result = m.color.shininess
 proc reflectivity*(m: Material): Coord = result = m.color.reflectivity
 proc rimDensity*(m: Material): Coord = result = m.rimDensity
+proc rimColor*(m: Material): Color = result = m.rimColor
+proc matcapTexture*(m: Material): Image = result = m.matcapTexture
 
 template `emission=`*(m: Material, v: Color) =
     if not m.color.emissionInited:
@@ -170,6 +176,13 @@ template `reflectivity=`*(m: Material, r: Coord) =
     m.color.reflectivityInited = true
 template `rimDensity=`*(m: Material, val: Coord) =
     m.rimDensity = val
+template `rimColor=`*(m: Material, val: Color) =
+    m.rimColor = val
+template `matcapTexture=`*(m: Material, i: Image) =
+    if m.matcapTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_MATCAP_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.matcapTexture = i
 
 template removeEmissionColor*(m: Material) =
     m.color.emissionInited = false
@@ -239,6 +252,7 @@ template setupRIMLightTechnique*(m: Material) =
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
     else:
         gl.uniform1f(gl.getUniformLocation(m.shader, "uRimDensity"), m.rimDensity.GLfloat)
+        c.setColorUniform(m.shader, "uRimColor", m.rimColor)
 
 template setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
     if m.shader == invalidProgram:
@@ -313,6 +327,16 @@ proc setupSamplerAttributes(m: Material) =
     var theQuad {.noinit.}: array[4, GLfloat]
     var textureIndex : GLint = 0
 
+    if not m.matcapTexture.isNil:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATCAP_SAMPLER)
+        else:
+            if m.matcapTexture.isLoaded:
+                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnit"), textureIndex)
+                inc textureIndex
     if not m.albedoTexture.isNil:
         if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_AMBIENT_SAMPLER)
@@ -431,7 +455,7 @@ proc setupMaterialAttributes(m: Material, n: Node) =
             else:
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialShininess"), m.color.shininess)
         if m.shader != invalidProgram:
-            gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialTransparency"), n.alpha)
+            gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialTransparency"), c.alpha)
 
 proc setupLightAttributes(m: Material, v: SceneView) =
     var lightsCount = 0
@@ -521,9 +545,9 @@ template setupTransform*(m: Material, n: Node) =
     gl.uniformMatrix3fv(gl.getUniformLocation(m.shader, "normalMatrix"), false, normalMatrix)
     c.setTransformUniform(m.shader) # setup modelViewProjectionMatrix
 
-    # let worldCamPos = n.sceneView.camera.node.translation
-    # let camPos = newVector4(worldCamPos.x, worldCamPos.y, worldCamPos.z, 1.0)
-    # gl.uniform4fv(gl.getUniformLocation(m.shader, "uCamPosition"), camPos)
+    let worldCamPos = n.sceneView.camera.node.worldPos
+    let camPos = newVector4(worldCamPos.x, worldCamPos.y, worldCamPos.z, 1.0)
+    gl.uniform4fv(gl.getUniformLocation(m.shader, "uCamPosition"), camPos)
 
 proc createShader(m: Material) =
     let c = currentContext()

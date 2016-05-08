@@ -465,14 +465,25 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("specular", m.material.specular)
     p.visitProperty("shininess", m.material.shininess)
     p.visitProperty("reflectivity", m.material.reflectivity)
-    p.visitProperty("rim_density", m.material.rimDensity)
+
+    p.visitProperty("RIM color", m.material.rimColor)
+    p.visitProperty("RIM density", m.material.rimDensity)
+    p.visitProperty("RIM enable", m.material.isRIM)
+
+    p.visitProperty("albedoTexture", m.material.albedoTexture)
+    p.visitProperty("glossTexture", m.material.glossTexture)
+    p.visitProperty("specularTexture", m.material.specularTexture)
+    p.visitProperty("normalTexture", m.material.normalTexture)
+    p.visitProperty("reflectionTexture", m.material.reflectionTexture)
+    p.visitProperty("maskTexture", m.material.maskTexture)
+    p.visitProperty("matcapTexture", m.material.matcapTexture)
+
+    p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
     p.visitProperty("culling", m.material.bEnableBackfaceCulling)
     p.visitProperty("light", m.material.isLightReceiver)
     p.visitProperty("blend", m.material.blendEnable)
     p.visitProperty("depth test", m.material.depthEnable)
     p.visitProperty("wireframe", m.material.isWireframe)
-    p.visitProperty("RIM", m.material.isRIM)
-    p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
 registerComponent[MeshComponent]()
