@@ -332,7 +332,7 @@ proc setupSamplerAttributes(m: Material) =
             m.shaderMacroFlags.incl(WITH_MATCAP_SAMPLER)
         else:
             if m.matcapTexture.isLoaded:
-                gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+                gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnit"), textureIndex)
