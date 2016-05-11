@@ -165,7 +165,7 @@ proc draw*(m: Mesh) =
     if tex.isEmpty:
         return
 
-    when not defined(ios) and not defined(android) and not defined(js):
+    when not defined(ios) and not defined(android) and not defined(js) and not defined(emscripten):
         glPolygonMode(GL_FRONT_AND_BACK, if m.isWireframe: GL_LINE else: GL_FILL);
 
     gl.useProgram(m.shader)
@@ -188,5 +188,5 @@ proc draw*(m: Mesh) =
     gl.drawElements(gl.TRIANGLES, m.numberOfIndices, gl.UNSIGNED_SHORT)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
-    when not defined(ios) and not defined(android) and not defined(js):
+    when not defined(ios) and not defined(android) and not defined(js) and not defined(emscripten):
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL)
