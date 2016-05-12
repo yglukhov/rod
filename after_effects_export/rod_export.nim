@@ -41,7 +41,24 @@ var propertyNameMap = {
     "Input Black": "inBlack",
     "Gamma": "inGamma",
     "Output White": "outWhite",
-    "Output Black": "outBlack"
+    "Output Black": "outBlack",
+
+    "Red Input White": "redInWhite",
+    "Red Input Black": "redInBlack",
+    "Red Gamma": "redInGamma",
+    "Red Output White": "redOutWhite",
+    "Red Output Black": "redOutBlack",
+    "Green Input White": "greenInWhite",
+    "Green Input Black": "greenInBlack",
+    "Green Gamma": "greenInGamma",
+    "Green Output White": "greenOutWhite",
+    "Green Output Black": "greenOutBlack",
+    "Blue Input White": "blueInWhite",
+    "Blue Input Black": "blueInBlack",
+    "Blue Gamma": "blueInGamma",
+    "Blue Output White": "blueOutWhite",
+    "Blue Output Black": "blueOutBlack",
+
 }.toTable()
 
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
@@ -98,16 +115,31 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                 solid["size"] = % [source.width, source.height]
                 result["Solid"] = solid
 
+
+    proc separatedLevelValueAtTime(lvl: PropertyGroup, propName: string, t: float): Vector3 =
+        result[0] = lvl.property("Red " & propName, float).valueAtTime(t, false)
+        result[1] = lvl.property("Green " & propName, float).valueAtTime(t, false)
+        result[2] = lvl.property("Blue " & propName, float).valueAtTime(t, false)
+
+    proc levelsValueAtTime(lvl: PropertyGroup, t: float): JsonNode =
+        result = newJObject()
+        result["inWhite"] = % lvl.property("Input White", float).valueAtTime(t, false)
+        result["inBlack"] = % lvl.property("Input Black", float).valueAtTime(t, false)
+        result["inGamma"] = % lvl.property("Gamma", float).valueAtTime(t, false)
+        result["outWhite"] = % lvl.property("Output White", float).valueAtTime(t, false)
+        result["outBlack"] = % lvl.property("Output Black", float).valueAtTime(t, false)
+        result["inWhiteV"] = %separatedLevelValueAtTime(lvl, "Input White", t)
+        result["inBlackV"] = %separatedLevelValueAtTime(lvl, "Input Black", t)
+        result["inGammaV"] = %separatedLevelValueAtTime(lvl, "Gamma", t)
+        result["outWhiteV"] = %separatedLevelValueAtTime(lvl, "Output White", t)
+        result["outBlackV"] = %separatedLevelValueAtTime(lvl, "Output Black", t)
+
+
     let effects = layer.propertyGroup("Effects")
     if not effects.isNil:
         let levels = effects.propertyGroup("Levels (Individual Controls)")
         if not levels.isNil:
-            var lvl = newJObject()
-            lvl["inWhite"] = % levels.property("Input White", float).valueAtTime(0, false)
-            lvl["inBlack"] = % levels.property("Input Black", float).valueAtTime(0, false)
-            lvl["inGamma"] = % levels.property("Gamma", float).valueAtTime(0, false)
-            lvl["outWhite"] = % levels.property("Output White", float).valueAtTime(0, false)
-            lvl["outBlack"] = % levels.property("Output Black", float).valueAtTime(0, false)
+            var lvl = levelsValueAtTime(levels, 0)
             result["ChannelLevels"] = lvl
 
         let numbers = effects.propertyGroup("Numbers")
@@ -410,7 +442,7 @@ proc isSequenceLayer(layer: Layer): bool =
     if not f.isNil and not f.file.isNil and f.duration > 0:
         result = true
 
-proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float): int =
+proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float, length: int): int =
     var relTime = t - layer.startTime
 
     if layer.timeRemapEnabled:
@@ -421,7 +453,7 @@ proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float): int =
     if relTime < 0: relTime = 0
     if relTime >= f.duration: relTime = f.duration - 0.01
 
-    result = int(relTime / f.frameDuration)
+    result = int(relTime / f.frameDuration) mod length
 
 proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var animationStartTime = marker.time
@@ -437,8 +469,9 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
     let footage = layer.layerFootage
 
     var s = animationStartTime
+    let length =  getSequenceFilesFromSource(footage).len
     while s < dEndTime:
-        sampledPropertyValues.add(%sequenceFrameAtTime(layer, footage, s))
+        sampledPropertyValues.add(%sequenceFrameAtTime(layer, footage, s, length))
         s += timeStep
 
     let anim = newJObject()
