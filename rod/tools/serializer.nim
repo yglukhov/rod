@@ -8,6 +8,7 @@ when not defined(js) and not defined(android) and not defined(ios):
 import nimx.image
 import nimx.types
 import nimx.pathutils
+import nimx.matrixes
 
 import rod.rod_types
 import rod.component
@@ -16,6 +17,7 @@ import rod.component.sprite
 import rod.component.light
 import rod.component.text_component
 import rod.component.mesh_component
+import rod.component.particle_system
 
 type Serializer* = ref object
     savePath*: string
@@ -29,6 +31,9 @@ proc vectorToJNode[T](vec: T): JsonNode =
     result = newJArray()
     for k, v in vec:
         result.add(%v)
+
+proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
+    result = vectorToJNode(vec)
 
 proc colorToJNode(color:Color): JsonNode =
     result = newJArray()
@@ -72,6 +77,27 @@ method getComponentData(s: Serializer, c: LightSource): JsonNode =
     result.add("specular", %c.lightSpecular)
     result.add("constant", %c.lightConstant)
 
+method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
+    result = newJObject()
+    result.add("duration", %c.duration)
+    result.add("isLooped", %c.isLooped)
+    result.add("birthRate", %c.birthRate)
+    result.add("lifetime", %c.lifetime)
+    result.add("startVelocity", %c.startVelocity)
+    result.add("randVelocityFrom", %c.randVelocityFrom)
+    result.add("randVelocityTo", %c.randVelocityTo)
+    result.add("randRotVelocityFrom", %c.randRotVelocityFrom)
+    result.add("randRotVelocityTo", %c.randRotVelocityTo)
+    result.add("startScale", %c.startScale)
+    result.add("dstScale", %c.dstScale)
+    result.add("randScaleFrom", %c.randScaleFrom)
+    result.add("randScaleTo", %c.randScaleTo)
+    result.add("startAlpha", %c.startAlpha)
+    result.add("dstAlpha", %c.dstAlpha)
+    result.add("startColor", %c.startColor)
+    result.add("dstColor", %c.dstColor)
+    result.add("gravity", %c.gravity)
+    result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
 
 method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result = newJObject()
