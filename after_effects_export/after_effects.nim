@@ -261,6 +261,15 @@ proc newRegex*(pattern: cstring): JSRegExp {.importc: "new RegExp".}
 proc match*(str: cstring, reg: JSRegExp): seq[cstring] {.importcpp.}
 
 proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
+    var cacheValid = false
+    {.emit: """
+    if (`source`.__sequenceFiles !== undefined) {
+        `result` = `source`.__sequenceFiles;
+        `cacheValid` = true;
+    }
+    """.}
+    if cacheValid: return
+
     var allFilesInDir = newFolder(source.file.path).getFiles()
     var pattern = newRegex("""(.*)\[(\d+)-(\d+)\](.*)""")
     var matches = source.name.match(pattern)
@@ -297,6 +306,11 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
 
     for i, f in filesWithIndexes:
         result[i] = f.f
+
+    {.emit: """
+    `source`.__sequenceFiles = `result`;
+    """.}
+
 
 proc justification*(td: TextDocument): TextJustification =
     {.emit: """
