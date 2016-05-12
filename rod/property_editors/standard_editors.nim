@@ -14,7 +14,7 @@ import rod.viewport
 
 when defined(js):
     from dom import alert
-elif not defined(android) and not defined(ios):
+elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 var gColorPicker*: ColorPickerView
@@ -193,6 +193,8 @@ when not defined(android) and not defined(ios):
         b.onAction do():
             when defined(js):
                 alert("Files can be opened only in native editor version")
+            elif defined(emscripten):
+                discard
             else:
                 let path = callDialogFileOpen("Select Image")
                 if not path.isNil:

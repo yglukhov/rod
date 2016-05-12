@@ -139,7 +139,7 @@ proc swapCompositingBuffers*(v: SceneView) =
     let c = currentContext()
     let gl = c.gl
     let vp = gl.getViewport()
-    when defined(js) or defined(gles2only):
+    when defined(js) or defined(emscripten) or defined(gles2only):
         #proc ortho*(dest: var Matrix4, left, right, bottom, top, near, far: Coord) =
         var mat = ortho(0, Coord(vp[2]), Coord(vp[3]), 0, -1, 1)
 
@@ -163,7 +163,7 @@ proc swapCompositingBuffers*(v: SceneView) =
             # Swap active buffer to backup buffer
             gl.bindFramebuffer(v.mBackupFrameBuffer, false)
             gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
-        glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT, GL_NEAREST)
+        glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT, GLenum(GL_NEAREST))
 
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 

@@ -268,14 +268,14 @@ method draw*(bc: BlurComponent) =
 
         var theQuad {.noinit.}: array[4, GLfloat]
         var textureIndex : GLint = 0
-        gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+        gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
         gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(bc.motionMap, gl, theQuad))
         gl.uniform4fv(gl.getUniformLocation(bc.postShader, "uMotionUnitCoords"), theQuad)
         gl.uniform1i(gl.getUniformLocation(bc.postShader, "motionUnit"), textureIndex)
 
         inc textureIndex
 
-        gl.activeTexture(gl.TEXTURE0 + textureIndex.GLenum)
+        gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
         gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(bc.postMap, gl, theQuad))
         gl.uniform4fv(gl.getUniformLocation(bc.postShader, "uTexUnitCoords"), theQuad)
         gl.uniform1i(gl.getUniformLocation(bc.postShader, "texUnit"), textureIndex)
