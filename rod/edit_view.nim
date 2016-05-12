@@ -275,7 +275,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
         when not defined(js) and not defined(android) and not defined(ios):
             let saveButton = Button.new(newRect(110, result.bounds.height - 40, 60, 20))
-            saveButton.title = "Save"
+            saveButton.title = "Save J"
             saveButton.onAction do():
                 if outlineView.selectedIndexPath.len > 0:
                     var selectedNode = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)

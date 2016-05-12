@@ -36,7 +36,7 @@ proc camera*(v: SceneView): Camera =
             v.mCamera = nodeWithCamera.componentIfAvailable(Camera)
     result = v.mCamera
 
-template viewMatrix(v: SceneView): Matrix4 = v.mCamera.node.worldTransform.inversed
+template viewMatrix*(v: SceneView): Matrix4 = v.mCamera.node.worldTransform.inversed
 
 proc prepareFramebuffer(v: SceneView, i: var SelfContainedImage, sz: Size) =
     if i.isNil:

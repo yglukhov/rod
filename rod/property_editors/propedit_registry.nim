@@ -10,6 +10,7 @@ import rod.meta_data
 
 type PropertyEditorView* = ref object of View
     onActionGetJson*: proc(j: JsonNode)
+    onChange*: proc()
 
 var propEditors = initTable[TypeId, proc(n: Node, v: Variant): PropertyEditorView]()
 
@@ -23,7 +24,7 @@ proc registerPropertyEditor*[T](createView: proc(setter: proc(s: T), getter: pro
         let sng = v.get(SetterAndGetter[T])
         result = createView(sng.setter, sng.getter)
 
-proc propertyEditorForProperty*(n: Node, keyPath, title: string, v: Variant): View =
+proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCallback: proc()): View =
     let creator = propEditors.getOrDefault(v.typeId)
     result = View.new(newRect(6, 6, 328, 36))
     let label = newLabel(newRect(6, 6, 100, 36))
@@ -42,4 +43,6 @@ proc propertyEditorForProperty*(n: Node, keyPath, title: string, v: Variant): Vi
         editor.setFrameSize(sz)
         editor.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
         result.addSubview(editor)
+
+        editor.onChange = onChangeCallback
 

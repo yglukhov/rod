@@ -20,6 +20,7 @@ type PropertyVisitor* = object of RootObj
 
     name*: string
     commit*: proc()
+    onChangeCallback*: proc()
 
 proc clear*(p: var PropertyVisitor) =
     p.setterAndGetter = newVariant()
@@ -42,4 +43,19 @@ template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, defFla
         if p.requireName:
             p.name = propName
         p.setterAndGetter = newVariant(sng)
+        p.commit()
+
+template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, onChange: proc()) =
+    var defFlags = { pfEditable, pfAnimatable }
+    if (defFlags * p.flags) != {}:
+        var sng : SetterAndGetter[type(s)]
+        if p.requireSetter:
+            sng.setter = proc(v: type(s)) = s = v
+        if p.requireGetter:
+            sng.getter = proc(): type(s) = s
+        if p.requireName:
+            p.name = propName
+        p.setterAndGetter = newVariant(sng)
+        p.onChangeCallback = onChange
+
         p.commit()

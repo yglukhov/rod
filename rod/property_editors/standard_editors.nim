@@ -223,6 +223,9 @@ proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc()
     cb.onAction do():
         setter(cb.boolValue)
 
+        if not pv.onChange.isNil:
+            pv.onChange()
+
     result = pv
     result.addSubview(cb)
 
