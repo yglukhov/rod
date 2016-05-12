@@ -381,7 +381,7 @@ method draw*(m: MeshComponent) =
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
-    when not defined(ios) and not defined(android) and not defined(js):
+    when not defined(ios) and not defined(android) and not defined(js) and not defined(emscripten):
         glPolygonMode(gl.FRONT_AND_BACK, GL_FILL)
 
     #TODO to default settings

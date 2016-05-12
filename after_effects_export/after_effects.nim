@@ -66,6 +66,7 @@ type
         isTrackMatte*: bool
         hasTrackMatte*: bool
         timeRemapEnabled*: bool
+        nullLayer*: bool
 
         ## The start time of the layer, expressed in composition time (seconds).
         ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.
@@ -133,7 +134,10 @@ template len*[T](c: Collection[T]): int = cast[seq[type(c.fieldToCheckType)]](c)
 proc remove*(i: Item) {.importcpp.}
 
 proc layers*(c: Composition): Collection[Layer] = {.emit:"`result` = `c`.layers;".}
+proc selectedLayers*(c: Composition): seq[Layer] = {.emit:"`result` = `c`.selectedLayers; if (`result`.length === undefined) { `result` = [`result`]; }".}
 proc layer*(c: Composition, name: cstring): Layer {.importcpp.}
+
+proc activeItem*(p: Project, T: typedesc): T = {.emit: "`result` = `p`.activeItem;".}
 
 iterator items*[T](c: Collection[T]): T =
     for i in 0 ..< c.len: yield c[i]
@@ -225,6 +229,9 @@ proc value*[T](p: Property[T]): T = {.emit: "`result` = `p`.value;".}
 proc valueAtTime*[T](p: Property[T], t: float, e: bool = false): T =
     {.emit: "`result` = `p`.valueAtTime(`t`, `e`);".}
 
+proc setValue*[T](p: Property[T], v: T) = {.emit: "`p`.setValue(`v`);".}
+proc setValueAtTime*[T](p: Property[T], t: float, v: T) = {.emit: "`p`.setValueAtTime(`t`, `v`);".}
+
 proc children*(layer: Layer): seq[Layer] =
     result = newSeq[Layer]()
     for i in layer.containingComp.layers:
@@ -254,6 +261,15 @@ proc newRegex*(pattern: cstring): JSRegExp {.importc: "new RegExp".}
 proc match*(str: cstring, reg: JSRegExp): seq[cstring] {.importcpp.}
 
 proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
+    var cacheValid = false
+    {.emit: """
+    if (`source`.__sequenceFiles !== undefined) {
+        `result` = `source`.__sequenceFiles;
+        `cacheValid` = true;
+    }
+    """.}
+    if cacheValid: return
+
     var allFilesInDir = newFolder(source.file.path).getFiles()
     var pattern = newRegex("""(.*)\[(\d+)-(\d+)\](.*)""")
     var matches = source.name.match(pattern)
@@ -290,6 +306,11 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
 
     for i, f in filesWithIndexes:
         result[i] = f.f
+
+    {.emit: """
+    `source`.__sequenceFiles = `result`;
+    """.}
+
 
 proc justification*(td: TextDocument): TextJustification =
     {.emit: """

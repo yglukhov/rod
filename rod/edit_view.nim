@@ -33,7 +33,7 @@ import variant
 
 when defined(js):
     import dom except Event
-elif not defined(android) and not defined(ios):
+elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 type EventCatchingView* = ref object of View
@@ -128,7 +128,7 @@ import streams
 import json
 import tools.serializer
 proc saveNode(editor: Editor, selectedNode: Node3D): bool =
-    when not defined(js) and not defined(android) and not defined(ios):
+    when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
         let path = callDialogFileSave("Save Json")
         if not path.isNil:
             var s = Serializer.new()
@@ -137,7 +137,7 @@ proc saveNode(editor: Editor, selectedNode: Node3D): bool =
     return false
 
 proc loadNode(editor: Editor): bool =
-    when not defined(js) and not defined(android) and not defined(ios):
+    when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
         let path = callDialogFileOpen("Select Json")
         if not path.isNil:
             let rn = newNodeWithResource(path)
@@ -257,6 +257,8 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
         loadButton.onAction do():
             when defined(js):
                 alert("Loading is currenlty availble in native version only.")
+            elif defined(emscripten):
+                discard
             else:
                 var sip = outlineView.selectedIndexPath
                 var p = e.rootNode
@@ -275,7 +277,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
         when not defined(js) and not defined(android) and not defined(ios):
             let saveButton = Button.new(newRect(110, result.bounds.height - 40, 60, 20))
-            saveButton.title = "Save"
+            saveButton.title = "Save J"
             saveButton.onAction do():
                 if outlineView.selectedIndexPath.len > 0:
                     var selectedNode = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)

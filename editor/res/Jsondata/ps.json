@@ -1,0 +1,68 @@
+{
+  "name": "New Node", 
+  "components": 
+  {
+    "ParticleSystem": 
+    {
+      "texture": "particle.png", 
+      "isLooped": false, 
+      "startVelocity": 8.0, 
+      "lifetime": 8.0, 
+      "randVelocityFrom": 0.0, 
+      "startColor": [
+        1.0, 
+        0.0, 
+        0.0
+      ], 
+      "duration": 4.0, 
+      "birthRate": 100.0, 
+      "randVelocityTo": 0.0, 
+      "dstScale": [
+        0.0, 
+        0.0, 
+        0.0
+      ], 
+      "startAlpha": 1.0, 
+      "randScaleTo": 0.0, 
+      "dstAlpha": 0.0, 
+      "dstColor": [
+        1.0, 
+        1.0, 
+        1.0
+      ], 
+      "randRotVelocityTo": 80.0, 
+      "gravity": [
+        0.0, 
+        -1.5, 
+        0.0
+      ], 
+      "randRotVelocityFrom": -74.0, 
+      "startScale": [
+        3.0, 
+        3.0, 
+        3.0
+      ], 
+      "randScaleFrom": 0.0
+    }, 
+    "NodeSelector": 
+    {}
+  }, 
+  "alpha": 1.0, 
+  "translation": [
+    0.0, 
+    0.0, 
+    0.0
+  ], 
+  "scale": [
+    1.0, 
+    1.0, 
+    1.0
+  ], 
+  "children": [], 
+  "rotation": [
+    0.0, 
+    0.0, 
+    0.0, 
+    1.0
+  ]
+}

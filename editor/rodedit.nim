@@ -66,10 +66,13 @@ proc startApplication() =
     lightSource.setDefaultLightSource()
 
 
+    let fpsAnimation = newAnimation()
+
     loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
         editView.rootNode.addChild(n)
 
         mainWindow.addSubview(editView)
+        mainWindow.addAnimation(fpsAnimation)
 
         registerAnimation(n, editView)
 
