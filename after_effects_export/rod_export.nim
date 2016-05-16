@@ -28,7 +28,7 @@ proc logi(args: varargs[string, `$`]) =
 
 proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
 
-template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(-zAngle, newVector3(0, 0, 1))
+template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
 
 var propertyNameMap = {
     "Rotation" : "rotation",
