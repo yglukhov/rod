@@ -43,6 +43,7 @@ template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, defFla
         if p.requireName:
             p.name = propName
         p.setterAndGetter = newVariant(sng)
+        p.onChangeCallback = nil
         p.commit()
 
 template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, onChange: proc()) =

@@ -1,12 +1,18 @@
 {
-  "name": "New Node", 
+  "name": "ps", 
   "components": 
   {
+    "ConePSGenShape": 
+    {
+      "is2D": false, 
+      "angle": 45.0, 
+      "radius": 1e-06
+    }, 
     "ParticleSystem": 
     {
       "texture": "particle.png", 
-      "isLooped": false, 
-      "startVelocity": 8.0, 
+      "isLooped": true, 
+      "startVelocity": 12.0, 
       "lifetime": 8.0, 
       "randVelocityFrom": 0.0, 
       "startColor": [
@@ -14,7 +20,7 @@
         0.0, 
         0.0
       ], 
-      "duration": 4.0, 
+      "duration": 3.0, 
       "birthRate": 100.0, 
       "randVelocityTo": 0.0, 
       "dstScale": [
@@ -23,20 +29,31 @@
         0.0
       ], 
       "startAlpha": 1.0, 
+      "attractorNode": "ps", 
       "randScaleTo": 0.0, 
-      "dstAlpha": 0.0, 
+      "dstAlpha": 1.0, 
+      "is3dRotation": false, 
+      "genShapeNode": "ps", 
       "dstColor": [
-        1.0, 
-        1.0, 
-        1.0
-      ], 
-      "randRotVelocityTo": 80.0, 
-      "gravity": [
         0.0, 
-        -1.5, 
+        1.0, 
         0.0
       ], 
-      "randRotVelocityFrom": -74.0, 
+      "randRotVelocityTo": [
+        0.0, 
+        0.0, 
+        0.0
+      ], 
+      "gravity": [
+        0.0, 
+        -2.0, 
+        0.0
+      ], 
+      "randRotVelocityFrom": [
+        0.0, 
+        0.0, 
+        0.0
+      ], 
       "startScale": [
         3.0, 
         3.0, 
