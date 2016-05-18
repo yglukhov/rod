@@ -74,6 +74,14 @@ proc removeComponent*(n: Node, name: string) =
             c.componentNodeWillBeRemovedFromSceneView()
             n.components.del(name)
 
+proc getComponent*(n: Node, T: typedesc[Component]): T =
+    for k, v in n.components:
+        type TT = T
+        if v of TT:
+            return v.TT
+
+    return nil
+
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
 proc update(n: Node) =
