@@ -97,9 +97,9 @@ proc makeTransform(n: Node): Matrix4 =
     var rot = n.rotation.toMatrix4()
 
     # // Set up final matrix with scale, rotation and translation
-    result[0] = n.scale.x * rot[0]; result[1] = n.scale.y * rot[1]; result[2] = n.scale.z * rot[2];
-    result[4] = n.scale.x * rot[4]; result[5] = n.scale.y * rot[5]; result[6] = n.scale.z * rot[6];
-    result[8] = n.scale.x * rot[8]; result[9] = n.scale.y * rot[9]; result[10] = n.scale.z * rot[10];
+    result[0] = n.scale.x * rot[0]; result[1] = n.scale.x * rot[1]; result[2] = n.scale.x * rot[2];
+    result[4] = n.scale.y * rot[4]; result[5] = n.scale.y * rot[5]; result[6] = n.scale.y * rot[6];
+    result[8] = n.scale.z * rot[8]; result[9] = n.scale.z * rot[9]; result[10] = n.scale.z * rot[10];
     result[12] = n.translation.x;  result[13] = n.translation.y; result[14] = n.translation.z;
 
     # // No projection term
