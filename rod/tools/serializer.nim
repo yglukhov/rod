@@ -18,6 +18,7 @@ import rod.component.light
 import rod.component.text_component
 import rod.component.mesh_component
 import rod.component.particle_system
+import rod.component.particle_helpers
 
 type Serializer* = ref object
     savePath*: string
@@ -31,6 +32,12 @@ proc vectorToJNode[T](vec: T): JsonNode =
     result = newJArray()
     for k, v in vec:
         result.add(%v)
+
+proc `%`*(n: Node): JsonNode =
+    if not n.isNil:
+        result = newJString(n.name)
+    else:
+        result = newJString("")
 
 proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
     result = vectorToJNode(vec)
@@ -81,11 +88,13 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result = newJObject()
     result.add("duration", %c.duration)
     result.add("isLooped", %c.isLooped)
+    result.add("isPlayed", %c.isPlayed)
     result.add("birthRate", %c.birthRate)
     result.add("lifetime", %c.lifetime)
     result.add("startVelocity", %c.startVelocity)
     result.add("randVelocityFrom", %c.randVelocityFrom)
     result.add("randVelocityTo", %c.randVelocityTo)
+    result.add("is3dRotation", %c.is3dRotation)
     result.add("randRotVelocityFrom", %c.randRotVelocityFrom)
     result.add("randRotVelocityTo", %c.randRotVelocityTo)
     result.add("startScale", %c.startScale)
@@ -97,7 +106,34 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("startColor", %c.startColor)
     result.add("dstColor", %c.dstColor)
     result.add("gravity", %c.gravity)
-    result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
+    if c.texture.filePath().len > 0:
+        result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
+
+    result.add("attractorNode", %c.attractorNode)
+    result.add("genShapeNode", %c.genShapeNode)
+
+method getComponentData(s: Serializer, c: ConePSGenShape): JsonNode =
+    result = newJObject()
+    result.add("angle", %c.angle)
+    result.add("radius", %c.radius)
+    result.add("is2D", %c.is2D)
+
+method getComponentData(s: Serializer, c: SpherePSGenShape): JsonNode =
+    result = newJObject()
+    result.add("radius", %c.radius)
+    result.add("isRandPos", %c.isRandPos)
+    result.add("isRandDir", %c.isRandDir)
+    result.add("is2D", %c.is2D)
+
+method getComponentData(s: Serializer, c: BoxPSGenShape): JsonNode =
+    result = newJObject()
+    result.add("dimension", %c.dimension)
+    result.add("is2D", %c.is2D)
+
+method getComponentData(s: Serializer, c: WavePSAttractor): JsonNode =
+    result = newJObject()
+    result.add("forceValue", %c.forceValue)
+    result.add("frequence", %c.frequence)
 
 method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result = newJObject()
