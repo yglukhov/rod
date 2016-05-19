@@ -42,6 +42,9 @@ proc `%`*(n: Node): JsonNode =
 proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
     result = vectorToJNode(vec)
 
+proc `%`*(v: Size): JsonNode =
+    result = vectorToJNode(newVector2(v.width, v.height))
+
 proc colorToJNode(color:Color): JsonNode =
     result = newJArray()
     for k, v in color.fieldPairs:
@@ -108,6 +111,10 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("gravity", %c.gravity)
     if c.texture.filePath().len > 0:
         result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
+        result.add("texSize", %c.frameSize)
+        result.add("animColumns", %c.animColumns)
+        result.add("framesCount", %c.framesCount)
+        result.add("fps", %c.fps)
 
     result.add("attractorNode", %c.attractorNode)
     result.add("genShapeNode", %c.genShapeNode)
