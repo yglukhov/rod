@@ -199,6 +199,8 @@ when not defined(android) and not defined(ios):
                 let path = callDialogFileOpen("Select Image")
                 if not path.isNil:
                     setter(imageWithContentsOfFile(path))
+                    if not pv.onChange.isNil:
+                        pv.onChange()
 
         result = pv
         result.addSubview(b)
