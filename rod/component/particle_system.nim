@@ -42,21 +42,15 @@ uniform mat4 viewMatrix;
 uniform mat4 worldMatrix;
 
 varying float vAlpha;
-varying float vLifeTime;
 varying float vColor;
 varying vec2 texCoords;
 
 
-#ifdef TEXTURED
+#ifdef ANIMATED_TEXTURE
     uniform vec2 uFrameSize;
     uniform int uAnimColumns;
     uniform int uFramesCount;
     uniform float uFPS;
-
-int loopedWrap(int frameNum, int framesCount)
-{
-    return int(mod(float(frameNum), float(framesCount)));
-}
 #endif
 
 #ifdef ROTATION_3D
@@ -103,13 +97,11 @@ void main()
 {
     vAlpha = aAlpha;
     vColor = aColor;
-    vLifeTime = aLifeTime;
     vec3 vertexOffset;
 
-#ifdef TEXTURED
-    //int currFrame = int( (1.0 - vLifeTime) * float(uFramesCount - 1) );
-    float validFrame = mod(vLifeTime * uFPS, float(uFramesCount - 1));
-    int currFrame = int(validFrame);
+#ifdef ANIMATED_TEXTURE
+    // calculate anim frame
+    int currFrame = int( mod(aLifeTime * uFPS, float(uFramesCount - 1)) );
     int row = currFrame / uAnimColumns;
     int col = int(mod(float(currFrame), float(uAnimColumns)));
     vec2 fc = vec2(uFrameSize.x * float(col), uFrameSize.y * float(row));
@@ -159,7 +151,6 @@ precision mediump float;
 #endif
 
 varying float vAlpha;
-varying float vLifeTime;
 varying float vColor;
 varying vec2 texCoords;
 
@@ -175,8 +166,8 @@ vec3 encodeRgbFromFloat( float f )
 void main()
 {
 #ifdef TEXTURED
-    vec4 texture = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * texCoords);
-    gl_FragColor = texture * vec4(encodeRgbFromFloat(vColor), vAlpha);
+    vec4 tex_color = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * texCoords);
+    gl_FragColor = tex_color * vec4(encodeRgbFromFloat(vColor), vAlpha);
 #else
     gl_FragColor = vec4(encodeRgbFromFloat(vColor), vAlpha);
 #endif
@@ -221,6 +212,7 @@ type
         birthRate*: float
         lifetime*: float
         texture*: Image
+        isTextureAnimated*: bool
         frameSize*: Size
         animColumns*: int
         framesCount*: int
@@ -287,6 +279,13 @@ proc newVertexDesc(posSize, rotSize, scSize, aSize, colorSize, idSize, lifeTimeS
     result.idSize = idSize
     result.lifeTimeSize = lifeTimeSize
 
+proc calculateVertexDesc(ps: ParticleSystem): VertexDesc =
+    let lifeTimeSize = if ps.isTextureAnimated: 1.int32
+                                          else: 0.int32
+    let rotationSize = if ps.is3dRotation: 3.int32
+                                     else: 1.int32
+    result = newVertexDesc(3, rotationSize, 2, 1, 1, 1, lifeTimeSize)
+
 proc transformDirection*(mat: Matrix4, dir: Vector3): Vector3 =
     result.x = dir.x * mat[0] + dir.y * mat[4] + dir.z * mat[8]
     result.y = dir.x * mat[1] + dir.y * mat[5] + dir.z * mat[9]
@@ -340,10 +339,7 @@ proc initSystem(ps: ParticleSystem) =
     ps.animation = newAnimation()
     ps.animation.numberOfLoops = -1
 
-    if ps.is3dRotation:
-        ps.vertexDesc = newVertexDesc(3, 3, 2, 1, 1, 1, 1)
-    else:
-        ps.vertexDesc = newVertexDesc(3, 1, 2, 1, 1, 1, 1)
+    ps.vertexDesc = ps.calculateVertexDesc()
     ps.particlesVertexBuff = newSeq[float32]( int(ceil(ps.birthRate) * ceil(ps.lifetime)) * ps.getVertexSize() )
     ps.vertexBuffer = gl.createBuffer()
     ps.indexBuffer = gl.createBuffer()
@@ -368,8 +364,9 @@ proc initSystem(ps: ParticleSystem) =
     ps.remainingDuration = ps.duration
     ps.lastBirthTime = epochTime()
 
-    ps.lastPos = ps.node.worldPos
-    ps.curPos = ps.node.worldPos
+    if not ps.node.isNil:
+        ps.lastPos = ps.node.worldPos
+        ps.curPos = ps.node.worldPos
 
     ps.isInited = true
 
@@ -414,10 +411,13 @@ method init(ps: ParticleSystem) =
 
     ps.is3dRotation = false
 
+    ps.isTextureAnimated = false
     ps.framesCount = 1
     ps.animColumns = 1
     ps.frameSize = newSize(1.0, 1.0)
     ps.fps = 1.0
+
+    # ps.initSystem()
 
 proc start*(ps: ParticleSystem) =
     ps.isPlayed = true
@@ -553,11 +553,12 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         offset += ps.vertexDesc.idSize
 
         # lifeTime
-        let lf = ps.lifeTime - ps.particles[i].lifeTime
-        ps.particlesVertexBuff[v1 + offset] = lf
-        ps.particlesVertexBuff[v2 + offset] = lf
-        ps.particlesVertexBuff[v3 + offset] = lf
-        ps.particlesVertexBuff[v4 + offset] = lf
+        if ps.isTextureAnimated:
+            let lf = ps.lifeTime - ps.particles[i].lifeTime
+            ps.particlesVertexBuff[v1 + offset] = lf
+            ps.particlesVertexBuff[v2 + offset] = lf
+            ps.particlesVertexBuff[v3 + offset] = lf
+            ps.particlesVertexBuff[v4 + offset] = lf
 
         ps.count.inc()
 
@@ -640,8 +641,9 @@ method draw*(ps: ParticleSystem) =
     gl.vertexAttribPointer(5, ps.vertexDesc.idSize, gl.FLOAT, false, stride.GLsizei , offset)
     offset += ps.vertexDesc.idSize * sizeof(GLfloat)
 
-    gl.enableVertexAttribArray(6)
-    gl.vertexAttribPointer(6, ps.vertexDesc.lifeTimeSize, gl.FLOAT, false, stride.GLsizei , offset)
+    if ps.isTextureAnimated:
+        gl.enableVertexAttribArray(6)
+        gl.vertexAttribPointer(6, ps.vertexDesc.lifeTimeSize, gl.FLOAT, false, stride.GLsizei , offset)
 
     if ps.is3dRotation:
         ps.shader.addDefine("ROTATION_3D")
@@ -653,8 +655,14 @@ method draw*(ps: ParticleSystem) =
         gl.activeTexture(gl.TEXTURE0)
         gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(ps.texture, gl, theQuad))
         ps.shader.addDefine("TEXTURED")
+
+        if ps.isTextureAnimated:
+            ps.shader.addDefine("ANIMATED_TEXTURE")
+        else:
+            ps.shader.removeDefine("ANIMATED_TEXTURE")
     else:
         ps.shader.removeDefine("TEXTURED")
+        ps.shader.removeDefine("ANIMATED_TEXTURE")
 
     ps.shader.bindShader()
 
@@ -717,6 +725,7 @@ method deserialize*(ps: ParticleSystem, j: JsonNode) =
     j.getSerializedValue("gravity", ps.gravity)
 
     j.getSerializedValue("texture", ps.texture)
+    j.getSerializedValue("isTextureAnimated", ps.isTextureAnimated)
     j.getSerializedValue("texSize", ps.frameSize)
     j.getSerializedValue("animColumns", ps.animColumns)
     j.getSerializedValue("framesCount", ps.framesCount)
@@ -742,11 +751,8 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
         else:
             ps.stop()
 
-    proc on3dRotationChange() =
-        if ps.is3dRotation:
-            ps.vertexDesc = newVertexDesc(3, 3, 2, 1, 1, 1, 1)
-        else:
-            ps.vertexDesc = newVertexDesc(3, 1, 2, 1, 1, 1, 1)
+    proc toCalculateVertexDesc() =
+        ps.vertexDesc = ps.calculateVertexDesc()
 
     p.visitProperty("duration", ps.duration)
     p.visitProperty("isLooped", ps.isLooped, onLoopedChange)
@@ -758,7 +764,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("startVelocity", ps.startVelocity)
     p.visitProperty("randVelFrom", ps.randVelocityFrom)
     p.visitProperty("randVelTo", ps.randVelocityTo)
-    p.visitProperty("is3dRotation", ps.is3dRotation, on3dRotationChange)
+    p.visitProperty("is3dRotation", ps.is3dRotation, toCalculateVertexDesc)
     p.visitProperty("randRotVelFrom", ps.randRotVelocityFrom)
     p.visitProperty("randRotVelTo", ps.randRotVelocityTo)
     p.visitProperty("startScale", ps.startScale)
@@ -771,6 +777,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("dstColor", ps.dstColor)
     p.visitProperty("gravity", ps.gravity)
     p.visitProperty("texture", ps.texture, onTextureChange)
+    p.visitProperty("isTexAnim", ps.isTextureAnimated, toCalculateVertexDesc)
     p.visitProperty("texSize", ps.frameSize)
     p.visitProperty("animColumns", ps.animColumns)
     p.visitProperty("framesCount", ps.framesCount)
