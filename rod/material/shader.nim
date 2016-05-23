@@ -85,6 +85,10 @@ template setUniform*(sh: Shader, name: string, uniform: float) =
     let gl = currentContext().gl
     gl.uniform1f(gl.getUniformLocation(sh.program, name), uniform)
 
+template setUniform*(sh: Shader, name: string, uniform: Vector2) =
+    let gl = currentContext().gl
+    gl.uniform2fv(gl.getUniformLocation(sh.program, name), uniform)
+
 template setUniform*(sh: Shader, name: string, uniform: Vector3) =
     let gl = currentContext().gl
     gl.uniform3fv(gl.getUniformLocation(sh.program, name), uniform)
@@ -92,6 +96,9 @@ template setUniform*(sh: Shader, name: string, uniform: Vector3) =
 template setUniform*(sh: Shader, name: string, uniform: Vector4) =
     let gl = currentContext().gl
     gl.uniform4fv(gl.getUniformLocation(sh.program, name), uniform)
+
+template setUniform*(sh: Shader, name: string, uniform: Size) =
+    currentContext().setPointUniform(gl.getUniformLocation(sh.program, name), newPoint(uniform.width, uniform.height))
 
 template setUniform*(sh: Shader, name: string, uniform: Matrix4) =
     let gl = currentContext().gl

@@ -7,6 +7,11 @@ import nimx.matrixes
 import rod.rod_types
 import rod.node
 
+proc getSerializedValue*(j: JsonNode, name: string, val: var int) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getNum().int
+
 proc getSerializedValue*(j: JsonNode, name: string, val: var float32) =
     let jN = j{name}
     if not jN.isNil:
@@ -21,6 +26,11 @@ proc getSerializedValue*(j: JsonNode, name: string, val: var Vector3) =
     let jN = j{name}
     if not jN.isNil:
         val = newVector3(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum())
+
+proc getSerializedValue*(j: JsonNode, name: string, val: var Size) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newSize(jN[0].getFnum(), jN[1].getFnum())
 
 proc getSerializedValue*(j: JsonNode, name: string, val: var Image) =
     let jN = j{name}
