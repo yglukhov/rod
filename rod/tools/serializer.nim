@@ -111,6 +111,7 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("gravity", %c.gravity)
     if c.texture.filePath().len > 0:
         result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
+        result.add("isTextureAnimated", %c.isTextureAnimated)
         result.add("texSize", %c.frameSize)
         result.add("animColumns", %c.animColumns)
         result.add("framesCount", %c.framesCount)
