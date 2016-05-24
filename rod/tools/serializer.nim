@@ -45,6 +45,11 @@ proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
 proc `%`*(v: Size): JsonNode =
     result = vectorToJNode(newVector2(v.width, v.height))
 
+proc `%`*(v: Color): JsonNode =
+    result = newJArray()
+    for k, val in v.fieldPairs:
+        result.add( %val )
+
 proc colorToJNode(color:Color): JsonNode =
     result = newJArray()
     for k, v in color.fieldPairs:
@@ -58,7 +63,7 @@ proc getRelativeResourcePath(s: Serializer, path: string): string =
     result = relativePathToPath(resourcePath, path)
     echo "save path = ", resourcePath, "  relative = ", result
 
-method getComponentData(s: Serializer, c: Component): JsonNode =
+method getComponentData(s: Serializer, c: Component): JsonNode {.base.} =
     result = newJObject()
 
 method getComponentData(s: Serializer, c: Text): JsonNode =
@@ -104,10 +109,9 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("dstScale", %c.dstScale)
     result.add("randScaleFrom", %c.randScaleFrom)
     result.add("randScaleTo", %c.randScaleTo)
-    result.add("startAlpha", %c.startAlpha)
-    result.add("dstAlpha", %c.dstAlpha)
     result.add("startColor", %c.startColor)
     result.add("dstColor", %c.dstColor)
+    result.add("isBlendAdd", %c.isBlendAdd)
     result.add("gravity", %c.gravity)
     if c.texture.filePath().len > 0:
         result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
@@ -119,6 +123,12 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
 
     result.add("attractorNode", %c.attractorNode)
     result.add("genShapeNode", %c.genShapeNode)
+
+    result.add("isMove", %c.isMove)
+    result.add("amplitude", %c.amplitude)
+    result.add("frequency", %c.frequency)
+    result.add("distance", %c.distance)
+    result.add("speed", %c.speed)
 
 method getComponentData(s: Serializer, c: ConePSGenShape): JsonNode =
     result = newJObject()
@@ -187,6 +197,7 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
         of "tex_coords": return c.vboData.vertInfo.numOfCoordPerTexCoord > 0  or false
         of "normals": return c.vboData.vertInfo.numOfCoordPerNormal > 0  or false
         of "tangents": return c.vboData.vertInfo.numOfCoordPerTangent > 0  or false
+        else: return false
 
     template addInfo(name: string, f: typed) =
         if needsKey(name):

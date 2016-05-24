@@ -46,3 +46,11 @@ proc getSerializedValue*(j: JsonNode, name: string, val: var Node) =
     let jN = j{name}
     if not jN.isNil and jN.getStr().len > 0:
         val = newNode(jN.getStr())
+
+proc getSerializedValue*(j: JsonNode, name: string, val: var Color) =
+    let jN = j{name}
+    if not jN.isNil:
+        val.r = jN[0].getFNum()
+        val.g = jN[1].getFNum()
+        val.b = jN[2].getFNum()
+        val.a = jN[3].getFNum()
