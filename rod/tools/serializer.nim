@@ -153,6 +153,7 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("shininess", %c.material.shininess)
     result.add("reflectivity", %c.material.reflectivity)
     result.add("rim_density", %c.material.rim_density)
+    result.add("rimColor", colorToJNode(c.material.rimColor))
 
     result.add("culling", %c.material.bEnableBackfaceCulling)
     result.add("light", %c.material.isLightReceiver)

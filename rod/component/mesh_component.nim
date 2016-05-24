@@ -175,6 +175,9 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     m.material.reflectivity = jNode.getFnum()
     jNode = j{"rim_density"}
     m.material.rim_density = jNode.getFnum()
+    jNode = j{"rimColor"}
+    if not jNode.isNil:
+        m.material.rimColor = jNode.jNodeToColor()
 
     jNode = j{"culling"}
     m.material.bEnableBackfaceCulling = jNode.getBVal()
