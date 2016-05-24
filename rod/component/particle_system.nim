@@ -188,8 +188,6 @@ type
         position: Vector3
         rotation, rotationVelocity: Vector3 #deg per sec
         scale: Vector3
-        alpha: float32
-        id: int
         lifetime: float
         velocity: Vector3
         randStartScale: float
@@ -218,10 +216,9 @@ type
         framesCount*: int
         fps*: float
 
-        startColor*, dstColor*: Vector3
+        startColor*, dstColor*: Color
         startScale*, dstScale*: Vector3
         randScaleFrom*, randScaleTo*: float32
-        startAlpha*, dstAlpha*: float32
         startVelocity*, randVelocityFrom*, randVelocityTo*: float32
         randRotVelocityFrom*, randRotVelocityTo*: Vector3 # deg
         gravity*: Vector3
@@ -242,6 +239,11 @@ type
         isInited: bool
 
         lastPos, curPos: Vector3 # data to interpolate particle generation
+
+        isBlendAdd*: bool
+        # debug data
+        isMove*: bool
+        amplitude*, frequency*, distance*, speed*: float
 
 
 proc randomBetween(fromV, toV: float32): float32 =
@@ -311,7 +313,6 @@ proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle 
     result.randStartScale = randomBetween(ps.randScaleFrom, ps.randScaleTo)
     result.rotation = newVector3(0.0, 0.0, 0.0)
     result.rotationVelocity = randomBetween(ps.randRotVelocityFrom, ps.randRotVelocityTo)
-    result.alpha = ps.startAlpha
     result.lifetime = ps.lifetime
 
 proc fillIBuffer(ps: ParticleSystem) =
@@ -395,15 +396,13 @@ method init(ps: ParticleSystem) =
     ps.randVelocityTo = 0.0
     ps.randRotVelocityFrom = newVector3(0.0, 0.0, 0.0)
     ps.randRotVelocityTo = newVector3(0.0, 0.0, 0.0)
-    ps.startAlpha = 1.0
-    ps.dstAlpha = 0.0
+    ps.startColor = newColor(1.0, 1.0, 1.0, 1.0)
+    ps.dstColor = newColor(1.0, 1.0, 1.0, 1.0)
     ps.startScale = newVector3(3.0, 3.0, 3.0)
     ps.dstScale = newVector3(0.0, 0.0, 0.0)
     ps.randScaleFrom = 0.0
     ps.randScaleTo = 0.0
     ps.gravity = newVector3(0.0, -1.5, 0.0)
-    ps.startColor = newVector3(1.0, 1.0, 1.0)
-    ps.dstColor = newVector3(1.0, 1.0, 1.0)
 
     ps.isLooped = true
     ps.duration = 3.0
@@ -416,6 +415,14 @@ method init(ps: ParticleSystem) =
     ps.animColumns = 1
     ps.frameSize = newSize(1.0, 1.0)
     ps.fps = 1.0
+
+    ps.isBlendAdd = false
+
+    ps.isMove = false
+    ps.amplitude = 5.0
+    ps.frequency = 0.4
+    ps.distance = 40.0
+    ps.speed = 9.0
 
     # ps.initSystem()
 
@@ -433,7 +440,19 @@ proc start*(ps: ParticleSystem) =
 proc stop*(ps: ParticleSystem) =
     ps.isPlayed = false
 
-proc decodeRgbToFloat(c: Vector3): float32 =
+proc `*`(c: Color, f: float): Color =
+    result.r = c.r * f
+    result.g = c.g * f
+    result.b = c.b * f
+    result.a = c.a * f
+
+proc `+`(c1, c2: Color): Color =
+    result.r = c1.r + c2.r
+    result.g = c1.g + c2.g
+    result.b = c1.b + c2.b
+    result.a = c1.a + c2.a
+
+proc rgbToFloat(c: Color): float32 =
     float32((int(c[0]*255) + int(c[1]*255) * 256 + int(c[2]*255) * 256 * 256))
 
 template setVector3ToBuffer(buff: var seq[float32], offset: int, vec: Vector3) =
@@ -441,10 +460,7 @@ template setVector3ToBuffer(buff: var seq[float32], offset: int, vec: Vector3) =
     buff[offset + 1] = vec.y
     buff[offset + 2] = vec.z
 
-var gCounter = 0.0
 proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
-    gCounter += 0.05
-    let xpos = sin(gCounter) * 10
     var newParticlesCount = ps.newParticles.len
     ps.count = 0
 
@@ -530,19 +546,20 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         offset += ps.vertexDesc.scaleSize
 
         # alpha
-        ps.particles[i].alpha = ps.startAlpha * normLifeTime + ps.dstAlpha * oneMinusNormLifeTime
-        ps.particlesVertexBuff[v1 + offset] = ps.particles[i].alpha
-        ps.particlesVertexBuff[v2 + offset] = ps.particles[i].alpha
-        ps.particlesVertexBuff[v3 + offset] = ps.particles[i].alpha
-        ps.particlesVertexBuff[v4 + offset] = ps.particles[i].alpha
+        let color = ps.startColor * normLifeTime + ps.dstColor * oneMinusNormLifeTime
+        let alpha = color.a * normLifeTime + color.a * oneMinusNormLifeTime
+        ps.particlesVertexBuff[v1 + offset] = alpha
+        ps.particlesVertexBuff[v2 + offset] = alpha
+        ps.particlesVertexBuff[v3 + offset] = alpha
+        ps.particlesVertexBuff[v4 + offset] = alpha
         offset += ps.vertexDesc.alphaSize
 
         # color
-        let color = decodeRgbToFloat(ps.startColor * normLifeTime + ps.dstColor * oneMinusNormLifeTime)
-        ps.particlesVertexBuff[v1 + offset] = color
-        ps.particlesVertexBuff[v2 + offset] = color
-        ps.particlesVertexBuff[v3 + offset] = color
-        ps.particlesVertexBuff[v4 + offset] = color
+        let encoded_color = rgbToFloat(color)
+        ps.particlesVertexBuff[v1 + offset] = encoded_color
+        ps.particlesVertexBuff[v2 + offset] = encoded_color
+        ps.particlesVertexBuff[v3 + offset] = encoded_color
+        ps.particlesVertexBuff[v4 + offset] = encoded_color
         offset += ps.vertexDesc.colorSize
 
         # ID
@@ -567,6 +584,12 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         ps.particles.add(ps.newParticles[i])
 
 proc update(ps: ParticleSystem, dt: float) =
+    if ps.isMove:
+        ps.node.translation.x += ps.speed * dt
+        ps.node.translation.y = ps.amplitude * cos(ps.node.translation.x * ps.frequency)
+        if ps.node.translation.x > ps.distance / 2.0:
+            ps.node.translation.x = -ps.distance / 2.0;
+
     let perParticleTime = 1.0 / ps.birthRate
     let curTime = epochTime()
 
@@ -688,9 +711,15 @@ method draw*(ps: ParticleSystem) =
     gl.depthMask(false)
     gl.enable(gl.DEPTH_TEST)
 
+    if ps.isBlendAdd:
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE)
+    else:
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+
     gl.drawElements(gl.TRIANGLES, ps.count * 6, gl.UNSIGNED_SHORT)
 
     #TODO to default settings
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
     gl.disable(gl.DEPTH_TEST)
@@ -718,10 +747,9 @@ method deserialize*(ps: ParticleSystem, j: JsonNode) =
     j.getSerializedValue("dstScale", ps.dstScale)
     j.getSerializedValue("randScaleFrom", ps.randScaleFrom)
     j.getSerializedValue("randScaleTo", ps.randScaleTo)
-    j.getSerializedValue("startAlpha", ps.startAlpha)
-    j.getSerializedValue("dstAlpha", ps.dstAlpha)
     j.getSerializedValue("startColor", ps.startColor)
     j.getSerializedValue("dstColor", ps.dstColor)
+    j.getSerializedValue("isBlendAdd", ps.isBlendAdd)
     j.getSerializedValue("gravity", ps.gravity)
 
     j.getSerializedValue("texture", ps.texture)
@@ -733,6 +761,12 @@ method deserialize*(ps: ParticleSystem, j: JsonNode) =
 
     j.getSerializedValue("genShapeNode", ps.genShapeNode)
     j.getSerializedValue("attractorNode", ps.attractorNode)
+
+    j.getSerializedValue("isMove", ps.isMove)
+    j.getSerializedValue("amplitude", ps.amplitude)
+    j.getSerializedValue("frequency", ps.frequency)
+    j.getSerializedValue("distance", ps.distance)
+    j.getSerializedValue("speed", ps.speed)
 
     # ps.initSystem()
 
@@ -771,10 +805,9 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("dstScale", ps.dstScale)
     p.visitProperty("randScaleFrom", ps.randScaleFrom)
     p.visitProperty("randScaleTo", ps.randScaleTo)
-    p.visitProperty("startAlpha", ps.startAlpha)
-    p.visitProperty("dstAlpha", ps.dstAlpha)
     p.visitProperty("startColor", ps.startColor)
     p.visitProperty("dstColor", ps.dstColor)
+    p.visitProperty("isBlendAdd", ps.isBlendAdd)
     p.visitProperty("gravity", ps.gravity)
     p.visitProperty("texture", ps.texture, onTextureChange)
     p.visitProperty("isTexAnim", ps.isTextureAnimated, toCalculateVertexDesc)
@@ -783,8 +816,12 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("framesCount", ps.framesCount)
     p.visitProperty("fps", ps.fps)
 
+    p.visitProperty("isMove", ps.isMove)
+    p.visitProperty("amplitude", ps.amplitude)
+    p.visitProperty("frequency", ps.frequency)
+    p.visitProperty("distance", ps.distance)
+    p.visitProperty("speed", ps.speed)
 
-# registerComponent[ParticleSystem]()
 registerComponent[ParticleSystem](proc(): Component =
     result = newParticleSystem()
     )

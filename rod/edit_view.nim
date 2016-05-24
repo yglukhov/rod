@@ -140,8 +140,11 @@ proc loadNode(editor: Editor): bool =
     when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
         let path = callDialogFileOpen("Select Json")
         if not path.isNil:
-            let rn = newNodeWithResource(path)
-            editor.rootNode.addChild(rn)
+            let ln = newNodeWithResource(path)
+            if not editor.selectedNode.isNil:
+                editor.selectedNode.addChild(ln)
+            else:
+                editor.rootNode.addChild(ln)
             return true
 
     return false
@@ -341,6 +344,9 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
 
     v.window.addSubview(inspectorView)
     v.window.addSubview(settingsView)
+
+    let fpsAnimation = newAnimation()
+    v.SceneView.addAnimation(fpsAnimation)
 
     return editor
 
