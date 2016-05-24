@@ -321,15 +321,13 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     for it in cn.children:
         result.addChild(setupFromColladaNode(it, colladaScene))
 
-var gScenesResCache = initResourceCache[ColladaScene]()
-
 proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
     var loader: ColladaLoader
     result = loader.load(s)
     s.close()
 
 proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
-    let colladaScene = gScenesResCache.get(resourceName)
+    let colladaScene = findCachedResource[ColladaScene](resourceName)
 
     if colladaScene.isNil:
         resourceNotCached(resourceName)
@@ -338,7 +336,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             pushParentResource(resourceName)
 
             let colladaScene = loadColladaFromStream(s, resourceName)
-            gScenesResCache.registerResource(resourceName, colladaScene)
+            registerResource(resourceName, colladaScene)
 
             let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
             for anim in colladaScene.animations:
@@ -356,12 +354,9 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
         popParentResource()
         handler(res)
 
-registerResourcePreloader(["dae"], proc(name: string, callback: proc()) =
-    loadResourceAsync(name, proc(s: Stream) =
+registerResourcePreloader(["dae"]) do(name: string, callback: proc(r: ColladaScene)):
+    loadResourceAsync(name) do(s: Stream):
         pushParentResource(name)
         let colladaScene = loadColladaFromStream(s, name)
         popParentResource()
-        gScenesResCache.registerResource(name, colladaScene)
-        callback()
-    )
-)
+        callback(colladaScene)
