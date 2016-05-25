@@ -53,4 +53,7 @@ proc getSerializedValue*(j: JsonNode, name: string, val: var Color) =
         val.r = jN[0].getFNum()
         val.g = jN[1].getFNum()
         val.b = jN[2].getFNum()
-        val.a = jN[3].getFNum()
+        if jN.len > 3: #TODO: new format should always have 4 components for color.
+            val.a = jN[3].getFNum()
+        else:
+            val.a = 1.0
