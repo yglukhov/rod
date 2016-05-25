@@ -13,13 +13,14 @@ method init*(c: Camera) =
     c.projectionMode = cpPerspective
     c.zNear = 1
     c.zFar = 10000
+    c.fov = 30
 
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
     case c.projectionMode
     of cpOrtho:
         mat.ortho(-viewportBounds.width / 2, viewportBounds.width / 2, -viewportBounds.height / 2, viewportBounds.height / 2, c.zNear, c.zFar)
     of cpPerspective:
-        mat.perspective(30, viewportBounds.width / viewportBounds.height, c.zNear, c.zFar)
+        mat.perspective(c.fov, viewportBounds.width / viewportBounds.height, c.zNear, c.zFar)
     of cpManual:
         doAssert(not c.mManualGetProjectionMatrix.isNil)
         c.mManualGetProjectionMatrix(viewportBounds, mat)
@@ -31,5 +32,6 @@ proc `manualGetProjectionMatrix=`*(c: Camera, p: proc(viewportBounds: Rect, mat:
 method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("zNear", c.zNear)
     p.visitProperty("zFar", c.zFar)
+    p.visitProperty("fov", c.fov)
 
 registerComponent[Camera]()

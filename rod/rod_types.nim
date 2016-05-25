@@ -61,7 +61,8 @@ type
 
     Camera* = ref object of Component
         projectionMode*: CameraProjection
-        zNear*, zFar*: Coord
+        zNear*, zFar*, fov*: Coord
+
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
 
     UIComponent* = ref object of Component
