@@ -37,13 +37,11 @@ proc parseVector4(source: string): Vector4 =
     result[i] = parseFloat(it)
     inc(i)
 
-proc parseMatrix4(source: string): Matrix4 =
-    var nodeMarix: array[16, float32]
+proc parseMatrix4(source: openarray[float32]): Matrix4 =
     var i = 0
-    for it in split(source):
-        nodeMarix[i] = parseFloat(it)
-        inc(i)
-    result = nodeMarix
+    while i < result.len:
+        result[i] = source[i]
+        inc i
 
 proc isNear(v1, v2: float32): bool =
     result = abs( v1 - v2 ) < 0.01.float32
