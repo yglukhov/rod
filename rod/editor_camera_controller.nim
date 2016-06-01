@@ -33,6 +33,7 @@ proc setToNode(cc: EditorCameraController, n: Node) =
 
 proc onTapDown*(cc: EditorCameraController, e : var Event) =
     echo "onTapDown"
+    cc.camAnchor.translation = cc.camera.translation
 
 proc onScrollProgress*(cc: EditorCameraController, dx, dy : float32, e : var Event) =
     cc.currentAngle.x = dy

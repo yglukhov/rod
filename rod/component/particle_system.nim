@@ -1,5 +1,6 @@
 import times
 import math
+import random
 import json
 import tables
 
@@ -40,6 +41,7 @@ uniform mat4 modelViewProjectionMatrix;
 uniform mat4 projMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 worldMatrix;
+uniform vec3 uNodeScale;
 
 varying float vAlpha;
 varying float vColor;
@@ -119,6 +121,7 @@ void main()
     texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
 #endif
 
+    vertexOffset = vertexOffset * uNodeScale;
     vertexOffset = vertexOffset * aScale;
 
     mat4 rMatrix = getRotationMatrix(aRotation);
@@ -707,6 +710,7 @@ method draw*(ps: ParticleSystem) =
 
     ps.shader.setUniform("projMatrix", projMatrix)
     ps.shader.setUniform("viewMatrix", viewMatrix)
+    ps.shader.setUniform("uNodeScale", ps.node.scale)
 
     gl.depthMask(false)
     gl.enable(gl.DEPTH_TEST)
