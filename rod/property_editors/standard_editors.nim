@@ -6,11 +6,14 @@ import nimx.matrixes
 import nimx.image
 import nimx.button
 import nimx.color_picker
+import nimx.context
+import nimx.portable_gl
 
 import rod.property_editors.propedit_registry
 import rod.numeric_text_field
 import rod.node
 import rod.viewport
+import rod.component.mesh_component
 
 when defined(js):
     from dom import alert
@@ -18,6 +21,7 @@ elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 var gColorPicker*: ColorPickerView
+var currEditedNode: Node
 
 template toStr(v: SomeReal, precision: uint): string = formatFloat(v, ffDecimal, precision)
 template toStr(v: SomeInteger): string = $v
@@ -207,7 +211,84 @@ when not defined(android) and not defined(ios):
 
     registerPropertyEditor(newImagePropertyView)
 
+    type ImagePercent = tuple
+        s: Image
+        v: float32
+    proc newMaterialImagePropertyView(setter: proc(t: ImagePercent), getter: proc(): ImagePercent ): PropertyEditorView =
+        let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
+
+        var loadedImage = getter().s
+        let imgButton = newImageButton(pv, newPoint(0, 0), newSize(24, 24), loadedImage)
+
+        let bOpen = Button.new(newRect(30, 0, 70, 24))
+        bOpen.title = "Open"
+        bOpen.onAction do():
+            when defined(js):
+                alert("Files can be opened only in native editor version")
+            elif defined(emscripten):
+                discard
+            else:
+                let path = callDialogFileOpen("Select Image")
+                if not path.isNil:
+                    loadedImage = imageWithContentsOfFile(path)
+                    var t:ImagePercent
+                    t.s = loadedImage
+                    t.v = getter().v.float32
+                    setter(t)
+                    imgButton.image = loadedImage
+                    if not pv.onChange.isNil:
+                        pv.onChange()
+
+        let bRemove = Button.new(newRect(105, 0, 70, 24))
+        bRemove.title = "Remove"
+        bRemove.onAction do():
+            if not getter().s.isNil:
+                var simg = getter().s.SelfContainedImage
+                let c = currentContext()
+                let gl = c.gl
+                gl.deleteFramebuffer(simg.framebuffer)
+                gl.deleteTexture(simg.texture)
+                simg.framebuffer = invalidFrameBuffer
+                simg.texture = invalidTexture
+                simg = nil
+                var t:ImagePercent
+                t.s = nil
+                t.v = getter().v.float32
+                setter(t)
+                imgButton.image = nil
+                loadedImage = nil
+                if not pv.onChange.isNil:
+                    pv.onChange()
+
+        result = pv
+        result.addSubview(bOpen)
+        result.addSubview(bRemove)
+
+        if not currEditedNode.isNil:
+            let meshComp = currEditedNode.componentIfAvailable(MeshComponent)
+            if not meshComp.isNil:
+                let tf = newNumericTextField(newRect(180, 0, 50, 24))
+                tf.textColor = newGrayColor(0.0)
+                tf.text = toStr(getter().v, tf.precision)
+                tf.onAction do():
+                    try:
+                        var v: float32
+                        fromStr(tf.text, v)
+                        var t:ImagePercent
+                        t.s = if not loadedImage.isNil: loadedImage else: getter().s
+                        t.v = v.float32
+                        setter(t)
+                        if not pv.onChange.isNil:
+                            pv.onChange()
+                    except ValueError:
+                        discard
+                result.addSubview(tf)
+
+    registerPropertyEditor(newMaterialImagePropertyView)
+
 proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): PropertyEditorView =
+    currEditedNode = editedNode
+
     let textField = newTextField(newRect(0, 0, 200, 24))
     let n = getter()
     textField.textColor = newGrayColor(0.0)
@@ -221,6 +302,8 @@ proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc()
     result.addSubview(textField)
 
 proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc(): bool): PropertyEditorView =
+    currEditedNode = editedNode
+
     let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
     let cb = newCheckbox(newRect(0, 0, 200, 24))
     cb.value = if getter(): 1 else: 0

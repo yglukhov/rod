@@ -68,39 +68,48 @@ varying vec2 vTexCoord;
 #ifdef WITH_MATCAP_SAMPLER
 uniform sampler2D matcapUnit;
 uniform vec4 uMatcapUnitCoords;
+uniform float uMatcapPercent;
 #endif
 #ifdef WITH_AMBIENT_SAMPLER
 uniform sampler2D texUnit;
 uniform vec4 uTexUnitCoords;
+uniform float uTexUnitPercent;
 #endif
 #ifdef WITH_GLOSS_SAMPLER
 uniform sampler2D glossMapUnit;
 uniform vec4 uGlossUnitCoords;
+uniform float uGlossPercent;
 #endif
 #ifdef WITH_SPECULAR_SAMPLER
 uniform sampler2D specularMapUnit;
 uniform vec4 uSpecularUnitCoords;
+uniform float uSpecularPercent;
 #endif
 #ifdef WITH_BUMP_SAMPLER
 uniform sampler2D bumpMapUnit;
 uniform vec4 uBumpUnitCoords;
+uniform float uBumpPercent;
 #endif
 #ifdef WITH_NORMAL_SAMPLER
 uniform sampler2D normalMapUnit;
 uniform vec4 uNormalUnitCoords;
+uniform float uNormalPercent;
 #endif
 #ifdef WITH_REFLECTION_SAMPLER
 uniform sampler2D reflectMapUnit;
 uniform vec4 uReflectUnitCoords;
 uniform float uReflectivity;
+uniform float uReflectionPercent;
 #endif
 #ifdef WITH_FALLOF_SAMPLER
 uniform sampler2D falloffMapUnit;
 uniform vec4 uFallofUnitCoords;
+uniform float uFalloffPercent;
 #endif
 #ifdef WITH_MASK_SAMPLER
 uniform sampler2D maskMapUnit;
 uniform vec4 uMaskUnitCoords;
+uniform float uMaskPercent;
 #endif
 
 #ifdef WITH_MATERIAL_AMBIENT
@@ -233,7 +242,7 @@ mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
 #ifdef WITH_NORMAL_SAMPLER
     #define WITH_NORMALMAP_UNSIGNED
     vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ){
-        vec3 map = texture2D(normalMapUnit, texcoord, mipBias).xyz;
+        vec3 map = texture2D(normalMapUnit, texcoord, mipBias).xyz * uNormalPercent;
     #ifdef WITH_NORMALMAP_UNSIGNED
         map = map * 255.0/127.0 - 128.0/127.0;
     #endif
@@ -260,7 +269,7 @@ float computeAmbient(float lAmb) {
 float computeDiffuse(float lDif, float lAttenuation, vec3 L, vec3 normal) {
     float result = 1.0;
     #ifdef WITH_GLOSS_SAMPLER
-        vec2  roughnessV = texture2D(glossMapUnit, uGlossUnitCoords.xy + (uGlossUnitCoords.zw - uGlossUnitCoords.xy) * vTexCoord, mipBias).rg;
+        vec2  roughnessV = texture2D(glossMapUnit, uGlossUnitCoords.xy + (uGlossUnitCoords.zw - uGlossUnitCoords.xy) * vTexCoord, mipBias).rg * uGlossPercent;
         float roughness = (1-roughnessV.r) + uMaterialDiffuse.z * (1.0 - roughnessV.g);
         result *= roughness;
     #endif
@@ -316,7 +325,7 @@ vec3 toSRGB(vec3 c) {
 
 vec4 computeTexel() {
     #ifdef WITH_MASK_SAMPLER
-        float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a;
+        float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a * uMaskPercent;
         if ( mask < 0.001 ) {
             discard;
         }
@@ -337,7 +346,7 @@ vec4 computeTexel() {
 
     #ifdef WITH_MATERIAL_DIFFUSE
         #ifdef WITH_AMBIENT_SAMPLER
-            vec4 diffTextureTexel = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * vTexCoord, mipBias);
+            vec4 diffTextureTexel = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * vTexCoord, mipBias) * uTexUnitPercent;
             diffTextureTexel *= uMaterialDiffuse;
             diffuse += diffTextureTexel;
         #else
@@ -353,7 +362,7 @@ vec4 computeTexel() {
             #ifdef WITH_NORMAL_SAMPLER
                 mat3 TBN = mat3(vTangent, vBinormal, vNormal);
                 vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
-                vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0;
+                vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0 * uNormalPercent;
 
                 vec3 normal = TBN * bumpNormal;
 
@@ -383,7 +392,7 @@ vec4 computeTexel() {
         float specCoef = 1.0;
 
         #ifdef WITH_SPECULAR_SAMPLER
-            float texSpec = texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r;
+            float texSpec = texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r * uSpecularPercent;
             specCoef += texSpec;
         #endif
 
@@ -397,7 +406,7 @@ vec4 computeTexel() {
             vec3 r = reflect( normalize(-vPosition.xyz), normal );
             float m = 2.0 * sqrt( r.x*r.x + r.y*r.y + (r.z+1.0)*(r.z+1.0) );
             vec2 vReflCoord = vec2(r.x/m + 0.5, r.y/m + 0.5);
-            vec4 reflectColor = texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord, mipBias) * reflCoef;
+            vec4 reflectColor = texture2D(reflectMapUnit, uReflectUnitCoords.xy + (uReflectUnitCoords.zw - uReflectUnitCoords.xy) * vReflCoord, mipBias) * reflCoef * uReflectionPercent;
 
             // ambient += reflectColor;
 
@@ -541,7 +550,7 @@ vec4 computeTexel() {
 #ifdef WITH_MATCAP_SAMPLER
 vec4 computeTexelMatcap() {
     #ifdef WITH_MASK_SAMPLER
-        float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a;
+        float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a * uMaskPercent;
         if ( mask < 0.001 ) {
             discard;
         }
@@ -551,7 +560,7 @@ vec4 computeTexelMatcap() {
         #ifdef WITH_NORMAL_SAMPLER
             mat3 TBN = mat3(vTangent, vBinormal, vNormal);
             vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
-            vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0;
+            vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0 * uNormalPercent;
             vec3 normal = TBN * bumpNormal;
             #ifdef WITH_NORMALMAP_TO_SRGB
                 normal = toSRGB(normal);
@@ -578,7 +587,7 @@ vec4 computeTexelMatcap() {
     vec2 uv = reflected.xy / m + 0.5;
     uv = vec2(uv.x, 1.0 - uv.y);
 
-    return vec4(texture2D(matcapUnit, uMatcapUnitCoords.xy + (uMatcapUnitCoords.zw - uMatcapUnitCoords.xy) * uv, mipBias).rgb, uMaterialTransparency);
+    return vec4(texture2D(matcapUnit, uMatcapUnitCoords.xy + (uMatcapUnitCoords.zw - uMatcapUnitCoords.xy) * uv, mipBias).rgb, uMaterialTransparency) * uMatcapPercent;
 }
 #endif
 
