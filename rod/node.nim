@@ -178,6 +178,13 @@ proc newChild*(n: Node, childName: string = nil): Node =
     result = newNode(childName)
     n.addChild(result)
 
+proc insertChild*(n, c: Node, index: int) =
+    c.removeFromParent()
+    n.children.insert(c, index)
+    c.parent = n
+    if not n.mSceneView.isNil:
+        c.nodeWasAddedToSceneView(n.mSceneView)
+
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
         result = n

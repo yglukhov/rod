@@ -209,6 +209,25 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
         inspector.inspectedNode = n
 
+    outlineView.onDragAndDrop = proc(fromIp, toIp: openarray[int]) =
+        let f = outlineView.itemAtIndexPath(fromIp).get(Node3D)
+        var tos = @toIp
+        tos.setLen(tos.len - 1)
+        let t = outlineView.itemAtIndexPath(tos).get(Node3D)
+        let toIndex = toIp[^1]
+        if f.parent == t:
+            let cIndex = t.children.find(f)
+            if toIndex < cIndex:
+                t.children.delete(cIndex)
+                t.children.insert(f, toIndex)
+            elif toIndex > cIndex:
+                t.children.delete(cIndex)
+                t.children.insert(f, toIndex - 1)
+        else:
+            f.removeFromParent()
+            t.insertChild(f, toIndex)
+        outlineView.reloadData()
+
     outlineView.reloadData()
 
     let outlineScrollView = newScrollView(outlineView)
