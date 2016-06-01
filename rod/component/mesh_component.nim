@@ -25,6 +25,8 @@ import rod.viewport
 import rod.ray
 import rod.rod_types
 
+import animation.skeleton
+
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
 
@@ -49,6 +51,14 @@ type
         bProccesPostEffects*: bool
         prevTransform*: Matrix4
 
+        skeleton*: Skeleton
+        initMesh*: seq[Glfloat]
+        currMesh*: seq[Glfloat]
+        vertexWeights*: seq[Glfloat]
+        boneIDs*: seq[Glfloat]
+
+        debugSkeleton*: bool
+
 var vboCache* = initTable[string, VBOData]()
 
 method init*(m: MeshComponent) =
@@ -59,6 +69,8 @@ method init*(m: MeshComponent) =
     m.vboData.minCoord = newVector3(high(int).Coord, high(int).Coord, high(int).Coord)
     m.vboData.maxCoord = newVector3(low(int).Coord, low(int).Coord, low(int).Coord)
     procCall m.Component.init()
+
+    m.debugSkeleton = false
 
 proc checkMinMax*(m: MeshComponent, x, y, z: float32) =
     if x < m.vboData.minCoord[0]:
@@ -110,10 +122,252 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
         gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
         m.vboData.numberOfIndices = indexData.len.GLsizei
 
+        m.currMesh = vertexAttrData
+
     if currentContext().isNil:
         m.loadFunc = loadFunc
     else:
         loadFunc()
+
+
+proc loadMeshComponent(m: MeshComponent, resourceName: string) =
+    if not vboCache.contains(m.resourceName):
+        loadResourceAsync resourceName, proc(s: Stream) =
+            let loadFunc = proc() =
+                var loader: ObjLoader
+                var vertexData = newSeq[GLfloat]()
+                var texCoordData = newSeq[GLfloat]()
+                var normalData = newSeq[GLfloat]()
+                var vertexAttrData = newSeq[GLfloat]()
+                var indexData = newSeq[GLushort]()
+                template addVertex(x, y, z: float) =
+                    vertexData.add(x)
+                    vertexData.add(y)
+                    vertexData.add(z)
+
+                template addNormal(x, y, z: float) =
+                    normalData.add(x)
+                    normalData.add(y)
+                    normalData.add(z)
+
+                template addTexCoord(u, v, w: float) =
+                    texCoordData.add(u)
+                    texCoordData.add(1.0 - v)
+
+                template uvIndex(t, v: int): int =
+                    ## If texture index is not assigned, fallback to vertex index
+                    if t == 0: (v - 1) else: (t - 1)
+
+                template addFace(vi0, vi1, vi2, ti0, ti1, ti2, ni0, ni1, ni2: int) =
+                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0 - 1, uvIndex(ti0, vi0), ni0 - 1))
+                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1 - 1, uvIndex(ti1, vi1), ni1 - 1))
+                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2 - 1, uvIndex(ti2, vi2), ni2 - 1))
+
+                loader.loadMeshData(s, addVertex, addTexCoord, addNormal, addFace)
+                s.close()
+
+                m.vboData.vertInfo = newVertexInfoWithVertexData(vertexData.len, texCoordData.len, normalData.len)
+                m.createVBO(indexData, vertexAttrData)
+                vboCache[m.resourceName] = m.vboData
+
+            if currentContext().isNil:
+                m.loadFunc = loadFunc
+            else:
+                loadFunc()
+    else:
+        m.vboData = vboCache[m.resourceName]
+
+proc loadWithResource*(m: MeshComponent, resourceName: string) =
+    m.loadFunc = proc() =
+        m.loadMeshComponent(resourceName)
+
+template loadMeshComponentWithResource*(m: MeshComponent, resourceName: string) {.deprecated.} =
+    m.loadWithResource(resourceName)
+
+proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
+    let gl = currentContext().gl
+    let vertexData = [
+        v1[0], v1[1], v1[2], t1.x, t1.y,
+        v2[0], v2[1], v2[2], t2.x, t2.y,
+        v3[0], v3[1], v3[2], t3.x, t3.y,
+        v4[0], v4[1], v4[2], t4.x, t4.y
+        ]
+    let indexData = [0.GLushort, 1, 2, 2, 3, 0]
+
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
+    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
+
+    m.vboData.vertInfo = newVertexInfoWithVertexData(3, 2)
+
+    m.vboData.indexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
+    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
+
+    m.vboData.vertexBuffer = gl.createBuffer()
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
+    gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
+    m.vboData.numberOfIndices = indexData.len.GLsizei
+
+proc loadWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
+    m.loadFunc = proc() =
+        m.loadMeshQuad(v1, v2, v3, v4, t1, t2, t3, t4)
+
+template meshComponentWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) {.deprecated.} =
+    m.loadWithQuad(v1, v2, v3, v4, t1, t2, t3, t4)
+
+proc load(m: MeshComponent) =
+    if not m.loadFunc.isNil:
+        m.loadFunc()
+        m.loadFunc = nil
+
+proc transformPoint(mat: Matrix4, point: Vector3): Vector3 =
+    result.x = point.x * mat[0] + point.y * mat[4] + point.z * mat[8] + mat[12];
+    result.y = point.x * mat[1] + point.y * mat[5] + point.z * mat[9] + mat[13];
+    result.z = point.x * mat[2] + point.y * mat[6] + point.z * mat[10] + mat[14];
+
+proc setupAndDraw*(m: MeshComponent) =
+    let c = currentContext()
+    let gl = c.gl
+
+    m.material.setupVertexAttributes(m.vboData.vertInfo)
+    m.material.updateSetup(m.node)
+    if m.material.bEnableBackfaceCulling:
+        gl.enable(gl.CULL_FACE)
+
+    if not m.skeleton.isNil:
+        m.skeleton.update()
+
+        let stride = int(m.vboData.vertInfo.stride / sizeof(Glfloat))
+        let vertCount = int(m.currMesh.len / stride)
+        for i in 0 ..< vertCount:
+            var pos: Vector3
+            var initPos: Vector3
+            initPos.x = m.initMesh[stride * i + 0]
+            initPos.y = m.initMesh[stride * i + 1]
+            initPos.z = m.initMesh[stride * i + 2]
+
+            for j in 0 ..< 4:
+                let index = 4*i + j
+                if m.vertexWeights[index] > 0.0:
+                    let bone = m.skeleton.getBone( m.boneIDs[index].int16 )
+                    # let resMatrix = bone.matrix * bone.invMatrix
+                    pos += bone.matrix.transformPoint( initPos ) * m.vertexWeights[index]
+
+            m.currMesh[stride * i + 0] = pos.x
+            m.currMesh[stride * i + 1] = pos.y
+            m.currMesh[stride * i + 2] = pos.z
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
+        gl.bufferData(gl.ARRAY_BUFFER, m.currMesh, gl.STATIC_DRAW)
+
+    gl.drawElements(gl.TRIANGLES, m.vboData.numberOfIndices, gl.UNSIGNED_SHORT)
+
+
+method draw*(m: MeshComponent) =
+    let c = currentContext()
+    let gl = c.gl
+
+    if m.vboData.indexBuffer == invalidBuffer:
+        m.load()
+        if m.vboData.indexBuffer == invalidBuffer:
+            return
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
+
+    if not m.bProccesPostEffects or m.node.sceneView.isNil or m.node.sceneView.postprocessContext.isNil or m.node.sceneView.postprocessContext.shader == invalidProgram:
+        m.setupAndDraw()
+    else:
+        m.node.sceneView.postprocessContext.drawProc(m)
+
+    if m.material.bEnableBackfaceCulling:
+        gl.disable(gl.CULL_FACE)
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+    gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
+    when not defined(ios) and not defined(android) and not defined(js) and not defined(emscripten):
+        glPolygonMode(gl.FRONT_AND_BACK, GL_FILL)
+
+    #TODO to default settings
+    gl.disable(gl.DEPTH_TEST)
+    gl.activeTexture(gl.TEXTURE0)
+    gl.enable(gl.BLEND)
+
+    if m.debugSkeleton:
+        m.skeleton.debugDraw()
+
+proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
+    proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
+        when defined(js):
+            asm "`gl`.BufferSubData(`target`, `offset`, new Uint16Array(`data`));"
+        else:
+            glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
+
+    let gl = currentContext().gl
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.vboData.indexBuffer)
+    let bufSize = gl.getBufferParameteriv(gl.ELEMENT_ARRAY_BUFFER, gl.BUFFER_SIZE)
+    let size = int(bufSize / sizeof(GLushort))
+    result = newSeq[GLushort](size)
+
+    getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
+
+
+# --------- read data from VBO ------------
+proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
+    proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLfloat]) =
+        when defined(js):
+            asm "`gl`.BufferSubData(`target`, `offset`, new Float32Array(`data`));"
+        else:
+            glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
+
+    let gl = currentContext().gl
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, c.vboData.vertexBuffer)
+    let bufSize = gl.getBufferParameteriv(gl.ARRAY_BUFFER, gl.BUFFER_SIZE)
+    let size = int(bufSize / sizeof(float32))
+    result = newSeq[float32](size)
+
+    getBufferSubData(gl.ARRAY_BUFFER, 0, result)
+
+proc extractVertexData*(c: MeshComponent, size, offset: int32, data: seq[float32]): seq[float32] =
+    let dataStride = int(c.vboData.vertInfo.stride / sizeof(float32))
+    let vertCount = int (data.len / dataStride)
+
+    result = newSeq[float32](vertCount * size)
+    for i in 0 ..< vertCount:
+        for j in 0 ..< size:
+            result[ size*i + j ] = data[ dataStride*i + j + offset ]
+
+proc extractVertCoords*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.} =
+    let size = (int32)c.vboData.vertInfo.numOfCoordPerVert
+    let offset = (int32)0
+    result = c.extractVertexData(size, offset, data)
+
+proc extractTexCoords*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
+    let size = (int32)c.vboData.vertInfo.numOfCoordPerTexCoord
+    let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert
+    result = c.extractVertexData(size, offset, data)
+
+proc extractNormals*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
+    let size = (int32)c.vboData.vertInfo.numOfCoordPerNormal
+    let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord
+    result = c.extractVertexData(size, offset, data)
+
+proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
+    let size = (int32)c.vboData.vertInfo.numOfCoordPerTangent
+    let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord + c.vboData.vertInfo.numOfCoordPerNormal
+    result = c.extractVertexData(size, offset, data)
+
+method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
+    var inv_mat: Matrix4
+    if tryInverse (c.node.worldTransform(), inv_mat) == false:
+        return false
+
+    let localRay = r.transform(inv_mat)
+    result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
 
 proc jNodeToColor(j: JsonNode): Color =
     result.r = j[0].getFNum()
@@ -255,209 +509,6 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
 
     m.createVBO(indices, vertexData)
 
-
-proc loadMeshComponent(m: MeshComponent, resourceName: string) =
-    if not vboCache.contains(m.resourceName):
-        loadResourceAsync resourceName, proc(s: Stream) =
-            let loadFunc = proc() =
-                var loader: ObjLoader
-                var vertexData = newSeq[GLfloat]()
-                var texCoordData = newSeq[GLfloat]()
-                var normalData = newSeq[GLfloat]()
-                var vertexAttrData = newSeq[GLfloat]()
-                var indexData = newSeq[GLushort]()
-                template addVertex(x, y, z: float) =
-                    vertexData.add(x)
-                    vertexData.add(y)
-                    vertexData.add(z)
-
-                template addNormal(x, y, z: float) =
-                    normalData.add(x)
-                    normalData.add(y)
-                    normalData.add(z)
-
-                template addTexCoord(u, v, w: float) =
-                    texCoordData.add(u)
-                    texCoordData.add(1.0 - v)
-
-                template uvIndex(t, v: int): int =
-                    ## If texture index is not assigned, fallback to vertex index
-                    if t == 0: (v - 1) else: (t - 1)
-
-                template addFace(vi0, vi1, vi2, ti0, ti1, ti2, ni0, ni1, ni2: int) =
-                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0 - 1, uvIndex(ti0, vi0), ni0 - 1))
-                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1 - 1, uvIndex(ti1, vi1), ni1 - 1))
-                    indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2 - 1, uvIndex(ti2, vi2), ni2 - 1))
-
-                loader.loadMeshData(s, addVertex, addTexCoord, addNormal, addFace)
-                s.close()
-
-                m.vboData.vertInfo = newVertexInfoWithVertexData(vertexData.len, texCoordData.len, normalData.len)
-                m.createVBO(indexData, vertexAttrData)
-                vboCache[m.resourceName] = m.vboData
-
-            if currentContext().isNil:
-                m.loadFunc = loadFunc
-            else:
-                loadFunc()
-    else:
-        m.vboData = vboCache[m.resourceName]
-
-proc loadWithResource*(m: MeshComponent, resourceName: string) =
-    m.loadFunc = proc() =
-        m.loadMeshComponent(resourceName)
-
-template loadMeshComponentWithResource*(m: MeshComponent, resourceName: string) {.deprecated.} =
-    m.loadWithResource(resourceName)
-
-proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
-    let gl = currentContext().gl
-    let vertexData = [
-        v1[0], v1[1], v1[2], t1.x, t1.y,
-        v2[0], v2[1], v2[2], t2.x, t2.y,
-        v3[0], v3[1], v3[2], t3.x, t3.y,
-        v4[0], v4[1], v4[2], t4.x, t4.y
-        ]
-    let indexData = [0.GLushort, 1, 2, 2, 3, 0]
-
-    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
-    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
-    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
-    m.checkMinMax(vertexData[0], vertexData[1], vertexData[2])
-
-    m.vboData.vertInfo = newVertexInfoWithVertexData(3, 2)
-
-    m.vboData.indexBuffer = gl.createBuffer()
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
-    gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
-
-    m.vboData.vertexBuffer = gl.createBuffer()
-    gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
-    m.vboData.numberOfIndices = indexData.len.GLsizei
-
-proc loadWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
-    m.loadFunc = proc() =
-        m.loadMeshQuad(v1, v2, v3, v4, t1, t2, t3, t4)
-
-template meshComponentWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) {.deprecated.} =
-    m.loadWithQuad(v1, v2, v3, v4, t1, t2, t3, t4)
-
-proc load(m: MeshComponent) =
-    if not m.loadFunc.isNil:
-        m.loadFunc()
-        m.loadFunc = nil
-
-proc setupAndDraw*(m: MeshComponent) =
-    let c = currentContext()
-    let gl = c.gl
-
-    m.material.setupVertexAttributes(m.vboData.vertInfo)
-    m.material.updateSetup(m.node)
-    if m.material.bEnableBackfaceCulling:
-        gl.enable(gl.CULL_FACE)
-
-    gl.drawElements(gl.TRIANGLES, m.vboData.numberOfIndices, gl.UNSIGNED_SHORT)
-
-method draw*(m: MeshComponent) =
-    let c = currentContext()
-    let gl = c.gl
-
-    if m.vboData.indexBuffer == invalidBuffer:
-        m.load()
-        if m.vboData.indexBuffer == invalidBuffer:
-            return
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
-
-    if not m.bProccesPostEffects or m.node.sceneView.isNil or m.node.sceneView.postprocessContext.isNil or m.node.sceneView.postprocessContext.shader == invalidProgram:
-        m.setupAndDraw()
-    else:
-        m.node.sceneView.postprocessContext.drawProc(m)
-
-    if m.material.bEnableBackfaceCulling:
-        gl.disable(gl.CULL_FACE)
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
-    gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
-    when not defined(ios) and not defined(android) and not defined(js) and not defined(emscripten):
-        glPolygonMode(gl.FRONT_AND_BACK, GL_FILL)
-
-    #TODO to default settings
-    gl.disable(gl.DEPTH_TEST)
-    gl.activeTexture(gl.TEXTURE0)
-    gl.enable(gl.BLEND)
-
-proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
-    proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
-        when defined(js):
-            asm "`gl`.BufferSubData(`target`, `offset`, new Uint16Array(`data`));"
-        else:
-            glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
-
-    let gl = currentContext().gl
-
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.vboData.indexBuffer)
-    let bufSize = gl.getBufferParameteriv(gl.ELEMENT_ARRAY_BUFFER, gl.BUFFER_SIZE)
-    let size = int(bufSize / sizeof(GLushort))
-    result = newSeq[GLushort](size)
-
-    getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
-
-proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
-    proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLfloat]) =
-        when defined(js):
-            asm "`gl`.BufferSubData(`target`, `offset`, new Float32Array(`data`));"
-        else:
-            glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
-
-    let gl = currentContext().gl
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, c.vboData.vertexBuffer)
-    let bufSize = gl.getBufferParameteriv(gl.ARRAY_BUFFER, gl.BUFFER_SIZE)
-    let size = int(bufSize / sizeof(float32))
-    result = newSeq[float32](size)
-
-    getBufferSubData(gl.ARRAY_BUFFER, 0, result)
-
-proc extractVertexData*(c: MeshComponent, size, offset: int32, data: seq[float32]): seq[float32] =
-    let dataStride = int(c.vboData.vertInfo.stride / sizeof(float32))
-    let vertCount = int (data.len / dataStride)
-
-    result = newSeq[float32](vertCount * size)
-    for i in 0 ..< vertCount:
-        for j in 0 ..< size:
-            result[ size*i + j ] = data[ dataStride*i + j + offset ]
-
-proc extractVertCoords*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.} =
-    let size = (int32)c.vboData.vertInfo.numOfCoordPerVert
-    let offset = (int32)0
-    result = c.extractVertexData(size, offset, data)
-
-proc extractTexCoords*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
-    let size = (int32)c.vboData.vertInfo.numOfCoordPerTexCoord
-    let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert
-    result = c.extractVertexData(size, offset, data)
-
-proc extractNormals*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
-    let size = (int32)c.vboData.vertInfo.numOfCoordPerNormal
-    let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord
-    result = c.extractVertexData(size, offset, data)
-
-proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] {.procvar.}  =
-    let size = (int32)c.vboData.vertInfo.numOfCoordPerTangent
-    let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord + c.vboData.vertInfo.numOfCoordPerNormal
-    result = c.extractVertexData(size, offset, data)
-
-method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
-    var inv_mat: Matrix4
-    if tryInverse (c.node.worldTransform(), inv_mat) == false:
-        return false
-
-    let localRay = r.transform(inv_mat)
-    result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
-
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("emission", m.material.emission)
     p.visitProperty("ambient", m.material.ambient)
@@ -485,5 +536,7 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("blend", m.material.blendEnable)
     p.visitProperty("depth test", m.material.depthEnable)
     p.visitProperty("wireframe", m.material.isWireframe)
+
+    p.visitProperty("debugSkeleton", m.debugSkeleton)
 
 registerComponent[MeshComponent]()

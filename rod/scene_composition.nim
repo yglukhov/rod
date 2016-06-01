@@ -14,6 +14,8 @@ import rod.quaternion
 
 import rod.dae_animation
 
+import component.animation.skeleton
+
 import nimx.image
 import nimx.resource
 import nimx.resource_cache
@@ -57,6 +59,7 @@ proc hash(v: VertexNormal): Hash =
     result = !$result
 
 proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openarray[GLfloat], vertexAttrData: var seq[GLfloat], vi, ni, ti: int,
+                  vertWeightsData: var seq[GLfloat], boneIDsData: var seq[GLfloat], skeleton: Skeleton, skinController: ColladaSkinController,
                   vertexesHash: var Table[VertexNormal, GLushort], tgX = 0.0, tgY = 0.0, tgZ: float32 = 0.0, bNeedTangent: bool = false): GLushort =
     var v: VertexNormal
     v.vx = vertexData[vi * 3 + 0]
@@ -64,10 +67,12 @@ proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openar
     v.vz = vertexData[vi * 3 + 2]
     var attributesPerVertex: int = 0
     attributesPerVertex += 3
+
     if texCoordData.len > 0:
         attributesPerVertex += 2
         v.tx = texCoordData[ti * 2 + 0]
         v.ty = texCoordData[ti * 2 + 1]
+
     if normalData.len > 0:
         attributesPerVertex += 3
         v.nx = normalData[ni * 3 + 0]
@@ -103,15 +108,43 @@ proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openar
             vertexAttrData.add(tgZ)
             attributesPerVertex += 3
 
+        # vertex bone weights
+        if not skeleton.isNil and not skinController.isNil:
+            for j in 0 ..< 4:
+                if j < skinController.weightsPerVertex:
+                    var bData: tuple[bone: string, weight: float32]
+                    bData = skinController.boneAndWeightForVertex(vi, j)
+                    if not bData.bone.isNil:
+                        boneIDsData.add( Glfloat( skeleton.getBoneIdByName(bData.bone) ) )
+                        vertWeightsData.add( bData.weight )
+                    else:
+                        boneIDsData.add(0.0)
+                        vertWeightsData.add(0.0)
+                else:
+                    boneIDsData.add(0.0) # add bone ID
+                    vertWeightsData.add(0.0) # add bone weight
+                # echo "v  ", v, " j  ", j,  "  bdata ", repr bData
+
         result = GLushort(vertexAttrData.len / attributesPerVertex - 1)
 
         vertexesHash[v] = result
     else:
         result = vertexesHash[v]
 
-proc prepareVBO(m: MeshComponent, vertexData, texCoordData, normalData: openarray[GLfloat], faces: seq[int],
+proc prepareVBO(m: MeshComponent, cGeometry: ColladaGeometry,
                 vertexAttrData: var seq[GLfloat], indexData: var seq[GLushort],
-                vertexOfset, normalOfset, texcoordOfset: int, bNeedComputeTangentData: bool = false) =
+                vertWeightsData: var seq[GLfloat], boneIDsData: var seq[GLfloat], skeleton: Skeleton, skinController: ColladaSkinController,
+                bNeedComputeTangentData: bool = false) =
+
+    var vertexOfset = cGeometry.faceAccessor.vertexOfset
+    var normalOfset = cGeometry.faceAccessor.normalOfset
+    var texcoordOfset = cGeometry.faceAccessor.texcoordOfset
+
+    var vertexData = cGeometry.vertices
+    var texCoordData = cGeometry.texcoords
+    var normalData = cGeometry.normals
+    var faces = cGeometry.triangles
+
     var i = 0
     var stride = 1
     const coordPerVertex = 3
@@ -154,13 +187,19 @@ proc prepareVBO(m: MeshComponent, vertexData, texCoordData, normalData: openarra
             tangent.normalize()
             # bitangent.normalize()
 
-            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0, vertexesHash, tangent.x, tangent.y, tangent.z, true))
-            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1, vertexesHash, tangent.x, tangent.y, tangent.z, true))
-            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2, vertexesHash, tangent.x, tangent.y, tangent.z, true))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0,
+                                        vertWeightsData, boneIDsData, skeleton, skinController, vertexesHash, tangent.x, tangent.y, tangent.z, true))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1,
+                                        vertWeightsData, boneIDsData, skeleton, skinController, vertexesHash, tangent.x, tangent.y, tangent.z, true))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2,
+                                        vertWeightsData, boneIDsData, skeleton, skinController, vertexesHash, tangent.x, tangent.y, tangent.z, true))
         else:
-            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0, vertexesHash))
-            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1, vertexesHash))
-            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2, vertexesHash))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi0, ni0, ti0,
+                                        vertWeightsData, boneIDsData, skeleton, skinController, vertexesHash))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi1, ni1, ti1,
+                                        vertWeightsData, boneIDsData, skeleton, skinController, vertexesHash))
+            indexData.add(mergeIndexes(m, vertexData, texCoordData, normalData, vertexAttrData, vi2, ni2, ti2,
+                                        vertWeightsData, boneIDsData, skeleton, skinController, vertexesHash))
 
         i += faceStep
 
@@ -181,14 +220,7 @@ proc parseArray3(source: string): array[0 .. 2, float32] =
         result[i] = parseFloat(it)
         inc(i)
 
-proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
-    result = newNode(cn.name)
-    var materialInited = false
-    var geometryInited = false
-    var childColladaMaterial: ColladaMaterial
-    var childColladaGeometry: ColladaGeometry
-    var nodeMesh: MeshComponent
-
+proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: ColladaScene) =
     if cn.matrix != nil:
         let modelMatrix = parseMatrix4(cn.matrix)
 
@@ -197,17 +229,17 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
         var rotation: Vector4
 
         if modelMatrix.tryGetTranslationFromModel(translation) and modelMatrix.tryGetScaleRotationFromModel(scale, rotation):
-            result.scale = scale
-            result.translation = translation
-            result.rotation = newQuaternion(rotation[0], rotation[1], rotation[2], rotation[3])
+            node.scale = scale
+            node.translation = translation
+            node.rotation = newQuaternion(rotation[0], rotation[1], rotation[2], rotation[3])
     else:
         if cn.scale != nil:
             let scale = parseArray3(cn.scale)
-            result.scale = newVector3(scale[0], scale[1], scale[2])
+            node.scale = newVector3(scale[0], scale[1], scale[2])
 
         if cn.translation != nil:
             let translation = parseArray3(cn.translation)
-            result.translation = newVector3(translation[0], translation[1], translation[2])
+            node.translation = newVector3(translation[0], translation[1], translation[2])
 
         var finalRotation = newQuaternion(0, 0, 0, 1)
 
@@ -221,14 +253,154 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
             let rotationZ = parseArray4(cn.rotationZ)
             finalRotation *= aroundZ(rotationZ[3])
 
-        result.rotation = finalRotation
+        node.rotation = finalRotation
 
-    if cn.geometry != nil:
-        for geom in colladaScene.childNodesGeometry:
-            if cn.geometry.contains(geom.name) or geom.name.contains(cn.geometry):
-                childColladaGeometry = geom
-                geometryInited = true
-                nodeMesh = result.component(MeshComponent)
+proc setupMaterialFromCollada(nodeMesh: var MeshComponent, cm: ColladaMaterial, colladaScene: ColladaScene) =
+    var transparency = cm.transparency
+    if transparency < 1.0:
+        nodeMesh.material.blendEnable = true
+    nodeMesh.material.emission = newColor(cm.emission[0], cm.emission[1], cm.emission[2], cm.emission[3])
+    nodeMesh.material.ambient = newColor(cm.ambient[0], cm.ambient[1], cm.ambient[2], cm.ambient[3])
+    nodeMesh.material.diffuse = newColor(cm.diffuse[0], cm.diffuse[1], cm.diffuse[2], cm.diffuse[3])
+    nodeMesh.material.specular = newColor(cm.specular[0], cm.specular[1], cm.specular[2], cm.specular[3])
+    if cm.shininess > 1.0:
+        nodeMesh.material.shininess = cm.shininess
+    else:
+        nodeMesh.material.shininess = 1.0
+
+    #TODO
+    # reflective*: Vector4
+    # transparent*: Vector4
+    # transparentTextureName*: string
+    # add other material texture
+    # childMesh.material.falloffTexture = imageWithResource("")
+
+    if cm.diffuseTextureName != nil:
+        var texName = colladaScene.getTextureLocationByName(cm.diffuseTextureName)
+        if texName != nil:
+            nodeMesh.material.albedoTexture = imageWithResource(texName)
+            nodeMesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
+
+    if cm.reflectiveTextureName != nil:
+        var texName = colladaScene.getTextureLocationByName(cm.reflectiveTextureName)
+        if texName != nil:
+            nodeMesh.material.reflectionTexture = imageWithResource(texName)
+            nodeMesh.material.reflectivity = cm.reflectivity
+
+    if cm.specularTextureName != nil:
+        var texName = colladaScene.getTextureLocationByName(cm.specularTextureName)
+        if texName != nil:
+            nodeMesh.material.specularTexture = imageWithResource(texName)
+    # normalmap tex seted manually in dae file
+    if cm.normalmapTextureName != nil:
+        var texName = colladaScene.getTextureLocationByName(cm.normalmapTextureName)
+        if texName != nil:
+            nodeMesh.material.normalTexture = imageWithResource(texName)
+
+
+proc getAnimationSourceByName(anim: ColladaAnimation, name: string): ColladaSource =
+    for source in anim.sources:
+        if source.id.contains(name):
+            return source
+
+    for animation in anim.children:
+        return animation.getAnimationSourceByName(name)
+
+
+proc loadBones(bone: var Bone, animDuration: var float, cn: ColladaNode, colladaScene: ColladaScene, skinController: ColladaSkinController) =
+    bone = newBone()
+    bone.name = cn.name
+    bone.startMatrix = parseMatrix4(cn.matrix)
+    bone.startMatrix.transpose()
+    var invMat = skinController.boneInvMatrix(bone.name)
+    if not invMat.isNil:
+        bone.invMatrix = parseMatrix4( skinController.boneInvMatrix(bone.name) )
+        bone.invMatrix.transpose()
+        # echo "bone name  ", bone.name,  "inverted matrix  ", bone.invMatrix
+    else:
+        bone.invMatrix = bone.startMatrix.inversed()
+
+    var bindShapeMatrix = parseMatrix4(skinController.bindShapeMatrix)
+    bindShapeMatrix.transpose()
+
+    bone.invMatrix = bone.invMatrix * bindShapeMatrix
+
+    var sourceMatrix: ColladaSource
+    var sourceTime: ColladaSource
+    for anim in colladaScene.animations:
+        let sm = anim.getAnimationSourceByName(bone.name & "-Matrix-animation-output-transform")
+        if not sm.isNil:
+            sourceMatrix = sm
+
+        let st = anim.getAnimationSourceByName(bone.name & "-Matrix-animation-input")
+        if not st.isNil:
+            sourceTime = st
+
+    if not sourceMatrix.isNil:
+        var animTrack = newAnimationTrack()
+        var matData = newSeq[float32](16)
+        bone.animTrack = animTrack
+
+        for i in 0 ..< int(sourceMatrix.dataFloat.len / 16):
+            for j in 0 .. 15:
+                matData[j] = sourceMatrix.dataFloat[16*i + j]
+
+            var frame = AnimationFrame.new()
+            frame.matrix = parseMatrix4(matData)
+            frame.matrix.transpose()
+            frame.matrix = frame.matrix
+            frame.time = sourceTime.dataFloat[i]
+            animTrack.frames.add(frame)
+
+            if animDuration < frame.time:
+                animDuration = frame.time
+
+    for joint in cn.children:
+        var b: Bone
+        b.loadBones(animDuration, joint, colladaScene, skinController)
+        if not b.isNil:
+            bone.children.add(b)
+
+proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, hasSkeletalAnimation: var bool): Node =
+    var node = newNode(cn.name)
+    var materialInited = false
+    var geometryInited = false
+    var childColladaMaterial: ColladaMaterial
+    var childColladaGeometry: ColladaGeometry
+    var childSkinController: ColladaSkinController
+    var nodeMesh: MeshComponent
+
+    node.setupNodeFromCollada(cn, colladaScene)
+
+    if not colladaScene.skinControllers.isNil:
+        # get skin controller
+        childSkinController =  colladaScene.skinControllers[0]
+        var bones: Bone
+        var animDuration = 0.0
+        for joint in cn.children:
+            if joint.kind == NodeKind.Joint:
+                bones.loadBones(animDuration, joint, colladaScene, childSkinController)
+
+        let geom = colladaScene.childNodesGeometry[0]
+        childColladaGeometry = geom
+        geometryInited = true
+        nodeMesh = node.component(MeshComponent)
+
+        if not bones.isNil:
+            nodeMesh.skeleton = newSkeleton()
+            nodeMesh.skeleton.setBones(bones)
+            nodeMesh.skeleton.animDuration = animDuration
+
+        hasSkeletalAnimation = true
+
+    else:
+        if cn.geometry != nil:
+            for geom in colladaScene.childNodesGeometry:
+                if cn.geometry.contains(geom.name) or geom.name.contains(cn.geometry):
+                    childColladaGeometry = geom
+                    geometryInited = true
+                    nodeMesh = node.component(MeshComponent)
+
 
     if cn.material != nil:
         for mat in colladaScene.childNodesMaterial:
@@ -236,94 +408,40 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
                 childColladaMaterial = mat
                 materialInited = true
 
-    if materialInited:
-        var transparency = childColladaMaterial.transparency
-        if transparency < 1.0:
-            nodeMesh.material.blendEnable = true
-        nodeMesh.material.emission = newColor(childColladaMaterial.emission[0], childColladaMaterial.emission[1], childColladaMaterial.emission[2], childColladaMaterial.emission[3])
-        nodeMesh.material.ambient = newColor(childColladaMaterial.ambient[0], childColladaMaterial.ambient[1], childColladaMaterial.ambient[2], childColladaMaterial.ambient[3])
-        nodeMesh.material.diffuse = newColor(childColladaMaterial.diffuse[0], childColladaMaterial.diffuse[1], childColladaMaterial.diffuse[2], childColladaMaterial.diffuse[3])
-        nodeMesh.material.specular = newColor(childColladaMaterial.specular[0], childColladaMaterial.specular[1], childColladaMaterial.specular[2], childColladaMaterial.specular[3])
-        if childColladaMaterial.shininess > 1.0:
-            nodeMesh.material.shininess = childColladaMaterial.shininess
-        else:
-            nodeMesh.material.shininess = 1.0
-
-        #TODO
-        # reflective*: Vector4
-        # transparent*: Vector4
-        # transparentTextureName*: string
-        # add other material texture
-        # childMesh.material.falloffTexture = imageWithResource("")
-
-        if childColladaMaterial.diffuseTextureName != nil:
-            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.diffuseTextureName)
-            if texName != nil:
-                nodeMesh.material.albedoTexture = imageWithResource(texName)
-                nodeMesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
-
-        if childColladaMaterial.reflectiveTextureName != nil:
-            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.reflectiveTextureName)
-            if texName != nil:
-                nodeMesh.material.reflectionTexture = imageWithResource(texName)
-                nodeMesh.material.reflectivity = childColladaMaterial.reflectivity
-
-        if childColladaMaterial.specularTextureName != nil:
-            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.specularTextureName)
-            if texName != nil:
-                nodeMesh.material.specularTexture = imageWithResource(texName)
-        # normalmap tex seted manually in dae file
-        if childColladaMaterial.normalmapTextureName != nil:
-            var texName = colladaScene.getTextureLocationByName(childColladaMaterial.normalmapTextureName)
-            if texName != nil:
-                nodeMesh.material.normalTexture = imageWithResource(texName)
+    if materialInited and not nodeMesh.isNil:
+        nodeMesh.setupMaterialFromCollada(childColladaMaterial, colladaScene)
 
     if geometryInited:
         nodeMesh.resourceName = childColladaGeometry.name
 
-        var instanceWrd = "instance"
-        if childColladaGeometry.name.contains(instanceWrd):
-            var instanceName = ""
-            var j = 0
-            while j < childColladaGeometry.name.len:
-                var i = 0
-                while i < instanceWrd.len:
-                    if childColladaGeometry.name[j+i] == instanceWrd[i]:
-                        inc i
-                    else:
-                        break
-                if i != instanceWrd.len:
-                    instanceName &= $childColladaGeometry.name[j]
-                    inc j
-                else:
-                    break
-            instanceName &= instanceWrd
-            nodeMesh.resourceName = instanceName
+        let bNeedComputeTangentData = if nodeMesh.material.normalTexture.isNil(): false else: true
+        var vertexAttrData = newSeq[GLfloat]()
+        var indexData = newSeq[GLushort]()
+        var vertWeightsData = newSeq[GLfloat]()
+        var boneIDsData = newSeq[GLfloat]()
 
-        if not vboCache.contains(nodeMesh.resourceName):
+        nodeMesh.prepareVBO(childColladaGeometry, vertexAttrData, indexData, vertWeightsData, boneIDsData, nodeMesh.skeleton, childSkinController, bNeedComputeTangentData)
+        nodeMesh.vboData.vertInfo = newVertexInfoWithVertexData(childColladaGeometry.vertices.len, childColladaGeometry.texcoords.len, childColladaGeometry.normals.len, if bNeedComputeTangentData: 3 else: 0)
+        nodeMesh.createVBO(indexData, vertexAttrData)
 
-            let bNeedComputeTangentData = if nodeMesh.material.normalTexture.isNil(): false else: true
+        if not childSkinController.isNil:
+            nodeMesh.initMesh = vertexAttrData
+            nodeMesh.vertexWeights = vertWeightsData
+            nodeMesh.boneIDs = boneIDsData
 
-            var vertexAttrData = newSeq[GLfloat]()
-            var indexData = newSeq[GLushort]()
 
-            nodeMesh.prepareVBO(childColladaGeometry.vertices, childColladaGeometry.texcoords, childColladaGeometry.normals, childColladaGeometry.triangles, vertexAttrData, indexData,
-                                childColladaGeometry.faceAccessor.vertexOfset, childColladaGeometry.faceAccessor.normalOfset, childColladaGeometry.faceAccessor.texcoordOfset, bNeedComputeTangentData)
-            nodeMesh.vboData.vertInfo = newVertexInfoWithVertexData(childColladaGeometry.vertices.len, childColladaGeometry.texcoords.len, childColladaGeometry.normals.len, if bNeedComputeTangentData: 3 else: 0)
-            nodeMesh.createVBO(indexData, vertexAttrData)
-
-            vboCache[nodeMesh.resourceName] = nodeMesh.vboData
-        else:
-            nodeMesh.vboData = vboCache[nodeMesh.resourceName]
-
-    for it in cn.children:
-        result.addChild(setupFromColladaNode(it, colladaScene))
+    result = node
+    if childSkinController.isNil:
+        for it in cn.children:
+            result.addChild(setupFromColladaNode(it, colladaScene, hasSkeletalAnimation))
 
 proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
     var loader: ColladaLoader
     result = loader.load(s)
     s.close()
 
+# --------------- TODO ------
+import component.animation.animated_mesh
 proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
     let colladaScene = findCachedResource[ColladaScene](resourceName)
 
@@ -336,18 +454,22 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             let colladaScene = loadColladaFromStream(s, resourceName)
             registerResource(resourceName, colladaScene)
 
-            let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
-            for anim in colladaScene.animations:
-                discard animationWithCollada(res, anim)
+            var hasSkeletalAnimation = false
+            let res = setupFromColladaNode(colladaScene.rootNode, colladaScene, hasSkeletalAnimation)
+            if hasSkeletalAnimation == false:
+                for anim in colladaScene.animations:
+                    discard animationWithCollada(res, anim)
 
             popParentResource()
             handler(res)
     else:
         pushParentResource(resourceName)
 
-        let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
-        for anim in colladaScene.animations:
-            discard animationWithCollada(res, anim)
+        var hasSkeletalAnimation = false
+        let res = setupFromColladaNode(colladaScene.rootNode, colladaScene, hasSkeletalAnimation)
+        if hasSkeletalAnimation == false:
+            for anim in colladaScene.animations:
+                discard animationWithCollada(res, anim)
 
         popParentResource()
         handler(res)
