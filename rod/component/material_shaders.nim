@@ -270,13 +270,14 @@ float computeDiffuse(float lDif, float lAttenuation, vec3 L, vec3 normal) {
     float result = 1.0;
     #ifdef WITH_GLOSS_SAMPLER
         vec2  roughnessV = texture2D(glossMapUnit, uGlossUnitCoords.xy + (uGlossUnitCoords.zw - uGlossUnitCoords.xy) * vTexCoord, mipBias).rg * uGlossPercent;
-        float roughness = (1-roughnessV.r) + uMaterialDiffuse.z * (1.0 - roughnessV.g);
-        result *= roughness;
+        result *= max(dot(normal, L), roughnessV.r);
+    #else
+        result *= max(dot(normal, L), 0.0);
     #endif
     #ifdef WITH_LIGHT_DIFFUSE
         result *= lDif;
     #endif
-    result *= max(dot(normal, L), 0.0);
+
     result *= lAttenuation;
 
     return result;
@@ -286,8 +287,7 @@ float computeDiffuse(float lDif, float lAttenuation, vec3 L, vec3 normal) {
 float computeSpecular(float lSpec, float lAttenuation, float mShin, vec3 R, vec3 E) {
     float result = 1.0;
     #ifdef WITH_SPECULAR_SAMPLER
-        //float specularity = texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r * 255.0;
-        float specularity = mShin;
+        float specularity = texture2D(specularMapUnit, uSpecularUnitCoords.xy + (uSpecularUnitCoords.zw - uSpecularUnitCoords.xy) * vTexCoord, mipBias).r * 255.0;
     #else
         float specularity = mShin;
     #endif
@@ -544,6 +544,11 @@ vec4 computeTexel() {
     texel.a = diffuse.a;
     texel.a *= uMaterialTransparency;
 
+    #ifdef WITH_GAMMA_CORRECTION
+        vec3 gamma = vec3(1.0/2.2);
+        texel = vec4(pow(texel.xyz, gamma), texel.a);
+    #endif
+
     return texel;
 }
 
@@ -579,8 +584,8 @@ vec4 computeTexelMatcap() {
             #endif
         #endif
     #endif
-
-    vec3 bivector = uCamPosition.xyz - vPosition.xyz;
+    // vec3 bivector = uCamPosition.xyz - vPosition.xyz;
+    vec3 bivector = - vPosition.xyz;
     vec3 L = normalize(bivector);
     vec3 reflected = normalize(-reflect(L, normal));
     float m = 2.0 * sqrt( pow(reflected.x, 2.0) + pow(reflected.y, 2.0) + pow(reflected.z + 1.0, 2.0) );

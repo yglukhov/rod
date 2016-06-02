@@ -68,6 +68,7 @@ type ShaderMacro = enum
     WITH_RIM_LIGHT
     WITH_NORMALMAP_TO_SRGB
     WITH_MOTION_BLUR
+    WITH_GAMMA_CORRECTION
 
 type
     MaterialColor* = ref object
@@ -119,6 +120,7 @@ type
         isWireframe*: bool
         isRIM: bool
         isNormalSRGB: bool
+        gammaCorrection: bool
 
         shader*: ProgramRef
         vertexShader: string
@@ -157,6 +159,7 @@ proc bumpTexture*(m: Material): Image = result = m.bumpTexture
 proc reflectionTexture*(m: Material): Image = result = m.reflectionTexture
 proc falloffTexture*(m: Material): Image = result = m.falloffTexture
 proc maskTexture*(m: Material): Image = result = m.maskTexture
+proc gammaCorrection*(m: Material): bool = result = m.gammaCorrection
 
 template `emission=`*(m: Material, v: Color) =
     if not m.color.emissionInited:
@@ -267,6 +270,11 @@ template `maskTexture=`*(m: Material, i: Image) =
     if m.maskTexture.isNil:
         m.shaderMacroFlags.excl(WITH_MASK_SAMPLER)
         m.bShaderNeedUpdate = true
+template `gammaCorrection=`*(m: Material, v: bool) =
+    m.gammaCorrection = v
+    if m.gammaCorrection: m.shaderMacroFlags.incl(WITH_GAMMA_CORRECTION)
+    else: m.shaderMacroFlags.excl(WITH_GAMMA_CORRECTION)
+    m.bShaderNeedUpdate = true
 
 template removeEmissionColor*(m: Material) =
     m.color.emissionInited = false
