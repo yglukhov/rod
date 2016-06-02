@@ -445,11 +445,31 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     jNode = j{"sRGB_normal"}
     m.material.isNormalSRGB = jNode.getBVal()
 
+    jNode = j{"matcapPercent"}
+    m.material.matcapPercent = jNode.getFnum()
+    jNode = j{"albedoPercent"}
+    m.material.albedoPercent = jNode.getFnum()
+    jNode = j{"glossPercent"}
+    m.material.glossPercent = jNode.getFnum()
+    jNode = j{"specularPercent"}
+    m.material.specularPercent = jNode.getFnum()
+    jNode = j{"normalPercent"}
+    m.material.normalPercent = jNode.getFnum()
+    jNode = j{"bumpPercent"}
+    m.material.bumpPercent = jNode.getFnum()
+    jNode = j{"reflectionPercent"}
+    m.material.reflectionPercent = jNode.getFnum()
+    jNode = j{"falloffPercent"}
+    m.material.falloffPercent = jNode.getFnum()
+    jNode = j{"maskPercent"}
+    m.material.maskPercent = jNode.getFnum()
+
     proc getTexture(name: string): Image =
         let jNode = j{name}
         if not jNode.isNil:
             result = imageWithResource(jNode.getStr())
 
+    m.material.matcapTexture = getTexture("matcapTexture")
     m.material.albedoTexture = getTexture("albedoTexture")
     m.material.glossTexture = getTexture("glossTexture")
     m.material.specularTexture = getTexture("specularTexture")
@@ -521,13 +541,13 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("RIM density", m.material.rimDensity)
     p.visitProperty("RIM enable", m.material.isRIM)
 
-    p.visitProperty("albedoTexture", m.material.albedoTexture)
-    p.visitProperty("glossTexture", m.material.glossTexture)
-    p.visitProperty("specularTexture", m.material.specularTexture)
-    p.visitProperty("normalTexture", m.material.normalTexture)
-    p.visitProperty("reflectionTexture", m.material.reflectionTexture)
-    p.visitProperty("maskTexture", m.material.maskTexture)
-    p.visitProperty("matcapTexture", m.material.matcapTexture)
+    p.visitProperty("albedoTexture", (m.material.albedoTexture, m.material.albedoPercent))
+    p.visitProperty("glossTexture", (m.material.glossTexture, m.material.glossPercent))
+    p.visitProperty("specularTexture", (m.material.specularTexture, m.material.specularPercent))
+    p.visitProperty("normalTexture", (m.material.normalTexture, m.material.normalPercent))
+    p.visitProperty("reflectionTexture", (m.material.reflectionTexture, m.material.reflectionPercent))
+    p.visitProperty("maskTexture", (m.material.maskTexture, m.material.maskPercent))
+    p.visitProperty("matcapTexture", (m.material.matcapTexture, m.material.matcapPercent))
 
     p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 

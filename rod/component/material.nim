@@ -87,15 +87,24 @@ type
 
     Material* = ref object of RootObj
         matcapTexture: Image
+        albedoTexture: Image
+        glossTexture: Image
+        specularTexture: Image
+        normalTexture: Image
+        bumpTexture: Image
+        reflectionTexture: Image
+        falloffTexture: Image
+        maskTexture: Image
 
-        albedoTexture*: Image
-        glossTexture*: Image
-        specularTexture*: Image
-        normalTexture*: Image
-        bumpTexture*: Image
-        reflectionTexture*: Image
-        falloffTexture*: Image
-        maskTexture*: Image
+        matcapPercent*: float32
+        albedoPercent*: float32
+        glossPercent*: float32
+        specularPercent*: float32
+        normalPercent*: float32
+        bumpPercent*: float32
+        reflectionPercent*: float32
+        falloffPercent*: float32
+        maskPercent*: float32
 
         color*: MaterialColor
         rimDensity: Coord
@@ -140,6 +149,14 @@ proc reflectivity*(m: Material): Coord = result = m.color.reflectivity
 proc rimDensity*(m: Material): Coord = result = m.rimDensity
 proc rimColor*(m: Material): Color = result = m.rimColor
 proc matcapTexture*(m: Material): Image = result = m.matcapTexture
+proc albedoTexture*(m: Material): Image = result = m.albedoTexture
+proc glossTexture*(m: Material): Image = result = m.glossTexture
+proc specularTexture*(m: Material): Image = result = m.specularTexture
+proc normalTexture*(m: Material): Image = result = m.normalTexture
+proc bumpTexture*(m: Material): Image = result = m.bumpTexture
+proc reflectionTexture*(m: Material): Image = result = m.reflectionTexture
+proc falloffTexture*(m: Material): Image = result = m.falloffTexture
+proc maskTexture*(m: Material): Image = result = m.maskTexture
 
 template `emission=`*(m: Material, v: Color) =
     if not m.color.emissionInited:
@@ -183,6 +200,73 @@ template `matcapTexture=`*(m: Material, i: Image) =
         m.shaderMacroFlags.incl(WITH_MATCAP_SAMPLER)
         m.bShaderNeedUpdate = true
     m.matcapTexture = i
+    if m.matcapTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_MATCAP_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `albedoTexture=`*(m: Material, i: Image) =
+    if m.albedoTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_AMBIENT_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.albedoTexture = i
+    if m.albedoTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_AMBIENT_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `glossTexture=`*(m: Material, i: Image) =
+    if m.glossTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_GLOSS_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.glossTexture = i
+    if m.glossTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_GLOSS_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `specularTexture=`*(m: Material, i: Image) =
+    if m.specularTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_SPECULAR_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.specularTexture = i
+    if m.specularTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_SPECULAR_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `normalTexture=`*(m: Material, i: Image) =
+    if m.normalTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_NORMAL_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.normalTexture = i
+    if m.normalTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_NORMAL_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `bumpTexture=`*(m: Material, i: Image) =
+    if m.bumpTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_BUMP_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.bumpTexture = i
+    if m.bumpTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_BUMP_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `reflectionTexture=`*(m: Material, i: Image) =
+    if m.reflectionTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_REFLECTION_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.reflectionTexture = i
+    if m.reflectionTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_REFLECTION_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `falloffTexture=`*(m: Material, i: Image) =
+    if m.falloffTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_FALLOF_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.falloffTexture = i
+    if m.falloffTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_FALLOF_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `maskTexture=`*(m: Material, i: Image) =
+    if m.maskTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_MASK_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.maskTexture = i
+    if m.maskTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_MASK_SAMPLER)
+        m.bShaderNeedUpdate = true
 
 template removeEmissionColor*(m: Material) =
     m.color.emissionInited = false
@@ -283,6 +367,15 @@ proc newDefaultMaterial*(): Material =
     result.isLightReceiver = true
     result.bEnableBackfaceCulling = true
     result.color.new()
+    result.matcapPercent = 1.0
+    result.albedoPercent = 1.0
+    result.glossPercent = 1.0
+    result.specularPercent = 1.0
+    result.normalPercent = 1.0
+    result.bumpPercent = 1.0
+    result.reflectionPercent = 1.0
+    result.falloffPercent = 1.0
+    result.maskPercent = 1.0
 
 proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
     let c = currentContext()
@@ -336,6 +429,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercent"), m.matcapPercent)
                 inc textureIndex
     if not m.albedoTexture.isNil:
         if m.shader == invalidProgram:
@@ -346,6 +440,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.albedoTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uTexUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "texUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uTexUnitPercent"), m.albedoPercent)
                 inc textureIndex
     if not m.glossTexture.isNil:
         if m.shader == invalidProgram:
@@ -356,6 +451,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.glossTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uGlossUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "glossMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uGlossPercent"), m.glossPercent)
                 inc textureIndex
     if not m.specularTexture.isNil:
         if m.shader == invalidProgram:
@@ -366,6 +462,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.specularTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uSpecularUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "specularMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uSpecularPercent"), m.specularPercent)
                 inc textureIndex
     if not m.normalTexture.isNil:
         if m.shader == invalidProgram:
@@ -377,6 +474,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.normalTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uNormalUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "normalMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uNormalPercent"), m.normalPercent)
                 inc textureIndex
     if not m.bumpTexture.isNil:
         if m.shader == invalidProgram:
@@ -388,6 +486,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.bumpTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uBumpUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "bumpMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uBumpPercent"), m.bumpPercent)
                 inc textureIndex
     if not m.reflectionTexture.isNil:
         if m.shader == invalidProgram:
@@ -400,6 +499,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uReflectUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "reflectMapUnit"), textureIndex)
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uReflectivity"), m.color.reflectivity)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uReflectionPercent"), m.reflectionPercent)
                 inc textureIndex
     if not m.falloffTexture.isNil:
         if m.shader == invalidProgram:
@@ -411,6 +511,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.falloffTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uFallofUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "falloffMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uFalloffPercent"), m.falloffPercent)
                 inc textureIndex
     if not m.maskTexture.isNil:
         if m.shader == invalidProgram:
@@ -422,6 +523,7 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.maskTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaskUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "maskMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMaskPercent"), m.maskPercent)
                 inc textureIndex
 
 proc setupMaterialAttributes(m: Material, n: Node) =
