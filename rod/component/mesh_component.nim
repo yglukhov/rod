@@ -530,6 +530,9 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     m.createVBO(indices, vertexData)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
+
+    # p.visitProperty("material", m.material)
+
     p.visitProperty("emission", m.material.emission)
     p.visitProperty("ambient", m.material.ambient)
     p.visitProperty("diffuse", m.material.diffuse)
@@ -542,7 +545,7 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("RIM enable", m.material.isRIM)
 
     p.visitProperty("albedoTexture", (m.material.albedoTexture, m.material.albedoPercent))
-    p.visitProperty("glossTexture", (m.material.glossTexture, m.material.glossPercent))
+    p.visitProperty("diffuseTexture", (m.material.glossTexture, m.material.glossPercent))
     p.visitProperty("specularTexture", (m.material.specularTexture, m.material.specularPercent))
     p.visitProperty("normalTexture", (m.material.normalTexture, m.material.normalPercent))
     p.visitProperty("reflectionTexture", (m.material.reflectionTexture, m.material.reflectionPercent))
@@ -556,6 +559,7 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("blend", m.material.blendEnable)
     p.visitProperty("depth test", m.material.depthEnable)
     p.visitProperty("wireframe", m.material.isWireframe)
+    p.visitProperty("gammaCorrect", m.material.gammaCorrection)
 
     p.visitProperty("debugSkeleton", m.debugSkeleton)
 

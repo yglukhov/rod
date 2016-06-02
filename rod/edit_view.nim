@@ -91,13 +91,17 @@ proc newSettingsView(e: Editor, r: Rect): PanelView =
 
     let bgColorButton = newButton(result, newPoint(102, y), newSize(40, 20), "...")
     let pv = result
+    var cPicker: ColorPickerView
     bgColorbutton.onAction do():
-        let cPicker = newColorPickerView(newRect(0, 0, 300, 200))
-        cPicker.onColorSelected = proc(c: Color) =
-            currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
+        if cPicker.isNil:
+            cPicker = newColorPickerView(newRect(0, 0, 300, 200))
+            cPicker.onColorSelected = proc(c: Color) =
+                currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
+            cPicker.setFrameOrigin(newPoint(pv.frame.x - 300, pv.frame.y))
+            pv.window.addSubview(cPicker)
+        else:
             cPicker.removeFromSuperview()
-        cPicker.setFrameOrigin(newPoint(pv.frame.x - 300, pv.frame.y))
-        pv.window.addSubview(cPicker)
+            cPicker = nil
 
     y += bgColorLabel.frame.height + 6
 
