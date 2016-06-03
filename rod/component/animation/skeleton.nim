@@ -104,8 +104,8 @@ proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
     var p1 = newVector3(0.0, 0.0, 0.0)
     var p2 = newVector3(0.0, 0.0, 0.0)
 
-    p1 = parentMatrix.transformPoint(p1)
-    p2 = mat.transformPoint(p2)
+    parentMatrix.multiply(p1, p1)
+    mat.multiply(p2, p2)
 
     var points: array[6, float32]
     points[0] = p1.x

@@ -263,7 +263,9 @@ method draw*(am: AnimatedMesh) =
             if not am.initVertixes[i].weights[j].boneName.isNil:
                 let bone = am.skeleton.getBone( am.initVertixes[i].weights[j].boneName )
                 let resMatrix = bone.matrix * bone.invMatrix * am.bindShapeMatrix
-                pos += resMatrix.transformPoint( am.initVertixes[i].position ) * am.initVertixes[i].weights[j].weight
+                var transformedPos: Vector3
+                resMatrix.multiply( am.initVertixes[i].position, transformedPos )
+                pos += transformedPos * am.initVertixes[i].weights[j].weight
 
             # echo "vertID ", i, " boneName  ", am.initVertixes[i].weights[j].boneName, " weight  ", am.initVertixes[i].weights[j].weight, "  vert pos = ", pos
 

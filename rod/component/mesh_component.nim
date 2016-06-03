@@ -246,7 +246,9 @@ proc setupAndDraw*(m: MeshComponent) =
                 if m.vertexWeights[index] > 0.0:
                     let bone = m.skeleton.getBone( m.boneIDs[index].int16 )
                     # let resMatrix = bone.matrix * bone.invMatrix
-                    pos += bone.matrix.transformPoint( initPos ) * m.vertexWeights[index]
+                    var transformedPos: Vector3
+                    bone.matrix.multiply( initPos, transformedPos )
+                    pos += transformedPos * m.vertexWeights[index]
 
             m.currMesh[stride * i + 0] = pos.x
             m.currMesh[stride * i + 1] = pos.y
@@ -288,7 +290,7 @@ method draw*(m: MeshComponent) =
     gl.activeTexture(gl.TEXTURE0)
     gl.enable(gl.BLEND)
 
-    if m.debugSkeleton:
+    if m.debugSkeleton and not m.skeleton.isNil:
         m.skeleton.debugDraw()
 
 proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =

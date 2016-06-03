@@ -90,7 +90,7 @@ proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event
     if cc.currMouseKey == VirtualKey.MouseButtonMiddle:
         var shift_pos = newVector3(prev_x - dx, -prev_y + dy, 0.0) * 0.1
         var rotMat = cc.camPivot.rotation.toMatrix4()
-        shift_pos = rotMat.transformPoint(shift_pos)
+        rotMat.multiply(shift_pos, shift_pos)
         # shift_pos = viewMatrix.transformPoint(shift_pos)
 
         cc.camPivot.translation += shift_pos
