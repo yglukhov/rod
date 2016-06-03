@@ -122,8 +122,6 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
         gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
         m.vboData.numberOfIndices = indexData.len.GLsizei
 
-        m.currMesh = vertexAttrData
-
     if currentContext().isNil:
         m.loadFunc = loadFunc
     else:
@@ -221,11 +219,6 @@ proc load(m: MeshComponent) =
     if not m.loadFunc.isNil:
         m.loadFunc()
         m.loadFunc = nil
-
-proc transformPoint(mat: Matrix4, point: Vector3): Vector3 =
-    result.x = point.x * mat[0] + point.y * mat[4] + point.z * mat[8] + mat[12];
-    result.y = point.x * mat[1] + point.y * mat[5] + point.z * mat[9] + mat[13];
-    result.z = point.x * mat[2] + point.y * mat[6] + point.z * mat[10] + mat[14];
 
 proc setupAndDraw*(m: MeshComponent) =
     let c = currentContext()

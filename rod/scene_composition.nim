@@ -390,8 +390,13 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, hasSkelet
             nodeMesh.skeleton = newSkeleton()
             nodeMesh.skeleton.setBones(bones)
             nodeMesh.skeleton.animDuration = animDuration
+            echo "animDuration ", animDuration
 
         hasSkeletalAnimation = true
+
+        for mat in colladaScene.childNodesMaterial:
+            childColladaMaterial = mat
+            materialInited = true
 
     else:
         if cn.geometry != nil:
@@ -402,11 +407,11 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, hasSkelet
                     nodeMesh = node.component(MeshComponent)
 
 
-    if cn.material != nil:
-        for mat in colladaScene.childNodesMaterial:
-            if mat.name.contains(cn.material) or cn.material.contains(mat.name):
-                childColladaMaterial = mat
-                materialInited = true
+        if cn.material != nil:
+            for mat in colladaScene.childNodesMaterial:
+                if mat.name.contains(cn.material) or cn.material.contains(mat.name):
+                    childColladaMaterial = mat
+                    materialInited = true
 
     if materialInited and not nodeMesh.isNil:
         nodeMesh.setupMaterialFromCollada(childColladaMaterial, colladaScene)
@@ -425,6 +430,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, hasSkelet
         nodeMesh.createVBO(indexData, vertexAttrData)
 
         if not childSkinController.isNil:
+            nodeMesh.currMesh = vertexAttrData
             nodeMesh.initMesh = vertexAttrData
             nodeMesh.vertexWeights = vertWeightsData
             nodeMesh.boneIDs = boneIDsData

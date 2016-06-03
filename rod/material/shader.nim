@@ -14,11 +14,12 @@ type Shader* = ref object
     vertShader*, fragShader*: string
     program: ProgramRef
     shaderMacroFlags: HashSet[string]
+    shadersCache: Table[HashSet[string], tuple[shader: ProgramRef, refCount: int]]
     attributes: seq[tuple[index: GLuint, name: string]]
 
     needUpdate: bool
 
-var shadersCache = initTable[HashSet[string], tuple[shader: ProgramRef, refCount: int]]()
+# var shadersCache = initTable[HashSet[string], tuple[shader: ProgramRef, refCount: int]]()
 
 proc hash(sm: HashSet[string]): Hash =
     var sum = ""
@@ -29,8 +30,7 @@ proc hash(sm: HashSet[string]): Hash =
 
 proc createShader(sh: Shader) =
     let gl = currentContext().gl
-
-    if not shadersCache.contains(sh.shaderMacroFlags):
+    if not sh.shadersCache.contains(sh.shaderMacroFlags):
         var commonShaderDefines = ""
 
         var vShader = sh.vertShader
@@ -45,11 +45,11 @@ proc createShader(sh: Shader) =
         sh.program = gl.newShaderProgram(vShader, fShader, sh.attributes)
         sh.needUpdate = false
 
-        shadersCache[sh.shaderMacroFlags] = (sh.program, 1)
+        sh.shadersCache[sh.shaderMacroFlags] = (sh.program, 1)
 
     else:
-        sh.program = shadersCache[sh.shaderMacroFlags].shader
-        shadersCache[sh.shaderMacroFlags].refCount += 1
+        sh.program = sh.shadersCache[sh.shaderMacroFlags].shader
+        sh.shadersCache[sh.shaderMacroFlags].refCount += 1
         sh.needUpdate = false
 
 proc newShader*(vs, fs: string, attributes: seq[tuple[index: GLuint, name: string]]): Shader =
@@ -59,6 +59,7 @@ proc newShader*(vs, fs: string, attributes: seq[tuple[index: GLuint, name: strin
     result.attributes = attributes
     result.needUpdate = true
     result.shaderMacroFlags = initSet[string]()
+    result.shadersCache = initTable[HashSet[string], tuple[shader: ProgramRef, refCount: int]]()
 
     result.createShader()
 

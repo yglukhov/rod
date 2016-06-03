@@ -84,11 +84,6 @@ proc newBone*(): Bone =
 
     # result.animTrack = newAnimationTrack()
 
-proc transformPoint(mat: Matrix4, point: Vector3): Vector3 =
-    result.x = point.x * mat[0] + point.y * mat[4] + point.z * mat[8] + mat[12];
-    result.y = point.x * mat[1] + point.y * mat[5] + point.z * mat[9] + mat[13];
-    result.z = point.x * mat[2] + point.y * mat[6] + point.z * mat[10] + mat[14];
-
 proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
     let gl = currentContext().gl
     var mat: Matrix4

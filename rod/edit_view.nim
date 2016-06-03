@@ -37,9 +37,29 @@ elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 type EventCatchingView* = ref object of View
+    keyUpDelegate*: proc (event: var Event)
+    keyDownDelegate*: proc (event: var Event)
+    mouseScrrollDelegate*: proc (event: var Event)
 
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
+
+method acceptsFirstResponder(v: EventCatchingView): bool = true
+
+method onKeyUp(v: EventCatchingView, e : var Event): bool =
+    echo "editor onKeyUp ", e.keyCode
+    if not v.keyUpDelegate.isNil:
+        v.keyUpDelegate(e)
+
+method onKeyDown(v: EventCatchingView, e : var Event): bool =
+    echo "editor onKeyUp ", e.keyCode
+    if not v.keyDownDelegate.isNil:
+        v.keyDownDelegate(e)
+
+method onScroll*(v: EventCatchingView, e: var Event): bool =
+    result = true
+    if not v.mouseScrrollDelegate.isNil:
+        v.mouseScrrollDelegate(e)
 
 proc newEventCatchingListener(v: EventCatchingView): EventCatchingListener =
     result.new
@@ -341,8 +361,8 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
     let settingsView = editor.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
 
-    # let cam = editor.rootNode.findNode("camera")
-    # editor.cameraController = newEditorCameraController(cam)
+    let cam = editor.rootNode.findNode("camera")
+    editor.cameraController = newEditorCameraController(cam)
 
     editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
     let eventListner = editor.eventCatchingView.newEventCatchingListener()
@@ -350,11 +370,19 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
 
     eventListner.tapDownDelegate = proc (event: var Event) =
         editor.onTouch(event)
-    #     editor.cameraController.onTapDown(event)
-    # eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
-    #     editor.cameraController.onScrollProgress(dx, dy, e)
-    # eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
-    #     editor.cameraController.onTapUp(dx, dy, e)
+        editor.cameraController.onTapDown(event)
+    eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
+        editor.cameraController.onScrollProgress(dx, dy, e)
+    eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
+        editor.cameraController.onTapUp(dx, dy, e)
+    editor.eventCatchingView.mouseScrrollDelegate = proc (event: var Event) =
+        editor.cameraController.onMouseScrroll(event)
+    editor.eventCatchingView.keyUpDelegate = proc (event: var Event) =
+        editor.cameraController.onKeyUp(event)
+        if event.keyCode == VirtualKey.F:
+            editor.cameraController.setToNode(editor.selectedNode)
+    editor.eventCatchingView.keyDownDelegate = proc (event: var Event) =
+        editor.cameraController.onKeyDown(event)
 
     v.window.addSubview(editor.eventCatchingView)
 
