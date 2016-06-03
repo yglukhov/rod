@@ -172,6 +172,18 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("RIM", %c.material.isRIM)
     result.add("sRGB_normal", %c.material.isNormalSRGB)
 
+    result.add("matcapPercent", %c.material.matcapPercent)
+    result.add("albedoPercent", %c.material.albedoPercent)
+    result.add("glossPercent", %c.material.glossPercent)
+    result.add("specularPercent", %c.material.specularPercent)
+    result.add("normalPercent", %c.material.normalPercent)
+    result.add("bumpPercent", %c.material.bumpPercent)
+    result.add("reflectionPercent", %c.material.reflectionPercent)
+    result.add("falloffPercent", %c.material.falloffPercent)
+    result.add("maskPercent", %c.material.maskPercent)
+
+    if not c.material.matcapTexture.isNil:
+        result.add("matcapTexture",  %s.getRelativeResourcePath(c.material.matcapTexture.filePath()))
     if not c.material.albedoTexture.isNil:
         result.add("albedoTexture",  %s.getRelativeResourcePath(c.material.albedoTexture.filePath()))
     if not c.material.glossTexture.isNil:
