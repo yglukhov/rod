@@ -122,8 +122,6 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
         gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
         m.vboData.numberOfIndices = indexData.len.GLsizei
 
-        m.currMesh = vertexAttrData
-
     if currentContext().isNil:
         m.loadFunc = loadFunc
     else:
@@ -222,11 +220,6 @@ proc load(m: MeshComponent) =
         m.loadFunc()
         m.loadFunc = nil
 
-proc transformPoint(mat: Matrix4, point: Vector3): Vector3 =
-    result.x = point.x * mat[0] + point.y * mat[4] + point.z * mat[8] + mat[12];
-    result.y = point.x * mat[1] + point.y * mat[5] + point.z * mat[9] + mat[13];
-    result.z = point.x * mat[2] + point.y * mat[6] + point.z * mat[10] + mat[14];
-
 proc setupAndDraw*(m: MeshComponent) =
     let c = currentContext()
     let gl = c.gl
@@ -253,7 +246,9 @@ proc setupAndDraw*(m: MeshComponent) =
                 if m.vertexWeights[index] > 0.0:
                     let bone = m.skeleton.getBone( m.boneIDs[index].int16 )
                     # let resMatrix = bone.matrix * bone.invMatrix
-                    pos += bone.matrix.transformPoint( initPos ) * m.vertexWeights[index]
+                    var transformedPos: Vector3
+                    bone.matrix.multiply( initPos, transformedPos )
+                    pos += transformedPos * m.vertexWeights[index]
 
             m.currMesh[stride * i + 0] = pos.x
             m.currMesh[stride * i + 1] = pos.y
@@ -295,7 +290,7 @@ method draw*(m: MeshComponent) =
     gl.activeTexture(gl.TEXTURE0)
     gl.enable(gl.BLEND)
 
-    if m.debugSkeleton:
+    if m.debugSkeleton and not m.skeleton.isNil:
         m.skeleton.debugDraw()
 
 proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =

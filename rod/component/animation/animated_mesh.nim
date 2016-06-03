@@ -247,11 +247,6 @@ proc setupFromColladaNode*(am: AnimatedMesh, cn: ColladaNode, colladaScene: Coll
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, am.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
 
-proc transformPoint(mat: Matrix4, point: Vector3): Vector3 =
-    result.x = point.x * mat[0] + point.y * mat[4] + point.z * mat[8] + mat[12];
-    result.y = point.x * mat[1] + point.y * mat[5] + point.z * mat[9] + mat[13];
-    result.z = point.x * mat[2] + point.y * mat[6] + point.z * mat[10] + mat[14];
-
 method draw*(am: AnimatedMesh) =
     let gl = currentContext().gl
 
@@ -268,7 +263,9 @@ method draw*(am: AnimatedMesh) =
             if not am.initVertixes[i].weights[j].boneName.isNil:
                 let bone = am.skeleton.getBone( am.initVertixes[i].weights[j].boneName )
                 let resMatrix = bone.matrix * bone.invMatrix * am.bindShapeMatrix
-                pos += resMatrix.transformPoint( am.initVertixes[i].position ) * am.initVertixes[i].weights[j].weight
+                var transformedPos: Vector3
+                resMatrix.multiply( am.initVertixes[i].position, transformedPos )
+                pos += transformedPos * am.initVertixes[i].weights[j].weight
 
             # echo "vertID ", i, " boneName  ", am.initVertixes[i].weights[j].boneName, " weight  ", am.initVertixes[i].weights[j].weight, "  vert pos = ", pos
 
