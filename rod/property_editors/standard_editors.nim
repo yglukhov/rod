@@ -13,6 +13,7 @@ import rod.property_editors.propedit_registry
 import rod.numeric_text_field
 import rod.node
 import rod.viewport
+import rod.quaternion
 import rod.component.mesh_component
 
 when defined(js):
@@ -316,6 +317,40 @@ proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc()
     result = pv
     result.addSubview(cb)
 
+proc newQuaternionPropertyView(setter: proc(s: Quaternion), getter: proc(): Quaternion): PropertyEditorView =
+    result = PropertyEditorView.new(newRect(0, 0, 208, 24))
+    const vecLen = 3
+
+    var xLen = 0.Coord
+    let width = (result.bounds.width - xLen) / vecLen - vecLen
+
+    let pv = result
+    proc complexSetter() =
+        var val: Quaternion
+        var euler = newVector3(0.0, 0.0, 0.0)
+        for i in 0 ..< pv.subviews.len:
+            try:
+                euler[i] = TextField(pv.subviews[i]).text.parseFloat()
+            except ValueError:
+                return
+
+        val = newQuaternionFromEulerYXZ(euler.x, euler.y, euler.z)
+        setter(val)
+
+    let val = getter()
+    let euler = val.eulerAngles()
+    for i in 0 ..< vecLen:
+        let textField = newNumericTextField(newRect(xLen, 0, width, result.bounds.height))
+        xLen += width + 6
+        if i == vecLen - 1:
+            textField.autoresizingMask = {afFlexibleMaxX, afFlexibleMaxY}
+        else:
+            textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+        textField.text = toStr(-euler[i], textField.precision)
+        textField.textColor = newGrayColor(0.0)
+        textField.onAction complexSetter
+        result.addSubview(textField)
+
 registerPropertyEditor(newTextPropertyView)
 registerPropertyEditor(newScalarPropertyView[Coord])
 registerPropertyEditor(newScalarPropertyView[float])
@@ -328,3 +363,4 @@ registerPropertyEditor(newSizePropertyView)
 registerPropertyEditor(newPointPropertyView)
 registerPropertyEditor(newNodePropertyView)
 registerPropertyEditor(newBoolPropertyView)
+registerPropertyEditor(newQuaternionPropertyView)
