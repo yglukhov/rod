@@ -14,8 +14,9 @@ type EditorCameraController* = ref object
     camera*: Node
     camPivot: Node
     camAnchor: Node
-    test: Node
-    currentShift: Vector3
+
+    startPos: Vector3
+    currentAngle: Vector3
     currNode: Node
     currKey: VirtualKey
     currMouseKey: VirtualKey
@@ -26,7 +27,8 @@ proc newEditorCameraController*(camera: Node) : EditorCameraController =
     result.camPivot = newNode("EditorCameraPivot")
     result.camAnchor = newNode("EditorCameraAnchor")
     result.camAnchor.translation = camera.translation
-    result.currentShift = newVector3(0)
+    result.startPos = camera.translation
+    result.currentAngle = newVector3(0)
 
     camera.parent.addChild(result.camPivot)
     result.camPivot.addChild(result.camAnchor)
@@ -40,7 +42,7 @@ proc updateCamera(cc: EditorCameraController) =
     discard worldMat.tryGetScaleRotationFromModel(scale, rot)
 
     cc.camera.translation = pos
-    cc.camera.rotation = newQuaternion(rot.x, rot.y, rot.z, -rot.w)
+    cc.camera.rotation = newQuaternion(rot.x, rot.y, rot.z, rot.w)
 
 proc setToNode*(cc: EditorCameraController, n: Node) =
     cc.currNode = n
@@ -75,16 +77,19 @@ proc onKeyUp*(cc: EditorCameraController, e: var Event) =
     if e.keyCode == VirtualKey.R:
         cc.camPivot.rotation = newQuaternion(0.0, 0.0, 0.0, 1.0)
         cc.camPivot.translation = newVector3(0.0)
+        cc.camAnchor.translation = cc.startPos
+        cc.currentAngle = newVector3(0.0)
+
         cc.updateCamera()
 
     cc.currKey = 0.VirtualKey
 
 proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event) =
     if cc.currKey == VirtualKey.LeftAlt or cc.currKey == VirtualKey.RightAlt:
-        cc.currentShift.x -= prev_y - dy
-        cc.currentShift.y -= prev_x - dx
+        cc.currentAngle.x += prev_y - dy
+        cc.currentAngle.y += prev_x - dx
 
-        let q = newQuaternionFromEulerXYZ(cc.currentShift.x, cc.currentShift.y, cc.currentShift.z)
+        let q = newQuaternionFromEulerXYZ(cc.currentAngle.x, cc.currentAngle.y, cc.currentAngle.z)
         cc.camPivot.rotation = q
 
     if cc.currMouseKey == VirtualKey.MouseButtonMiddle:

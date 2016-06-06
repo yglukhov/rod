@@ -260,6 +260,11 @@ proc registerAnimation*(n: Node, name: string, a: Animation) =
         n.animations = newTable[string, Animation]()
     n.animations[name] = a
 
+proc getGlobalAlpha*(n: Node): float =
+    result = n.alpha
+    if not n.parent.isNil:
+        result = result * n.parent.getGlobalAlpha()
+
 # Serialization
 proc newNodeFromJson*(j: JsonNode): Node
 proc deserialize*(n: Node, j: JsonNode)

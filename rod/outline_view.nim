@@ -32,6 +32,7 @@ type OutlineView* = ref object of View
     childOfItem*: proc(item: Variant, indexPath: openarray[int]): Variant
     createCell*: proc(): TableViewCell
     configureCell*: proc (cell: TableViewCell, indexPath: openarray[int])
+    onSizeChange*: proc (desiredSize: Size)
     onSelectionChanged*: proc()
     onDragAndDrop*: proc(fromIndexPath, toIndexPath: openarray[int])
     tempIndexPath: seq[int]
@@ -108,8 +109,23 @@ proc nodeAtIndexPath(v: OutlineView, indexPath: openarray[int]): ItemNode =
     for i in indexPath:
         result = result.children[i]
 
+proc getExpandedRowsCount(node: ItemNode): int =
+    result = node.children.len
+
+    for i in node.children:
+        if i.expanded:
+            result += i.getExpandedRowsCount()
+
+proc checkViewSize(v: OutlineView) =
+    var size: Size
+    size.height = Coord(v.rootItem.getExpandedRowsCount()) * rowHeight
+    size.width = 300
+    if not v.onSizeChange.isNil:
+        v.onSizeChange(size)
+
 proc setRowExpanded*(v: OutlineView, expanded: bool, indexPath: openarray[int]) =
     v.nodeAtIndexPath(indexPath).expanded = expanded
+    v.checkViewSize()
 
 proc expandRow*(v: OutlineView, indexPath: openarray[int]) =
     v.setRowExpanded(true, indexPath)
@@ -197,6 +213,7 @@ method onTouchEv*(v: OutlineView, e: var Event): bool =
         if not i.isNil:
             if pos.x < v.xOffsetBasedOnTempIndexPath and i.expandable:
                 i.expanded = not i.expanded
+                v.checkViewSize()
             elif v.tempIndexPath == v.selectedIndexPath:
                 v.selectedIndexPath.setLen(0)
                 v.selectionChanged()
