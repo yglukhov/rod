@@ -444,31 +444,31 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     m.material.isNormalSRGB = jNode.getBVal()
 
     jNode = j{"matcapPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.matcapPercent = jNode.getFnum()
     jNode = j{"albedoPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.albedoPercent = jNode.getFnum()
     jNode = j{"glossPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.glossPercent = jNode.getFnum()
     jNode = j{"specularPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.specularPercent = jNode.getFnum()
     jNode = j{"normalPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.normalPercent = jNode.getFnum()
     jNode = j{"bumpPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.bumpPercent = jNode.getFnum()
     jNode = j{"reflectionPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.reflectionPercent = jNode.getFnum()
     jNode = j{"falloffPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.falloffPercent = jNode.getFnum()
     jNode = j{"maskPercent"}
-    if not j.isNil:
+    if not jNode.isNil:
         m.material.maskPercent = jNode.getFnum()
 
     proc getTexture(name: string): Image =

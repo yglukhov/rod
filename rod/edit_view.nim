@@ -258,9 +258,6 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     outlineScrollView.setFrameSize(newSize(outlineScrollView.frame.size.width, outlineScrollView.frame.size.height - 7))
     result.addSubview(outlineScrollView)
 
-    outlineView.onSizeChange = proc(desiredSize: Size) =
-        outlineScrollView.subviewDidChangeDesiredSize(outlineView, desiredSize)
-
     let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
     # createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     createNodeButton.title = "+"

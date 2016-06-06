@@ -32,7 +32,6 @@ type OutlineView* = ref object of View
     childOfItem*: proc(item: Variant, indexPath: openarray[int]): Variant
     createCell*: proc(): TableViewCell
     configureCell*: proc (cell: TableViewCell, indexPath: openarray[int])
-    onSizeChange*: proc (desiredSize: Size)
     onSelectionChanged*: proc()
     onDragAndDrop*: proc(fromIndexPath, toIndexPath: openarray[int])
     tempIndexPath: seq[int]
@@ -119,9 +118,10 @@ proc getExpandedRowsCount(node: ItemNode): int =
 proc checkViewSize(v: OutlineView) =
     var size: Size
     size.height = Coord(v.rootItem.getExpandedRowsCount()) * rowHeight
-    size.width = 300
-    if not v.onSizeChange.isNil:
-        v.onSizeChange(size)
+    size.width = 300#v.bounds.width
+
+    if not v.superview.isNil:
+        v.superview.subviewDidChangeDesiredSize(v, size)
 
 proc setRowExpanded*(v: OutlineView, expanded: bool, indexPath: openarray[int]) =
     v.nodeAtIndexPath(indexPath).expanded = expanded
