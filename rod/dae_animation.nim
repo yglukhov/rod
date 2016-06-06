@@ -111,6 +111,7 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation, duration: var float32
                 model[index] = dataY.dataFloat[j]
                 inc index
 
+            model.transpose()
             discard model.tryGetTranslationFromModel(translation)
             discard model.tryGetScaleRotationFromModel(scale, rotation)
 

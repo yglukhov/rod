@@ -222,12 +222,13 @@ proc parseArray3(source: string): array[0 .. 2, float32] =
 
 proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: ColladaScene) =
     if cn.matrix != nil:
-        let modelMatrix = parseMatrix4(cn.matrix)
+        var modelMatrix = parseMatrix4(cn.matrix)
 
         var translation: Vector3
         var scale: Vector3
         var rotation: Vector4
 
+        modelMatrix.transpose()
         if modelMatrix.tryGetTranslationFromModel(translation) and modelMatrix.tryGetScaleRotationFromModel(scale, rotation):
             node.scale = scale
             node.translation = translation
@@ -447,7 +448,6 @@ proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
     s.close()
 
 # --------------- TODO ------
-import component.animation.animated_mesh
 proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
     let colladaScene = findCachedResource[ColladaScene](resourceName)
 

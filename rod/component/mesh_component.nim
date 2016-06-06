@@ -362,7 +362,10 @@ method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
         return false
 
     let localRay = r.transform(inv_mat)
-    result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
+    if c.node.getGlobalAlpha() < 0.0001:
+        result = false
+    else:
+        result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
 
 proc jNodeToColor(j: JsonNode): Color =
     result.r = j[0].getFNum()
@@ -441,23 +444,32 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     m.material.isNormalSRGB = jNode.getBVal()
 
     jNode = j{"matcapPercent"}
-    m.material.matcapPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.matcapPercent = jNode.getFnum()
     jNode = j{"albedoPercent"}
-    m.material.albedoPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.albedoPercent = jNode.getFnum()
     jNode = j{"glossPercent"}
-    m.material.glossPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.glossPercent = jNode.getFnum()
     jNode = j{"specularPercent"}
-    m.material.specularPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.specularPercent = jNode.getFnum()
     jNode = j{"normalPercent"}
-    m.material.normalPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.normalPercent = jNode.getFnum()
     jNode = j{"bumpPercent"}
-    m.material.bumpPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.bumpPercent = jNode.getFnum()
     jNode = j{"reflectionPercent"}
-    m.material.reflectionPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.reflectionPercent = jNode.getFnum()
     jNode = j{"falloffPercent"}
-    m.material.falloffPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.falloffPercent = jNode.getFnum()
     jNode = j{"maskPercent"}
-    m.material.maskPercent = jNode.getFnum()
+    if not jNode.isNil:
+        m.material.maskPercent = jNode.getFnum()
 
     proc getTexture(name: string): Image =
         let jNode = j{name}

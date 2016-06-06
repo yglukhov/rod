@@ -347,7 +347,9 @@ proc onTouch*(editor: Editor, e: var Event) =
 
     if castResult.len > 0:
         castResult.sort( proc (x, y: RayCastInfo): int =
-            result = int(x.distance - y.distance) )
+            result = int(x.distance > y.distance)
+            if abs(x.distance - y.distance) < 0.00001:
+                result = getTreeDistance(x.node, y.node) )
 
         var indexPath = newSeq[int]()
         editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
