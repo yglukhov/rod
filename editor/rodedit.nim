@@ -66,7 +66,7 @@ proc startApplication() =
     lightSource.setDefaultLightSource()
 
     mainWindow.addSubview(editView)
-    discard startEditingNodeInView(editView.rootNode, editView)
+    discard startEditingNodeInView(editView.rootNode, editView, false)
     # loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
     #     editView.rootNode.addChild(n)
 

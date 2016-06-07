@@ -1,6 +1,7 @@
 import times
 import tables
 import hashes
+import json
 
 import nimx.matrixes
 import nimx.types
@@ -11,6 +12,7 @@ import rod.component
 import rod.rod_types
 import rod.property_visitor
 import rod.material.shader
+import rod.tools.serializer_helpers
 
 
 const BoneVertexShader = """
@@ -170,10 +172,8 @@ proc newSkeleton*(): Skeleton =
 var gBoneID = int16(0)
 proc prepareRecursive(s: Skeleton, bone: Bone) =
     s.boneTable[bone.name] = bone
-    s.nameToIdTable[bone.name] = gBoneID
-    s.boneIdTable[gBoneID] = bone
-    bone.id = gBoneID
-    gBoneID.inc()
+    s.nameToIdTable[bone.name] = bone.id.int16
+    s.boneIdTable[bone.id.int16] = bone
 
     for b in bone.children:
         s.prepareRecursive(b)
@@ -207,3 +207,41 @@ proc debugDraw*(s: Skeleton) =
     mat.loadIdentity()
     s.rootBone.debugDraw(nil, mat)
 
+
+proc deserialize*(track: var AnimationTrack, j: JsonNode) =
+    for i in 0 ..< j.len:
+        var frame = AnimationFrame.new()
+        j[i].getSerializedValue("time", frame.time)
+        j[i].getSerializedValue("matrix", frame.matrix)
+        track.frames.add(frame)
+
+proc deserialize*(b: var Bone, j: JsonNode) =
+    j.getSerializedValue("name", b.name)
+    j.getSerializedValue("id", b.id)
+    j.getSerializedValue("startMatrix", b.startMatrix)
+    j.getSerializedValue("invMatrix", b.invMatrix)
+
+    var v = j{"animTrack"}
+    if not v.isNil:
+        b.animTrack = newAnimationTrack()
+        b.animTrack.deserialize(v)
+
+    v = j{"children"}
+    if not v.isNil:
+        for i in 0 ..< v.len:
+            var nBone = newBone()
+            nBone.deserialize(v[i])
+            b.children.add(nBone)
+
+proc deserialize*(s: var Skeleton, j: JsonNode) =
+    if j.isNil:
+        return
+
+    j.getSerializedValue("animDuration", s.animDuration)
+
+    var jNode = j{"rootBone"}
+    if not jNode.isNil:
+        s.rootBone = newBone()
+        s.rootBone.deserialize(jNode)
+
+        s.prepareRecursive(s.rootBone)

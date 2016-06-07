@@ -266,7 +266,7 @@ proc toPointTowards*(fwdDirection, upDirection: Vector3): Matrix4 =
 proc toLookAt*(targetLocation, eyeLocation, upDirection: Vector3): Matrix4 =
     var fwdDir = targetLocation - eyeLocation
     var pt = toPointTowards(fwdDir, upDirection)
-    pt.transpose()
+    # pt.transpose()
 
     pt[12] += eyeLocation.x * pt[0] + eyeLocation.y * pt[4] + eyeLocation.z * pt[8];
     pt[13] += eyeLocation.x * pt[1] + eyeLocation.y * pt[5] + eyeLocation.z * pt[9];
