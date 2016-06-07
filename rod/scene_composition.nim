@@ -307,12 +307,14 @@ proc getAnimationSourceByName(anim: ColladaAnimation, name: string): ColladaSour
     for animation in anim.children:
         return animation.getAnimationSourceByName(name)
 
-
-proc loadBones(bone: var Bone, animDuration: var float, cn: ColladaNode, colladaScene: ColladaScene, skinController: ColladaSkinController) =
+proc loadBones(bone: var Bone, animDuration: var float, cn: ColladaNode, colladaScene: ColladaScene, skinController: ColladaSkinController, boneID: var int) =
     bone = newBone()
     bone.name = cn.name
     bone.startMatrix = parseMatrix4(cn.matrix)
     bone.startMatrix.transpose()
+    bone.id = boneID
+    boneID.inc()
+
     var invMat = skinController.boneInvMatrix(bone.name)
     if not invMat.isNil:
         bone.invMatrix = parseMatrix4( skinController.boneInvMatrix(bone.name) )
@@ -358,7 +360,7 @@ proc loadBones(bone: var Bone, animDuration: var float, cn: ColladaNode, collada
 
     for joint in cn.children:
         var b: Bone
-        b.loadBones(animDuration, joint, colladaScene, skinController)
+        b.loadBones(animDuration, joint, colladaScene, skinController, boneID)
         if not b.isNil:
             bone.children.add(b)
 
@@ -378,9 +380,10 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, hasSkelet
         childSkinController =  colladaScene.skinControllers[0]
         var bones: Bone
         var animDuration = 0.0
+        var boneID = 0
         for joint in cn.children:
             if joint.kind == NodeKind.Joint:
-                bones.loadBones(animDuration, joint, colladaScene, childSkinController)
+                bones.loadBones(animDuration, joint, colladaScene, childSkinController, boneID)
 
         let geom = colladaScene.childNodesGeometry[0]
         childColladaGeometry = geom

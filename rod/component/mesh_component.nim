@@ -24,6 +24,7 @@ import rod.component.camera
 import rod.viewport
 import rod.ray
 import rod.rod_types
+import rod.tools.serializer_helpers
 
 import animation.skeleton
 
@@ -297,6 +298,8 @@ proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
         when defined(js):
             asm "`gl`.BufferSubData(`target`, `offset`, new Uint16Array(`data`));"
+        elif defined(android):
+            echo "android dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
 
@@ -312,9 +315,14 @@ proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
 
 # --------- read data from VBO ------------
 proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
+    if not c.skeleton.isNil:
+        return c.initMesh
+
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLfloat]) =
         when defined(js):
             asm "`gl`.BufferSubData(`target`, `offset`, new Float32Array(`data`));"
+        elif defined(android):
+            echo "android dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
 
@@ -535,6 +543,19 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
             offset += 3
 
     m.createVBO(indices, vertexData)
+
+    jNode = j{"skeleton"}
+    if not jNode.isNil:
+        m.skeleton = newSkeleton()
+        m.skeleton.deserialize(jNode)
+
+        m.initMesh = vertexData
+        m.currMesh = vertexData
+
+        m.vertexWeights = newSeq[Glfloat]()
+        m.boneIDs = newSeq[Glfloat]()
+        j.getSerializedValue("vertexWeights", m.vertexWeights)
+        j.getSerializedValue("boneIDs", m.boneIDs)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
 
