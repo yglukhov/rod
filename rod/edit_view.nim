@@ -359,7 +359,7 @@ proc onTouch*(editor: Editor, e: var Event) =
             editor.outlineView.expandBranch(indexPath)
 
 
-proc startEditingNodeInView*(n: Node3D, v: View): Editor =
+proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Editor =
     var editor = Editor.new()
     editor.rootNode = n
     editor.sceneView = n.sceneView # Warning!
@@ -397,6 +397,17 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
 
     v.window.addSubview(inspectorView)
     v.window.addSubview(settingsView)
+
+    if startFromGame:
+        let closeEditorButton = Button.new(newRect(v.window.bounds.width - 23, 3, 20, 20))
+        closeEditorButton.title = "x"
+        v.window.addSubview(closeEditorButton)
+        closeEditorButton.onAction do():
+            editor.eventCatchingView.removeFromSuperview()
+            editor.treeView.removeFromSuperview()
+            inspectorView.removeFromSuperview()
+            settingsView.removeFromSuperview()
+            closeEditorButton.removeFromSuperview()
 
     let fpsAnimation = newAnimation()
     v.SceneView.addAnimation(fpsAnimation)
