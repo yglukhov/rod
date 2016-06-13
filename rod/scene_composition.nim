@@ -228,6 +228,7 @@ proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: Collada
         var scale: Vector3
         var rotation: Vector4
 
+        # collada store matrixes in DX format, in GL we need transposed
         modelMatrix.transpose()
         if modelMatrix.tryGetTranslationFromModel(translation) and modelMatrix.tryGetScaleRotationFromModel(scale, rotation):
             node.scale = scale
@@ -286,7 +287,7 @@ proc setupMaterialFromCollada(nodeMesh: var MeshComponent, cm: ColladaMaterial, 
         var texName = colladaScene.getTextureLocationByName(cm.reflectiveTextureName)
         if texName != nil:
             nodeMesh.material.reflectionTexture = imageWithResource(texName)
-            nodeMesh.material.reflectivity = cm.reflectivity
+            nodeMesh.material.reflectionPercent = cm.reflectivity
 
     if cm.specularTextureName != nil:
         var texName = colladaScene.getTextureLocationByName(cm.specularTextureName)

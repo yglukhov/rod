@@ -65,6 +65,7 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
         let light = n.componentIfAvailable(LightSource)
         if not light.isNil:
             let size = 10.0
+            ns.color = light.lightColor
             ns.modelMatrix = n.worldTransform()
             # ns.modelMatrix.translate(newVector3(size/2.0, size/2.0, size/2.0) )
             ns.modelMatrix.scale(newVector3(size, size, size))

@@ -405,22 +405,6 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
         if not jN.isNil:
             val = imageWithResource(jN.getStr())
 
-    # getValue("emission", m.material.emission)
-    # getValue("ambient", m.material.ambient)
-    # getValue("diffuse", m.material.diffuse)
-    # getValue("specular", m.material.specular)
-    # getValue("shininess", m.material.shininess)
-    # getValue("reflectivity", m.material.reflectivity)
-    # getValue("rim_density", m.material.rim_density)
-
-    # getValue("culling", m.material.bEnableBackfaceCulling)
-    # getValue("light", m.material.isLightReceiver)
-    # getValue("blend", m.material.blendEnable)
-    # getValue("depth_test", m.material.depthEnable)
-    # getValue("wireframe", m.material.isWireframe)
-    # getValue("RIM", m.material.isRIM)
-    # getValue("sRGB_normal", m.material.isNormalSRGB)
-
     var jNode = j{"emission"}
     m.material.emission = jNode.jNodeToColor()
     jNode = j{"ambient"}
@@ -431,10 +415,10 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     m.material.specular = jNode.jNodeToColor()
     jNode = j{"shininess"}
     m.material.shininess = jNode.getFnum()
-    jNode = j{"reflectivity"}
-    m.material.reflectivity = jNode.getFnum()
     jNode = j{"rim_density"}
     m.material.rim_density = jNode.getFnum()
+    jNode = j{"rimColor"}
+    if not jNode.isNil: m.material.rimColor = jNode.jNodeToColor()
 
     jNode = j{"culling"}
     m.material.bEnableBackfaceCulling = jNode.getBVal()
@@ -454,6 +438,12 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     jNode = j{"matcapPercent"}
     if not jNode.isNil:
         m.material.matcapPercent = jNode.getFnum()
+    jNode = j{"matcapInterpolatePercent"}
+    if not jNode.isNil:
+        m.material.matcapInterpolatePercent = jNode.getFnum()
+    jNode = j{"matcapMixPercent"}
+    if not jNode.isNil:
+        m.material.matcapMixPercent = jNode.getFnum()
     jNode = j{"albedoPercent"}
     if not jNode.isNil:
         m.material.albedoPercent = jNode.getFnum()
@@ -485,6 +475,7 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
             result = imageWithResource(jNode.getStr())
 
     m.material.matcapTexture = getTexture("matcapTexture")
+    m.material.matcapInterpolateTexture = getTexture("matcapInterpolateTexture")
     m.material.albedoTexture = getTexture("albedoTexture")
     m.material.glossTexture = getTexture("glossTexture")
     m.material.specularTexture = getTexture("specularTexture")
@@ -566,7 +557,6 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("diffuse", m.material.diffuse)
     p.visitProperty("specular", m.material.specular)
     p.visitProperty("shininess", m.material.shininess)
-    p.visitProperty("reflectivity", m.material.reflectivity)
 
     p.visitProperty("RIM color", m.material.rimColor)
     p.visitProperty("RIM density", m.material.rimDensity)
@@ -579,6 +569,9 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("reflectionTexture", (m.material.reflectionTexture, m.material.reflectionPercent))
     p.visitProperty("maskTexture", (m.material.maskTexture, m.material.maskPercent))
     p.visitProperty("matcapTexture", (m.material.matcapTexture, m.material.matcapPercent))
+    p.visitProperty("matcapInterTexture", (m.material.matcapInterpolateTexture, m.material.matcapInterpolatePercent))
+
+    p.visitProperty("matcapInterPercent", m.material.matcapMixPercent)
 
     p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
