@@ -15,19 +15,31 @@ type ChannelLevels* = ref object of Component
     inWhiteV*, inBlackV*, inGammaV*, outWhiteV*, outBlackV*: Vector3
 
 var levelsPostEffect = newPostEffect("""
-uniform vec3 inWhite;
-uniform vec3 inBlack;
-uniform vec3 inGamma;
-uniform vec3 outWhite;
-uniform vec3 outBlack;
+uniform vec3 inWhiteV;
+uniform vec3 inBlackV;
+uniform vec3 inGammaV;
+uniform vec3 outWhiteV;
+uniform vec3 outBlackV;
+
+uniform float inWhite;
+uniform float inBlack;
+uniform float inGamma;
+uniform float outWhite;
+uniform float outBlack;
 
 vec3 colorPow(vec3 i, vec3 p) {
     return vec3(pow(i.r, p.r), pow(i.g, p.g), pow(i.b, p.b));
 }
 
+vec3 colorPow(vec3 i, float p) {
+    return vec3(pow(i.r, p), pow(i.g, p), pow(i.b, p));
+}
+
 void channelLevels() {
     vec3 inPixel = gl_FragColor.rgb;
-    gl_FragColor.rgb = colorPow((inPixel - inBlack) / (inWhite - inBlack), inGamma) * (outWhite - outBlack) + outBlack;
+    inPixel = colorPow((inPixel - inBlackV) / (inWhiteV - inBlackV), inGammaV) * (outWhiteV - outBlackV) + outBlackV;
+    inPixel = colorPow((inPixel - inBlack) / (inWhite - inBlack), inGamma) * (outWhite - outBlack) + outBlack;
+    gl_FragColor.rgb = inPixel;
 }
 """, "channelLevels")
 
@@ -36,18 +48,18 @@ template `~==`(f1, f2: float): bool = (f1 > f2 - 0.2 and f1 < f2 + 0.2)
 proc `~==`(v: Vector3, f2: float): bool {.inline.} = v[0] ~== f2 and v[1] ~== f2 and v[2] ~== f2
 
 template areValuesNormal(c: ChannelLevels): bool =
-    c.inWhiteV * c.inWhite ~== 1 and
-        c.inBlackV * c.inBlack ~== 0 and
-        c.inGammaV * c.inGamma ~== 1 and
-        c.outWhiteV * c.outWhite ~== 1 and
-        c.outBlackV * c.outBlack ~== 0
+    c.inWhiteV ~== 1 and c.inWhite ~== 1 and
+        c.inBlackV ~== 1 and c.inBlack ~== 0 and
+        c.inGammaV ~== 1 and c.inGamma ~== 1 and
+        c.outWhiteV ~== 1 and c.outWhite ~== 1 and
+        c.outBlackV ~== 1 and c.outBlack ~== 0
 
 method init*(c: ChannelLevels) =
     c.inWhiteV = newVector3(1, 1, 1)
-    c.inBlackV = newVector3(1, 1, 1)
+    c.inBlackV = newVector3(0, 0, 0)
     c.inGammaV = newVector3(1, 1, 1)
     c.outWhiteV = newVector3(1, 1, 1)
-    c.outBlackV = newVector3(1, 1, 1)
+    c.outBlackV = newVector3(0, 0, 0)
 
     c.inWhite = 1
     c.inBlack = 0
@@ -83,17 +95,17 @@ method deserialize*(c: ChannelLevels, j: JsonNode) =
 
 method draw*(cl: ChannelLevels) =
     if not cl.areValuesNormal():
-        let iw = cl.inWhiteV * cl.inWhite
-        let ib = cl.inBlackV * cl.inBlack
-        let g = cl.inGammaV * cl.inGamma
-        let ow = cl.outWhiteV * cl.outWhite
-        let ob = cl.outBlackV * cl.outBlack
         pushPostEffect levelsPostEffect:
-            setUniform("inWhite", iw)
-            setUniform("inBlack", ib)
-            setUniform("inGamma", g)
-            setUniform("outWhite", ow)
-            setUniform("outBlack", ob)
+            setUniform("inWhiteV", cl.inWhiteV)
+            setUniform("inBlackV", cl.inBlackV)
+            setUniform("inGammaV", cl.inGammaV)
+            setUniform("outWhiteV", cl.outWhiteV)
+            setUniform("outBlackV", cl.outBlackV)
+            setUniform("inWhite", cl.inWhite)
+            setUniform("inBlack", cl.inBlack)
+            setUniform("inGamma", cl.inGamma)
+            setUniform("outWhite", cl.outWhite)
+            setUniform("outBlack", cl.outBlack)
         for c in cl.node.children: c.recursiveDraw()
         popPostEffect()
 
