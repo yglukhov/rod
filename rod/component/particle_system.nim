@@ -1,5 +1,6 @@
 import times
 import math
+import random
 import json
 import tables
 
@@ -40,6 +41,7 @@ uniform mat4 modelViewProjectionMatrix;
 uniform mat4 projMatrix;
 uniform mat4 viewMatrix;
 uniform mat4 worldMatrix;
+uniform vec3 uNodeScale;
 
 varying float vAlpha;
 varying float vColor;
@@ -119,6 +121,7 @@ void main()
     texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
 #endif
 
+    vertexOffset = vertexOffset * uNodeScale;
     vertexOffset = vertexOffset * aScale;
 
     mat4 rMatrix = getRotationMatrix(aRotation);
@@ -288,10 +291,10 @@ proc calculateVertexDesc(ps: ParticleSystem): VertexDesc =
                                      else: 1.int32
     result = newVertexDesc(3, rotationSize, 2, 1, 1, 1, lifeTimeSize)
 
-proc transformDirection*(mat: Matrix4, dir: Vector3): Vector3 =
-    result.x = dir.x * mat[0] + dir.y * mat[4] + dir.z * mat[8]
-    result.y = dir.x * mat[1] + dir.y * mat[5] + dir.z * mat[9]
-    result.z = dir.x * mat[2] + dir.y * mat[6] + dir.z * mat[10]
+# proc transformDirection*(mat: Matrix4, dir: Vector3): Vector3 =
+#     result.x = dir.x * mat[0] + dir.y * mat[4] + dir.z * mat[8]
+#     result.y = dir.x * mat[1] + dir.y * mat[5] + dir.z * mat[9]
+#     result.z = dir.x * mat[2] + dir.y * mat[6] + dir.z * mat[10]
 
 proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle =
     result = Particle.new()
@@ -707,6 +710,7 @@ method draw*(ps: ParticleSystem) =
 
     ps.shader.setUniform("projMatrix", projMatrix)
     ps.shader.setUniform("viewMatrix", viewMatrix)
+    ps.shader.setUniform("uNodeScale", ps.node.scale)
 
     gl.depthMask(false)
     gl.enable(gl.DEPTH_TEST)

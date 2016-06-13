@@ -37,9 +37,29 @@ elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 type EventCatchingView* = ref object of View
+    keyUpDelegate*: proc (event: var Event)
+    keyDownDelegate*: proc (event: var Event)
+    mouseScrrollDelegate*: proc (event: var Event)
 
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
+
+method acceptsFirstResponder(v: EventCatchingView): bool = true
+
+method onKeyUp(v: EventCatchingView, e : var Event): bool =
+    echo "editor onKeyUp ", e.keyCode
+    if not v.keyUpDelegate.isNil:
+        v.keyUpDelegate(e)
+
+method onKeyDown(v: EventCatchingView, e : var Event): bool =
+    echo "editor onKeyUp ", e.keyCode
+    if not v.keyDownDelegate.isNil:
+        v.keyDownDelegate(e)
+
+method onScroll*(v: EventCatchingView, e: var Event): bool =
+    result = true
+    if not v.mouseScrrollDelegate.isNil:
+        v.mouseScrrollDelegate(e)
 
 proc newEventCatchingListener(v: EventCatchingView): EventCatchingListener =
     result.new
@@ -91,13 +111,17 @@ proc newSettingsView(e: Editor, r: Rect): PanelView =
 
     let bgColorButton = newButton(result, newPoint(102, y), newSize(40, 20), "...")
     let pv = result
+    var cPicker: ColorPickerView
     bgColorbutton.onAction do():
-        let cPicker = newColorPickerView(newRect(0, 0, 300, 200))
-        cPicker.onColorSelected = proc(c: Color) =
-            currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
+        if cPicker.isNil:
+            cPicker = newColorPickerView(newRect(0, 0, 300, 200))
+            cPicker.onColorSelected = proc(c: Color) =
+                currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
+            cPicker.setFrameOrigin(newPoint(pv.frame.x - 300, pv.frame.y))
+            pv.window.addSubview(cPicker)
+        else:
             cPicker.removeFromSuperview()
-        cPicker.setFrameOrigin(newPoint(pv.frame.x - 300, pv.frame.y))
-        pv.window.addSubview(cPicker)
+            cPicker = nil
 
     y += bgColorLabel.frame.height + 6
 
@@ -209,6 +233,25 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
         inspector.inspectedNode = n
 
+    outlineView.onDragAndDrop = proc(fromIp, toIp: openarray[int]) =
+        let f = outlineView.itemAtIndexPath(fromIp).get(Node3D)
+        var tos = @toIp
+        tos.setLen(tos.len - 1)
+        let t = outlineView.itemAtIndexPath(tos).get(Node3D)
+        let toIndex = toIp[^1]
+        if f.parent == t:
+            let cIndex = t.children.find(f)
+            if toIndex < cIndex:
+                t.children.delete(cIndex)
+                t.children.insert(f, toIndex)
+            elif toIndex > cIndex:
+                t.children.delete(cIndex)
+                t.children.insert(f, toIndex - 1)
+        else:
+            f.removeFromParent()
+            t.insertChild(f, toIndex)
+        outlineView.reloadData()
+
     outlineView.reloadData()
 
     let outlineScrollView = newScrollView(outlineView)
@@ -304,7 +347,9 @@ proc onTouch*(editor: Editor, e: var Event) =
 
     if castResult.len > 0:
         castResult.sort( proc (x, y: RayCastInfo): int =
-            result = int(x.distance - y.distance) )
+            result = int(x.distance > y.distance)
+            if abs(x.distance - y.distance) < 0.00001:
+                result = getTreeDistance(x.node, y.node) )
 
         var indexPath = newSeq[int]()
         editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
@@ -314,7 +359,7 @@ proc onTouch*(editor: Editor, e: var Event) =
             editor.outlineView.expandBranch(indexPath)
 
 
-proc startEditingNodeInView*(n: Node3D, v: View): Editor =
+proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Editor =
     var editor = Editor.new()
     editor.rootNode = n
     editor.sceneView = n.sceneView # Warning!
@@ -322,8 +367,8 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
     let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
     let settingsView = editor.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
 
-    # let cam = editor.rootNode.findNode("camera")
-    # editor.cameraController = newEditorCameraController(cam)
+    let cam = editor.rootNode.findNode("camera")
+    editor.cameraController = newEditorCameraController(cam)
 
     editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
     let eventListner = editor.eventCatchingView.newEventCatchingListener()
@@ -331,11 +376,19 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
 
     eventListner.tapDownDelegate = proc (event: var Event) =
         editor.onTouch(event)
-    #     editor.cameraController.onTapDown(event)
-    # eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
-    #     editor.cameraController.onScrollProgress(dx, dy, e)
-    # eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
-    #     editor.cameraController.onTapUp(dx, dy, e)
+        editor.cameraController.onTapDown(event)
+    eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
+        editor.cameraController.onScrollProgress(dx, dy, e)
+    eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
+        editor.cameraController.onTapUp(dx, dy, e)
+    editor.eventCatchingView.mouseScrrollDelegate = proc (event: var Event) =
+        editor.cameraController.onMouseScrroll(event)
+    editor.eventCatchingView.keyUpDelegate = proc (event: var Event) =
+        editor.cameraController.onKeyUp(event)
+        if event.keyCode == VirtualKey.F:
+            editor.cameraController.setToNode(editor.selectedNode)
+    editor.eventCatchingView.keyDownDelegate = proc (event: var Event) =
+        editor.cameraController.onKeyDown(event)
 
     v.window.addSubview(editor.eventCatchingView)
 
@@ -344,6 +397,17 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
 
     v.window.addSubview(inspectorView)
     v.window.addSubview(settingsView)
+
+    if startFromGame:
+        let closeEditorButton = Button.new(newRect(v.window.bounds.width - 23, 3, 20, 20))
+        closeEditorButton.title = "x"
+        v.window.addSubview(closeEditorButton)
+        closeEditorButton.onAction do():
+            editor.eventCatchingView.removeFromSuperview()
+            editor.treeView.removeFromSuperview()
+            inspectorView.removeFromSuperview()
+            settingsView.removeFromSuperview()
+            closeEditorButton.removeFromSuperview()
 
     let fpsAnimation = newAnimation()
     v.SceneView.addAnimation(fpsAnimation)

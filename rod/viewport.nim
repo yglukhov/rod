@@ -237,7 +237,18 @@ method handleMouseEvent*(v: SceneView, e: var Event): bool =
                 result = i.c.handleMouseEvent(r, e, i.i)
                 if result: break
 
+method viewOnEnter*(v:SceneView){.base.} = discard
+method viewOnExit*(v:SceneView){.base.} = discard
+
+method viewDidMoveToWindow*(v:SceneView)=
+    procCall v.View.viewDidMoveToWindow()
+    if not v.window.isNil:
+        v.viewOnEnter()
+
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
+    if w.isNil:
+        v.viewOnExit()
+
     procCall v.View.viewWillMoveToWindow(w)
     for c in v.uiComponents:
         c.sceneViewWillMoveToWindow(w)

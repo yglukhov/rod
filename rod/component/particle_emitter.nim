@@ -1,6 +1,7 @@
 import json
 import times
 import math
+import random
 
 import rod.quaternion
 
@@ -32,7 +33,7 @@ type
         radius*: float
         gravity*: float
         resetRadius*: float
-        
+
     ParticleEmitter* = ref object of Component
         lifetime*: float
         birthRate*: float
@@ -43,7 +44,7 @@ type
         particles: seq[ParticleData]
         drawDebug*: bool
         oneShot: bool
-        direction*: Coord 
+        direction*: Coord
         directionRandom*: float
 
         velocity*: Coord
@@ -88,7 +89,7 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
 
 template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) =
     part.remainingLifetime -= timeDiff
-    
+
     if p.attractor != nil:
         var destination = origin - part.coord
         const rad = 1.0.float
@@ -109,7 +110,7 @@ template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: fl
         else:
             part.velocity += p.gravity
 
-    else:    
+    else:
         part.velocity += p.gravity
 
     let velDiff = (part.velocity * timeDiff) / 0.01

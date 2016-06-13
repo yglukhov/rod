@@ -19,6 +19,7 @@ import rod.component.text_component
 import rod.component.mesh_component
 import rod.component.particle_system
 import rod.component.particle_helpers
+import rod.component.animation.skeleton
 
 type Serializer* = ref object
     savePath*: string
@@ -153,6 +154,33 @@ method getComponentData(s: Serializer, c: WavePSAttractor): JsonNode =
     result.add("forceValue", %c.forceValue)
     result.add("frequence", %c.frequence)
 
+
+proc getAnimationTrackData(s: Serializer, track: AnimationTrack): JsonNode =
+    result = newJArray()
+    for frame in track.frames:
+        var frameNode = newJObject()
+        frameNode.add("time", %frame.time)
+        frameNode.add("matrix", %frame.matrix)
+        result.add(frameNode)
+
+proc getBonesData(s: Serializer, bone: Bone): JsonNode =
+    result = newJObject()
+    result.add("name", %bone.name)
+    result.add("id", %bone.id)
+    result.add("startMatrix", %bone.startMatrix)
+    result.add("invMatrix", %bone.invMatrix)
+    result.add("animTrack", s.getAnimationTrackData(bone.animTrack))
+
+    var childrenNode = newJArray()
+    result.add("children", childrenNode)
+    for child in bone.children:
+        childrenNode.add( s.getBonesData(child) )
+
+proc getSkeletonData(s: Serializer, skeleton: Skeleton): JsonNode =
+    result = newJObject()
+    result.add("animDuration", %skeleton.animDuration)
+    result.add("rootBone", s.getBonesData(skeleton.rootBone))
+
 method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result = newJObject()
 
@@ -172,6 +200,18 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("RIM", %c.material.isRIM)
     result.add("sRGB_normal", %c.material.isNormalSRGB)
 
+    result.add("matcapPercent", %c.material.matcapPercent)
+    result.add("albedoPercent", %c.material.albedoPercent)
+    result.add("glossPercent", %c.material.glossPercent)
+    result.add("specularPercent", %c.material.specularPercent)
+    result.add("normalPercent", %c.material.normalPercent)
+    result.add("bumpPercent", %c.material.bumpPercent)
+    result.add("reflectionPercent", %c.material.reflectionPercent)
+    result.add("falloffPercent", %c.material.falloffPercent)
+    result.add("maskPercent", %c.material.maskPercent)
+
+    if not c.material.matcapTexture.isNil:
+        result.add("matcapTexture",  %s.getRelativeResourcePath(c.material.matcapTexture.filePath()))
     if not c.material.albedoTexture.isNil:
         result.add("albedoTexture",  %s.getRelativeResourcePath(c.material.albedoTexture.filePath()))
     if not c.material.glossTexture.isNil:
@@ -214,6 +254,10 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     for v in ib:
         ibNode.add(%int32(v))
 
+    if not c.skeleton.isNil:
+        result.add("skeleton", s.getSkeletonData(c.skeleton))
+        result["vertexWeights"] = %c.vertexWeights
+        result["boneIDs"] = %c.boneIDs
 
 proc getNodeData(s: Serializer, n: Node): JsonNode =
     result = newJObject()

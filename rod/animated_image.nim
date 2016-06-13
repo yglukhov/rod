@@ -41,7 +41,7 @@ proc frameAnimation*(ai: AnimatedImage, desiredFramerate: int = 30): Animation =
         a.loopDuration = float(ai.images.len) * fps
         a.continueUntilEndOfLoopOnCancel = true
         a.onAnimate = proc(p: float) =
-            ai.currentFrame = round(float(ai.images.len - 1) * p)
+            ai.currentFrame = round(float(ai.images.len - 1) * p).int
         ai.anim = a
     result = ai.anim
 
