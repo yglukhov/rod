@@ -1,4 +1,6 @@
 import strutils
+import tables
+import algorithm
 
 import nimx.view
 import nimx.text_field
@@ -8,6 +10,7 @@ import nimx.button
 import nimx.color_picker
 import nimx.context
 import nimx.portable_gl
+import nimx.popup_button
 
 import rod.property_editors.propedit_registry
 import rod.numeric_text_field
@@ -15,6 +18,7 @@ import rod.node
 import rod.viewport
 import rod.quaternion
 import rod.component.mesh_component
+import rod.property_visitor
 
 when defined(js):
     from dom import alert
@@ -351,6 +355,126 @@ proc newQuaternionPropertyView(setter: proc(s: Quaternion), getter: proc(): Quat
         textField.onAction complexSetter
         result.addSubview(textField)
 
+proc newEnumPropertyView(setter: proc(s: EnumValue), getter: proc(): EnumValue): PropertyEditorView =
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, 24))
+    var val = getter()
+    var items = newSeq[string]()
+    for k, v in val.possibleValues:
+        items.add(k)
+
+    sort(items, system.cmp)
+    var enumChooser = newPopupButton(pv,
+        newPoint(0.0, 0.0), newSize(200, 24),
+        items  )
+
+    enumChooser.onAction do():
+        val.curValue = val.possibleValues[enumChooser.selectedItem()]
+        setter(val)
+        if not pv.changeInspector.isNil:
+            pv.changeInspector()
+
+    result = pv
+
+template closureScope*(body: untyped): stmt = (proc() = body)()
+proc newScalarSeqPropertyView[T](setter: proc(s: seq[T]), getter: proc(): seq[T]): PropertyEditorView =
+    var val = getter()
+    var height = val.len() * 26 + 26
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, height.Coord))
+
+    proc onValChange() =
+        setter(val)
+
+    proc onSeqChange() =
+        onValChange()
+        if not pv.changeInspector.isNil:
+            pv.changeInspector()
+
+    var y = 0.Coord
+    for i in 0 ..< val.len:
+        closureScope:
+            let index = i
+            let tf = newNumericTextField(newRect(0.Coord, y, 150, 24))
+            pv.addSubview(tf)
+            tf.textColor = newGrayColor(0.0)
+            tf.text = toStr(val[i], tf.precision)
+            tf.onAction do():
+                if index < val.len:
+                    fromStr(tf.text, val[index])
+                    onValChange()
+
+            let removeButton = Button.new(newRect(153, y, 25, 25))
+            removeButton.title = "-"
+            pv.addSubview(removeButton)
+            removeButton.onAction do():
+                val.delete(index)
+                onSeqChange()
+
+            y += 26
+
+    let addButton = Button.new(newRect(153, y, 25, 25))
+    addButton.title = "+"
+    pv.addSubview(addButton)
+    addButton.onAction do():
+        val.add(0.0)
+        onSeqChange()
+
+    result = pv
+
+# proc newSeqPropertyView[I: static[int], T](setter: proc(s: seq[TVector[I, T]]), getter: proc(): seq[TVector[I, T]]): PropertyEditorView =
+proc newSeqPropertyView[T](setter: proc(s: seq[T]), getter: proc(): seq[T]): PropertyEditorView =
+    var val = getter()
+    var height = val.len() * 26 + 26
+    let pv = PropertyEditorView.new(newRect(0, 0, 208, height.Coord))
+    const vecLen = high(T) + 1
+
+    proc onValChange() =
+        setter(val)
+
+    proc onSeqChange() =
+        onValChange()
+        if not pv.changeInspector.isNil:
+            pv.changeInspector()
+
+    var x = 0.Coord
+    var y = 0.Coord
+    for i in 0 ..< val.len:
+        closureScope:
+            let index = i
+            var vecVal = val[i]
+
+            x = 0.Coord
+            for j in 0 ..< vecLen:
+                closureScope:
+                    let jIndex = j
+                    let tf = newNumericTextField(newRect(x, y, 35, 24))
+                    x += 37
+                    pv.addSubview(tf)
+                    tf.textColor = newGrayColor(0.0)
+                    tf.text = toStr(vecVal[j], tf.precision)
+                    tf.onAction do():
+                        if index < val.len:
+                            val[index][jIndex] = tf.text.parseFloat()
+                            onValChange()
+
+            let removeButton = Button.new(newRect(x, y, 25, 25))
+            removeButton.title = "-"
+            pv.addSubview(removeButton)
+            removeButton.onAction do():
+                val.delete(index)
+                onSeqChange()
+
+            y += 26
+
+    let addButton = Button.new(newRect(x, y, 25, 25))
+    addButton.title = "+"
+    pv.addSubview(addButton)
+    addButton.onAction do():
+        var newVal : TVector[vecLen, Coord]
+        val.add(newVal)
+        onSeqChange()
+
+    result = pv
+
 registerPropertyEditor(newTextPropertyView)
 registerPropertyEditor(newScalarPropertyView[Coord])
 registerPropertyEditor(newScalarPropertyView[float])
@@ -364,3 +488,7 @@ registerPropertyEditor(newPointPropertyView)
 registerPropertyEditor(newNodePropertyView)
 registerPropertyEditor(newBoolPropertyView)
 registerPropertyEditor(newQuaternionPropertyView)
+registerPropertyEditor(newEnumPropertyView)
+registerPropertyEditor(newScalarSeqPropertyView[float])
+registerPropertyEditor(newSeqPropertyView[TVector[4, Coord]])
+registerPropertyEditor(newSeqPropertyView[TVector[5, Coord]])

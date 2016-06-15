@@ -44,7 +44,11 @@ uniform mat4 worldMatrix;
 uniform vec3 uNodeScale;
 
 varying float vAlpha;
-varying float vColor;
+#ifdef GL_ES
+    varying highp float vColor;
+#else
+    varying float vColor;
+#endif
 varying vec2 texCoords;
 
 
@@ -144,8 +148,11 @@ void main()
 """
 const ParticleFragmentShader = """
 #ifdef GL_ES
-#extension GL_OES_standard_derivatives : enable
-precision mediump float;
+    #extension GL_OES_standard_derivatives : enable
+    precision mediump float;
+    varying highp float vColor;
+#else
+    varying float vColor;
 #endif
 
 #ifdef TEXTURED
@@ -154,7 +161,6 @@ precision mediump float;
 #endif
 
 varying float vAlpha;
-varying float vColor;
 varying vec2 texCoords;
 
 vec3 encodeRgbFromFloat( float f )
@@ -178,6 +184,10 @@ void main()
 """
 
 type
+    ParticleModeEnum* = enum
+        BeetwenValue
+        TimeSequence
+
     VertexDesc = object
         positionSize: int32
         rotationSize: int32
@@ -248,6 +258,11 @@ type
         isMove*: bool
         amplitude*, frequency*, distance*, speed*: float
 
+        scaleMode*: ParticleModeEnum
+        colorMode*: ParticleModeEnum
+        scaleSeq*: seq[TVector[4, Coord]]
+        colorSeq*: seq[TVector[5, Coord]]
+
 
 proc randomBetween(fromV, toV: float32): float32 =
     result = random(fromV - toV) + toV
@@ -290,11 +305,6 @@ proc calculateVertexDesc(ps: ParticleSystem): VertexDesc =
     let rotationSize = if ps.is3dRotation: 3.int32
                                      else: 1.int32
     result = newVertexDesc(3, rotationSize, 2, 1, 1, 1, lifeTimeSize)
-
-# proc transformDirection*(mat: Matrix4, dir: Vector3): Vector3 =
-#     result.x = dir.x * mat[0] + dir.y * mat[4] + dir.z * mat[8]
-#     result.y = dir.x * mat[1] + dir.y * mat[5] + dir.z * mat[9]
-#     result.z = dir.x * mat[2] + dir.y * mat[6] + dir.z * mat[10]
 
 proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle =
     result = Particle.new()
@@ -427,6 +437,10 @@ method init(ps: ParticleSystem) =
     ps.distance = 40.0
     ps.speed = 9.0
 
+    ps.scaleMode = ParticleModeEnum.BeetwenValue
+    ps.colorMode = ParticleModeEnum.BeetwenValue
+    ps.scaleSeq = newSeq[TVector[4, Coord]]()
+    ps.colorSeq = newSeq[TVector[5, Coord]]()
     # ps.initSystem()
 
 proc start*(ps: ParticleSystem) =
@@ -462,6 +476,34 @@ template setVector3ToBuffer(buff: var seq[float32], offset: int, vec: Vector3) =
     buff[offset + 0] = vec.x
     buff[offset + 1] = vec.y
     buff[offset + 2] = vec.z
+
+proc getValueAtTime[T](s: seq[T], time: float): T =
+    var frame1, frame2: T
+    const vecLen = high(T) + 1
+    var val: T
+
+    for i in 0 ..< s.len:
+        if s[i][0] >= time:
+            frame2 = s[i]
+            if i == 0:
+                return frame2
+            else:
+                frame1 = s[i-1]
+            break
+        else:
+            frame1 = s[i]
+            frame2 = s[i]
+
+    let startTime = frame1[0]
+    let endTime = frame2[0]
+    if startTime == endTime:
+        return frame2
+
+    let t = (time - startTime) / (endTime - startTime)
+    for i in 1 ..< vecLen:
+        val[i] = frame1[i] * (1 - t) + frame2[i] * t
+
+    return val
 
 proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
     var newParticlesCount = ps.newParticles.len
@@ -533,8 +575,13 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         offset += ps.vertexDesc.rotationSize
 
         # scale
-        ps.particles[i].scale.x = (ps.startScale.x + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.x * oneMinusNormLifeTime
-        ps.particles[i].scale.y = (ps.startScale.y + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.y * oneMinusNormLifeTime
+        if ps.scaleMode == ParticleModeEnum.TimeSequence:
+            let sc = ps.scaleSeq.getValueAtTime(1.0 - normLifeTime)
+            ps.particles[i].scale.x = sc[1]
+            ps.particles[i].scale.y = sc[2]
+        else:
+            ps.particles[i].scale.x = (ps.startScale.x + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.x * oneMinusNormLifeTime
+            ps.particles[i].scale.y = (ps.startScale.y + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.y * oneMinusNormLifeTime
         ps.particlesVertexBuff[v1 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v1 + offset + 1] = ps.particles[i].scale.y
 
@@ -548,16 +595,24 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         ps.particlesVertexBuff[v4 + offset + 1] = ps.particles[i].scale.y
         offset += ps.vertexDesc.scaleSize
 
-        # alpha
-        let color = ps.startColor * normLifeTime + ps.dstColor * oneMinusNormLifeTime
-        let alpha = color.a * normLifeTime + color.a * oneMinusNormLifeTime
+        # alpha and color
+        var alpha: float
+        var color: Color
+        if ps.colorMode == ParticleModeEnum.TimeSequence:
+            let sc = ps.colorSeq.getValueAtTime(1.0 - normLifeTime)
+            color.r = sc[1]
+            color.g = sc[2]
+            color.b = sc[3]
+            alpha = sc[4]
+        else:
+            color = ps.startColor * normLifeTime + ps.dstColor * oneMinusNormLifeTime
+            alpha = color.a * normLifeTime + color.a * oneMinusNormLifeTime
         ps.particlesVertexBuff[v1 + offset] = alpha
         ps.particlesVertexBuff[v2 + offset] = alpha
         ps.particlesVertexBuff[v3 + offset] = alpha
         ps.particlesVertexBuff[v4 + offset] = alpha
         offset += ps.vertexDesc.alphaSize
 
-        # color
         let encoded_color = rgbToFloat(color)
         ps.particlesVertexBuff[v1 + offset] = encoded_color
         ps.particlesVertexBuff[v2 + offset] = encoded_color
@@ -776,6 +831,7 @@ method deserialize*(ps: ParticleSystem, j: JsonNode) =
 
 method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     proc onLoopedChange() =
+        echo "onLoopedChange"
         ps.remainingDuration = ps.duration
         ps.lastBirthTime = epochTime()
 
@@ -792,6 +848,19 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     proc toCalculateVertexDesc() =
         ps.vertexDesc = ps.calculateVertexDesc()
 
+    p.visitProperty("scaleMode", ps.scaleMode)
+    if ps.scaleMode == ParticleModeEnum.BeetwenValue:
+        p.visitProperty("startScale", ps.startScale)
+        p.visitProperty("dstScale", ps.dstScale)
+    else:
+        p.visitProperty("scaleSeq", ps.scaleSeq)
+
+    p.visitProperty("colorMode", ps.colorMode)
+    if ps.colorMode == ParticleModeEnum.BeetwenValue:
+        p.visitProperty("startColor", ps.startColor)
+        p.visitProperty("dstColor", ps.dstColor)
+    else:
+        p.visitProperty("colorSeq", ps.colorSeq)
     p.visitProperty("duration", ps.duration)
     p.visitProperty("isLooped", ps.isLooped, onLoopedChange)
     p.visitProperty("isPlayed", ps.isPlayed, onPlayedChange)
@@ -805,12 +874,8 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("is3dRotation", ps.is3dRotation, toCalculateVertexDesc)
     p.visitProperty("randRotVelFrom", ps.randRotVelocityFrom)
     p.visitProperty("randRotVelTo", ps.randRotVelocityTo)
-    p.visitProperty("startScale", ps.startScale)
-    p.visitProperty("dstScale", ps.dstScale)
     p.visitProperty("randScaleFrom", ps.randScaleFrom)
     p.visitProperty("randScaleTo", ps.randScaleTo)
-    p.visitProperty("startColor", ps.startColor)
-    p.visitProperty("dstColor", ps.dstColor)
     p.visitProperty("isBlendAdd", ps.isBlendAdd)
     p.visitProperty("gravity", ps.gravity)
     p.visitProperty("texture", ps.texture, onTextureChange)
