@@ -365,7 +365,7 @@ proc newEnumPropertyView(setter: proc(s: EnumValue), getter: proc(): EnumValue):
     sort(items, system.cmp)
     var enumChooser = newPopupButton(pv,
         newPoint(0.0, 0.0), newSize(200, 24),
-        items  )
+        items, val.curValue)
 
     enumChooser.onAction do():
         val.curValue = val.possibleValues[enumChooser.selectedItem()]

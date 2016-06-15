@@ -69,7 +69,11 @@ template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, defFla
 template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, onChange: proc()) =
     var defFlags = { pfEditable, pfAnimatable }
     if (defFlags * p.flags) != {}:
-        var sng : SetterAndGetter[type(s)]
+        when s is enum:
+            var sng : SetterAndGetter[EnumValue]
+        else:
+            var sng : SetterAndGetter[type(s)]
+
         if p.requireSetter:
             when s is enum:
                 sng.setter = proc(v: EnumValue) =
@@ -79,7 +83,7 @@ template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, onChan
         if p.requireGetter:
             when s is enum:
                 sng.getter = proc(): EnumValue =
-                    result.possibleValues.initTable()
+                    result.possibleValues = initTable[string, int]()
                     for i in low(type(s)) .. high(type(s)):
                         result.possibleValues[$i] = ord(i)
                     result.curValue = ord(s)

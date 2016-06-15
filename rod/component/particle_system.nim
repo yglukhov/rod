@@ -253,15 +253,15 @@ type
 
         lastPos, curPos: Vector3 # data to interpolate particle generation
 
+        scaleMode*: ParticleModeEnum
+        colorMode*: ParticleModeEnum
+        scaleSeq*: seq[TVector[4, Coord]] # time, scale
+        colorSeq*: seq[TVector[5, Coord]] # time, color
+
         isBlendAdd*: bool
         # debug data
         isMove*: bool
         amplitude*, frequency*, distance*, speed*: float
-
-        scaleMode*: ParticleModeEnum
-        colorMode*: ParticleModeEnum
-        scaleSeq*: seq[TVector[4, Coord]]
-        colorSeq*: seq[TVector[5, Coord]]
 
 
 proc randomBetween(fromV, toV: float32): float32 =
@@ -826,6 +826,14 @@ method deserialize*(ps: ParticleSystem, j: JsonNode) =
     j.getSerializedValue("frequency", ps.frequency)
     j.getSerializedValue("distance", ps.distance)
     j.getSerializedValue("speed", ps.speed)
+
+    var scaleM, colorM: int
+    j.getSerializedValue("scaleMode", scaleM)
+    j.getSerializedValue("colorMode", colorM)
+    ps.scaleMode = ParticleModeEnum(scaleM)
+    ps.colorMode = ParticleModeEnum(colorM)
+    j.getSerializedValue("scaleSeq", ps.scaleSeq)
+    j.getSerializedValue("colorSeq", ps.colorSeq)
 
     # ps.initSystem()
 
