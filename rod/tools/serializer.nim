@@ -24,11 +24,6 @@ import rod.component.animation.skeleton
 type Serializer* = ref object
     savePath*: string
 
-proc `%`*[T](elements: openArray[T]): JsonNode =
-    result = newJArray()
-    for elem in elements:
-        result.add(%elem)
-
 proc vectorToJNode[T](vec: T): JsonNode =
     result = newJArray()
     for k, v in vec:
@@ -50,6 +45,11 @@ proc `%`*(v: Color): JsonNode =
     result = newJArray()
     for k, val in v.fieldPairs:
         result.add( %val )
+
+proc `%`*[T](elements: openArray[T]): JsonNode =
+    result = newJArray()
+    for elem in elements:
+        result.add(%elem)
 
 proc colorToJNode(color:Color): JsonNode =
     result = newJArray()
@@ -118,6 +118,12 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("dstColor", %c.dstColor)
     result.add("isBlendAdd", %c.isBlendAdd)
     result.add("gravity", %c.gravity)
+
+    result.add("scaleMode", %c.scaleMode.ord)
+    result.add("colorMode", %c.colorMode.ord)
+    result.add("scaleSeq", %c.scaleSeq)
+    result.add("colorSeq", %c.colorSeq)
+
     if c.texture.filePath().len > 0:
         result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
         result.add("isTextureAnimated", %c.isTextureAnimated)
