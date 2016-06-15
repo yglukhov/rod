@@ -24,11 +24,6 @@ import rod.component.animation.skeleton
 type Serializer* = ref object
     savePath*: string
 
-proc `%`*[T](elements: openArray[T]): JsonNode =
-    result = newJArray()
-    for elem in elements:
-        result.add(%elem)
-
 proc vectorToJNode[T](vec: T): JsonNode =
     result = newJArray()
     for k, v in vec:
@@ -50,6 +45,11 @@ proc `%`*(v: Color): JsonNode =
     result = newJArray()
     for k, val in v.fieldPairs:
         result.add( %val )
+
+proc `%`*[T](elements: openArray[T]): JsonNode =
+    result = newJArray()
+    for elem in elements:
+        result.add(%elem)
 
 proc colorToJNode(color:Color): JsonNode =
     result = newJArray()
@@ -85,13 +85,17 @@ method getComponentData(s: Serializer, c: Sprite): JsonNode =
     for img in c.images:
         imagesNode.add( %s.getRelativeResourcePath(img.filePath()) )
 
-
 method getComponentData(s: Serializer, c: LightSource): JsonNode =
     result = newJObject()
     result.add("ambient", %c.lightAmbient)
     result.add("diffuse", %c.lightDiffuse)
     result.add("specular", %c.lightSpecular)
     result.add("constant", %c.lightConstant)
+    result.add("linear", %c.lightLinear)
+    result.add("quadratic", %c.lightQuadratic)
+    result.add("is_precomp_attenuation", %c.lightAttenuationInited)
+    result.add("attenuation", %c.lightAttenuation)
+    result.add("color", %c.lightColor)
 
 method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result = newJObject()
@@ -114,6 +118,12 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("dstColor", %c.dstColor)
     result.add("isBlendAdd", %c.isBlendAdd)
     result.add("gravity", %c.gravity)
+
+    result.add("scaleMode", %c.scaleMode.ord)
+    result.add("colorMode", %c.colorMode.ord)
+    result.add("scaleSeq", %c.scaleSeq)
+    result.add("colorSeq", %c.colorSeq)
+
     if c.texture.filePath().len > 0:
         result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
         result.add("isTextureAnimated", %c.isTextureAnimated)
@@ -189,7 +199,6 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("diffuse", colorToJNode(c.material.diffuse))
     result.add("specular", colorToJNode(c.material.specular))
     result.add("shininess", %c.material.shininess)
-    result.add("reflectivity", %c.material.reflectivity)
     result.add("rim_density", %c.material.rim_density)
 
     result.add("culling", %c.material.bEnableBackfaceCulling)
@@ -198,9 +207,12 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("depth_test", %c.material.depthEnable)
     result.add("wireframe", %c.material.isWireframe)
     result.add("RIM", %c.material.isRIM)
+    result.add("rimColor", colorToJNode(c.material.rimColor))
+
     result.add("sRGB_normal", %c.material.isNormalSRGB)
 
     result.add("matcapPercent", %c.material.matcapPercent)
+    result.add("matcapInterpolatePercent", %c.material.matcapInterpolatePercent)
     result.add("albedoPercent", %c.material.albedoPercent)
     result.add("glossPercent", %c.material.glossPercent)
     result.add("specularPercent", %c.material.specularPercent)
@@ -210,8 +222,12 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("falloffPercent", %c.material.falloffPercent)
     result.add("maskPercent", %c.material.maskPercent)
 
+    result.add("matcapMixPercent", %c.material.matcapMixPercent)
+
     if not c.material.matcapTexture.isNil:
         result.add("matcapTexture",  %s.getRelativeResourcePath(c.material.matcapTexture.filePath()))
+    if not c.material.matcapInterpolateTexture.isNil:
+        result.add("matcapInterpolateTexture",  %s.getRelativeResourcePath(c.material.matcapInterpolateTexture.filePath()))
     if not c.material.albedoTexture.isNil:
         result.add("albedoTexture",  %s.getRelativeResourcePath(c.material.albedoTexture.filePath()))
     if not c.material.glossTexture.isNil:

@@ -37,6 +37,7 @@ type ShaderMacro = enum
     WITH_V_BINORMAL
     WITH_V_TANGENT
     WITH_MATCAP_SAMPLER
+    WITH_MATCAP_INTERPOLATE_SAMPLER
     WITH_AMBIENT_SAMPLER
     WITH_GLOSS_SAMPLER
     WITH_SPECULAR_SAMPLER
@@ -77,17 +78,16 @@ type
         diffuse: Color
         specular: Color
         shininess: float32
-        reflectivity: float32
 
         ambientInited: bool
         emissionInited: bool
         diffuseInited: bool
         specularInited: bool
         shininessInited: bool
-        reflectivityInited: bool
 
     Material* = ref object of RootObj
         matcapTexture: Image
+        matcapInterpolateTexture: Image
         albedoTexture: Image
         glossTexture: Image
         specularTexture: Image
@@ -98,6 +98,7 @@ type
         maskTexture: Image
 
         matcapPercent*: float32
+        matcapInterpolatePercent*: float32
         albedoPercent*: float32
         glossPercent*: float32
         specularPercent*: float32
@@ -107,6 +108,7 @@ type
         falloffPercent*: float32
         maskPercent*: float32
 
+        matcapMixPercent*: float32
         color*: MaterialColor
         rimDensity: Coord
         rimColor: Color
@@ -147,10 +149,10 @@ proc ambient*(m: Material): Color = result = m.color.ambient
 proc diffuse*(m: Material): Color = result = m.color.diffuse
 proc specular*(m: Material): Color = result = m.color.specular
 proc shininess*(m: Material): Coord = result = m.color.shininess
-proc reflectivity*(m: Material): Coord = result = m.color.reflectivity
 proc rimDensity*(m: Material): Coord = result = m.rimDensity
 proc rimColor*(m: Material): Color = result = m.rimColor
 proc matcapTexture*(m: Material): Image = result = m.matcapTexture
+proc matcapInterpolateTexture*(m: Material): Image = result = m.matcapInterpolateTexture
 proc albedoTexture*(m: Material): Image = result = m.albedoTexture
 proc glossTexture*(m: Material): Image = result = m.glossTexture
 proc specularTexture*(m: Material): Image = result = m.specularTexture
@@ -191,9 +193,6 @@ template `shininess=`*(m: Material, s: Coord) =
         m.bShaderNeedUpdate = true
     m.color.shininess = s
     m.color.shininessInited = true
-template `reflectivity=`*(m: Material, r: Coord) =
-    m.color.reflectivity = r
-    m.color.reflectivityInited = true
 template `rimDensity=`*(m: Material, val: Coord) =
     m.rimDensity = val
 template `rimColor=`*(m: Material, val: Color) =
@@ -205,6 +204,14 @@ template `matcapTexture=`*(m: Material, i: Image) =
     m.matcapTexture = i
     if m.matcapTexture.isNil:
         m.shaderMacroFlags.excl(WITH_MATCAP_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `matcapInterpolateTexture=`*(m: Material, i: Image) =
+    if m.matcapInterpolateTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_MATCAP_INTERPOLATE_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.matcapInterpolateTexture = i
+    if m.matcapInterpolateTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_MATCAP_INTERPOLATE_SAMPLER)
         m.bShaderNeedUpdate = true
 template `albedoTexture=`*(m: Material, i: Image) =
     if m.albedoTexture.isNil:
@@ -296,8 +303,6 @@ template removeShininess*(m: Material) =
     m.color.shininessInited = false
     m.shaderMacroFlags.excl(WITH_MATERIAL_SHININESS)
     m.bShaderNeedUpdate = true
-template removeReflectivity*(m: Material) =
-    m.color.reflectivityInited = false
 
 proc isLightReceiver*(m: Material): bool =
     result = m.isLightReceiver
@@ -308,7 +313,7 @@ template `isLightReceiver=`*(m: Material, val: bool) =
         m.bShaderNeedUpdate = true
 
         if not val:
-            for i in 0 .. m.currentLightSourcesCount - 1:
+            for i in 0 .. <m.currentLightSourcesCount:
                 m.shaderMacroFlags.excl(ShaderMacro(int(WITH_LIGHT_0) + i))
 
             m.shaderMacroFlags.excl(WITH_LIGHT_POSITION)
@@ -324,8 +329,6 @@ template `isLightReceiver=`*(m: Material, val: bool) =
             m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
             m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
             m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
-            m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
-            m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
 
 proc isRIM*(m: Material): bool =
     result = m.isRIM
@@ -376,6 +379,7 @@ proc newDefaultMaterial*(): Material =
     result.bEnableBackfaceCulling = true
     result.color.new()
     result.matcapPercent = 1.0
+    result.matcapInterpolatePercent = 1.0
     result.albedoPercent = 1.0
     result.glossPercent = 1.0
     result.specularPercent = 1.0
@@ -438,6 +442,18 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnit"), textureIndex)
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercent"), m.matcapPercent)
+                inc textureIndex
+    if not m.matcapInterpolateTexture.isNil:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATCAP_INTERPOLATE_SAMPLER)
+        else:
+            if m.matcapInterpolateTexture.isLoaded:
+                gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapInterpolateTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsInterpolate"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitInterpolate"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentInterpolate"), m.matcapInterpolatePercent)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapMixPercent"), m.matcapMixPercent)
                 inc textureIndex
     if not m.albedoTexture.isNil:
         if m.shader == invalidProgram:
@@ -506,7 +522,6 @@ proc setupSamplerAttributes(m: Material) =
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.reflectionTexture, gl, theQuad))
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uReflectUnitCoords"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "reflectMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uReflectivity"), m.color.reflectivity)
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uReflectionPercent"), m.reflectionPercent)
                 inc textureIndex
     if not m.falloffTexture.isNil:
@@ -581,6 +596,7 @@ proc setupLightAttributes(m: Material, v: SceneView) =
                 let lightWorldPos = ls.node.worldPos()
                 let lightPosition = v.viewMatrixCached * newVector4(lightWorldPos.x, lightWorldPos.y, lightWorldPos.z, 1.0)
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uLightPosition" & $lightsCount), lightPosition)
+                c.setColorUniform(m.shader, "uLightColor" & $lightsCount, ls.lightColor)
             if ls.lightAmbientInited:
                 if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
@@ -597,11 +613,20 @@ proc setupLightAttributes(m: Material, v: SceneView) =
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uLightSpecular" & $lightsCount), ls.lightSpecular)
             if ls.lightAttenuationInited:
+                if not m.shaderMacroFlags.contains(WITH_LIGHT_PRECOMPUTED_ATTENUATION):
+                    m.shaderMacroFlags.excl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+                    m.shaderNeedUpdate()
+
                 if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uAttenuation" & $lightsCount), ls.lightAttenuation)
-            elif ls.lightConstantInited and ls.lightLinearInited and ls.lightQuadraticInited:
+            # elif ls.lightConstantInited and ls.lightLinearInited and ls.lightQuadraticInited:
+            else:
+                if not m.shaderMacroFlags.contains(WITH_LIGHT_DYNAMIC_ATTENUATION):
+                    m.shaderMacroFlags.excl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
+                    m.shaderNeedUpdate()
+
                 if m.shader == invalidProgram:
                     m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
                 else:
@@ -633,8 +658,12 @@ proc setupLightAttributes(m: Material, v: SceneView) =
             m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
             m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
             m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
-            m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
-            m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+
+            for ls in values v.lightSources:
+                if ls.lightAttenuationInited:
+                    m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
+                elif ls.lightConstantInited and ls.lightLinearInited and ls.lightQuadraticInited:
+                    m.shaderMacroFlags.incl(WITH_LIGHT_DYNAMIC_ATTENUATION)
 
 template setupTransform*(m: Material, n: Node) =
     let c = currentContext()

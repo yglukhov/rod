@@ -76,6 +76,8 @@ type
         mLightQuadratic*: float32
         mLightAttenuation*: float32
 
+        mLightColor*: Color
+
         lightPosInited*: bool
         lightAmbientInited*: bool
         lightDiffuseInited*: bool
@@ -83,4 +85,4 @@ type
         lightConstantInited*: bool
         lightLinearInited*: bool
         lightQuadraticInited*: bool
-        lightAttenuationInited*: bool
+        mLightAttenuationInited*: bool
