@@ -28,9 +28,20 @@ proc `lightLinear=`*(ls: LightSource, val: Coord) =
 proc `lightQuadratic=`*(ls: LightSource, val: Coord) =
     ls.mLightQuadratic = val
     ls.lightQuadraticInited = true
+proc `lightAttenuationInited=`*(ls: LightSource, val: bool) =
+    ls.mLightAttenuationInited = val
+    if ls.mLightAttenuationInited:
+        ls.lightConstantInited = false
+        ls.lightLinearInited = false
+        ls.lightQuadraticInited = false
+    else:
+        ls.lightConstantInited = true
+        ls.lightLinearInited = true
+        ls.lightQuadraticInited = true
 proc `lightAttenuation=`*(ls: LightSource, val: Coord) =
     ls.mLightAttenuation = val
-    ls.lightAttenuationInited = true
+proc `lightColor=`*(ls: LightSource, val: Color) =
+    ls.mLightColor = val
 
 template lightAmbient*(ls: LightSource): Coord = ls.mLightAmbient
 template lightDiffuse*(ls: LightSource): Coord = ls.mLightDiffuse
@@ -39,6 +50,8 @@ template lightConstant*(ls: LightSource): Coord = ls.mLightConstant
 template lightLinear*(ls: LightSource): Coord = ls.mLightLinear
 template lightQuadratic*(ls: LightSource): Coord = ls.mLightQuadratic
 template lightAttenuation*(ls: LightSource): Coord = ls.mLightAttenuation
+template lightAttenuationInited*(ls: LightSource): bool = ls.mLightAttenuationInited
+template lightColor*(ls: LightSource): Color = ls.mLightColor
 
 proc setDefaultLightSource*(ls: LightSource) =
     ls.lightAmbient = 1.0
@@ -47,7 +60,10 @@ proc setDefaultLightSource*(ls: LightSource) =
     ls.lightConstant = 1.0
     ls.lightLinear = 0.000014
     ls.lightQuadratic = 0.00000007
-    ls.lightAttenuationInited = false
+    # ls.lightAttenuationInited = false
+    ls.lightColor = newColor(1.0, 1.0, 1.0, 1.0)
+    ls.lightAttenuation = 1.0
+    ls.lightAttenuationInited = true
 
 method init*(ls: LightSource) =
     procCall ls.Component.init()
@@ -76,13 +92,40 @@ method deserialize*(ls: LightSource, j: JsonNode) =
     if not v.isNil:
         ls.lightConstant = v.getFNum()
 
+    v = j{"linear"}
+    if not v.isNil:
+        ls.lightLinear = v.getFNum()
+
+    v = j{"quadratic"}
+    if not v.isNil:
+        ls.lightQuadratic = v.getFNum()
+
+    v = j{"is_precomp_attenuation"}
+    if not v.isNil:
+        ls.lightAttenuationInited = v.getBVal()
+
+    v = j{"attenuation"}
+    if not v.isNil:
+        ls.lightAttenuation = v.getFNum()
+
+    v = j{"color"}
+    if not v.isNil:
+        ls.lightColor.r = v[0].getFNum()
+        ls.lightColor.g = v[1].getFNum()
+        ls.lightColor.b = v[2].getFNum()
+        ls.lightColor.a = v[3].getFNum()
 
 method visitProperties*(ls: LightSource, p: var PropertyVisitor) =
     p.visitProperty("ambient", ls.lightAmbient)
     p.visitProperty("diffuse", ls.lightDiffuse)
     p.visitProperty("specular", ls.lightSpecular)
     p.visitProperty("constant", ls.lightConstant)
-    # p.visitProperty("linear", ls.lightLinear)
-    # p.visitProperty("quadratic", ls.lightQuadratic)
+    p.visitProperty("linear", ls.lightLinear)
+    p.visitProperty("quadratic", ls.lightQuadratic)
+
+    p.visitProperty("precomp_att", ls.lightAttenuation)
+    p.visitProperty("use_precomp", ls.lightAttenuationInited)
+
+    p.visitProperty("color", ls.lightColor)
 
 registerComponent[LightSource]()

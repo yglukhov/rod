@@ -40,8 +40,8 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         i.subviews[1].removeFromSuperview()
 
     if not n.isNil:
-        let propView = View.new(newRect(1, 29, i.bounds.width - 6, i.bounds.height - 40))
-        propView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
+        let propView = View.new(newRect(1, 0, i.bounds.width - 6, 20))
+        propView.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
 
         var y = Coord(0)
         var pv: View
@@ -78,31 +78,20 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         propView.addSubview(pv)
 
         var fs = propView.frame.size
-        fs.height = y + 27 + 6 + 12
+        fs.height = y + 15
         propView.setFrameSize(fs)
         i.addSubview(propView)
 
-        echo "Y: ", y, " FS: ", i.frame.size
-
-        i.fullHeight = if fs.height <= i.window.frame.height: fs.height else: i.window.frame.height
-        i.setFrameSize(newSize(i.frame.size.width, if i.collapsed: 27.Coord else: i.fullHeight))
-
-        if i.collapsible:
-            if i.collapsed:
-                i.collapsed = false
-                i.setFrameSize(newSize(i.frame.size.width, i.fullHeight))
-                i.setNeedsDisplay()
+        i.contentHeight = if fs.height + i.titleHeight <= i.window.frame.height: fs.height else: i.window.frame.height - i.titleHeight
+        i.collapsed = false
 
         let scView = newScrollView(propView)
-        scView.setFrameSize(newSize(i.frame.width, i.fullHeight))
+        scView.horizontalScrollBar = nil
+        scView.setFrameOrigin(newPoint(scView.frame.x, i.titleHeight))
+        scView.setFrameSize(newSize(i.frame.width, i.contentHeight))
         i.addSubview(scView)
-
     else:
-        if i.collapsible:
-            if not i.collapsed:
-                i.collapsed = true
-                i.setFrameSize(newSize(i.frame.size.width, if i.collapsed: 27.Coord else: i.fullHeight))
-                i.setNeedsDisplay()
+        i.collapsed = true
 
 proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string): View =
     result = View.new(newRect(0, y, 324, 17))
