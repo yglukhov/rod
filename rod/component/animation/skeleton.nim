@@ -41,8 +41,6 @@ void main()
 
 type
     AnimationType* = enum
-        Single
-        Looped
         Forward
         Reverse
         PingPong
@@ -73,10 +71,11 @@ type
         boneIdTable*: Table[int16, Bone]
         nameToIdTable*: Table[string, int16]
 
-        isPlayed: bool
+        isPlayed*: bool
         isPaused: bool
         currAnimTime: float
-        animType*: set[AnimationType]
+        isLooped*: bool
+        animType*: AnimationType
 
 proc newAnimationTrack*(): AnimationTrack =
     result = AnimationTrack.new()
@@ -174,7 +173,7 @@ proc newSkeleton*(): Skeleton =
     result.startTime = epochTime()
     result.animDuration = 1.0
 
-    result.animType = {AnimationType.Looped, AnimationType.Forward}
+    result.animType = AnimationType.Forward
     result.currAnimTime = 0.0
     result.isPlayed = true
 
@@ -231,24 +230,24 @@ proc update*(s: Skeleton) =
         return
 
     var time = epochTime() - s.startTime
-    if s.animType.contains(AnimationType.Single):
-        if s.animType.contains(AnimationType.Forward):
+    if s.isLooped == false:
+        if s.animType == AnimationType.Forward:
             s.currAnimTime = time
             if s.currAnimTime > s.animDuration:
                 s.stop()
 
-        if s.animType.contains(AnimationType.Reverse):
+        if s.animType == AnimationType.Reverse:
             s.currAnimTime = s.animDuration - time
             if s.currAnimTime < 0.0:
                 s.stop()
 
-    elif s.animType.contains(AnimationType.Looped):
-        if s.animType.contains(AnimationType.Forward):
+    elif s.isLooped:
+        if s.animType == AnimationType.Forward:
             s.currAnimTime = time
             if s.currAnimTime > s.animDuration:
                 s.startTime = epochTime()
 
-        if s.animType.contains(AnimationType.Reverse):
+        if s.animType == AnimationType.Reverse:
             s.currAnimTime = s.animDuration - time
             if s.currAnimTime < 0.0:
                 s.startTime = epochTime()
@@ -293,6 +292,9 @@ proc deserialize*(s: var Skeleton, j: JsonNode) =
         return
 
     j.getSerializedValue("animDuration", s.animDuration)
+    j.getSerializedValue("isPlayed", s.isPlayed)
+    j.getSerializedValue("isLooped", s.isLooped)
+    j.getSerializedValue("animType", s.animType)
 
     var jNode = j{"rootBone"}
     if not jNode.isNil:

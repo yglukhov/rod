@@ -35,6 +35,9 @@ proc `%`*(n: Node): JsonNode =
     else:
         result = newJString("")
 
+proc `%`*[T: enum](v: T): JsonNode =
+    result = newJInt(v.ord)
+
 proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
     result = vectorToJNode(vec)
 
@@ -119,8 +122,8 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("isBlendAdd", %c.isBlendAdd)
     result.add("gravity", %c.gravity)
 
-    result.add("scaleMode", %c.scaleMode.ord)
-    result.add("colorMode", %c.colorMode.ord)
+    result.add("scaleMode", %c.scaleMode)
+    result.add("colorMode", %c.colorMode)
     result.add("scaleSeq", %c.scaleSeq)
     result.add("colorSeq", %c.colorSeq)
 
@@ -189,6 +192,9 @@ proc getBonesData(s: Serializer, bone: Bone): JsonNode =
 proc getSkeletonData(s: Serializer, skeleton: Skeleton): JsonNode =
     result = newJObject()
     result.add("animDuration", %skeleton.animDuration)
+    result.add("isPlayed", %skeleton.isPlayed)
+    result.add("isLooped", %skeleton.isLooped)
+    result.add("animType", %skeleton.animType)
     result.add("rootBone", s.getBonesData(skeleton.rootBone))
 
 method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
