@@ -46,7 +46,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         var y = Coord(0)
         var pv: View
 
-        proc cahngeInspectorView() =
+        proc changeInspectorView() =
             i.inspectedNode = n
 
         var visitor : PropertyVisitor
@@ -55,7 +55,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, cahngeInspectorView)
+            pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView)
             pv.setFrameOrigin(newPoint(6, y))
             pv.setFrameSize(newSize(pv.frame.width - 16.Coord, pv.frame.height))
             y += pv.frame.height
@@ -82,7 +82,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         propView.setFrameSize(fs)
         i.addSubview(propView)
 
-        i.contentHeight = if fs.height + i.titleHeight <= i.window.frame.height: fs.height else: i.window.frame.height - i.titleHeight
+        i.contentHeight = if fs.height + i.titleHeight + i.frame.y <= i.window.frame.height: fs.height else: i.window.frame.height - i.titleHeight - i.frame.y
         i.collapsed = false
 
         let scView = newScrollView(propView)

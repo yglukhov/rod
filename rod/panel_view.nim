@@ -33,8 +33,8 @@ method init*(v: PanelView, r: Rect) =
     v.collapsible = false
     v.contentHeight = r.height - v.titleHeight
 
-    # Enable dragging
     v.enableDraggingByBackground()
+    v.enableViewResizing()
 
     # Enable collapsibility
     v.addGestureDetector(newTapGestureDetector(proc(tapPoint: Point) =
