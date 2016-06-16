@@ -57,7 +57,7 @@ proc startApplication() =
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
-    let camera = cameraNode.component(Camera)
+    discard cameraNode.component(Camera)
     cameraNode.translation.z = 100
 
     let light = editView.rootNode.newChild("point_light")
