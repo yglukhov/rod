@@ -35,13 +35,19 @@ method init*(i: InspectorView, r: Rect) =
 proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string): View
 proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): View
 
+proc moveSubviewToBack(v, s: View) =
+    let i = v.subviews.find(s)
+    if i != -1:
+        v.subviews.delete(i)
+        v.subviews.insert(s, 0)
+
 proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
-    if i.subviews.len > 1:
-        i.subviews[1].removeFromSuperview()
+    if i.subviews.len > 0 and (try: ScrollView(i.subviews[0]) != nil except: false):
+        i.subviews[0].removeFromSuperview()
 
     if not n.isNil:
         let propView = View.new(newRect(1, 0, i.bounds.width - 6, 20))
-        propView.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+        propView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
 
         var y = Coord(0)
         var pv: View
@@ -80,7 +86,6 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         var fs = propView.frame.size
         fs.height = y + 15
         propView.setFrameSize(fs)
-        i.addSubview(propView)
 
         i.contentHeight = if fs.height + i.titleHeight + i.frame.y <= i.window.frame.height: fs.height else: i.window.frame.height - i.titleHeight - i.frame.y
         i.collapsed = false
@@ -90,6 +95,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         scView.setFrameOrigin(newPoint(scView.frame.x, i.titleHeight))
         scView.setFrameSize(newSize(i.frame.width, i.contentHeight))
         i.addSubview(scView)
+        i.moveSubviewToBack(scView)
     else:
         i.collapsed = true
 

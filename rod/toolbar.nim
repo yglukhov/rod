@@ -35,6 +35,6 @@ proc updateWidth(v: Toolbar) =
         totalWidth += s.frame.width + xPadding
     v.setFrameSize(newSize(totalWidth, v.frame.height))
 
-proc addSubview*(v: Toolbar, s: View) =
+method addSubview*(v: Toolbar, s: View) =
     procCall v.View.addSubview(s)
     v.updateWidth()
