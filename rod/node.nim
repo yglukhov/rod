@@ -226,7 +226,10 @@ proc worldPos*(n: Node): Vector3 =
     result = n.localToWorld(newVector3())
 
 proc `worldPos=`(n: Node, p: Vector3) =
-    n.translation = n.parent.worldToLocal(p)
+    if n.parent.isNil:
+        n.translation = p
+    else:
+        n.translation = n.parent.worldToLocal(p)
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
