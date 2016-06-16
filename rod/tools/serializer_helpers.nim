@@ -18,6 +18,11 @@ proc getSerializedValue*(j: JsonNode, name: string, val: var int) =
     if not jN.isNil:
         val = jN.getNum().int
 
+proc getSerializedValue*[T: enum](j: JsonNode, name: string, val: var T) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = T(jN.getNum().int)
+
 proc getSerializedValue*(j: JsonNode, name: string, val: var float32) =
     let jN = j{name}
     if not jN.isNil:

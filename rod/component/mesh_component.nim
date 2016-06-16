@@ -582,6 +582,10 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("wireframe", m.material.isWireframe)
     p.visitProperty("gammaCorrect", m.material.gammaCorrection)
 
-    p.visitProperty("debugSkeleton", m.debugSkeleton)
+    if not m.skeleton.isNil:
+        p.visitProperty("isPlayed", m.skeleton.isPlayed)
+        p.visitProperty("isLooped", m.skeleton.isLooped)
+        p.visitProperty("animType", m.skeleton.animType)
+        p.visitProperty("debugSkeleton", m.debugSkeleton)
 
 registerComponent[MeshComponent]()

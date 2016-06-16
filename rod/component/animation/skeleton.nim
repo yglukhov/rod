@@ -40,6 +40,11 @@ void main()
 """
 
 type
+    AnimationType* = enum
+        Forward
+        Reverse
+        PingPong
+
     AnimationFrame* = ref object
         time*: float
         matrix*: Matrix4
@@ -66,6 +71,12 @@ type
         boneIdTable*: Table[int16, Bone]
         nameToIdTable*: Table[string, int16]
 
+        isPlayed*: bool
+        isPaused: bool
+        currAnimTime: float
+        isLooped*: bool
+        animType*: AnimationType
+
 proc newAnimationTrack*(): AnimationTrack =
     result = AnimationTrack.new()
     result.frames = newSeq[AnimationFrame]()
@@ -83,8 +94,6 @@ proc newBone*(): Bone =
     result.children = newSeq[Bone]()
     result.shader = newShader(BoneVertexShader, BoneFragmentShader, @[(0.GLuint, "aPosition")])
     result.invMatrix.loadIdentity()
-
-    # result.animTrack = newAnimationTrack()
 
 proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
     let gl = currentContext().gl
@@ -164,6 +173,10 @@ proc newSkeleton*(): Skeleton =
     result.startTime = epochTime()
     result.animDuration = 1.0
 
+    result.animType = AnimationType.Forward
+    result.currAnimTime = 0.0
+    result.isPlayed = true
+
     result.bonetable = initTable[string, Bone]()
     result.nameToIdTable = initTable[string, int16]()
     result.boneIdTable = initTable[int16, Bone]()
@@ -183,6 +196,10 @@ proc setBones*(s: Skeleton, bone: Bone) =
     s.rootBone = bone
     s.prepareRecursive(s.rootBone)
 
+    var mat: Matrix4
+    mat.loadIdentity()
+    s.rootBone.update(0.0, mat)
+
 proc getBone*(s: Skeleton, name: string): Bone =
     result = s.boneTable[name]
 
@@ -192,15 +209,52 @@ proc getBone*(s: Skeleton, id: int16): Bone =
 proc getBoneIdByName*(s: Skeleton, name: string): int16 =
     result = s.nameToIdTable[name]
 
-proc update*(s: Skeleton) =
-    var time = epochTime() - s.startTime
-    if time > s.animDuration:
-        time = 0
+proc play(s: Skeleton) =
+    if s.isPaused:
+        s.startTime = epochTime() - s.currAnimTime
+    else:
+        s.currAnimTime = 0.0
         s.startTime = epochTime()
+
+    s.isPlayed = true
+    s.isPaused = false
+
+proc stop(s: Skeleton) =
+    s.isPlayed = false
+
+proc pause(s: Skeleton) =
+    s.isPaused = true
+
+proc update*(s: Skeleton) =
+    if s.isPlayed == false or s.isPaused == true:
+        return
+
+    var time = epochTime() - s.startTime
+    if s.isLooped == false:
+        if s.animType == AnimationType.Forward:
+            s.currAnimTime = time
+            if s.currAnimTime > s.animDuration:
+                s.stop()
+
+        if s.animType == AnimationType.Reverse:
+            s.currAnimTime = s.animDuration - time
+            if s.currAnimTime < 0.0:
+                s.stop()
+
+    elif s.isLooped:
+        if s.animType == AnimationType.Forward:
+            s.currAnimTime = time
+            if s.currAnimTime > s.animDuration:
+                s.startTime = epochTime()
+
+        if s.animType == AnimationType.Reverse:
+            s.currAnimTime = s.animDuration - time
+            if s.currAnimTime < 0.0:
+                s.startTime = epochTime()
 
     var mat: Matrix4
     mat.loadIdentity()
-    s.rootBone.update(time, mat)
+    s.rootBone.update(s.currAnimTime, mat)
 
 proc debugDraw*(s: Skeleton) =
     var mat: Matrix4
@@ -238,6 +292,9 @@ proc deserialize*(s: var Skeleton, j: JsonNode) =
         return
 
     j.getSerializedValue("animDuration", s.animDuration)
+    j.getSerializedValue("isPlayed", s.isPlayed)
+    j.getSerializedValue("isLooped", s.isLooped)
+    j.getSerializedValue("animType", s.animType)
 
     var jNode = j{"rootBone"}
     if not jNode.isNil:

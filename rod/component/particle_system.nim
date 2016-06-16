@@ -827,11 +827,8 @@ method deserialize*(ps: ParticleSystem, j: JsonNode) =
     j.getSerializedValue("distance", ps.distance)
     j.getSerializedValue("speed", ps.speed)
 
-    var scaleM, colorM: int
-    j.getSerializedValue("scaleMode", scaleM)
-    j.getSerializedValue("colorMode", colorM)
-    ps.scaleMode = ParticleModeEnum(scaleM)
-    ps.colorMode = ParticleModeEnum(colorM)
+    j.getSerializedValue("scaleMode", ps.scaleMode)
+    j.getSerializedValue("colorMode", ps.colorMode)
     j.getSerializedValue("scaleSeq", ps.scaleSeq)
     j.getSerializedValue("colorSeq", ps.colorSeq)
 
