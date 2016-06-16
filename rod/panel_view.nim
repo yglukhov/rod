@@ -8,17 +8,12 @@ import nimx.types
 import nimx.composition
 import nimx.gesture_detector_newtouch
 import nimx.view
+import view_dragging_listener
 
 type PanelView* = ref object of View
     collapsible*: bool
     mCollapsed: bool
     contentHeight*: Coord
-
-# PanelView drag implementation
-
-type PanelScrollListener = ref object of OnScrollListener
-    panel: PanelView
-    diff: Point
 
 template titleHeight*(v: PanelView): Coord = Coord(27)
 
@@ -28,17 +23,6 @@ proc `collapsed=`*(v: PanelView, f: bool) =
     v.setNeedsDisplay()
 
 template collapsed*(v: PanelView): bool = v.mCollapsed
-
-proc newPanelScrollListener(v: PanelView): PanelScrollListener =
-    result.new
-    result.panel = v
-
-method onTapDown(ls: PanelScrollListener, e: var Event) =
-    ls.diff = e.localPosition
-
-method onScrollProgress(ls: PanelScrollListener, dx, dy : float32, e : var Event) =
-    ls.panel.setFrameOrigin(e.position - ls.diff)
-    ls.panel.setNeedsDisplay()
 
 # PanelView implementation
 
@@ -50,7 +34,7 @@ method init*(v: PanelView, r: Rect) =
     v.contentHeight = r.height - v.titleHeight
 
     # Enable dragging
-    v.addGestureDetector(newScrollGestureDetector(newPanelScrollListener(v)))
+    v.enableDraggingByBackground()
 
     # Enable collapsibility
     v.addGestureDetector(newTapGestureDetector(proc(tapPoint: Point) =
