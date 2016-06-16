@@ -46,13 +46,16 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         var y = Coord(0)
         var pv: View
 
+        proc cahngeInspectorView() =
+            i.inspectedNode = n
+
         var visitor : PropertyVisitor
         visitor.requireName = true
         visitor.requireSetter = true
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback )
+            pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, cahngeInspectorView)
             pv.setFrameOrigin(newPoint(6, y))
             pv.setFrameSize(newSize(pv.frame.width - 16.Coord, pv.frame.height))
             y += pv.frame.height

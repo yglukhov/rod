@@ -75,3 +75,14 @@ proc getSerializedValue*(j: JsonNode, name: string, val: var seq[Glfloat]) =
     if not jN.isNil:
         for i in 0 ..< jN.len:
             val.add( jN[i].getFnum() )
+
+proc getSerializedValue*[T: TVector](j: JsonNode, name: string, val: var seq[T]) =
+    let jN = j{name}
+    if not jN.isNil:
+        for i in 0 ..< jN.len:
+            var seqVal: T
+            const vecLen = high(T) + 1
+            for j in 0 ..< vecLen:
+                seqVal[j] = jN[i][j].getFnum()
+
+            val.add( seqVal )
