@@ -43,7 +43,7 @@ proc startApplication() =
     let cameraNode = editView.viewport.rootNode.newChild("camera")
     let camera = cameraNode.component(Camera)
     camera.projectionMode = cpOrtho
-    cameraNode.translation.z = 1
+    cameraNode.positionZ = 1
 
     camera.manualGetProjectionMatrix = proc(bounds: Rect, mat: var Matrix4) =
         let logicalWidth = bounds.width

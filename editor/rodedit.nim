@@ -57,22 +57,24 @@ proc startApplication() =
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
-    let camera = cameraNode.component(Camera)
-    cameraNode.translation.z = 100
+    discard cameraNode.component(Camera)
+    cameraNode.positionZ = 100
 
     let light = editView.rootNode.newChild("point_light")
-    light.translation = newVector3(-100,100,100)
+    light.position = newVector3(-100,100,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
-    loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
-        editView.rootNode.addChild(n)
+    mainWindow.addSubview(editView)
+    discard startEditingNodeInView(editView.rootNode, editView, false)
+    # loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
+    #     editView.rootNode.addChild(n)
 
-        mainWindow.addSubview(editView)
+    #     mainWindow.addSubview(editView)
 
-        registerAnimation(n, editView)
+    #     registerAnimation(n, editView)
 
-        discard startEditingNodeInView(editView.rootNode, editView)
+    #     discard startEditingNodeInView(editView.rootNode, editView)
 
     runAutoTestsIfNeeded()
 

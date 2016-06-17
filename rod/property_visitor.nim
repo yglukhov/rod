@@ -1,6 +1,7 @@
 import nimx.types
 import nimx.matrixes
 
+import tables
 import variant
 
 type SetterAndGetter*[T] = tuple[setter: proc(v: T), getter: proc(): T]
@@ -8,6 +9,10 @@ type SetterAndGetter*[T] = tuple[setter: proc(v: T), getter: proc(): T]
 type PropertyFlag* = enum
     pfEditable
     pfAnimatable
+
+type EnumValue* = object
+    possibleValues*: Table[string, int]
+    curValue*: int
 
 type PropertyVisitor* = object of RootObj
     qualifiers: seq[string]
@@ -35,11 +40,26 @@ proc popQualifier*(p: var PropertyVisitor) =
 
 template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, defFlags: set[PropertyFlag] = { pfEditable, pfAnimatable }) =
     if (defFlags * p.flags) != {}:
-        var sng : SetterAndGetter[type(s)]
+        when s is enum:
+            var sng : SetterAndGetter[EnumValue]
+        else:
+            var sng : SetterAndGetter[type(s)]
+
         if p.requireSetter:
-            sng.setter = proc(v: type(s)) = s = v
+            when s is enum:
+                sng.setter = proc(v: EnumValue) =
+                    s = type(s)(v.curValue)
+            else:
+                sng.setter = proc(v: type(s)) = s = v
         if p.requireGetter:
-            sng.getter = proc(): type(s) = s
+            when s is enum:
+                sng.getter = proc(): EnumValue =
+                    result.possibleValues = initTable[string, int]()
+                    for i in low(type(s)) .. high(type(s)):
+                        result.possibleValues[$i] = ord(i)
+                    result.curValue = ord(s)
+            else:
+                sng.getter = proc(): type(s) = s
         if p.requireName:
             p.name = propName
         p.setterAndGetter = newVariant(sng)
@@ -49,11 +69,26 @@ template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, defFla
 template visitProperty*(p: PropertyVisitor, propName: string, s: untyped, onChange: proc()) =
     var defFlags = { pfEditable, pfAnimatable }
     if (defFlags * p.flags) != {}:
-        var sng : SetterAndGetter[type(s)]
+        when s is enum:
+            var sng : SetterAndGetter[EnumValue]
+        else:
+            var sng : SetterAndGetter[type(s)]
+
         if p.requireSetter:
-            sng.setter = proc(v: type(s)) = s = v
+            when s is enum:
+                sng.setter = proc(v: EnumValue) =
+                    s = type(s)(v.curValue)
+            else:
+                sng.setter = proc(v: type(s)) = s = v
         if p.requireGetter:
-            sng.getter = proc(): type(s) = s
+            when s is enum:
+                sng.getter = proc(): EnumValue =
+                    result.possibleValues = initTable[string, int]()
+                    for i in low(type(s)) .. high(type(s)):
+                        result.possibleValues[$i] = ord(i)
+                    result.curValue = ord(s)
+            else:
+                sng.getter = proc(): type(s) = s
         if p.requireName:
             p.name = propName
         p.setterAndGetter = newVariant(sng)

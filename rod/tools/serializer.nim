@@ -11,6 +11,7 @@ import nimx.pathutils
 import nimx.matrixes
 
 import rod.rod_types
+import rod.node
 import rod.component
 import rod.component.material
 import rod.component.sprite
@@ -19,14 +20,10 @@ import rod.component.text_component
 import rod.component.mesh_component
 import rod.component.particle_system
 import rod.component.particle_helpers
+import rod.component.animation.skeleton
 
 type Serializer* = ref object
     savePath*: string
-
-proc `%`*[T](elements: openArray[T]): JsonNode =
-    result = newJArray()
-    for elem in elements:
-        result.add(%elem)
 
 proc vectorToJNode[T](vec: T): JsonNode =
     result = newJArray()
@@ -39,6 +36,9 @@ proc `%`*(n: Node): JsonNode =
     else:
         result = newJString("")
 
+proc `%`*[T: enum](v: T): JsonNode =
+    result = newJInt(v.ord)
+
 proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
     result = vectorToJNode(vec)
 
@@ -49,6 +49,11 @@ proc `%`*(v: Color): JsonNode =
     result = newJArray()
     for k, val in v.fieldPairs:
         result.add( %val )
+
+proc `%`*[T](elements: openArray[T]): JsonNode =
+    result = newJArray()
+    for elem in elements:
+        result.add(%elem)
 
 proc colorToJNode(color:Color): JsonNode =
     result = newJArray()
@@ -84,13 +89,17 @@ method getComponentData(s: Serializer, c: Sprite): JsonNode =
     for img in c.images:
         imagesNode.add( %s.getRelativeResourcePath(img.filePath()) )
 
-
 method getComponentData(s: Serializer, c: LightSource): JsonNode =
     result = newJObject()
     result.add("ambient", %c.lightAmbient)
     result.add("diffuse", %c.lightDiffuse)
     result.add("specular", %c.lightSpecular)
     result.add("constant", %c.lightConstant)
+    result.add("linear", %c.lightLinear)
+    result.add("quadratic", %c.lightQuadratic)
+    result.add("is_precomp_attenuation", %c.lightAttenuationInited)
+    result.add("attenuation", %c.lightAttenuation)
+    result.add("color", %c.lightColor)
 
 method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result = newJObject()
@@ -113,6 +122,12 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("dstColor", %c.dstColor)
     result.add("isBlendAdd", %c.isBlendAdd)
     result.add("gravity", %c.gravity)
+
+    result.add("scaleMode", %c.scaleMode)
+    result.add("colorMode", %c.colorMode)
+    result.add("scaleSeq", %c.scaleSeq)
+    result.add("colorSeq", %c.colorSeq)
+
     if c.texture.filePath().len > 0:
         result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
         result.add("isTextureAnimated", %c.isTextureAnimated)
@@ -153,6 +168,36 @@ method getComponentData(s: Serializer, c: WavePSAttractor): JsonNode =
     result.add("forceValue", %c.forceValue)
     result.add("frequence", %c.frequence)
 
+
+proc getAnimationTrackData(s: Serializer, track: AnimationTrack): JsonNode =
+    result = newJArray()
+    for frame in track.frames:
+        var frameNode = newJObject()
+        frameNode.add("time", %frame.time)
+        frameNode.add("matrix", %frame.matrix)
+        result.add(frameNode)
+
+proc getBonesData(s: Serializer, bone: Bone): JsonNode =
+    result = newJObject()
+    result.add("name", %bone.name)
+    result.add("id", %bone.id)
+    result.add("startMatrix", %bone.startMatrix)
+    result.add("invMatrix", %bone.invMatrix)
+    result.add("animTrack", s.getAnimationTrackData(bone.animTrack))
+
+    var childrenNode = newJArray()
+    result.add("children", childrenNode)
+    for child in bone.children:
+        childrenNode.add( s.getBonesData(child) )
+
+proc getSkeletonData(s: Serializer, skeleton: Skeleton): JsonNode =
+    result = newJObject()
+    result.add("animDuration", %skeleton.animDuration)
+    result.add("isPlayed", %skeleton.isPlayed)
+    result.add("isLooped", %skeleton.isLooped)
+    result.add("animType", %skeleton.animType)
+    result.add("rootBone", s.getBonesData(skeleton.rootBone))
+
 method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result = newJObject()
 
@@ -161,7 +206,6 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("diffuse", colorToJNode(c.material.diffuse))
     result.add("specular", colorToJNode(c.material.specular))
     result.add("shininess", %c.material.shininess)
-    result.add("reflectivity", %c.material.reflectivity)
     result.add("rim_density", %c.material.rim_density)
 
     result.add("culling", %c.material.bEnableBackfaceCulling)
@@ -170,8 +214,27 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     result.add("depth_test", %c.material.depthEnable)
     result.add("wireframe", %c.material.isWireframe)
     result.add("RIM", %c.material.isRIM)
+    result.add("rimColor", colorToJNode(c.material.rimColor))
+
     result.add("sRGB_normal", %c.material.isNormalSRGB)
 
+    result.add("matcapPercent", %c.material.matcapPercent)
+    result.add("matcapInterpolatePercent", %c.material.matcapInterpolatePercent)
+    result.add("albedoPercent", %c.material.albedoPercent)
+    result.add("glossPercent", %c.material.glossPercent)
+    result.add("specularPercent", %c.material.specularPercent)
+    result.add("normalPercent", %c.material.normalPercent)
+    result.add("bumpPercent", %c.material.bumpPercent)
+    result.add("reflectionPercent", %c.material.reflectionPercent)
+    result.add("falloffPercent", %c.material.falloffPercent)
+    result.add("maskPercent", %c.material.maskPercent)
+
+    result.add("matcapMixPercent", %c.material.matcapMixPercent)
+
+    if not c.material.matcapTexture.isNil:
+        result.add("matcapTexture",  %s.getRelativeResourcePath(c.material.matcapTexture.filePath()))
+    if not c.material.matcapInterpolateTexture.isNil:
+        result.add("matcapInterpolateTexture",  %s.getRelativeResourcePath(c.material.matcapInterpolateTexture.filePath()))
     if not c.material.albedoTexture.isNil:
         result.add("albedoTexture",  %s.getRelativeResourcePath(c.material.albedoTexture.filePath()))
     if not c.material.glossTexture.isNil:
@@ -214,11 +277,15 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
     for v in ib:
         ibNode.add(%int32(v))
 
+    if not c.skeleton.isNil:
+        result.add("skeleton", s.getSkeletonData(c.skeleton))
+        result["vertexWeights"] = %c.vertexWeights
+        result["boneIDs"] = %c.boneIDs
 
 proc getNodeData(s: Serializer, n: Node): JsonNode =
     result = newJObject()
     result.add("name", %n.name)
-    result.add("translation", vectorToJNode(n.translation))
+    result.add("translation", vectorToJNode(n.position))
     result.add("scale", vectorToJNode(n.scale))
     result.add("rotation", vectorToJNode(n.rotation))
     result.add("alpha", %n.alpha)

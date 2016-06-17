@@ -1,16 +1,16 @@
-import json
+import tables
 import nimx.view
 import nimx.text_field
+import nimx.font
 
 import rod.node
 import rod.property_visitor
 import variant
-import tables
 import rod.meta_data
 
 type PropertyEditorView* = ref object of View
-    onActionGetJson*: proc(j: JsonNode)
     onChange*: proc()
+    changeInspector*: proc()
 
 var propEditors = initTable[TypeId, proc(n: Node, v: Variant): PropertyEditorView]()
 
@@ -24,25 +24,36 @@ proc registerPropertyEditor*[T](createView: proc(setter: proc(s: T), getter: pro
         let sng = v.get(SetterAndGetter[T])
         result = createView(sng.setter, sng.getter)
 
-proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCallback: proc()): View =
+var gEditorFont: Font
+
+proc editorFont*(): Font =
+    if gEditorFont.isNil: gEditorFont = systemFontOfSize(14)
+    result = gEditorFont
+
+const editorRowHeight* = 16
+
+proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCallback, changeInspectorCallback: proc()): View =
     let creator = propEditors.getOrDefault(v.typeId)
-    result = View.new(newRect(6, 6, 328, 36))
-    let label = newLabel(newRect(6, 6, 100, 36))
+    result = View.new(newRect(0, 0, 328, editorRowHeight))
+    result.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+    let label = newLabel(newRect(0, 0, 100, editorRowHeight))
     label.textColor = newGrayColor(0.9)
     label.text = title & ":"
+    label.font = editorFont()
     result.addSubview(label)
     if creator.isNil:
         label.text = title & " - Unknown property"
     else:
         let editor = creator(n, v)
-        var sz = result.frame.size
-        sz.height = editor.frame.height
-        editor.setFrameOrigin(newPoint(label.frame.width, 12))
-        editor.setFrameSize(sz)
-        sz = newSize(result.bounds.width - label.frame.width - 12, editor.frame.height)
+        editor.setFrameOrigin(newPoint(label.frame.width, 0))
+        var sz = newSize(result.bounds.width - label.frame.width, editor.frame.height)
         editor.setFrameSize(sz)
         editor.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
         result.addSubview(editor)
 
-        editor.onChange = onChangeCallback
+        sz = result.frame.size
+        sz.height = editor.frame.height
+        result.setFrameSize(sz)
 
+        editor.onChange = onChangeCallback
+        editor.changeInspector = changeInspectorCallback

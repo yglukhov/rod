@@ -8,35 +8,21 @@ import nimx.types
 import nimx.composition
 import nimx.gesture_detector_newtouch
 import nimx.view
+import view_dragging_listener
 
 type PanelView* = ref object of View
     collapsible*: bool
     mCollapsed: bool
-    fullHeight*: Coord
+    contentHeight*: Coord
 
-# PanelView drag implementation
-
-type PanelScrollListener = ref object of OnScrollListener
-    panel: PanelView
-    diff: Point
+template titleHeight*(v: PanelView): Coord = Coord(27)
 
 proc `collapsed=`*(v: PanelView, f: bool) =
     v.mCollapsed = f
-    v.setFrameSize(newSize(v.frame.size.width, if v.mCollapsed: 27.Coord else: v.fullHeight))
+    v.setFrameSize(newSize(v.frame.size.width, if v.mCollapsed: v.titleHeight else: v.titleHeight + v.contentHeight))
     v.setNeedsDisplay()
 
 template collapsed*(v: PanelView): bool = v.mCollapsed
-
-proc newPanelScrollListener(v: PanelView): PanelScrollListener =
-    result.new
-    result.panel = v
-
-method onTapDown(ls: PanelScrollListener, e: var Event) =
-    ls.diff = e.localPosition
-
-method onScrollProgress(ls: PanelScrollListener, dx, dy : float32, e : var Event) =
-    ls.panel.setFrameOrigin(e.position - ls.diff)
-    ls.panel.setNeedsDisplay()
 
 # PanelView implementation
 
@@ -45,15 +31,15 @@ method init*(v: PanelView, r: Rect) =
     v.backgroundColor = newColor(0.5, 0.5, 0.5, 0.5)
     v.mCollapsed = false
     v.collapsible = false
-    v.fullHeight = r.height
+    v.contentHeight = r.height - v.titleHeight
 
-    # Enable dragging
-    v.addGestureDetector(newScrollGestureDetector(newPanelScrollListener(v)))
+    v.enableDraggingByBackground()
+    v.enableViewResizing()
 
     # Enable collapsibility
     v.addGestureDetector(newTapGestureDetector(proc(tapPoint: Point) =
         let innerPoint = tapPoint - v.frame.origin
-        if innerPoint.x > 0 and innerPoint.x < 27 and innerPoint.y > 0 and innerPoint.y < 27:
+        if innerPoint.x > 0 and innerPoint.x < v.titleHeight and innerPoint.y > 0 and innerPoint.y < v.titleHeight:
             if v.collapsible:
                 v.collapsed = not v.collapsed
     ))
@@ -71,7 +57,6 @@ void compose() {
 proc drawDisclosureTriangle(disclosed: bool, r: Rect) =
     disclosureTriangleComposition.draw r:
         setUniform("uAngle", if disclosed: Coord(PI / 2.0) else: Coord(0))
-    discard
 
 var gradientComposition = newComposition """
 void compose() {
@@ -99,15 +84,12 @@ method draw(v: PanelView, r: Rect) =
             # Main panel
             c.fillColor = newGrayColor(0.4, 0.6)
             c.strokeColor = newGrayColor(0.4, 0.6)
-            c.drawRect(newRect(r.x, r.y + 27, r.width, r.height - 27))
+            c.drawRect(newRect(r.x, r.y + v.titleHeight, r.width, r.height - v.titleHeight))
 
             # Collapse button open
-            drawDisclosureTriangle(true, newRect(r.x, r.y, 27, 27))
+            drawDisclosureTriangle(true, newRect(r.x, r.y, v.titleHeight, v.titleHeight))
         else:
-            #v.setFrameSize(newSize(v.frame.size.width, if v.collapsed: 27.Coord else: v.fullHeight))
-            #v.setNeedsDisplay()
-
             # Collapse button close
-            drawDisclosureTriangle(false, newRect(r.x, r.y, 27, 27))
+            drawDisclosureTriangle(false, newRect(r.x, r.y, v.titleHeight, v.titleHeight))
 
 method clipType*(v: PanelView): ClipType = ctDefaultClip

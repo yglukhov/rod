@@ -9,6 +9,7 @@ import node
 import panel_view
 import outline_view
 import inspector_view
+import toolbar
 import rod_types
 
 import nimx.animation
@@ -37,9 +38,29 @@ elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 type EventCatchingView* = ref object of View
+    keyUpDelegate*: proc (event: var Event)
+    keyDownDelegate*: proc (event: var Event)
+    mouseScrrollDelegate*: proc (event: var Event)
 
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
+
+method acceptsFirstResponder(v: EventCatchingView): bool = true
+
+method onKeyUp(v: EventCatchingView, e : var Event): bool =
+    echo "editor onKeyUp ", e.keyCode
+    if not v.keyUpDelegate.isNil:
+        v.keyUpDelegate(e)
+
+method onKeyDown(v: EventCatchingView, e : var Event): bool =
+    echo "editor onKeyUp ", e.keyCode
+    if not v.keyDownDelegate.isNil:
+        v.keyDownDelegate(e)
+
+method onScroll*(v: EventCatchingView, e: var Event): bool =
+    result = true
+    if not v.mouseScrrollDelegate.isNil:
+        v.mouseScrrollDelegate(e)
 
 proc newEventCatchingListener(v: EventCatchingView): EventCatchingListener =
     result.new
@@ -59,6 +80,7 @@ type Editor* = ref object
     rootNode*: Node3D
     eventCatchingView*: EventCatchingView
     treeView*: View
+    toolbar*: Toolbar
     sceneView*: SceneView
     selectedNode*: Node3D
     outlineView*:OutlineView
@@ -66,49 +88,11 @@ type Editor* = ref object
 
 proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
-    cameraNode.translation = newVector3(
-        focusNode.translation.x,
-        focusNode.translation.y,
-        focusNode.translation.z + distance
+    cameraNode.position = newVector3(
+        focusNode.position.x,
+        focusNode.position.y,
+        focusNode.position.z + distance
     )
-
-proc newSettingsView(e: Editor, r: Rect): PanelView =
-    result = PanelView.new(r)
-    result.collapsible = true
-
-    let title = newLabel(newRect(22, 6, 108, 15))
-    title.textColor = whiteColor()
-    title.text = "Editor Settings"
-
-    result.addSubview(title)
-
-    var y: Coord = 36
-    let bgColorLabel = newLabel(newRect(6, y, 50, 20))
-    bgColorLabel.textColor = newGrayColor(0.78)
-    bgColorLabel.text = "Background:"
-
-    result.addSubview(bgColorLabel)
-
-    let bgColorButton = newButton(result, newPoint(102, y), newSize(40, 20), "...")
-    let pv = result
-    bgColorbutton.onAction do():
-        let cPicker = newColorPickerView(newRect(0, 0, 300, 200))
-        cPicker.onColorSelected = proc(c: Color) =
-            currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
-            cPicker.removeFromSuperview()
-        cPicker.setFrameOrigin(newPoint(pv.frame.x - 300, pv.frame.y))
-        pv.window.addSubview(cPicker)
-
-    y += bgColorLabel.frame.height + 6
-
-    let cameraFocusButton = newButton(result, newPoint(6, y), newSize(120, 20), "Zoom Selection")
-    y += 26
-    cameraFocusButton.onAction do():
-        if not e.selectedNode.isNil:
-            let cam = e.rootNode.findNode("camera")
-            if not cam.isNil:
-                e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
-    result.addSubview(cameraFocusButton)
 
 proc getTreeViewIndexPathForNode(editor: Editor, n: Node3D, indexPath: var seq[int]) =
     # running up and calculate the path to the node in the tree
@@ -150,7 +134,7 @@ proc loadNode(editor: Editor): bool =
     return false
 
 proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
-    result = PanelView.new(newRect(0, 0, 200, 600)) #700
+    result = PanelView.new(newRect(0, 0, 200, 500)) #700
     result.collapsible = true
 
     let title = newLabel(newRect(22, 6, 108, 15))
@@ -159,7 +143,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
     result.addSubview(title)
 
-    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 60)) #-40
+    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 60))
     e.outlineView = outlineView
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
@@ -209,14 +193,32 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
 
         inspector.inspectedNode = n
 
+    outlineView.onDragAndDrop = proc(fromIp, toIp: openarray[int]) =
+        let f = outlineView.itemAtIndexPath(fromIp).get(Node3D)
+        var tos = @toIp
+        tos.setLen(tos.len - 1)
+        let t = outlineView.itemAtIndexPath(tos).get(Node3D)
+        let toIndex = toIp[^1]
+        if f.parent == t:
+            let cIndex = t.children.find(f)
+            if toIndex < cIndex:
+                t.children.delete(cIndex)
+                t.children.insert(f, toIndex)
+            elif toIndex > cIndex:
+                t.children.delete(cIndex)
+                t.children.insert(f, toIndex - 1)
+        else:
+            f.removeFromParent()
+            t.insertChild(f, toIndex)
+        outlineView.reloadData()
+
     outlineView.reloadData()
 
     let outlineScrollView = newScrollView(outlineView)
-    outlineScrollView.setFrameSize(newSize(outlineScrollView.frame.size.width, outlineScrollView.frame.size.height - 7))
     result.addSubview(outlineScrollView)
 
     let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
-    # createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     createNodeButton.title = "+"
     createNodeButton.onAction do():
         var sip = outlineView.selectedIndexPath
@@ -234,7 +236,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result.addSubview(createNodeButton)
 
     let deleteNodeButton = Button.new(newRect(24, result.bounds.height - 20, 20, 20))
-    # deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     deleteNodeButton.title = "-"
     deleteNodeButton.onAction do():
         if outlineView.selectedIndexPath.len != 0:
@@ -247,52 +249,11 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
     result.addSubview(deleteNodeButton)
 
     let refreshButton = Button.new(newRect(46, result.bounds.height - 20, 60, 20))
-    # refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+    refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     refreshButton.title = "Refresh"
     refreshButton.onAction do():
         outlineView.reloadData()
     result.addSubview(refreshButton)
-
-    when not defined(android) and not defined(ios):
-        let loadButton = Button.new(newRect(110, result.bounds.height - 20, 60, 20))
-        # loadButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
-        loadButton.title = "Load"
-        loadButton.onAction do():
-            when defined(js):
-                alert("Loading is currenlty availble in native version only.")
-            elif defined(emscripten):
-                discard
-            else:
-                var sip = outlineView.selectedIndexPath
-                var p = e.rootNode
-                if sip.len == 0:
-                    sip.add(0)
-                else:
-                    p = outlineView.itemAtIndexPath(sip).get(Node3D)
-
-                outlineView.expandRow(sip)
-                let path = callDialogFileOpen("Select file")
-                if not isNil(path) and path != "":
-                    loadSceneAsync path, proc(n: Node) =
-                        p.addChild(n)
-                        outlineView.reloadData()
-        result.addSubview(loadButton)
-
-        when not defined(js) and not defined(android) and not defined(ios):
-            let saveButton = Button.new(newRect(110, result.bounds.height - 40, 60, 20))
-            saveButton.title = "Save J"
-            saveButton.onAction do():
-                if outlineView.selectedIndexPath.len > 0:
-                    var selectedNode = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
-                    if not selectedNode.isNil:
-                        discard e.saveNode(selectedNode)
-            result.addSubview(saveButton)
-
-            let loadJButton = Button.new(newRect(50, result.bounds.height - 40, 60, 20))
-            loadJButton.title = "Load J"
-            loadJButton.onAction do():
-                discard e.loadNode()
-            result.addSubview(loadJButton)
 
 proc onTouch*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
@@ -304,7 +265,9 @@ proc onTouch*(editor: Editor, e: var Event) =
 
     if castResult.len > 0:
         castResult.sort( proc (x, y: RayCastInfo): int =
-            result = int(x.distance - y.distance) )
+            result = int(x.distance > y.distance)
+            if abs(x.distance - y.distance) < 0.00001:
+                result = getTreeDistance(x.node, y.node) )
 
         var indexPath = newSeq[int]()
         editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
@@ -313,17 +276,88 @@ proc onTouch*(editor: Editor, e: var Event) =
             editor.outlineView.selectItemAtIndexPath(indexPath)
             editor.outlineView.expandBranch(indexPath)
 
+proc createOpenAndSaveButtons(e: Editor) =
+    when not defined(android) and not defined(ios):
+        let loadButton = Button.new(newRect(0, 0, 60, 20))
+        # loadButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
+        loadButton.title = "Load"
+        loadButton.onAction do():
+            when defined(js):
+                alert("Loading is currenlty availble in native version only.")
+            elif defined(emscripten):
+                discard
+            else:
+                var sip = e.outlineView.selectedIndexPath
+                var p = e.rootNode
+                if sip.len == 0:
+                    sip.add(0)
+                else:
+                    p = e.outlineView.itemAtIndexPath(sip).get(Node3D)
 
-proc startEditingNodeInView*(n: Node3D, v: View): Editor =
+                e.outlineView.expandRow(sip)
+                let path = callDialogFileOpen("Select file")
+                if not isNil(path) and path != "":
+                    loadSceneAsync path, proc(n: Node) =
+                        p.addChild(n)
+                        e.outlineView.reloadData()
+        e.toolbar.addSubview(loadButton)
+
+        when not defined(js) and not defined(android) and not defined(ios):
+            let saveButton = Button.new(newRect(0, 0, 60, 20))
+            saveButton.title = "Save J"
+            saveButton.onAction do():
+                if e.outlineView.selectedIndexPath.len > 0:
+                    var selectedNode = e.outlineView.itemAtIndexPath(e.outlineView.selectedIndexPath).get(Node3D)
+                    if not selectedNode.isNil:
+                        discard e.saveNode(selectedNode)
+            e.toolbar.addSubview(saveButton)
+
+            let loadJButton = Button.new(newRect(0, 0, 60, 20))
+            loadJButton.title = "Load J"
+            loadJButton.onAction do():
+                discard e.loadNode()
+            e.toolbar.addSubview(loadJButton)
+
+proc createZoomSelectionButton(e: Editor) =
+    let b = Button.new(newRect(0, 0, 120, 20))
+    b.title = "Zoom Selection"
+    b.onAction do():
+        if not e.selectedNode.isNil:
+            let cam = e.rootNode.findNode("camera")
+            if not cam.isNil:
+                e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
+    e.toolbar.addSubview(b)
+
+proc createChangeBackgroundColorButton(e: Editor) =
+    let b = Button.new(newRect(0, 0, 130, 20))
+    b.title = "Background Color"
+    var cPicker: ColorPickerView
+    b.onAction do():
+        if cPicker.isNil:
+            cPicker = newColorPickerView(newRect(0, 0, 300, 200))
+            cPicker.onColorSelected = proc(c: Color) =
+                currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
+            let popupPoint = b.convertPointToWindow(newPoint(0, b.bounds.height + 5))
+            cPicker.setFrameOrigin(popupPoint)
+            b.window.addSubview(cPicker)
+        else:
+            cPicker.removeFromSuperview()
+            cPicker = nil
+    e.toolbar.addSubview(b)
+
+proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Editor =
     var editor = Editor.new()
     editor.rootNode = n
     editor.sceneView = n.sceneView # Warning!
 
-    let inspectorView = InspectorView.new(newRect(200, 0, 340, 700))
-    let settingsView = editor.newSettingsView(newRect(v.window.bounds.width - 200, v.window.bounds.height - 200, 200, 200))
+    const toolbarHeight = 30
 
-    # let cam = editor.rootNode.findNode("camera")
-    # editor.cameraController = newEditorCameraController(cam)
+    let inspectorView = InspectorView.new(newRect(200, toolbarHeight, 340, 700))
+
+    editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
+
+    let cam = editor.rootNode.findNode("camera")
+    editor.cameraController = newEditorCameraController(cam)
 
     editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
     let eventListner = editor.eventCatchingView.newEventCatchingListener()
@@ -331,19 +365,43 @@ proc startEditingNodeInView*(n: Node3D, v: View): Editor =
 
     eventListner.tapDownDelegate = proc (event: var Event) =
         editor.onTouch(event)
-    #     editor.cameraController.onTapDown(event)
-    # eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
-    #     editor.cameraController.onScrollProgress(dx, dy, e)
-    # eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
-    #     editor.cameraController.onTapUp(dx, dy, e)
+        editor.cameraController.onTapDown(event)
+    eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
+        editor.cameraController.onScrollProgress(dx, dy, e)
+    eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
+        editor.cameraController.onTapUp(dx, dy, e)
+    editor.eventCatchingView.mouseScrrollDelegate = proc (event: var Event) =
+        editor.cameraController.onMouseScrroll(event)
+    editor.eventCatchingView.keyUpDelegate = proc (event: var Event) =
+        editor.cameraController.onKeyUp(event)
+        if event.keyCode == VirtualKey.F:
+            editor.cameraController.setToNode(editor.selectedNode)
+    editor.eventCatchingView.keyDownDelegate = proc (event: var Event) =
+        editor.cameraController.onKeyDown(event)
 
     v.window.addSubview(editor.eventCatchingView)
 
     editor.treeView = newTreeView(editor, inspectorView)
+    editor.treeView.setFrameOrigin(newPoint(0, toolbarHeight))
     v.window.addSubview(editor.treeView)
 
+    editor.createOpenAndSaveButtons()
+    editor.createZoomSelectionButton()
+    editor.createChangeBackgroundColorButton()
+
     v.window.addSubview(inspectorView)
-    v.window.addSubview(settingsView)
+    v.window.addSubview(editor.toolbar)
+
+    if startFromGame:
+        let closeEditorButton = Button.new(newRect(v.window.bounds.width - 23, 3, 20, 20))
+        closeEditorButton.title = "x"
+        editor.toolbar.addSubview(closeEditorButton)
+        closeEditorButton.onAction do():
+            editor.eventCatchingView.removeFromSuperview()
+            editor.treeView.removeFromSuperview()
+            editor.toolbar.removeFromSuperview()
+            inspectorView.removeFromSuperview()
+            closeEditorButton.removeFromSuperview()
 
     let fpsAnimation = newAnimation()
     v.SceneView.addAnimation(fpsAnimation)

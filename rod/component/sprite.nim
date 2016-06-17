@@ -40,9 +40,9 @@ method draw*(s: Sprite) =
     discard """
     if s.motionBlurRadius != 0:
         var n = s.node
-        var rootOffset = n.translation
+        var rootOffset = n.position
         while not n.isNil:
-            rootOffset -= n.translation
+            rootOffset -= n.position
             n = n.parent
 
         if not i.isNil:
@@ -115,7 +115,10 @@ method rayCast*(s: Sprite, r: Ray, distance: var float32): bool =
     let localRay = r.transform(inv_mat)
     var minCoord = newVector3(-s.offset.x, -s.offset.y, 0.0)
     var maxCoord = newVector3(img.size.width - s.offset.x, img.size.height - s.offset.y, 0.01)
-    result = localRay.intersectWithAABB(minCoord, maxCoord, distance)
+    if s.node.getGlobalAlpha() < 0.0001:
+        result = false
+    else:
+        result = localRay.intersectWithAABB(minCoord, maxCoord, distance)
 
 
 method visitProperties*(t: Sprite, p: var PropertyVisitor) =

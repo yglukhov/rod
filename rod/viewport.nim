@@ -27,7 +27,8 @@ proc `rootNode=`*(v: SceneView, n: Node2D) =
     if not v.mRootNode.isNil:
         v.mRootNode.nodeWillBeRemovedFromSceneView()
     v.mRootNode = n
-    n.nodeWasAddedToSceneView(v)
+    if not n.isNil:
+        n.nodeWasAddedToSceneView(v)
 
 proc camera*(v: SceneView): Camera =
     if v.mCamera.isNil:

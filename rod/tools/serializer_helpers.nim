@@ -3,14 +3,25 @@ import json
 import nimx.image
 import nimx.types
 import nimx.matrixes
+import nimx.portable_gl
 
 import rod.rod_types
 import rod.node
+
+proc getSerializedValue*(j: JsonNode, name: string, val: var string) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getStr()
 
 proc getSerializedValue*(j: JsonNode, name: string, val: var int) =
     let jN = j{name}
     if not jN.isNil:
         val = jN.getNum().int
+
+proc getSerializedValue*[T: enum](j: JsonNode, name: string, val: var T) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = T(jN.getNum().int)
 
 proc getSerializedValue*(j: JsonNode, name: string, val: var float32) =
     let jN = j{name}
@@ -57,3 +68,26 @@ proc getSerializedValue*(j: JsonNode, name: string, val: var Color) =
             val.a = jN[3].getFNum()
         else:
             val.a = 1.0
+
+proc getSerializedValue*(j: JsonNode, name: string, val: var Matrix4) =
+    let jN = j{name}
+    if not jN.isNil:
+        for i in 0 ..< jN.len:
+            val[i] = jN[i].getFnum()
+
+proc getSerializedValue*(j: JsonNode, name: string, val: var seq[Glfloat]) =
+    let jN = j{name}
+    if not jN.isNil:
+        for i in 0 ..< jN.len:
+            val.add( jN[i].getFnum() )
+
+proc getSerializedValue*[T: TVector](j: JsonNode, name: string, val: var seq[T]) =
+    let jN = j{name}
+    if not jN.isNil:
+        for i in 0 ..< jN.len:
+            var seqVal: T
+            const vecLen = high(T) + 1
+            for j in 0 ..< vecLen:
+                seqVal[j] = jN[i][j].getFnum()
+
+            val.add( seqVal )

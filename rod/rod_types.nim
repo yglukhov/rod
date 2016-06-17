@@ -14,9 +14,9 @@ const maxLightsCount* = 8
 
 type
     Node3D* = ref object
-        translation*: Vector3
-        rotation*: Quaternion
-        scale*: Vector3
+        mTranslation*: Vector3
+        mRotation*: Quaternion
+        mScale*: Vector3
         components*: TableRef[string, Component]
         children*: seq[Node3D]
         parent*: Node3D
@@ -24,7 +24,7 @@ type
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
         alpha*: Coord
-        mMetaData*: MetaData
+        isDirty*: bool
 
     Node2D* = Node3D
 
@@ -61,7 +61,7 @@ type
 
     Camera* = ref object of Component
         projectionMode*: CameraProjection
-        zNear*, zFar*: Coord
+        zNear*, zFar*, fov*: Coord
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
 
     UIComponent* = ref object of Component
@@ -76,6 +76,8 @@ type
         mLightQuadratic*: float32
         mLightAttenuation*: float32
 
+        mLightColor*: Color
+
         lightPosInited*: bool
         lightAmbientInited*: bool
         lightDiffuseInited*: bool
@@ -83,4 +85,4 @@ type
         lightConstantInited*: bool
         lightLinearInited*: bool
         lightQuadraticInited*: bool
-        lightAttenuationInited*: bool
+        mLightAttenuationInited*: bool

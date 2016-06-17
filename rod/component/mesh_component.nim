@@ -24,6 +24,9 @@ import rod.component.camera
 import rod.viewport
 import rod.ray
 import rod.rod_types
+import rod.tools.serializer_helpers
+
+import animation.skeleton
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
@@ -49,6 +52,14 @@ type
         bProccesPostEffects*: bool
         prevTransform*: Matrix4
 
+        skeleton*: Skeleton
+        initMesh*: seq[Glfloat]
+        currMesh*: seq[Glfloat]
+        vertexWeights*: seq[Glfloat]
+        boneIDs*: seq[Glfloat]
+
+        debugSkeleton*: bool
+
 var vboCache* = initTable[string, VBOData]()
 
 method init*(m: MeshComponent) =
@@ -59,6 +70,8 @@ method init*(m: MeshComponent) =
     m.vboData.minCoord = newVector3(high(int).Coord, high(int).Coord, high(int).Coord)
     m.vboData.maxCoord = newVector3(low(int).Coord, low(int).Coord, low(int).Coord)
     procCall m.Component.init()
+
+    m.debugSkeleton = false
 
 proc checkMinMax*(m: MeshComponent, x, y, z: float32) =
     if x < m.vboData.minCoord[0]:
@@ -114,146 +127,6 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
         m.loadFunc = loadFunc
     else:
         loadFunc()
-
-proc jNodeToColor(j: JsonNode): Color =
-    result.r = j[0].getFNum()
-    result.g = j[1].getFNum()
-    result.b = j[2].getFNum()
-    result.a = j[3].getFNum()
-
-method deserialize*(m: MeshComponent, j: JsonNode) =
-    if j.isNil:
-        return
-
-    proc getValue(name: string, val: var Color) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = jN.jNodeToColor()
-
-    proc getValue(name: string, val: var float32) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = jN.getFnum()
-
-    proc getValue(name: string, val: var bool) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = jN.getBVal()
-
-    proc getValue(name: string, val: var Image) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = imageWithResource(jN.getStr())
-
-    # getValue("emission", m.material.emission)
-    # getValue("ambient", m.material.ambient)
-    # getValue("diffuse", m.material.diffuse)
-    # getValue("specular", m.material.specular)
-    # getValue("shininess", m.material.shininess)
-    # getValue("reflectivity", m.material.reflectivity)
-    # getValue("rim_density", m.material.rim_density)
-
-    # getValue("culling", m.material.bEnableBackfaceCulling)
-    # getValue("light", m.material.isLightReceiver)
-    # getValue("blend", m.material.blendEnable)
-    # getValue("depth_test", m.material.depthEnable)
-    # getValue("wireframe", m.material.isWireframe)
-    # getValue("RIM", m.material.isRIM)
-    # getValue("sRGB_normal", m.material.isNormalSRGB)
-
-    var jNode = j{"emission"}
-    m.material.emission = jNode.jNodeToColor()
-    jNode = j{"ambient"}
-    m.material.ambient = jNode.jNodeToColor()
-    jNode = j{"diffuse"}
-    m.material.diffuse = jNode.jNodeToColor()
-    jNode = j{"specular"}
-    m.material.specular = jNode.jNodeToColor()
-    jNode = j{"shininess"}
-    m.material.shininess = jNode.getFnum()
-    jNode = j{"reflectivity"}
-    m.material.reflectivity = jNode.getFnum()
-    jNode = j{"rim_density"}
-    m.material.rim_density = jNode.getFnum()
-
-    jNode = j{"culling"}
-    m.material.bEnableBackfaceCulling = jNode.getBVal()
-    jNode = j{"light"}
-    m.material.isLightReceiver = jNode.getBVal()
-    jNode = j{"blend"}
-    m.material.blendEnable = jNode.getBVal()
-    jNode = j{"depth_test"}
-    m.material.depthEnable = jNode.getBVal()
-    jNode = j{"wireframe"}
-    m.material.isWireframe = jNode.getBVal()
-    jNode = j{"RIM"}
-    m.material.isRIM = jNode.getBVal()
-    jNode = j{"sRGB_normal"}
-    m.material.isNormalSRGB = jNode.getBVal()
-
-    proc getTexture(name: string): Image =
-        let jNode = j{name}
-        if not jNode.isNil:
-            result = imageWithResource(jNode.getStr())
-
-    m.material.albedoTexture = getTexture("albedoTexture")
-    m.material.glossTexture = getTexture("glossTexture")
-    m.material.specularTexture = getTexture("specularTexture")
-    m.material.normalTexture = getTexture("normalTexture")
-    m.material.bumpTexture = getTexture("bumpTexture")
-    m.material.reflectionTexture = getTexture("reflectionTexture")
-    m.material.falloffTexture = getTexture("falloffTexture")
-    m.material.maskTexture = getTexture("maskTexture")
-
-    proc getAttribs(name: string): seq[float32] =
-        result = newSeq[float32]()
-        jNode = j{name}
-        if not jNode.isNil:
-            for v in jNode:
-                result.add(v.getFNum())
-
-    var vertCoords = getAttribs("vertex_coords")
-    var texCoords = getAttribs("tex_coords")
-    var normals = getAttribs("normals")
-    var tangents = getAttribs("tangents")
-
-    jNode = j{"indices"}
-    var indices = newSeq[GLushort]()
-    if not jNode.isNil:
-        for v in jNode:
-            indices.add( GLushort(v.getNum()) )
-
-    m.vboData.vertInfo = newVertexInfoWithVertexData(vertCoords.len, texCoords.len, normals.len, tangents.len)
-
-    let stride = int32( m.vboData.vertInfo.stride / sizeof(GLfloat) )
-    let size = int32(vertCoords.len * stride / 3)
-    var vertexData = newSeq[GLfloat](size)
-    for i in 0 ..< int32(vertCoords.len / 3):
-        var offset = 0
-        vertexData[stride * i + 0] = vertCoords[3*i + 0]
-        vertexData[stride * i + 1] = vertCoords[3*i + 1]
-        vertexData[stride * i + 2] = vertCoords[3*i + 2]
-        m.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
-        offset += 3
-
-        if texCoords.len != 0:
-            vertexData[stride * i + offset + 0] = texCoords[2*i + 0]
-            vertexData[stride * i + offset + 1] = texCoords[2*i + 1]
-            offset += 2
-
-        if normals.len != 0:
-            vertexData[stride * i + offset + 0] = normals[3*i + 0]
-            vertexData[stride * i + offset + 1] = normals[3*i + 1]
-            vertexData[stride * i + offset + 2] = normals[3*i + 2]
-            offset += 3
-
-        if tangents.len != 0:
-            vertexData[stride * i + offset + 0] = tangents[3*i + 0]
-            vertexData[stride * i + offset + 1] = tangents[3*i + 1]
-            vertexData[stride * i + offset + 2] = tangents[3*i + 2]
-            offset += 3
-
-    m.createVBO(indices, vertexData)
 
 
 proc loadMeshComponent(m: MeshComponent, resourceName: string) =
@@ -357,7 +230,36 @@ proc setupAndDraw*(m: MeshComponent) =
     if m.material.bEnableBackfaceCulling:
         gl.enable(gl.CULL_FACE)
 
+    if not m.skeleton.isNil:
+        m.skeleton.update()
+
+        let stride = int(m.vboData.vertInfo.stride / sizeof(Glfloat))
+        let vertCount = int(m.currMesh.len / stride)
+        for i in 0 ..< vertCount:
+            var pos: Vector3
+            var initPos: Vector3
+            initPos.x = m.initMesh[stride * i + 0]
+            initPos.y = m.initMesh[stride * i + 1]
+            initPos.z = m.initMesh[stride * i + 2]
+
+            for j in 0 ..< 4:
+                let index = 4*i + j
+                if m.vertexWeights[index] > 0.0:
+                    let bone = m.skeleton.getBone( m.boneIDs[index].int16 )
+                    # let resMatrix = bone.matrix * bone.invMatrix
+                    var transformedPos: Vector3
+                    bone.matrix.multiply( initPos, transformedPos )
+                    pos += transformedPos * m.vertexWeights[index]
+
+            m.currMesh[stride * i + 0] = pos.x
+            m.currMesh[stride * i + 1] = pos.y
+            m.currMesh[stride * i + 2] = pos.z
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
+        gl.bufferData(gl.ARRAY_BUFFER, m.currMesh, gl.STATIC_DRAW)
+
     gl.drawElements(gl.TRIANGLES, m.vboData.numberOfIndices, gl.UNSIGNED_SHORT)
+
 
 method draw*(m: MeshComponent) =
     let c = currentContext()
@@ -389,10 +291,15 @@ method draw*(m: MeshComponent) =
     gl.activeTexture(gl.TEXTURE0)
     gl.enable(gl.BLEND)
 
+    if m.debugSkeleton and not m.skeleton.isNil:
+        m.skeleton.debugDraw()
+
 proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
         when defined(js):
             asm "`gl`.BufferSubData(`target`, `offset`, new Uint16Array(`data`));"
+        elif defined(android):
+            echo "android dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
 
@@ -405,10 +312,17 @@ proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
 
     getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
 
+
+# --------- read data from VBO ------------
 proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
+    if not c.skeleton.isNil:
+        return c.initMesh
+
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLfloat]) =
         when defined(js):
             asm "`gl`.BufferSubData(`target`, `offset`, new Float32Array(`data`));"
+        elif defined(android):
+            echo "android dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
 
@@ -456,27 +370,208 @@ method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
         return false
 
     let localRay = r.transform(inv_mat)
-    result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
+    if c.node.getGlobalAlpha() < 0.0001:
+        result = false
+    else:
+        result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
+
+proc jNodeToColor(j: JsonNode): Color =
+    result.r = j[0].getFNum()
+    result.g = j[1].getFNum()
+    result.b = j[2].getFNum()
+    result.a = j[3].getFNum()
+
+method deserialize*(m: MeshComponent, j: JsonNode) =
+    if j.isNil:
+        return
+
+    proc getValue(name: string, val: var Color) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = jN.jNodeToColor()
+
+    proc getValue(name: string, val: var float32) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = jN.getFnum()
+
+    proc getValue(name: string, val: var bool) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = jN.getBVal()
+
+    proc getValue(name: string, val: var Image) =
+        let jN = j{name}
+        if not jN.isNil:
+            val = imageWithResource(jN.getStr())
+
+    var jNode = j{"emission"}
+    m.material.emission = jNode.jNodeToColor()
+    jNode = j{"ambient"}
+    m.material.ambient = jNode.jNodeToColor()
+    jNode = j{"diffuse"}
+    m.material.diffuse = jNode.jNodeToColor()
+    jNode = j{"specular"}
+    m.material.specular = jNode.jNodeToColor()
+    jNode = j{"shininess"}
+    m.material.shininess = jNode.getFnum()
+    jNode = j{"rim_density"}
+    m.material.rim_density = jNode.getFnum()
+    jNode = j{"rimColor"}
+    if not jNode.isNil: m.material.rimColor = jNode.jNodeToColor()
+
+    jNode = j{"culling"}
+    m.material.bEnableBackfaceCulling = jNode.getBVal()
+    jNode = j{"light"}
+    m.material.isLightReceiver = jNode.getBVal()
+    jNode = j{"blend"}
+    m.material.blendEnable = jNode.getBVal()
+    jNode = j{"depth_test"}
+    m.material.depthEnable = jNode.getBVal()
+    jNode = j{"wireframe"}
+    m.material.isWireframe = jNode.getBVal()
+    jNode = j{"RIM"}
+    m.material.isRIM = jNode.getBVal()
+    jNode = j{"sRGB_normal"}
+    m.material.isNormalSRGB = jNode.getBVal()
+
+    jNode = j{"matcapPercent"}
+    if not jNode.isNil:
+        m.material.matcapPercent = jNode.getFnum()
+    jNode = j{"matcapInterpolatePercent"}
+    if not jNode.isNil:
+        m.material.matcapInterpolatePercent = jNode.getFnum()
+    jNode = j{"matcapMixPercent"}
+    if not jNode.isNil:
+        m.material.matcapMixPercent = jNode.getFnum()
+    jNode = j{"albedoPercent"}
+    if not jNode.isNil:
+        m.material.albedoPercent = jNode.getFnum()
+    jNode = j{"glossPercent"}
+    if not jNode.isNil:
+        m.material.glossPercent = jNode.getFnum()
+    jNode = j{"specularPercent"}
+    if not jNode.isNil:
+        m.material.specularPercent = jNode.getFnum()
+    jNode = j{"normalPercent"}
+    if not jNode.isNil:
+        m.material.normalPercent = jNode.getFnum()
+    jNode = j{"bumpPercent"}
+    if not jNode.isNil:
+        m.material.bumpPercent = jNode.getFnum()
+    jNode = j{"reflectionPercent"}
+    if not jNode.isNil:
+        m.material.reflectionPercent = jNode.getFnum()
+    jNode = j{"falloffPercent"}
+    if not jNode.isNil:
+        m.material.falloffPercent = jNode.getFnum()
+    jNode = j{"maskPercent"}
+    if not jNode.isNil:
+        m.material.maskPercent = jNode.getFnum()
+
+    proc getTexture(name: string): Image =
+        let jNode = j{name}
+        if not jNode.isNil:
+            result = imageWithResource(jNode.getStr())
+
+    m.material.matcapTexture = getTexture("matcapTexture")
+    m.material.matcapInterpolateTexture = getTexture("matcapInterpolateTexture")
+    m.material.albedoTexture = getTexture("albedoTexture")
+    m.material.glossTexture = getTexture("glossTexture")
+    m.material.specularTexture = getTexture("specularTexture")
+    m.material.normalTexture = getTexture("normalTexture")
+    m.material.bumpTexture = getTexture("bumpTexture")
+    m.material.reflectionTexture = getTexture("reflectionTexture")
+    m.material.falloffTexture = getTexture("falloffTexture")
+    m.material.maskTexture = getTexture("maskTexture")
+
+    proc getAttribs(name: string): seq[float32] =
+        result = newSeq[float32]()
+        jNode = j{name}
+        if not jNode.isNil:
+            for v in jNode:
+                result.add(v.getFNum())
+
+    var vertCoords = getAttribs("vertex_coords")
+    var texCoords = getAttribs("tex_coords")
+    var normals = getAttribs("normals")
+    var tangents = getAttribs("tangents")
+
+    jNode = j{"indices"}
+    var indices = newSeq[GLushort]()
+    if not jNode.isNil:
+        for v in jNode:
+            indices.add( GLushort(v.getNum()) )
+
+    m.vboData.vertInfo = newVertexInfoWithVertexData(vertCoords.len, texCoords.len, normals.len, tangents.len)
+
+    let stride = int32( m.vboData.vertInfo.stride / sizeof(GLfloat) )
+    let size = int32(vertCoords.len * stride / 3)
+    var vertexData = newSeq[GLfloat](size)
+    for i in 0 ..< int32(vertCoords.len / 3):
+        var offset = 0
+        vertexData[stride * i + 0] = vertCoords[3*i + 0]
+        vertexData[stride * i + 1] = vertCoords[3*i + 1]
+        vertexData[stride * i + 2] = vertCoords[3*i + 2]
+        m.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
+        offset += 3
+
+        if texCoords.len != 0:
+            vertexData[stride * i + offset + 0] = texCoords[2*i + 0]
+            vertexData[stride * i + offset + 1] = texCoords[2*i + 1]
+            offset += 2
+
+        if normals.len != 0:
+            vertexData[stride * i + offset + 0] = normals[3*i + 0]
+            vertexData[stride * i + offset + 1] = normals[3*i + 1]
+            vertexData[stride * i + offset + 2] = normals[3*i + 2]
+            offset += 3
+
+        if tangents.len != 0:
+            vertexData[stride * i + offset + 0] = tangents[3*i + 0]
+            vertexData[stride * i + offset + 1] = tangents[3*i + 1]
+            vertexData[stride * i + offset + 2] = tangents[3*i + 2]
+            offset += 3
+
+    m.createVBO(indices, vertexData)
+
+    jNode = j{"skeleton"}
+    if not jNode.isNil:
+        m.skeleton = newSkeleton()
+        m.skeleton.deserialize(jNode)
+
+        m.initMesh = vertexData
+        m.currMesh = vertexData
+
+        m.vertexWeights = newSeq[Glfloat]()
+        m.boneIDs = newSeq[Glfloat]()
+        j.getSerializedValue("vertexWeights", m.vertexWeights)
+        j.getSerializedValue("boneIDs", m.boneIDs)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
+
+    # p.visitProperty("material", m.material)
+
     p.visitProperty("emission", m.material.emission)
     p.visitProperty("ambient", m.material.ambient)
     p.visitProperty("diffuse", m.material.diffuse)
     p.visitProperty("specular", m.material.specular)
     p.visitProperty("shininess", m.material.shininess)
-    p.visitProperty("reflectivity", m.material.reflectivity)
 
     p.visitProperty("RIM color", m.material.rimColor)
     p.visitProperty("RIM density", m.material.rimDensity)
     p.visitProperty("RIM enable", m.material.isRIM)
 
-    p.visitProperty("albedoTexture", m.material.albedoTexture)
-    p.visitProperty("glossTexture", m.material.glossTexture)
-    p.visitProperty("specularTexture", m.material.specularTexture)
-    p.visitProperty("normalTexture", m.material.normalTexture)
-    p.visitProperty("reflectionTexture", m.material.reflectionTexture)
-    p.visitProperty("maskTexture", m.material.maskTexture)
-    p.visitProperty("matcapTexture", m.material.matcapTexture)
+    p.visitProperty("albedoTexture", (m.material.albedoTexture, m.material.albedoPercent))
+    p.visitProperty("diffuseTexture", (m.material.glossTexture, m.material.glossPercent))
+    p.visitProperty("specularTexture", (m.material.specularTexture, m.material.specularPercent))
+    p.visitProperty("normalTexture", (m.material.normalTexture, m.material.normalPercent))
+    p.visitProperty("reflectionTexture", (m.material.reflectionTexture, m.material.reflectionPercent))
+    p.visitProperty("maskTexture", (m.material.maskTexture, m.material.maskPercent))
+    p.visitProperty("matcapTexture", (m.material.matcapTexture, m.material.matcapPercent))
+    p.visitProperty("matcapInterTexture", (m.material.matcapInterpolateTexture, m.material.matcapInterpolatePercent))
+
+    p.visitProperty("matcapInterPercent", m.material.matcapMixPercent)
 
     p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
@@ -485,5 +580,12 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("blend", m.material.blendEnable)
     p.visitProperty("depth test", m.material.depthEnable)
     p.visitProperty("wireframe", m.material.isWireframe)
+    p.visitProperty("gammaCorrect", m.material.gammaCorrection)
+
+    if not m.skeleton.isNil:
+        p.visitProperty("isPlayed", m.skeleton.isPlayed)
+        p.visitProperty("isLooped", m.skeleton.isLooped)
+        p.visitProperty("animType", m.skeleton.animType)
+        p.visitProperty("debugSkeleton", m.debugSkeleton)
 
 registerComponent[MeshComponent]()

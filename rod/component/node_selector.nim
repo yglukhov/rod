@@ -55,7 +55,7 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
             ns.modelMatrix.scale(mesh.vboData.maxCoord - mesh.vboData.minCoord)
             return true
         let sprite = n.componentIfAvailable(Sprite)
-        if not sprite.isNil:
+        if not sprite.isNil and not sprite.image.isNil:
             let w = sprite.image.size.width
             let h = sprite.image.size.height
             ns.modelMatrix = n.worldTransform()
@@ -65,6 +65,7 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
         let light = n.componentIfAvailable(LightSource)
         if not light.isNil:
             let size = 10.0
+            ns.color = light.lightColor
             ns.modelMatrix = n.worldTransform()
             # ns.modelMatrix.translate(newVector3(size/2.0, size/2.0, size/2.0) )
             ns.modelMatrix.scale(newVector3(size, size, size))
