@@ -74,6 +74,18 @@ proc rotation*(n: Node): Quaternion = n.mRotation
 proc `rotation=`*(n: Node, r: Quaternion) = 
     n.mRotation = r
     n.isDirty = true
+proc `rotationX=`*(n: Node, vx: float) = 
+    n.mRotation.x = vx
+    n.isDirty = true
+proc `rotationY=`*(n: Node, vy: float) = 
+    n.mRotation.y = vy
+    n.isDirty = true
+proc `rotationZ=`*(n: Node, vz: float) = 
+    n.mRotation.z = vz
+    n.isDirty = true
+proc `rotationW=`*(n: Node, vw: float) = 
+    n.mRotation.w = vw
+    n.isDirty = true
 
 template scale*(n: Node): Vector3 = n.mScale
 proc `scale=`*(n: Node, s: Vector3) = 
