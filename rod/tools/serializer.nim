@@ -11,6 +11,7 @@ import nimx.pathutils
 import nimx.matrixes
 
 import rod.rod_types
+import rod.node
 import rod.component
 import rod.component.material
 import rod.component.sprite
@@ -284,7 +285,7 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
 proc getNodeData(s: Serializer, n: Node): JsonNode =
     result = newJObject()
     result.add("name", %n.name)
-    result.add("translation", vectorToJNode(n.translation))
+    result.add("translation", vectorToJNode(n.position))
     result.add("scale", vectorToJNode(n.scale))
     result.add("rotation", vectorToJNode(n.rotation))
     result.add("alpha", %n.alpha)

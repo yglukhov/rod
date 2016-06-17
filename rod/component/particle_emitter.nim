@@ -121,7 +121,7 @@ template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: fl
 
 template drawParticle(p: ParticleEmitter, part: ParticleData) =
     let proto = p.particlePrototype
-    proto.translation = part.coord
+    proto.position = part.coord
     proto.rotation = part.rotation
     proto.scale = part.scale
     let pc = proto.component(Particle)
