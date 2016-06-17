@@ -11,6 +11,7 @@ import nimx.pathutils
 import nimx.matrixes
 
 import rod.rod_types
+import rod.node
 import rod.component
 import rod.component.material
 import rod.component.sprite
@@ -34,6 +35,9 @@ proc `%`*(n: Node): JsonNode =
         result = newJString(n.name)
     else:
         result = newJString("")
+
+proc `%`*[T: enum](v: T): JsonNode =
+    result = newJInt(v.ord)
 
 proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
     result = vectorToJNode(vec)
@@ -119,8 +123,8 @@ method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
     result.add("isBlendAdd", %c.isBlendAdd)
     result.add("gravity", %c.gravity)
 
-    result.add("scaleMode", %c.scaleMode.ord)
-    result.add("colorMode", %c.colorMode.ord)
+    result.add("scaleMode", %c.scaleMode)
+    result.add("colorMode", %c.colorMode)
     result.add("scaleSeq", %c.scaleSeq)
     result.add("colorSeq", %c.colorSeq)
 
@@ -189,6 +193,9 @@ proc getBonesData(s: Serializer, bone: Bone): JsonNode =
 proc getSkeletonData(s: Serializer, skeleton: Skeleton): JsonNode =
     result = newJObject()
     result.add("animDuration", %skeleton.animDuration)
+    result.add("isPlayed", %skeleton.isPlayed)
+    result.add("isLooped", %skeleton.isLooped)
+    result.add("animType", %skeleton.animType)
     result.add("rootBone", s.getBonesData(skeleton.rootBone))
 
 method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
@@ -278,7 +285,7 @@ method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
 proc getNodeData(s: Serializer, n: Node): JsonNode =
     result = newJObject()
     result.add("name", %n.name)
-    result.add("translation", vectorToJNode(n.translation))
+    result.add("translation", vectorToJNode(n.position))
     result.add("scale", vectorToJNode(n.scale))
     result.add("rotation", vectorToJNode(n.rotation))
     result.add("alpha", %n.alpha)

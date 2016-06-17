@@ -643,10 +643,10 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
 
 proc update(ps: ParticleSystem, dt: float) =
     if ps.isMove:
-        ps.node.translation.x += ps.speed * dt
-        ps.node.translation.y = ps.amplitude * cos(ps.node.translation.x * ps.frequency)
-        if ps.node.translation.x > ps.distance / 2.0:
-            ps.node.translation.x = -ps.distance / 2.0;
+        ps.node.positionX = ps.node.positionX + ps.speed * dt
+        ps.node.positionY = ps.amplitude * cos(ps.node.positionX * ps.frequency)
+        if ps.node.positionX > ps.distance / 2.0:
+            ps.node.positionX = -ps.distance / 2.0;
 
     let perParticleTime = 1.0 / ps.birthRate
     let curTime = epochTime()
@@ -827,11 +827,8 @@ method deserialize*(ps: ParticleSystem, j: JsonNode) =
     j.getSerializedValue("distance", ps.distance)
     j.getSerializedValue("speed", ps.speed)
 
-    var scaleM, colorM: int
-    j.getSerializedValue("scaleMode", scaleM)
-    j.getSerializedValue("colorMode", colorM)
-    ps.scaleMode = ParticleModeEnum(scaleM)
-    ps.colorMode = ParticleModeEnum(colorM)
+    j.getSerializedValue("scaleMode", ps.scaleMode)
+    j.getSerializedValue("colorMode", ps.colorMode)
     j.getSerializedValue("scaleSeq", ps.scaleSeq)
     j.getSerializedValue("colorSeq", ps.colorSeq)
 

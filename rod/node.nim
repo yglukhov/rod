@@ -26,11 +26,71 @@ import rod.component
 
 proc newNode*(name: string = nil): Node =
     result.new()
-    result.scale = newVector3(1, 1, 1)
-    result.rotation = newQuaternion()
+    result.mScale = newVector3(1, 1, 1)
+    result.mRotation = newQuaternion()
     result.children = @[]
     result.name = name
     result.alpha = 1.0
+    result.isDirty = true
+
+template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation 
+proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
+    n.mTranslation = p
+    n.isDirty = true
+
+proc `translate=`*(n: Node, p: Vector3) =
+    n.mTranslation += p
+    n.isDirty = true
+proc `translateX=`*(n: Node, vx: float) =
+    n.mTranslation.x += vx
+    n.isDirty = true
+proc `translateY=`*(n: Node, vy: float) =
+    n.mTranslation.y += vy
+    n.isDirty = true
+proc `translateZ=`*(n: Node, vz: float) =
+    n.mTranslation.z += vz
+    n.isDirty = true
+
+proc position*(n: Node): Vector3 = n.mTranslation
+proc positionX*(n: Node): float = n.mTranslation.x
+proc positionY*(n: Node): float = n.mTranslation.y
+proc positionZ*(n: Node): float = n.mTranslation.z
+
+proc `position=`*(n: Node, p: Vector3) = 
+    n.mTranslation = p
+    n.isDirty = true
+    
+proc `positionX=`*(n: Node, x: float) = 
+    n.mTranslation.x = x
+    n.isDirty = true
+proc `positionY=`*(n: Node, y: float) = 
+    n.mTranslation.y = y
+    n.isDirty = true
+proc `positionZ=`*(n: Node, z: float) = 
+    n.mTranslation.z = z
+    n.isDirty = true
+
+proc rotation*(n: Node): Quaternion = n.mRotation
+proc `rotation=`*(n: Node, r: Quaternion) = 
+    n.mRotation = r
+    n.isDirty = true
+proc `rotationX=`*(n: Node, vx: float) = 
+    n.mRotation.x = vx
+    n.isDirty = true
+proc `rotationY=`*(n: Node, vy: float) = 
+    n.mRotation.y = vy
+    n.isDirty = true
+proc `rotationZ=`*(n: Node, vz: float) = 
+    n.mRotation.z = vz
+    n.isDirty = true
+proc `rotationW=`*(n: Node, vw: float) = 
+    n.mRotation.w = vw
+    n.isDirty = true
+
+template scale*(n: Node): Vector3 = n.mScale
+proc `scale=`*(n: Node, s: Vector3) = 
+    n.mScale = s
+    n.isDirty = true
 
 proc createComponentForNode(n: Node, name: string): Component =
     result = createComponent(name)
@@ -94,13 +154,13 @@ proc recursiveUpdate*(n: Node) =
     for c in n.children: c.recursiveUpdate()
 
 proc makeTransform(n: Node): Matrix4 =
-    var rot = n.rotation.toMatrix4()
+    var rot = n.mRotation.toMatrix4()
 
     # // Set up final matrix with scale, rotation and translation
-    result[0] = n.scale.x * rot[0]; result[1] = n.scale.x * rot[1]; result[2] = n.scale.x * rot[2];
-    result[4] = n.scale.y * rot[4]; result[5] = n.scale.y * rot[5]; result[6] = n.scale.y * rot[6];
-    result[8] = n.scale.z * rot[8]; result[9] = n.scale.z * rot[9]; result[10] = n.scale.z * rot[10];
-    result[12] = n.translation.x;  result[13] = n.translation.y; result[14] = n.translation.z;
+    result[0] = n.mScale.x * rot[0]; result[1] = n.mScale.x * rot[1]; result[2] = n.mScale.x * rot[2];
+    result[4] = n.mScale.y * rot[4]; result[5] = n.mScale.y * rot[5]; result[6] = n.mScale.y * rot[6];
+    result[8] = n.mScale.z * rot[8]; result[9] = n.mScale.z * rot[9]; result[10] = n.mScale.z * rot[10];
+    result[12] = n.position.x;  result[13] = n.position.y; result[14] = n.position.z;
 
     # // No projection term
     result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
@@ -226,29 +286,32 @@ proc worldPos*(n: Node): Vector3 =
     result = n.localToWorld(newVector3())
 
 proc `worldPos=`(n: Node, p: Vector3) =
-    n.translation = n.parent.worldToLocal(p)
+    if n.parent.isNil:
+        n.mTranslation = p
+    else:
+        n.mTranslation = n.parent.worldToLocal(p)
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
-    p.visitProperty("translation", n.translation)
+    p.visitProperty("translation", n.mTranslation)
     p.visitProperty("worldPos", n.worldPos)
-    p.visitProperty("scale", n.scale)
-    p.visitProperty("rotation", n.rotation)
+    p.visitProperty("scale", n.mScale)
+    p.visitProperty("rotation", n.mRotation)
     p.visitProperty("alpha", n.alpha)
 
-    p.visitProperty("tX", n.translation.x, { pfAnimatable })
-    p.visitProperty("tY", n.translation.y, { pfAnimatable })
-    p.visitProperty("tZ", n.translation.z, { pfAnimatable })
-    p.visitProperty("sX", n.scale.x, { pfAnimatable })
-    p.visitProperty("sY", n.scale.y, { pfAnimatable })
-    p.visitProperty("sZ", n.scale.z, { pfAnimatable })
+    p.visitProperty("tX", n.mTranslation.x, { pfAnimatable })
+    p.visitProperty("tY", n.mTranslation.y, { pfAnimatable })
+    p.visitProperty("tZ", n.mTranslation.z, { pfAnimatable })
+    p.visitProperty("sX", n.mScale.x, { pfAnimatable })
+    p.visitProperty("sY", n.mScale.y, { pfAnimatable })
+    p.visitProperty("sZ", n.mScale.z, { pfAnimatable })
 
 proc reparentTo*(n, newParent: Node) =
     # Change parent of a node preserving its world transform
     let oldWorldTransform = n.worldTransform
     newParent.addChild(n)
     let newTransform = newParent.worldTransform.inversed() * oldWorldTransform
-    n.translation = translationFromMatrix(newTransform)
+    n.mTranslation = translationFromMatrix(newTransform)
 
 proc animationNamed*(n: Node, name: string, preserveHandlers: bool = false): Animation =
     if not n.animations.isNil:
@@ -299,7 +362,7 @@ proc deserialize*(n: Node, j: JsonNode) =
         n.name = j["name"].getStr(nil)
     var v = j{"translation"}
     if not v.isNil:
-        n.translation = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
+        n.position = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
     v = j{"scale"}
     if not v.isNil:
         n.scale = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())

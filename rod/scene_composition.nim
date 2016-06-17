@@ -232,7 +232,7 @@ proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: Collada
         modelMatrix.transpose()
         if modelMatrix.tryGetTranslationFromModel(translation) and modelMatrix.tryGetScaleRotationFromModel(scale, rotation):
             node.scale = scale
-            node.translation = translation
+            node.position = translation
             node.rotation = newQuaternion(rotation[0], rotation[1], rotation[2], rotation[3])
     else:
         if cn.scale != nil:
@@ -241,7 +241,7 @@ proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: Collada
 
         if cn.translation != nil:
             let translation = parseArray3(cn.translation)
-            node.translation = newVector3(translation[0], translation[1], translation[2])
+            node.position = newVector3(translation[0], translation[1], translation[2])
 
         var finalRotation = newQuaternion(0, 0, 0, 1)
 
