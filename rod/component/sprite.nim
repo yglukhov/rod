@@ -40,9 +40,9 @@ method draw*(s: Sprite) =
     discard """
     if s.motionBlurRadius != 0:
         var n = s.node
-        var rootOffset = n.translation
+        var rootOffset = n.position
         while not n.isNil:
-            rootOffset -= n.translation
+            rootOffset -= n.position
             n = n.parent
 
         if not i.isNil:

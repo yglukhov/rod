@@ -88,10 +88,10 @@ type Editor* = ref object
 
 proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
-    cameraNode.translation = newVector3(
-        focusNode.translation.x,
-        focusNode.translation.y,
-        focusNode.translation.z + distance
+    cameraNode.position = newVector3(
+        focusNode.position.x,
+        focusNode.position.y,
+        focusNode.position.z + distance
     )
 
 proc getTreeViewIndexPathForNode(editor: Editor, n: Node3D, indexPath: var seq[int]) =
