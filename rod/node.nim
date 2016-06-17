@@ -70,12 +70,12 @@ proc `positionZ=`*(n: Node, z: float) =
     n.mTranslation.z = z
     n.isDirty = true
 
-template rotation*(n: Node): Quaternion = n.mRotation
+proc rotation*(n: Node): Quaternion = n.mRotation
 proc `rotation=`*(n: Node, r: Quaternion) = 
     n.mRotation = r
     n.isDirty = true
-template scale*(n: Node): Vector3 = n.mScale
 
+template scale*(n: Node): Vector3 = n.mScale
 proc `scale=`*(n: Node, s: Vector3) = 
     n.mScale = s
     n.isDirty = true
