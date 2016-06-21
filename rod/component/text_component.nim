@@ -7,6 +7,8 @@ import nimx.view
 import rod.node
 import rod.component
 import rod.property_visitor
+import rod.component.camera
+import rod.viewport
 
 type TextJustification* = enum
     tjLeft
@@ -94,9 +96,19 @@ method draw*(t: Text) =
             wsv.normalize()
             wsv *= sv.length
 
-            p.x = px + wsv.x
-            p.y = py + wsv.y
+            var worldScale = newVector3(1.0)
+            var worldRotation: Vector4
+            discard t.node.worldTransform.tryGetScaleRotationFromModel(worldScale, worldRotation)
+
+            let view = t.node.sceneView
+            var projMatrix : Matrix4
+            view.camera.getProjectionMatrix(view.bounds, projMatrix)
+            let y_direction = abs(projMatrix[5]) / projMatrix[5]
+
+            p.x = px + wsv.x / abs(worldScale.x)
+            p.y = py - y_direction * wsv.y / abs(worldScale.y)
             c.drawText(t.font, p, t.mText)
+
             p.x = px
             p.y = py
 
