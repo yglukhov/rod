@@ -42,6 +42,7 @@ type
         viewMatrixCached*: Matrix4
         mCamera*: Camera
         mRootNode*: Node3D
+        animationRunner*: AnimationRunner
         #view*: View
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int
