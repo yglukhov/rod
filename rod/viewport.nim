@@ -257,6 +257,8 @@ method viewDidMoveToWindow*(v:SceneView)=
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
     if w.isNil:
         v.viewOnExit()
+
+    if not v.window.isNil:
         v.window.removeAnimationRunner(v.animationRunner)
 
     procCall v.View.viewWillMoveToWindow(w)
