@@ -19,11 +19,12 @@ type
         mScale*: Vector3
         components*: TableRef[string, Component]
         children*: seq[Node3D]
-        parent*: Node3D
+        mParent*: Node3D
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
         alpha*: Coord
+        mMatrix*: Matrix4
         isDirty*: bool
 
     Node2D* = Node3D

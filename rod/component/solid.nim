@@ -4,6 +4,7 @@ import nimx.types
 import nimx.context
 import nimx.matrixes
 
+import rod.node
 import rod.component
 import rod.property_visitor
 
