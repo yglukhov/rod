@@ -5,12 +5,13 @@ import nimx.button
 import nimx.matrixes
 import nimx.menu
 import nimx.scroll_view
+import nimx.panel_view
+import nimx.linear_layout
 
 import variant
 
 export view
 
-import panel_view
 import node
 import component
 import rod_types
@@ -19,7 +20,6 @@ import property_visitor
 import property_editors.propedit_registry
 import property_editors.standard_editors
 
-import rod.linear_layout
 
 type InspectorView* = ref object of PanelView
 

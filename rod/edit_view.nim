@@ -4,14 +4,14 @@ import algorithm
 import nimx.view
 import nimx.types
 import nimx.button
+import nimx.outline_view
 
 import node
-import panel_view
-import outline_view
 import inspector_view
 import toolbar
 import rod_types
 
+import nimx.panel_view
 import nimx.animation
 import nimx.color_picker
 import nimx.context
