@@ -78,14 +78,5 @@ proc startApplication() =
 
     runAutoTestsIfNeeded()
 
-when defined js:
-    import dom
-    dom.window.onload = proc (e: Event) =
-        startApplication()
-else:
-    try:
-        startApplication()
-        runUntilQuit()
-    except:
-        logi "Exception caught: ", getCurrentExceptionMsg()
-        logi getCurrentException().getStackTrace()
+runApplication:
+    startApplication()
