@@ -5,10 +5,10 @@ import nimx.view
 import nimx.types
 import nimx.button
 import nimx.outline_view
+import nimx.toolbar
 
 import node
 import inspector_view
-import toolbar
 import rod_types
 
 import nimx.panel_view
