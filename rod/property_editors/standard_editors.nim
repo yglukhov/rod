@@ -28,7 +28,6 @@ elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 var gColorPicker*: ColorPickerView
-var currEditedNode: Node
 
 template toStr(v: SomeReal, precision: uint): string = formatFloat(v, ffDecimal, precision)
 template toStr(v: SomeInteger): string = $v
@@ -212,7 +211,7 @@ when not defined(android) and not defined(ios):
     type ImagePercent = tuple
         s: Image
         v: float32
-    proc newMaterialImagePropertyView(setter: proc(t: ImagePercent), getter: proc(): ImagePercent ): PropertyEditorView =
+    proc newMaterialImagePropertyView(editedNode: Node, setter: proc(t: ImagePercent), getter: proc(): ImagePercent): PropertyEditorView =
         let pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
 
         var loadedImage = getter().s
@@ -262,30 +261,27 @@ when not defined(android) and not defined(ios):
         result.addSubview(bOpen)
         result.addSubview(bRemove)
 
-        if not currEditedNode.isNil:
-            let meshComp = currEditedNode.componentIfAvailable(MeshComponent)
-            if not meshComp.isNil:
-                let tf = newNumericTextField(newRect(180, 0, 50, editorRowHeight))
-                tf.text = toStr(getter().v, tf.precision)
-                tf.onAction do():
-                    try:
-                        var v: float32
-                        fromStr(tf.text, v)
-                        var t:ImagePercent
-                        t.s = if not loadedImage.isNil: loadedImage else: getter().s
-                        t.v = v.float32
-                        setter(t)
-                        if not pv.onChange.isNil:
-                            pv.onChange()
-                    except ValueError:
-                        discard
-                result.addSubview(tf)
+        let meshComp = editedNode.componentIfAvailable(MeshComponent)
+        if not meshComp.isNil:
+            let tf = newNumericTextField(newRect(180, 0, 50, editorRowHeight))
+            tf.text = toStr(getter().v, tf.precision)
+            tf.onAction do():
+                try:
+                    var v: float32
+                    fromStr(tf.text, v)
+                    var t:ImagePercent
+                    t.s = if not loadedImage.isNil: loadedImage else: getter().s
+                    t.v = v.float32
+                    setter(t)
+                    if not pv.onChange.isNil:
+                        pv.onChange()
+                except ValueError:
+                    discard
+            result.addSubview(tf)
 
     registerPropertyEditor(newMaterialImagePropertyView)
 
 proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc(): Node): PropertyEditorView =
-    currEditedNode = editedNode
-
     let textField = newTextField(newRect(0, 0, 200, editorRowHeight))
     textField.font = editorFont()
     textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
@@ -299,9 +295,7 @@ proc newNodePropertyView(editedNode: Node, setter: proc(s: Node), getter: proc()
     result = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
     result.addSubview(textField)
 
-proc newBoolPropertyView(editedNode: Node, setter: proc(s: bool), getter: proc(): bool): PropertyEditorView =
-    currEditedNode = editedNode
-
+proc newBoolPropertyView(setter: proc(s: bool), getter: proc(): bool): PropertyEditorView =
     let pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
     let cb = newCheckbox(newRect(0, 0, editorRowHeight, editorRowHeight))
     cb.value = if getter(): 1 else: 0
