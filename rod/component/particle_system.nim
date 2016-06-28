@@ -544,7 +544,8 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             ps.particles[i].velocity += ps.attractor.getForceAtPoint(ps.particles[i].position)
 
         if ps.airDensity > 0.0:
-            var density_vec = ps.particles[i].velocity.normalized()
+            var density_vec = ps.particles[i].velocity
+            density_vec.normalize()
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
 
         ps.particles[i].velocity.x += ps.gravity.x*dt
