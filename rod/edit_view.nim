@@ -116,7 +116,9 @@ proc saveNode(editor: Editor, selectedNode: Node3D): bool =
         let path = callDialogFileSave("Save Json")
         if not path.isNil:
             var s = Serializer.new()
-            s.save(selectedNode, path)
+            var sData = selectedNode.serialize(s)
+            s.save(sData, path)
+            # s.save(selectedNode, path)
 
     return false
 

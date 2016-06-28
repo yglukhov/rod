@@ -7,7 +7,7 @@ import rod.quaternion
 import rod.component
 import rod.rod_types
 import rod.property_visitor
-import rod.tools.serializer_helpers
+import rod.tools.serializer
 
 import nimx.matrixes
 import nimx.animation
@@ -71,13 +71,19 @@ method generate*(pgs: ConePSGenShape): ParticleGenerationData =
         result.position = pos
         result.direction = dir
 
-method deserialize*(pgs: ConePSGenShape, j: JsonNode) =
+method deserialize*(pgs: ConePSGenShape, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
 
-    j.getSerializedValue("angle", pgs.angle)
-    j.getSerializedValue("radius", pgs.radius)
-    j.getSerializedValue("is2D", pgs.is2D)
+    s.deserializeValue(j, "angle", pgs.angle)
+    s.deserializeValue(j, "radius", pgs.radius)
+    s.deserializeValue(j, "is2D", pgs.is2D)
+
+method serialize*(c: ConePSGenShape, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("angle", s.getValue(c.angle))
+    result.add("radius", s.getValue(c.radius))
+    result.add("is2D", s.getValue(c.is2D))
 
 method visitProperties*(pgs: ConePSGenShape, p: var PropertyVisitor) =
     p.visitProperty("angle", pgs.angle)
@@ -125,14 +131,21 @@ method generate*(pgs: SpherePSGenShape): ParticleGenerationData =
     else:
         result.generateRandDir(pgs.is2D)
 
-method deserialize*(pgs: SpherePSGenShape, j: JsonNode) =
+method deserialize*(pgs: SpherePSGenShape, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
 
-    j.getSerializedValue("radius", pgs.radius)
-    j.getSerializedValue("is2D", pgs.is2D)
-    j.getSerializedValue("isRandPos", pgs.isRandPos)
-    j.getSerializedValue("isRandDir", pgs.isRandDir)
+    s.deserializeValue(j, "radius", pgs.radius)
+    s.deserializeValue(j, "is2D", pgs.is2D)
+    s.deserializeValue(j, "isRandPos", pgs.isRandPos)
+    s.deserializeValue(j, "isRandDir", pgs.isRandDir)
+
+method serialize*(c: SpherePSGenShape, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("radius", s.getValue(c.radius))
+    result.add("isRandPos", s.getValue(c.isRandPos))
+    result.add("isRandDir", s.getValue(c.isRandDir))
+    result.add("is2D", s.getValue(c.is2D))
 
 method visitProperties*(pgs: SpherePSGenShape, p: var PropertyVisitor) =
     p.visitProperty("radius", pgs.radius)
@@ -151,12 +164,17 @@ method generate*(pgs: BoxPSGenShape): ParticleGenerationData =
     else:
         result.position = newVector3(random(-d.x .. d.x), random(-d.y .. d.y), random(-d.z .. d.z))
 
-method deserialize*(pgs: BoxPSGenShape, j: JsonNode) =
+method deserialize*(pgs: BoxPSGenShape, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
 
-    j.getSerializedValue("dimension", pgs.dimension)
-    j.getSerializedValue("is2D", pgs.is2D)
+    s.deserializeValue(j, "dimension", pgs.dimension)
+    s.deserializeValue(j, "is2D", pgs.is2D)
+
+method serialize*(c: BoxPSGenShape, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("dimension", s.getValue(c.dimension))
+    result.add("is2D", s.getValue(c.is2D))
 
 method visitProperties*(pgs: BoxPSGenShape, p: var PropertyVisitor) =
     p.visitProperty("dimension", pgs.dimension)
@@ -171,13 +189,17 @@ method getForceAtPoint*(attr: WavePSAttractor, point: Vector3): Vector3 =
     # result.y = -point.y * attr.forceValue
     result.y = cos(point.x / attr.frequence) * attr.forceValue
 
-method deserialize*(attr: WavePSAttractor, j: JsonNode) =
+method deserialize*(attr: WavePSAttractor, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
 
-    j.getSerializedValue("forceValue", attr.forceValue)
-    j.getSerializedValue("frequence", attr.frequence)
+    s.deserializeValue(j, "forceValue", attr.forceValue)
+    s.deserializeValue(j, "frequence", attr.frequence)
 
+method serialize*(c: WavePSAttractor, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("forceValue", s.getValue(c.forceValue))
+    result.add("frequence", s.getValue(c.frequence))
 
 method visitProperties*(attr: WavePSAttractor, p: var PropertyVisitor) =
     p.visitProperty("forceValue", attr.forceValue)

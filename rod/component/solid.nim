@@ -7,6 +7,7 @@ import nimx.matrixes
 import rod.node
 import rod.component
 import rod.property_visitor
+import rod.tools.serializer
 
 type Solid* = ref object of Component
     size*: Size
@@ -15,7 +16,7 @@ type Solid* = ref object of Component
 method init*(s: Solid) =
     s.color = whiteColor()
 
-method deserialize*(s: Solid, j: JsonNode) =
+method deserialize*(s: Solid, j: JsonNode, serializer: Serializer) =
     var v = j{"color"}
     if not v.isNil:
         s.color = newColor(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())

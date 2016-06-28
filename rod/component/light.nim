@@ -7,6 +7,7 @@ import rod.component
 import rod.viewport
 import rod.node
 import rod.property_visitor
+import rod.tools.serializer
 
 export LightSource
 
@@ -75,7 +76,7 @@ method componentNodeWasAddedToSceneView*(ls: LightSource) =
 method componentNodeWillBeRemovedFromSceneView(ls: LightSource) =
     ls.node.sceneView.removeLightSource(ls)
 
-method deserialize*(ls: LightSource, j: JsonNode) =
+method deserialize*(ls: LightSource, j: JsonNode, s: Serializer) =
     var v = j{"ambient"}
     if not v.isNil:
         ls.lightAmbient = v.getFNum()
@@ -114,6 +115,18 @@ method deserialize*(ls: LightSource, j: JsonNode) =
         ls.lightColor.g = v[1].getFNum()
         ls.lightColor.b = v[2].getFNum()
         ls.lightColor.a = v[3].getFNum()
+
+method serialize*(c: LightSource, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("ambient", s.getValue(c.lightAmbient))
+    result.add("diffuse", s.getValue(c.lightDiffuse))
+    result.add("specular", s.getValue(c.lightSpecular))
+    result.add("constant", s.getValue(c.lightConstant))
+    result.add("linear", s.getValue(c.lightLinear))
+    result.add("quadratic", s.getValue(c.lightQuadratic))
+    result.add("is_precomp_attenuation", s.getValue(c.lightAttenuationInited))
+    result.add("attenuation", s.getValue(c.lightAttenuation))
+    result.add("color", s.getValue(c.lightColor))
 
 method visitProperties*(ls: LightSource, p: var PropertyVisitor) =
     p.visitProperty("ambient", ls.lightAmbient)

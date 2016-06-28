@@ -15,7 +15,7 @@ import nimx.view
 import quaternion
 import property_visitor
 import ray
-import meta_data
+import rod.tools.serializer
 
 import rod_types
 export Node
@@ -218,6 +218,30 @@ proc recursiveDraw*(n: Node) =
             for c in n.children: c.recursiveDraw()
     c.alpha = oldAlpha
 
+proc findNode*(n: Node, p: proc(n: Node): bool): Node =
+    if p(n):
+        result = n
+    else:
+        for c in n.children:
+            result = c.findNode(p)
+            if not result.isNil: break
+
+proc findNode*(n: Node, name: string): Node =
+    n.findNode proc(n: Node): bool =
+        n.name == name
+
+
+let nodeLoadRefTable = newTable[string, proc(nodeValue: Node)]()
+template addNodeRef*(refNode: var Node, name: string) =
+    let refProc = proc(nodeValue: Node) = refNode = nodeValue
+    nodeLoadRefTable[name] = refProc
+
+proc checkNodeRefs(view: SceneView) =
+    for k, v in nodeLoadRefTable:
+        let foundNode = view.mRootNode.findNode(k)
+        if not foundNode.isNil:
+            v(foundNode)
+
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     if not n.components.isNil:
         for c in n.components.values: c.componentNodeWillBeRemovedFromSceneView()
@@ -227,6 +251,7 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
     n.mSceneView = v
+    v.checkNodeRefs()
     if not n.components.isNil:
         for c in n.components.values: c.componentNodeWasAddedToSceneView()
     if not n.children.isNil:
@@ -272,18 +297,6 @@ proc insertChild*(n, c: Node, index: int) =
     c.setDirty()
     if not n.mSceneView.isNil:
         c.nodeWasAddedToSceneView(n.mSceneView)
-
-proc findNode*(n: Node, p: proc(n: Node): bool): Node =
-    if p(n):
-        result = n
-    else:
-        for c in n.children:
-            result = c.findNode(p)
-            if not result.isNil: break
-
-proc findNode*(n: Node, name: string): Node =
-    n.findNode proc(n: Node): bool =
-        n.name == name
 
 proc childNamed*(n: Node, name: string): Node =
     for c in n.children:
@@ -357,21 +370,19 @@ proc getGlobalAlpha*(n: Node): float =
         result = result * n.parent.getGlobalAlpha()
 
 # Serialization
-proc newNodeFromJson*(j: JsonNode): Node
-proc deserialize*(n: Node, j: JsonNode)
+proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
+proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
 proc loadComposition*(n: Node, resourceName: string) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(resourceName)
-        n.deserialize(j)
+        let serializer = Serializer.new()
+        n.deserialize(j, serializer)
         popParentResource()
 
 import ae_animation
 
 # proc deserialize*(n: Node, s: Serializer) =
-#     proc toValue(j: JsonNode, s: var string) =
-#         s = j.str
-
 #     proc toValue(j: JsonNode, s: var string) =
 #         s = j.str
 
@@ -385,30 +396,23 @@ import ae_animation
 #         jNode{jsonNameForPropName(k)}.toValue(v)
 
 
-proc deserialize*(n: Node, j: JsonNode) =
+proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if n.name.isNil:
-        n.name = j["name"].getStr(nil)
-    var v = j{"translation"}
-    if not v.isNil:
-        n.position = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j{"scale"}
-    if not v.isNil:
-        n.scale = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j{"rotation"}
-    if not v.isNil:
-        n.rotation = newQuaternion(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
-    v = j{"alpha"}
-    if not v.isNil:
-        n.alpha = v.getFNum()
-    v = j{"children"}
+        s.deserializeValue(j, "name", n.name)
+    s.deserializeValue(j, "translation", n.position)
+    s.deserializeValue(j, "scale", n.mScale)
+    s.deserializeValue(j, "rotation", n.mRotation)
+    s.deserializeValue(j, "alpha", n.alpha)
+
+    var v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
-            n.addChild(newNodeFromJson(v[i]))
+            n.addChild(newNodeFromJson(v[i], s))
     v = j{"components"}
     if not v.isNil:
         for k, c in v:
             let comp = n.component(k)
-            comp.deserialize(c)
+            comp.deserialize(c, s)
 
     let animations = j{"animations"}
     if not animations.isNil and animations.len > 0:
@@ -420,9 +424,9 @@ proc deserialize*(n: Node, j: JsonNode) =
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 
-proc newNodeFromJson*(j: JsonNode): Node =
+proc newNodeFromJson*(j: JsonNode, s: Serializer): Node =
     result = newNode()
-    result.deserialize(j)
+    result.deserialize(j, s)
 
 proc newNodeWithResource*(name: string): Node =
     result = newNode()
@@ -431,6 +435,30 @@ proc newNodeWithResource*(name: string): Node =
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
     result.loadComposition("compositions/" & name & ".json")
+
+proc serialize*(n: Node, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("name", s.getValue(n.name))
+    result.add("translation", s.getValue(n.position))
+    result.add("scale", s.getValue(n.scale))
+    result.add("rotation", s.getValue(n.rotation))
+    result.add("alpha", s.getValue(n.alpha))
+
+    if not n.components.isNil:
+        var componentsNode = newJObject()
+        result.add("components", componentsNode)
+
+        for key, value in n.components:
+            var jcomp: JsonNode
+            jcomp = value.serialize( s )
+
+            if not jcomp.isNil:
+                componentsNode.add(key, jcomp)
+
+    var childsNode = newJArray()
+    result.add("children", childsNode)
+    for child in n.children:
+        childsNode.add( child.serialize(s) )
 
 proc getDepth*(n: Node): int =
     result = 0

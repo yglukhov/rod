@@ -9,6 +9,7 @@ import rod.component
 import rod.property_visitor
 import rod.component.camera
 import rod.viewport
+import rod.tools.serializer
 
 type TextJustification* = enum
     tjLeft
@@ -37,7 +38,7 @@ proc `text=`*(t: Text, text: string) =
 proc text*(t: Text) : string =
     result = t.mText
 
-method deserialize*(t: Text, j: JsonNode) =
+method deserialize*(t: Text, j: JsonNode, s: Serializer) =
     var v = j{"text"}
     if not v.isNil:
         t.mText = v.getStr()
@@ -68,6 +69,15 @@ method deserialize*(t: Text, j: JsonNode) =
         of "center": t.justification = tjCenter
         of "right": t.justification = tjRight
         else: discard
+
+method serialize*(c: Text, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("text", s.getValue(c.text))
+    result.add("color", s.getValue(c.color))
+    result.add("shadowX", s.getValue(c.shadowX))
+    result.add("shadowY", s.getValue(c.shadowY))
+    result.add("shadowColor", s.getValue(c.shadowColor))
+    result.add("Tracking Amount", s.getValue(c.trackingAmount))
 
 method draw*(t: Text) =
     if not t.mText.isNil:
