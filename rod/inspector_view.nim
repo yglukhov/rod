@@ -116,12 +116,9 @@ proc createNewComponentButton(inspector: InspectorView, n: Node3D): View =
         var items = newSeq[MenuItem]()
         for i, c in registeredComponents():
             let menuItem = newMenuItem(c)
-            let pWorkaroundForJS = proc(mi: MenuItem): proc() =
-                result = proc() =
-                    discard n.component(mi.title)
-                    inspector.inspectedNode = n
-
-            menuItem.action = pWorkaroundForJS(menuItem)
+            menuItem.action = proc() =
+                discard n.component(menuItem.title)
+                inspector.inspectedNode = n
             items.add(menuItem)
 
         menu.items = items

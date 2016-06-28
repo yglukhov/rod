@@ -3,12 +3,13 @@ import nimx.context
 import nimx.composition
 import nimx.portable_gl
 import nimx.render_to_image
+import nimx.property_visitor
+
 import json
 
 import rod.node
 import rod.viewport
 import rod.component
-import rod.property_visitor
 import rod.tools.serializer
 
 type ChannelLevels* = ref object of Component

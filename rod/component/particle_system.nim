@@ -9,7 +9,6 @@ import rod.quaternion
 import rod.node
 import rod.component
 import rod.rod_types
-import rod.property_visitor
 import rod.viewport
 import rod.component.particle_helpers
 import rod.component.camera
@@ -23,6 +22,7 @@ import nimx.types
 import nimx.portable_gl
 import nimx.view
 import nimx.image
+import nimx.property_visitor
 
 const ParticleVertexShader = """
 attribute vec3 aPosition;

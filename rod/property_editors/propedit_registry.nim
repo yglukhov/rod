@@ -2,11 +2,12 @@ import tables
 import nimx.view
 import nimx.text_field
 import nimx.font
+import nimx.property_visitor
 
 import rod.node
-import rod.property_visitor
-import variant
 import rod.meta_data
+
+import variant
 
 type PropertyEditorView* = ref object of View
     onChange*: proc()

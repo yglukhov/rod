@@ -13,6 +13,7 @@ import nimx.portable_gl
 import nimx.popup_button
 import nimx.font
 import nimx.linear_layout
+import nimx.property_visitor
 
 import rod.property_editors.propedit_registry
 import rod.numeric_text_field
@@ -20,7 +21,6 @@ import rod.node
 import rod.viewport
 import rod.quaternion
 import rod.component.mesh_component
-import rod.property_visitor
 
 when defined(js):
     from dom import alert
