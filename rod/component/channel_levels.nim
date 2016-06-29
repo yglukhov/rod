@@ -4,6 +4,7 @@ import nimx.composition
 import nimx.portable_gl
 import nimx.render_to_image
 import nimx.property_visitor
+
 import json
 
 import rod.node
