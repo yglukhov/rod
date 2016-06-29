@@ -251,7 +251,6 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
     n.mSceneView = v
-    v.checkNodeRefs()
     if not n.components.isNil:
         for c in n.components.values: c.componentNodeWasAddedToSceneView()
     if not n.children.isNil:
