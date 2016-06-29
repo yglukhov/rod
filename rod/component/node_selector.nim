@@ -3,6 +3,7 @@ import nimx.portable_gl
 import nimx.types
 import nimx.image
 import nimx.matrixes
+import nimx.property_visitor
 
 import rod.component
 import rod.quaternion
@@ -12,7 +13,6 @@ import rod.component.light
 import rod.component.camera
 import rod.component.sprite
 import rod.node
-import rod.property_visitor
 import rod.viewport
 
 const vertexShader = """

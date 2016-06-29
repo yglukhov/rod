@@ -3,10 +3,10 @@ import json
 import nimx.types
 import nimx.context
 import nimx.matrixes
+import nimx.property_visitor
 
 import rod.node
 import rod.component
-import rod.property_visitor
 import rod.tools.serializer
 
 type Solid* = ref object of Component

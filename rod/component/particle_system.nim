@@ -9,7 +9,6 @@ import rod.quaternion
 import rod.node
 import rod.component
 import rod.rod_types
-import rod.property_visitor
 import rod.viewport
 import rod.component.particle_helpers
 import rod.component.camera
@@ -23,6 +22,7 @@ import nimx.types
 import nimx.portable_gl
 import nimx.view
 import nimx.image
+import nimx.property_visitor
 
 const ParticleVertexShader = """
 attribute vec3 aPosition;
@@ -44,13 +44,14 @@ uniform mat4 worldMatrix;
 uniform vec3 uNodeScale;
 
 varying float vAlpha;
+#ifdef TEXTURED
+    varying vec2 texCoords;
+#endif
 #ifdef GL_ES
     varying highp float vColor;
 #else
     varying float vColor;
 #endif
-varying vec2 texCoords;
-
 
 #ifdef ANIMATED_TEXTURE
     uniform vec2 uFrameSize;
@@ -101,6 +102,7 @@ varying vec2 texCoords;
 
 void main()
 {
+    vAlpha = aLifeTime;
     vAlpha = aAlpha;
     vColor = aColor;
     vec3 vertexOffset;
@@ -122,7 +124,9 @@ void main()
     if (aID == 2.0) { vertexOffset = vec3( 0.5,  -0.5, 0); }
     if (aID == 3.0) { vertexOffset = vec3(-0.5,  -0.5, 0); }
 
+#ifdef TEXTURED
     texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
+#endif
 #endif
 
     vertexOffset = vertexOffset * uNodeScale;
@@ -156,12 +160,13 @@ const ParticleFragmentShader = """
 #endif
 
 #ifdef TEXTURED
+    varying vec2 texCoords;
+
     uniform sampler2D texUnit;
     uniform vec4 uTexUnitCoords;
 #endif
 
 varying float vAlpha;
-varying vec2 texCoords;
 
 vec3 encodeRgbFromFloat( float f )
 {

@@ -1,12 +1,12 @@
 import json
 import nimx.types
 import nimx.matrixes
+import nimx.property_visitor
 
 import rod.rod_types
 import rod.component
 import rod.viewport
 import rod.node
-import rod.property_visitor
 import rod.tools.serializer
 
 export LightSource

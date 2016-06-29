@@ -11,6 +11,7 @@ import nimx.portable_gl
 import nimx.types
 import nimx.view
 import nimx.system_logger
+import nimx.property_visitor
 
 import nimasset.obj
 
@@ -19,7 +20,6 @@ import rod.component.material
 import rod.component.light
 import rod.vertex_data_info
 import rod.node
-import rod.property_visitor
 import rod.component.camera
 import rod.viewport
 import rod.ray

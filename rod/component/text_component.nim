@@ -3,10 +3,10 @@ import nimx.types
 import nimx.font
 import nimx.context
 import nimx.view
+import nimx.property_visitor
 
 import rod.node
 import rod.component
-import rod.property_visitor
 import rod.component.camera
 import rod.viewport
 import rod.tools.serializer

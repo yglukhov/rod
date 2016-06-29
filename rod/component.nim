@@ -3,9 +3,9 @@ import tables, sequtils
 import json
 
 import nimx.types
+import nimx.property_visitor
 
 import node
-import property_visitor
 import rod_types
 import ray
 import rod.tools.serializer

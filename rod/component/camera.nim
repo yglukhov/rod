@@ -1,10 +1,10 @@
 import nimx.matrixes
 import nimx.types
 import nimx.context
+import nimx.property_visitor
 
 import rod.component
 import rod.rod_types
-import rod.property_visitor
 
 export CameraProjection
 export Camera

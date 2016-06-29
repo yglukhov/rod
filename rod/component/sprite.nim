@@ -3,10 +3,10 @@ import nimx.types
 import nimx.context
 import nimx.image
 import nimx.animation
+import nimx.property_visitor
 import json, strutils
 
 import rod.node
-import rod.property_visitor
 import rod.ray
 import rod.tools.serializer
 

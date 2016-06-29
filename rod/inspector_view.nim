@@ -7,6 +7,7 @@ import nimx.menu
 import nimx.scroll_view
 import nimx.panel_view
 import nimx.linear_layout
+import nimx.property_visitor
 
 import variant
 
@@ -16,9 +17,8 @@ import node
 import component
 import rod_types
 
-import property_visitor
-import property_editors.propedit_registry
-import property_editors.standard_editors
+import rod.property_editors.propedit_registry
+import rod.property_editors.standard_editors
 
 
 type InspectorView* = ref object of PanelView
@@ -116,12 +116,9 @@ proc createNewComponentButton(inspector: InspectorView, n: Node3D): View =
         var items = newSeq[MenuItem]()
         for i, c in registeredComponents():
             let menuItem = newMenuItem(c)
-            let pWorkaroundForJS = proc(mi: MenuItem): proc() =
-                result = proc() =
-                    discard n.component(mi.title)
-                    inspector.inspectedNode = n
-
-            menuItem.action = pWorkaroundForJS(menuItem)
+            menuItem.action = proc() =
+                discard n.component(menuItem.title)
+                inspector.inspectedNode = n
             items.add(menuItem)
 
         menu.items = items

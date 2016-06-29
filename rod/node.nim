@@ -11,9 +11,9 @@ import nimx.animation
 import nimx.image
 import nimx.portable_gl
 import nimx.view
+import nimx.property_visitor
 
 import quaternion
-import property_visitor
 import ray
 import rod.tools.serializer
 
@@ -251,7 +251,6 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
     n.mSceneView = v
-    v.checkNodeRefs()
     if not n.components.isNil:
         for c in n.components.values: c.componentNodeWasAddedToSceneView()
     if not n.children.isNil:
