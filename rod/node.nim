@@ -11,9 +11,9 @@ import nimx.animation
 import nimx.image
 import nimx.portable_gl
 import nimx.view
+import nimx.property_visitor
 
 import quaternion
-import property_visitor
 import ray
 import rod.tools.serializer
 
