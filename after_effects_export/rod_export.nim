@@ -457,7 +457,7 @@ proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float, length: int): i
     if relTime < 0: relTime = 0
     if relTime >= f.duration: relTime = f.duration - 0.01
 
-    result = int(relTime / f.frameDuration) mod length
+    result = round(relTime / f.frameDuration mod length.float).int
 
 proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var animationStartTime = marker.time
@@ -480,6 +480,7 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
 
     let anim = newJObject()
     anim["duration"] = %(animationEndTime - animationStartTime)
+    anim["frameLerp"] = %false
     anim["values"] = sampledPropertyValues
     if marker.loops != 0: anim["numberOfLoops"] = %marker.loops
 
