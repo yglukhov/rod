@@ -3,12 +3,14 @@ import nimx.context
 import nimx.composition
 import nimx.portable_gl
 import nimx.render_to_image
+import nimx.property_visitor
+
 import json
+
 import rod.node
 import rod.viewport
-
 import rod.component
-import rod.property_visitor
+import rod.tools.serializer
 
 type ChannelLevels* = ref object of Component
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: Coord
@@ -67,7 +69,7 @@ method init*(c: ChannelLevels) =
     c.outWhite = 1
     c.outBlack = 0
 
-method deserialize*(c: ChannelLevels, j: JsonNode) =
+method deserialize*(c: ChannelLevels, j: JsonNode, s: Serializer) =
     var v = j{"inWhiteV"}
     if not v.isNil:
         c.inWhiteV = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())

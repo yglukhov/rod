@@ -4,14 +4,14 @@ import algorithm
 import nimx.view
 import nimx.types
 import nimx.button
+import nimx.outline_view
+import nimx.toolbar
 
 import node
-import panel_view
-import outline_view
 import inspector_view
-import toolbar
 import rod_types
 
+import nimx.panel_view
 import nimx.animation
 import nimx.color_picker
 import nimx.context
@@ -116,7 +116,9 @@ proc saveNode(editor: Editor, selectedNode: Node3D): bool =
         let path = callDialogFileSave("Save Json")
         if not path.isNil:
             var s = Serializer.new()
-            s.save(selectedNode, path)
+            var sData = selectedNode.serialize(s)
+            s.save(sData, path)
+            # s.save(selectedNode, path)
 
     return false
 

@@ -5,11 +5,11 @@ import variant
 import rod_types
 import node
 import component
-import property_visitor
 
 import nimx.matrixes
 import nimx.types
 import nimx.animation
+import nimx.property_visitor
 
 proc rawPropertyNameFromPropertyName(name: string): string =
     var n = name
