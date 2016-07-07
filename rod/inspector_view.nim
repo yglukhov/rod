@@ -115,11 +115,12 @@ proc createNewComponentButton(inspector: InspectorView, n: Node3D): View =
         menu.new()
         var items = newSeq[MenuItem]()
         for i, c in registeredComponents():
-            let menuItem = newMenuItem(c)
-            menuItem.action = proc() =
-                discard n.component(menuItem.title)
-                inspector.inspectedNode = n
-            items.add(menuItem)
+            closureScope:
+                let menuItem = newMenuItem(c)
+                menuItem.action = proc() =
+                    discard n.component(menuItem.title)
+                    inspector.inspectedNode = n
+                items.add(menuItem)
 
         menu.items = items
         menu.popupAtPoint(inspector, newPoint(0, 27))

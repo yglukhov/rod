@@ -157,6 +157,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         var textDoc = text.property("Source Text", TextDocument).value
         var txt = newJObject()
         txt["text"] = % $textDoc.text
+        txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
         case textDoc.justification
@@ -172,7 +173,18 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
             let alpha = shadow.property("Opacity", float32).valueAtTime(0) / 100
             txt["shadowColor"] = %[color.x, color.y, color.z, alpha]
             let radAngle = degToRad(angle + 180)
-            txt["shadowOff"] = %[distance * cos(radAngle), - distance * sin(radAngle)]
+            # txt["shadowOff"] = %[distance * cos(radAngle), - distance * sin(radAngle)]
+            txt["shadowX"] = %(distance * cos(radAngle))
+            txt["shadowY"] = %(- distance * sin(radAngle))
+
+        let stroke = layer.propertyGroup("Layer Styles").propertyGroup("Stroke")
+        if not stroke.isNil:
+            logi "Stroke  "
+            let size = stroke.property("Size", float32).valueAtTime(0)
+            let color = stroke.property("Color", Vector4).valueAtTime(0)
+            let alpha = stroke.property("Opacity", float32).valueAtTime(0) / 100
+            txt["strokeColor"] = %[color.x, color.y, color.z, alpha]
+            txt["strokeSize"] = %size
 
         result["Text"] = txt
 

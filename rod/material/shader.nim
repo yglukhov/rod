@@ -98,6 +98,11 @@ template setUniform*(sh: Shader, name: string, uniform: Vector4) =
     let gl = currentContext().gl
     gl.uniform4fv(gl.getUniformLocation(sh.program, name), uniform)
 
+template setUniform*(sh: Shader, name: string, uniform: Color) =
+    let gl = currentContext().gl
+    let arr = [uniform.r, uniform.g, uniform.b, uniform.a]
+    gl.uniform4fv(gl.getUniformLocation(sh.program, name), arr)
+
 template setUniform*(sh: Shader, name: string, uniform: Size) =
     currentContext().setPointUniform(gl.getUniformLocation(sh.program, name), newPoint(uniform.width, uniform.height))
 
