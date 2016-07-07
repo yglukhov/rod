@@ -9,6 +9,7 @@ import nimx.matrixes
 import nimx.view
 import nimx.image
 import nimx.resource
+import nimx.property_visitor
 
 import rod.node
 import rod.viewport
@@ -16,7 +17,6 @@ import rod.component
 import rod.component.camera
 import rod.component.mesh_component
 import rod.postprocess_context
-import rod.property_visitor
 
 type BlurComponent* = ref object of Component
     motionMap: SelfContainedImage

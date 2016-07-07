@@ -8,12 +8,12 @@ import rod.quaternion
 import rod.node
 import rod.component
 import rod.rod_types
-import rod.property_visitor
 
 import nimx.matrixes
 import nimx.animation
 import nimx.context
 import nimx.types
+import nimx.property_visitor
 
 type ParticleData = tuple
     coord: Vector3

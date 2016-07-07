@@ -18,6 +18,10 @@ export Viewport
 export SceneView
 
 
+method init*(v: SceneView, frame: Rect) =
+    procCall v.View.init(frame)
+    v.animationRunner = newAnimationRunner()
+
 proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
 
@@ -168,7 +172,10 @@ proc swapCompositingBuffers*(v: SceneView) =
 
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 
-proc addAnimation*(v: SceneView, a: Animation) = v.window.addAnimation(a)
+proc addAnimation*(v: SceneView, a: Animation) =
+    v.animationRunner.pushAnimation(a)
+
+proc removeAnimation*(v: SceneView, a: Animation) = v.animationRunner.removeAnimation(a)
 
 proc addLightSource*(v: SceneView, ls: LightSource) =
     if v.lightSources.isNil():
@@ -245,10 +252,14 @@ method viewDidMoveToWindow*(v:SceneView)=
     procCall v.View.viewDidMoveToWindow()
     if not v.window.isNil:
         v.viewOnEnter()
+        v.window.addAnimationRunner(v.animationRunner)
 
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
     if w.isNil:
         v.viewOnExit()
+
+    if not v.window.isNil:
+        v.window.removeAnimationRunner(v.animationRunner)
 
     procCall v.View.viewWillMoveToWindow(w)
     for c in v.uiComponents:

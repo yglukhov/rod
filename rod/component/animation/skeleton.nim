@@ -7,12 +7,12 @@ import nimx.matrixes
 import nimx.types
 import nimx.context
 import nimx.portable_gl
+import nimx.property_visitor
 
 import rod.component
 import rod.rod_types
-import rod.property_visitor
 import rod.material.shader
-import rod.tools.serializer_helpers
+import rod.tools.serializer
 
 
 const BoneVertexShader = """
@@ -262,43 +262,72 @@ proc debugDraw*(s: Skeleton) =
     s.rootBone.debugDraw(nil, mat)
 
 
-proc deserialize*(track: var AnimationTrack, j: JsonNode) =
+proc deserialize*(track: var AnimationTrack, j: JsonNode, s: Serializer) =
     for i in 0 ..< j.len:
         var frame = AnimationFrame.new()
-        j[i].getSerializedValue("time", frame.time)
-        j[i].getSerializedValue("matrix", frame.matrix)
+        s.deserializeValue(j[i], "time", frame.time)
+        s.deserializeValue(j[i], "matrix", frame.matrix)
         track.frames.add(frame)
 
-proc deserialize*(b: var Bone, j: JsonNode) =
-    j.getSerializedValue("name", b.name)
-    j.getSerializedValue("id", b.id)
-    j.getSerializedValue("startMatrix", b.startMatrix)
-    j.getSerializedValue("invMatrix", b.invMatrix)
+proc serialize*(track: AnimationTrack, s: Serializer): JsonNode =
+    result = newJArray()
+    for frame in track.frames:
+        var frameNode = newJObject()
+        frameNode.add("time", s.getValue(frame.time))
+        frameNode.add("matrix", s.getValue(frame.matrix))
+        result.add(frameNode)
+
+proc deserialize*(b: var Bone, j: JsonNode, s: Serializer) =
+    s.deserializeValue(j, "name", b.name)
+    s.deserializeValue(j, "id", b.id)
+    s.deserializeValue(j, "startMatrix", b.startMatrix)
+    s.deserializeValue(j, "invMatrix", b.invMatrix)
 
     var v = j{"animTrack"}
     if not v.isNil:
         b.animTrack = newAnimationTrack()
-        b.animTrack.deserialize(v)
+        b.animTrack.deserialize(v, s)
 
     v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
             var nBone = newBone()
-            nBone.deserialize(v[i])
+            nBone.deserialize(v[i], s)
             b.children.add(nBone)
 
-proc deserialize*(s: var Skeleton, j: JsonNode) =
+proc serialize*(bone: Bone, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("name", s.getValue(bone.name))
+    result.add("id", s.getValue(bone.id))
+    result.add("startMatrix", s.getValue(bone.startMatrix))
+    result.add("invMatrix", s.getValue(bone.invMatrix))
+    result.add("animTrack", bone.animTrack.serialize(s))
+
+    var childrenNode = newJArray()
+    result.add("children", childrenNode)
+    for child in bone.children:
+        childrenNode.add( child.serialize(s) )
+
+proc deserialize*(s: var Skeleton, j: JsonNode, serializer: Serializer) =
     if j.isNil:
         return
 
-    j.getSerializedValue("animDuration", s.animDuration)
-    j.getSerializedValue("isPlayed", s.isPlayed)
-    j.getSerializedValue("isLooped", s.isLooped)
-    j.getSerializedValue("animType", s.animType)
+    serializer.deserializeValue(j, "animDuration", s.animDuration)
+    serializer.deserializeValue(j, "isPlayed", s.isPlayed)
+    serializer.deserializeValue(j, "isLooped", s.isLooped)
+    serializer.deserializeValue(j, "animType", s.animType)
 
     var jNode = j{"rootBone"}
     if not jNode.isNil:
         s.rootBone = newBone()
-        s.rootBone.deserialize(jNode)
+        s.rootBone.deserialize(jNode, serializer)
 
         s.prepareRecursive(s.rootBone)
+
+proc serialize*(skeleton: Skeleton, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("animDuration", s.getValue(skeleton.animDuration))
+    result.add("isPlayed", s.getValue(skeleton.isPlayed))
+    result.add("isLooped", s.getValue(skeleton.isLooped))
+    result.add("animType", s.getValue(skeleton.animType))
+    result.add("rootBone", skeleton.rootBone.serialize(s))

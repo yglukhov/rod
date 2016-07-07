@@ -95,13 +95,14 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                     imageFileRelativeExportPaths.add(%getExportPathFromSourceFile(footageSource, f))
 
                     # Copy the file to the resources
-                    let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
-                    logi "Copying: ", resourcePath
-                    let targetFile = newFile(resourcePath)
-                    if not targetFile.parent.create():
-                        logi "ERROR: Could not create folder for ", resourcePath
-                    if not f.copy(targetFile):
-                        logi "ERROR: Could not copy ", resourcePath
+                    if app.settings.getSetting("rodExport", "copyResources") == "true":
+                        let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
+                        logi "Copying: ", resourcePath
+                        let targetFile = newFile(resourcePath)
+                        if not targetFile.parent.create():
+                            logi "ERROR: Could not create folder for ", resourcePath
+                        if not f.copy(targetFile):
+                            logi "ERROR: Could not copy ", resourcePath
 
                 var sprite = newJObject()
                 sprite["fileNames"] = imageFileRelativeExportPaths
@@ -456,7 +457,7 @@ proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float, length: int): i
     if relTime < 0: relTime = 0
     if relTime >= f.duration: relTime = f.duration - 0.01
 
-    result = int(relTime / f.frameDuration) mod length
+    result = round(relTime / f.frameDuration mod length.float).int
 
 proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var animationStartTime = marker.time
@@ -479,6 +480,7 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
 
     let anim = newJObject()
     anim["duration"] = %(animationEndTime - animationStartTime)
+    anim["frameLerp"] = %false
     anim["values"] = sampledPropertyValues
     if marker.loops != 0: anim["numberOfLoops"] = %marker.loops
 
@@ -609,6 +611,15 @@ function buildUI(contextObj) {
 
   var filePath = topGroup.add("statictext");
   filePath.alignment = ["fill", "fill"];
+
+  var isCopyResources = topGroup.add("checkbox", undefined, "Copy resources");
+  isCopyResources.alignment = ["right", "center"];
+  isCopyResources.value = true
+  app.settings.saveSetting("rodExport", "copyResources", "true")
+
+  isCopyResources.onClick = function(e) {
+    app.settings.saveSetting("rodExport", "copyResources", isCopyResources.value + "");
+  }
 
   var exportButton = topGroup.add("button", undefined,
     "Export selected compositions");

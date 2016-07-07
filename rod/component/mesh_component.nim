@@ -11,6 +11,7 @@ import nimx.portable_gl
 import nimx.types
 import nimx.view
 import nimx.system_logger
+import nimx.property_visitor
 
 import nimasset.obj
 
@@ -19,12 +20,11 @@ import rod.component.material
 import rod.component.light
 import rod.vertex_data_info
 import rod.node
-import rod.property_visitor
 import rod.component.camera
 import rod.viewport
 import rod.ray
 import rod.rod_types
-import rod.tools.serializer_helpers
+import rod.tools.serializer
 
 import animation.skeleton
 
@@ -375,99 +375,38 @@ method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
     else:
         result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
 
-proc jNodeToColor(j: JsonNode): Color =
-    result.r = j[0].getFNum()
-    result.g = j[1].getFNum()
-    result.b = j[2].getFNum()
-    result.a = j[3].getFNum()
 
-method deserialize*(m: MeshComponent, j: JsonNode) =
+method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
 
-    proc getValue(name: string, val: var Color) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = jN.jNodeToColor()
+    s.deserializeValue(j, "emission", m.material.emission)
+    s.deserializeValue(j, "ambient", m.material.ambient)
+    s.deserializeValue(j, "diffuse", m.material.diffuse)
+    s.deserializeValue(j, "specular", m.material.specular)
+    s.deserializeValue(j, "shininess", m.material.shininess)
+    s.deserializeValue(j, "rim_density", m.material.rim_density)
+    s.deserializeValue(j, "rimColor", m.material.rimColor)
 
-    proc getValue(name: string, val: var float32) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = jN.getFnum()
+    s.deserializeValue(j, "culling", m.material.bEnableBackfaceCulling)
+    s.deserializeValue(j, "light", m.material.isLightReceiver)
+    s.deserializeValue(j, "blend", m.material.blendEnable)
+    s.deserializeValue(j, "depth_test", m.material.depthEnable)
+    s.deserializeValue(j, "wireframe", m.material.isWireframe)
+    s.deserializeValue(j, "RIM", m.material.isRIM)
+    s.deserializeValue(j, "sRGB_normal", m.material.isNormalSRGB)
 
-    proc getValue(name: string, val: var bool) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = jN.getBVal()
-
-    proc getValue(name: string, val: var Image) =
-        let jN = j{name}
-        if not jN.isNil:
-            val = imageWithResource(jN.getStr())
-
-    var jNode = j{"emission"}
-    m.material.emission = jNode.jNodeToColor()
-    jNode = j{"ambient"}
-    m.material.ambient = jNode.jNodeToColor()
-    jNode = j{"diffuse"}
-    m.material.diffuse = jNode.jNodeToColor()
-    jNode = j{"specular"}
-    m.material.specular = jNode.jNodeToColor()
-    jNode = j{"shininess"}
-    m.material.shininess = jNode.getFnum()
-    jNode = j{"rim_density"}
-    m.material.rim_density = jNode.getFnum()
-    jNode = j{"rimColor"}
-    if not jNode.isNil: m.material.rimColor = jNode.jNodeToColor()
-
-    jNode = j{"culling"}
-    m.material.bEnableBackfaceCulling = jNode.getBVal()
-    jNode = j{"light"}
-    m.material.isLightReceiver = jNode.getBVal()
-    jNode = j{"blend"}
-    m.material.blendEnable = jNode.getBVal()
-    jNode = j{"depth_test"}
-    m.material.depthEnable = jNode.getBVal()
-    jNode = j{"wireframe"}
-    m.material.isWireframe = jNode.getBVal()
-    jNode = j{"RIM"}
-    m.material.isRIM = jNode.getBVal()
-    jNode = j{"sRGB_normal"}
-    m.material.isNormalSRGB = jNode.getBVal()
-
-    jNode = j{"matcapPercent"}
-    if not jNode.isNil:
-        m.material.matcapPercent = jNode.getFnum()
-    jNode = j{"matcapInterpolatePercent"}
-    if not jNode.isNil:
-        m.material.matcapInterpolatePercent = jNode.getFnum()
-    jNode = j{"matcapMixPercent"}
-    if not jNode.isNil:
-        m.material.matcapMixPercent = jNode.getFnum()
-    jNode = j{"albedoPercent"}
-    if not jNode.isNil:
-        m.material.albedoPercent = jNode.getFnum()
-    jNode = j{"glossPercent"}
-    if not jNode.isNil:
-        m.material.glossPercent = jNode.getFnum()
-    jNode = j{"specularPercent"}
-    if not jNode.isNil:
-        m.material.specularPercent = jNode.getFnum()
-    jNode = j{"normalPercent"}
-    if not jNode.isNil:
-        m.material.normalPercent = jNode.getFnum()
-    jNode = j{"bumpPercent"}
-    if not jNode.isNil:
-        m.material.bumpPercent = jNode.getFnum()
-    jNode = j{"reflectionPercent"}
-    if not jNode.isNil:
-        m.material.reflectionPercent = jNode.getFnum()
-    jNode = j{"falloffPercent"}
-    if not jNode.isNil:
-        m.material.falloffPercent = jNode.getFnum()
-    jNode = j{"maskPercent"}
-    if not jNode.isNil:
-        m.material.maskPercent = jNode.getFnum()
+    s.deserializeValue(j, "matcapPercent", m.material.matcapPercent)
+    s.deserializeValue(j, "matcapInterpolatePercent", m.material.matcapInterpolatePercent)
+    s.deserializeValue(j, "matcapMixPercent", m.material.matcapMixPercent)
+    s.deserializeValue(j, "albedoPercent", m.material.albedoPercent)
+    s.deserializeValue(j, "glossPercent", m.material.glossPercent)
+    s.deserializeValue(j, "specularPercent", m.material.specularPercent)
+    s.deserializeValue(j, "normalPercent", m.material.normalPercent)
+    s.deserializeValue(j, "bumpPercent", m.material.bumpPercent)
+    s.deserializeValue(j, "reflectionPercent", m.material.reflectionPercent)
+    s.deserializeValue(j, "falloffPercent", m.material.falloffPercent)
+    s.deserializeValue(j, "maskPercent", m.material.maskPercent)
 
     proc getTexture(name: string): Image =
         let jNode = j{name}
@@ -487,7 +426,7 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
 
     proc getAttribs(name: string): seq[float32] =
         result = newSeq[float32]()
-        jNode = j{name}
+        let jNode = j{name}
         if not jNode.isNil:
             for v in jNode:
                 result.add(v.getFNum())
@@ -497,7 +436,7 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     var normals = getAttribs("normals")
     var tangents = getAttribs("tangents")
 
-    jNode = j{"indices"}
+    var jNode = j{"indices"}
     var indices = newSeq[GLushort]()
     if not jNode.isNil:
         for v in jNode:
@@ -538,15 +477,99 @@ method deserialize*(m: MeshComponent, j: JsonNode) =
     jNode = j{"skeleton"}
     if not jNode.isNil:
         m.skeleton = newSkeleton()
-        m.skeleton.deserialize(jNode)
+        m.skeleton.deserialize(jNode, s)
 
         m.initMesh = vertexData
         m.currMesh = vertexData
 
         m.vertexWeights = newSeq[Glfloat]()
         m.boneIDs = newSeq[Glfloat]()
-        j.getSerializedValue("vertexWeights", m.vertexWeights)
-        j.getSerializedValue("boneIDs", m.boneIDs)
+        s.deserializeValue(j, "vertexWeights", m.vertexWeights)
+        s.deserializeValue(j, "boneIDs", m.boneIDs)
+
+method serialize*(c: MeshComponent, s: Serializer): JsonNode =
+    result = newJObject()
+
+    result.add("emission", s.getValue(c.material.emission))
+    result.add("ambient", s.getValue(c.material.ambient))
+    result.add("diffuse", s.getValue(c.material.diffuse))
+    result.add("specular", s.getValue(c.material.specular))
+    result.add("shininess", s.getValue(c.material.shininess))
+    result.add("rim_density", s.getValue(c.material.rim_density))
+
+    result.add("culling", s.getValue(c.material.bEnableBackfaceCulling))
+    result.add("light", s.getValue(c.material.isLightReceiver))
+    result.add("blend", s.getValue(c.material.blendEnable))
+    result.add("depth_test", s.getValue(c.material.depthEnable))
+    result.add("wireframe", s.getValue(c.material.isWireframe))
+    result.add("RIM", s.getValue(c.material.isRIM))
+    result.add("rimColor", s.getValue(c.material.rimColor))
+
+    result.add("sRGB_normal", s.getValue(c.material.isNormalSRGB))
+
+    result.add("matcapPercent", s.getValue(c.material.matcapPercent))
+    result.add("matcapInterpolatePercent", s.getValue(c.material.matcapInterpolatePercent))
+    result.add("albedoPercent", s.getValue(c.material.albedoPercent))
+    result.add("glossPercent", s.getValue(c.material.glossPercent))
+    result.add("specularPercent", s.getValue(c.material.specularPercent))
+    result.add("normalPercent", s.getValue(c.material.normalPercent))
+    result.add("bumpPercent", s.getValue(c.material.bumpPercent))
+    result.add("reflectionPercent", s.getValue(c.material.reflectionPercent))
+    result.add("falloffPercent", s.getValue(c.material.falloffPercent))
+    result.add("maskPercent", s.getValue(c.material.maskPercent))
+
+    result.add("matcapMixPercent", s.getValue(c.material.matcapMixPercent))
+
+    if not c.material.matcapTexture.isNil:
+        result.add("matcapTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapTexture.filePath())))
+    if not c.material.matcapInterpolateTexture.isNil:
+        result.add("matcapInterpolateTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapInterpolateTexture.filePath())))
+    if not c.material.albedoTexture.isNil:
+        result.add("albedoTexture",  s.getValue(s.getRelativeResourcePath(c.material.albedoTexture.filePath())))
+    if not c.material.glossTexture.isNil:
+        result.add("glossTexture",  s.getValue(s.getRelativeResourcePath(c.material.glossTexture.filePath())))
+    if not c.material.specularTexture.isNil:
+        result.add("specularTexture",  s.getValue(s.getRelativeResourcePath(c.material.specularTexture.filePath())))
+    if not c.material.normalTexture.isNil:
+        result.add("normalTexture",  s.getValue(s.getRelativeResourcePath(c.material.normalTexture.filePath())))
+    if not c.material.bumpTexture.isNil:
+        result.add("bumpTexture",  s.getValue(s.getRelativeResourcePath(c.material.bumpTexture.filePath())))
+    if not c.material.reflectionTexture.isNil:
+        result.add("reflectionTexture",  s.getValue(s.getRelativeResourcePath(c.material.reflectionTexture.filePath())))
+    if not c.material.falloffTexture.isNil:
+        result.add("falloffTexture",  s.getValue(s.getRelativeResourcePath(c.material.falloffTexture.filePath())))
+    if not c.material.maskTexture.isNil:
+        result.add("maskTexture",  s.getValue(s.getRelativeResourcePath(c.material.maskTexture.filePath())))
+
+    var data = c.getVBDataFromVRAM()
+
+    proc needsKey(name: string): bool =
+        case name
+        of "vertex_coords": return c.vboData.vertInfo.numOfCoordPerVert > 0 or false
+        of "tex_coords": return c.vboData.vertInfo.numOfCoordPerTexCoord > 0  or false
+        of "normals": return c.vboData.vertInfo.numOfCoordPerNormal > 0  or false
+        of "tangents": return c.vboData.vertInfo.numOfCoordPerTangent > 0  or false
+        else: return false
+
+    template addInfo(name: string, f: typed) =
+        if needsKey(name):
+            result[name] = s.getValue(f(c, data))
+
+    addInfo("vertex_coords", extractVertCoords)
+    addInfo("tex_coords", extractTexCoords)
+    addInfo("normals", extractNormals)
+    addInfo("tangents", extractTangents)
+
+    var ib = c.getIBDataFromVRAM()
+    var ibNode = newJArray()
+    result.add("indices", ibNode)
+    for v in ib:
+        ibNode.add(s.getValue(int32(v)))
+
+    if not c.skeleton.isNil:
+        result.add("skeleton", c.skeleton.serialize(s))
+        result["vertexWeights"] = s.getValue(c.vertexWeights)
+        result["boneIDs"] = s.getValue(c.boneIDs)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
 

@@ -1,13 +1,15 @@
-import rod.component
 import nimx.types
 import nimx.context
 import nimx.image
 import nimx.animation
+import nimx.property_visitor
+
 import json, strutils
 
 import rod.node
-import rod.property_visitor
 import rod.ray
+import rod.tools.serializer
+import rod.component
 
 #import image_blur
 
@@ -68,7 +70,7 @@ proc createFrameAnimation(s: Sprite) =
         s.currentFrame = int(float(s.images.len - 1) * p)
     s.node.registerAnimation("sprite", a)
 
-method deserialize*(s: Sprite, j: JsonNode) =
+method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
     if not v.isNil:
         s.node.alpha = v.getFNum(1.0)
@@ -102,6 +104,15 @@ method deserialize*(s: Sprite, j: JsonNode) =
 
     if s.images.len > 1:
         s.createFrameAnimation()
+
+method serialize*(c: Sprite, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("currentFrame", s.getValue(c.currentFrame))
+
+    var imagesNode = newJArray()
+    result.add("fileNames", s.getValue(imagesNode))
+    for img in c.images:
+        imagesNode.add( s.getValue(s.getRelativeResourcePath(img.filePath())) )
 
 method rayCast*(s: Sprite, r: Ray, distance: var float32): bool =
     let img = s.image
