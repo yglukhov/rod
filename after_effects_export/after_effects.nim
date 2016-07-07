@@ -122,6 +122,7 @@ type
     TextDocument* = ref TextDocumentObj
     TextDocumentObj {.importc.} = object of RootObj
         text*: cstring
+        font*: cstring
         fontSize*: int
         fillColor*: array[3, float]
 
