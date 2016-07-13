@@ -69,7 +69,7 @@ var gExportFolderPath = ""
 proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string =
     var path = $footageSource.projectPath
     if path[^1] != '/': path &= "/"
-    result = relativePathToPath(gCompExportPath, path & $decodeURIComponent(file.name))
+    result = relativePathToPath("/" & gCompExportPath, path & $decodeURIComponent(file.name))
 
 proc `%`[T: string | SomeNumber](s: openarray[T]): JsonNode =
     result = newJArray()
