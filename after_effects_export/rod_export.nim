@@ -470,6 +470,8 @@ proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float, length: int): i
     if relTime >= f.duration: relTime = f.duration - 0.01
 
     result = round(relTime / f.frameDuration mod length.float).int
+    if result >= length:
+        result.dec()
 
 proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var animationStartTime = marker.time
