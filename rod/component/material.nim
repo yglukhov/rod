@@ -17,6 +17,7 @@ import rod.component.camera
 import rod.quaternion
 import rod.vertex_data_info
 import rod.viewport
+import rod.postprocess_context
 
 import rod.animated_image
 
@@ -38,6 +39,7 @@ type ShaderMacro = enum
     WITH_V_TANGENT
     WITH_MATCAP_SAMPLER
     WITH_MATCAP_INTERPOLATE_SAMPLER
+    WITH_MATCAP_MASK_SAMPLER
     WITH_AMBIENT_SAMPLER
     WITH_GLOSS_SAMPLER
     WITH_SPECULAR_SAMPLER
@@ -70,6 +72,7 @@ type ShaderMacro = enum
     WITH_NORMALMAP_TO_SRGB
     WITH_MOTION_BLUR
     WITH_GAMMA_CORRECTION
+    WITH_SHADOW
 
 type
     MaterialColor* = ref object
@@ -88,6 +91,7 @@ type
     Material* = ref object of RootObj
         matcapTexture: Image
         matcapInterpolateTexture: Image
+        matcapMaskTexture: Image
         albedoTexture: Image
         glossTexture: Image
         specularTexture: Image
@@ -99,6 +103,7 @@ type
 
         matcapPercent*: float32
         matcapInterpolatePercent*: float32
+        matcapMaskPercent*: float32
         albedoPercent*: float32
         glossPercent*: float32
         specularPercent*: float32
@@ -108,7 +113,6 @@ type
         falloffPercent*: float32
         maskPercent*: float32
 
-        matcapMixPercent*: float32
         color*: MaterialColor
         rimDensity: Coord
         rimColor: Color
@@ -153,6 +157,7 @@ proc rimDensity*(m: Material): Coord = result = m.rimDensity
 proc rimColor*(m: Material): Color = result = m.rimColor
 proc matcapTexture*(m: Material): Image = result = m.matcapTexture
 proc matcapInterpolateTexture*(m: Material): Image = result = m.matcapInterpolateTexture
+proc matcapMaskTexture*(m: Material): Image = result = m.matcapMaskTexture
 proc albedoTexture*(m: Material): Image = result = m.albedoTexture
 proc glossTexture*(m: Material): Image = result = m.glossTexture
 proc specularTexture*(m: Material): Image = result = m.specularTexture
@@ -212,6 +217,14 @@ template `matcapInterpolateTexture=`*(m: Material, i: Image) =
     m.matcapInterpolateTexture = i
     if m.matcapInterpolateTexture.isNil:
         m.shaderMacroFlags.excl(WITH_MATCAP_INTERPOLATE_SAMPLER)
+        m.bShaderNeedUpdate = true
+template `matcapMaskTexture=`*(m: Material, i: Image) =
+    if m.matcapMaskTexture.isNil:
+        m.shaderMacroFlags.incl(WITH_MATCAP_MASK_SAMPLER)
+        m.bShaderNeedUpdate = true
+    m.matcapMaskTexture = i
+    if m.matcapMaskTexture.isNil:
+        m.shaderMacroFlags.excl(WITH_MATCAP_MASK_SAMPLER)
         m.bShaderNeedUpdate = true
 template `albedoTexture=`*(m: Material, i: Image) =
     if m.albedoTexture.isNil:
@@ -380,6 +393,7 @@ proc newDefaultMaterial*(): Material =
     result.color.new()
     result.matcapPercent = 1.0
     result.matcapInterpolatePercent = 1.0
+    result.matcapMaskPercent = 1.0
     result.albedoPercent = 1.0
     result.glossPercent = 1.0
     result.specularPercent = 1.0
@@ -425,6 +439,11 @@ proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
         gl.vertexAttribPointer(aBinormal.GLuint, vertInfo.numOfCoordPerBinormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerBinormal * sizeof(GLfloat)
 
+var postContext: PostprocessContext
+
+proc setupShadow*(m: Material, pc: PostprocessContext) =
+    postContext = pc
+
 proc setupSamplerAttributes(m: Material) =
     let c = currentContext()
     let gl = c.gl
@@ -453,7 +472,17 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsInterpolate"), theQuad)
                 gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitInterpolate"), textureIndex)
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentInterpolate"), m.matcapInterpolatePercent)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapMixPercent"), m.matcapMixPercent)
+                inc textureIndex
+    if not m.matcapMaskTexture.isNil:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATCAP_MASK_SAMPLER)
+        else:
+            if m.matcapMaskTexture.isLoaded:
+                gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapMaskTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapMaskUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapMaskUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapMaskPercent"), m.matcapMaskPercent)
                 inc textureIndex
     if not m.albedoTexture.isNil:
         if m.shader == invalidProgram:
@@ -548,8 +577,35 @@ proc setupSamplerAttributes(m: Material) =
                 gl.uniform1i(gl.getUniformLocation(m.shader, "maskMapUnit"), textureIndex)
                 gl.uniform1f(gl.getUniformLocation(m.shader, "uMaskPercent"), m.maskPercent)
                 inc textureIndex
+    if not m.maskTexture.isNil:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MASK_SAMPLER)
+            m.shaderMacroFlags.incl(WITH_V_POSITION)
+        else:
+            if m.maskTexture.isLoaded:
+                gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.maskTexture, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaskUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "maskMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMaskPercent"), m.maskPercent)
+                inc textureIndex
+    if not postContext.isNil and not postContext.depthImage.isNil:
+        if not m.shaderMacroFlags.contains(WITH_SHADOW):
+            m.shaderMacroFlags.incl(WITH_SHADOW)
+            m.shaderNeedUpdate()
 
-proc setupMaterialAttributes(m: Material, n: Node) =
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_SHADOW)
+        else:
+            gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
+            gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(postContext.depthImage, gl, theQuad))
+            gl.uniform4fv(gl.getUniformLocation(m.shader, "uDepthUnitCoords"), theQuad)
+            gl.uniform1i(gl.getUniformLocation(m.shader, "depthMapUnit"), textureIndex)
+            inc textureIndex
+
+            gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "lightMatrix"), false, postContext.depthMatrix)
+
+proc setupMaterialAttributes(m: Material) =
     if not m.color.isNil:
         let c = currentContext()
         let gl = c.gl
@@ -680,6 +736,7 @@ template setupTransform*(m: Material, n: Node) =
     else:
         normalMatrix.loadIdentity()
 
+    gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelMatrix"), false, n.worldTransform)
     gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelViewMatrix"), false, modelViewMatrix)
     gl.uniformMatrix3fv(gl.getUniformLocation(m.shader, "normalMatrix"), false, normalMatrix)
     c.setTransformUniform(m.shader) # setup modelViewProjectionMatrix
@@ -777,7 +834,7 @@ method updateSetup*(m: Material, n: Node) {.base.} =
                 m.fragmentShader = ""
 
         m.setupSamplerAttributes()
-        m.setupMaterialAttributes(n)
+        m.setupMaterialAttributes()
         if m.isLightReceiver:
             m.setupLightAttributes(n.sceneView)
         # setup shader techniques
@@ -790,12 +847,12 @@ method updateSetup*(m: Material, n: Node) {.base.} =
 
     gl.useProgram(m.shader)
     m.setupSamplerAttributes()
-    m.setupMaterialAttributes(n)
+    m.setupMaterialAttributes()
     if m.isLightReceiver:
         m.setupLightAttributes(n.sceneView)
     if m.isRIM:
         m.setupRIMLightTechnique()
-    m.setupTransform(n)
+    # m.setupTransform(n)
 
     if n.alpha < 1.0 or m.blendEnable:
         gl.enable(gl.BLEND)
