@@ -298,8 +298,6 @@ proc reset*(t: Trail) =
     else:
         t.shader = TrailTextureShader
 
-    echo "___SKIP___"
-
 proc trailImage*(t: Trail): Image =
     result = t.image
 
