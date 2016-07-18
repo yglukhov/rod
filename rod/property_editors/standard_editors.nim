@@ -98,50 +98,6 @@ when not defined(android) and not defined(ios):
 
     registerPropertyEditor(newMaterialImagePropertyView)
 
-    type ShaderSource = tuple
-        vertexPath: string
-        fragmentPath: string
-    proc newShaderPropertyView(setter: proc(ss: ShaderSource), getter: proc(): ShaderSource): PropertyEditorView =
-        let pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
-
-        var ssTmp: ShaderSource
-        ssTmp.vertexPath = getter().vertexPath
-        ssTmp.fragmentPath = getter().fragmentPath
-
-        let bttnVertex = Button.new(newRect(30, 0, 70, editorRowHeight))
-        bttnVertex.title = "vertex"
-        bttnVertex.onAction do():
-            when defined(js): alert("Files can be opened only in native editor version")
-            elif defined(emscripten): discard
-            else:
-                let path = callDialogFileOpen("Select Vertex Shader")
-                if not path.isNil:
-                    ssTmp.vertexPath = path
-                    ssTmp.fragmentPath = getter().fragmentPath
-                    setter(ssTmp)
-                    if not pv.onChange.isNil:
-                        pv.onChange()
-
-        let bttnFragment = Button.new(newRect(105, 0, 70, editorRowHeight))
-        bttnFragment.title = "fragment"
-        bttnFragment.onAction do():
-            when defined(js): alert("Files can be opened only in native editor version")
-            elif defined(emscripten): discard
-            else:
-                let path = callDialogFileOpen("Select Fragment Shader")
-                if not path.isNil:
-                    ssTmp.fragmentPath = path
-                    ssTmp.vertexPath = getter().vertexPath
-                    setter(ssTmp)
-                    if not pv.onChange.isNil:
-                        pv.onChange()
-
-        result = pv
-        result.addSubview(bttnVertex)
-        result.addSubview(bttnFragment)
-
-    registerPropertyEditor(newShaderPropertyView)
-
 proc newNodePropertyView(editedObject: Variant, setter: proc(s: Node), getter: proc(): Node): PropertyEditorView =
     let textField = newTextField(newRect(0, 0, 200, editorRowHeight))
     textField.font = editorFont()
