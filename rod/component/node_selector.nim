@@ -3,6 +3,7 @@ import nimx.portable_gl
 import nimx.types
 import nimx.image
 import nimx.matrixes
+import nimx.property_visitor
 
 import rod.component
 import rod.quaternion
@@ -12,7 +13,6 @@ import rod.component.light
 import rod.component.camera
 import rod.component.sprite
 import rod.node
-import rod.property_visitor
 import rod.viewport
 
 const vertexShader = """
@@ -55,7 +55,7 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
             ns.modelMatrix.scale(mesh.vboData.maxCoord - mesh.vboData.minCoord)
             return true
         let sprite = n.componentIfAvailable(Sprite)
-        if not sprite.isNil:
+        if not sprite.isNil and not sprite.image.isNil:
             let w = sprite.image.size.width
             let h = sprite.image.size.height
             ns.modelMatrix = n.worldTransform()

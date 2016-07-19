@@ -3,11 +3,12 @@ import tables, sequtils
 import json
 
 import nimx.types
+import nimx.property_visitor
 
 import node
-import property_visitor
 import rod_types
 import ray
+import rod.tools.serializer
 
 export Component
 
@@ -41,7 +42,8 @@ method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
 method isPosteffectComponent*(c: Component): bool {.base.} = false
 
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
-method deserialize*(c: Component, j: JsonNode) {.base.} = discard
+method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} = discard
+method serialize*(c: Component, s: Serializer): JsonNode {.base.} = discard
 
 type UpdateProcComponent = ref object of Component
     updateProc: proc()

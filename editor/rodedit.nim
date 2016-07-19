@@ -57,11 +57,11 @@ proc startApplication() =
     editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     editView.rootNode = newNode("(root)")
     let cameraNode = editView.rootNode.newChild("camera")
-    let camera = cameraNode.component(Camera)
-    cameraNode.translation.z = 100
+    discard cameraNode.component(Camera)
+    cameraNode.positionZ = 100
 
     let light = editView.rootNode.newChild("point_light")
-    light.translation = newVector3(-100,100,100)
+    light.position = newVector3(-100,100,100)
     let lightSource = light.component(LightSource)
     lightSource.setDefaultLightSource()
 
@@ -78,14 +78,5 @@ proc startApplication() =
 
     runAutoTestsIfNeeded()
 
-when defined js:
-    import dom
-    dom.window.onload = proc (e: Event) =
-        startApplication()
-else:
-    try:
-        startApplication()
-        runUntilQuit()
-    except:
-        logi "Exception caught: ", getCurrentExceptionMsg()
-        logi getCurrentException().getStackTrace()
+runApplication:
+    startApplication()

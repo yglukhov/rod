@@ -78,6 +78,8 @@ proc handleTouchEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3)
         e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
         if e.localPosition.inRect(v.bounds):
             result = v.processTouchEvent(e)
+            if result and e.buttonState == bsDown:
+                c.mView.touchTarget = v
 
 proc sceneViewWillMoveToWindow*(c: UIComponent, w: Window) =
     if not c.mView.isNil:

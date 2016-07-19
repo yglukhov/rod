@@ -9,12 +9,11 @@ import rod.quaternion
 import rod.node
 import rod.component
 import rod.rod_types
-import rod.property_visitor
 import rod.viewport
 import rod.component.particle_helpers
 import rod.component.camera
 import rod.material.shader
-import rod.tools.serializer_helpers
+import rod.tools.serializer
 
 import nimx.matrixes
 import nimx.animation
@@ -23,6 +22,7 @@ import nimx.types
 import nimx.portable_gl
 import nimx.view
 import nimx.image
+import nimx.property_visitor
 
 const ParticleVertexShader = """
 attribute vec3 aPosition;
@@ -44,13 +44,14 @@ uniform mat4 worldMatrix;
 uniform vec3 uNodeScale;
 
 varying float vAlpha;
+#ifdef TEXTURED
+    varying vec2 texCoords;
+#endif
 #ifdef GL_ES
     varying highp float vColor;
 #else
     varying float vColor;
 #endif
-varying vec2 texCoords;
-
 
 #ifdef ANIMATED_TEXTURE
     uniform vec2 uFrameSize;
@@ -122,11 +123,12 @@ void main()
     if (aID == 2.0) { vertexOffset = vec3( 0.5,  -0.5, 0); }
     if (aID == 3.0) { vertexOffset = vec3(-0.5,  -0.5, 0); }
 
-    texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
+    #ifdef TEXTURED
+        texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
+    #endif
 #endif
 
-    vertexOffset = vertexOffset * uNodeScale;
-    vertexOffset = vertexOffset * aScale;
+    vertexOffset = vertexOffset * uNodeScale * aScale;
 
     mat4 rMatrix = getRotationMatrix(aRotation);
     vec4 rotatedVertexOffset = rMatrix * vec4(vertexOffset, 1.0);
@@ -149,19 +151,20 @@ void main()
 const ParticleFragmentShader = """
 #ifdef GL_ES
     #extension GL_OES_standard_derivatives : enable
-    precision mediump float;
+    precision highp float;
     varying highp float vColor;
 #else
     varying float vColor;
 #endif
 
 #ifdef TEXTURED
+    varying vec2 texCoords;
+
     uniform sampler2D texUnit;
     uniform vec4 uTexUnitCoords;
 #endif
 
 varying float vAlpha;
-varying vec2 texCoords;
 
 vec3 encodeRgbFromFloat( float f )
 {
@@ -176,9 +179,11 @@ void main()
 {
 #ifdef TEXTURED
     vec4 tex_color = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * texCoords);
-    gl_FragColor = tex_color * vec4(encodeRgbFromFloat(vColor), vAlpha);
+    vec3 color = encodeRgbFromFloat(vColor);
+    gl_FragColor = tex_color * vec4(color.xyz, vAlpha);
 #else
-    gl_FragColor = vec4(encodeRgbFromFloat(vColor), vAlpha);
+    vec3 color = encodeRgbFromFloat(vColor);
+    gl_FragColor = vec4(color.xyz, vAlpha);
 #endif
 }
 """
@@ -235,6 +240,7 @@ type
         startVelocity*, randVelocityFrom*, randVelocityTo*: float32
         randRotVelocityFrom*, randRotVelocityTo*: Vector3 # deg
         gravity*: Vector3
+        airDensity*: float32
 
         currentTime: float # to calculate normal dt
         lastTime: float
@@ -368,8 +374,7 @@ proc initSystem(ps: ParticleSystem) =
             (2.GLuint, "aScale"),
             (3.GLuint, "aAlpha"),
             (4.GLuint, "aColor"),
-            (5.GLuint, "aID"),
-            (6.GLuint, "aLifeTime")])
+            (5.GLuint, "aID")])
 
     ps.genShapeNode = ps.node
 
@@ -542,6 +547,11 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         if not ps.attractor.isNil:
             ps.particles[i].velocity += ps.attractor.getForceAtPoint(ps.particles[i].position)
 
+        if ps.airDensity > 0.0:
+            var density_vec = ps.particles[i].velocity
+            density_vec.normalize()
+            ps.particles[i].velocity -= density_vec * ps.airDensity * dt
+
         ps.particles[i].velocity.x += ps.gravity.x*dt
         ps.particles[i].velocity.y += ps.gravity.y*dt
         ps.particles[i].velocity.z += ps.gravity.z*dt
@@ -607,6 +617,8 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         else:
             color = ps.startColor * normLifeTime + ps.dstColor * oneMinusNormLifeTime
             alpha = color.a * normLifeTime + color.a * oneMinusNormLifeTime
+
+        alpha *= ps.node.alpha
         ps.particlesVertexBuff[v1 + offset] = alpha
         ps.particlesVertexBuff[v2 + offset] = alpha
         ps.particlesVertexBuff[v3 + offset] = alpha
@@ -643,10 +655,10 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
 
 proc update(ps: ParticleSystem, dt: float) =
     if ps.isMove:
-        ps.node.translation.x += ps.speed * dt
-        ps.node.translation.y = ps.amplitude * cos(ps.node.translation.x * ps.frequency)
-        if ps.node.translation.x > ps.distance / 2.0:
-            ps.node.translation.x = -ps.distance / 2.0;
+        ps.node.positionX = ps.node.positionX + ps.speed * dt
+        ps.node.positionY = ps.amplitude * cos(ps.node.positionX * ps.frequency)
+        if ps.node.positionX > ps.distance / 2.0:
+            ps.node.positionX = -ps.distance / 2.0;
 
     let perParticleTime = 1.0 / ps.birthRate
     let curTime = epochTime()
@@ -659,7 +671,7 @@ proc update(ps: ParticleSystem, dt: float) =
         ps.genShape = ps.genShapeNode.getComponent(PSGenShape)
 
     if not ps.attractorNode.isNil:
-        ps.attractor = ps.genShapeNode.getComponent(PSAttractor)
+        ps.attractor = ps.attractorNode.getComponent(PSAttractor)
 
     # chek IB size (need for runtime property editing)
     if ps.indexBufferSize < int(ceil(ps.birthRate) * ceil(ps.lifetime)):
@@ -723,6 +735,8 @@ method draw*(ps: ParticleSystem) =
     offset += ps.vertexDesc.idSize * sizeof(GLfloat)
 
     if ps.isTextureAnimated:
+        ps.shader.bindAttribLocation(6, "aLifeTime")
+
         gl.enableVertexAttribArray(6)
         gl.vertexAttribPointer(6, ps.vertexDesc.lifeTimeSize, gl.FLOAT, false, stride.GLsizei , offset)
 
@@ -750,11 +764,12 @@ method draw*(ps: ParticleSystem) =
     if not ps.texture.isNil:
         ps.shader.setUniform("uTexUnitCoords", theQuad)
         ps.shader.setUniform("texUnit", 0)
-        var fs = newSize(ps.frameSize.width / ps.texture.size.width, ps.frameSize.height / ps.texture.size.height)
-        ps.shader.setUniform("uFrameSize", fs)
-        ps.shader.setUniform("uAnimColumns", ps.animColumns)
-        ps.shader.setUniform("uFramesCount", ps.framesCount)
-        ps.shader.setUniform("uFPS", ps.fps)
+        if ps.isTextureAnimated:
+            var fs = newSize(ps.frameSize.width / ps.texture.size.width, ps.frameSize.height / ps.texture.size.height)
+            ps.shader.setUniform("uFrameSize", fs)
+            ps.shader.setUniform("uAnimColumns", ps.animColumns)
+            ps.shader.setUniform("uFramesCount", ps.framesCount)
+            ps.shader.setUniform("uFPS", ps.fps)
 
     ps.shader.setTransformUniform()
 
@@ -787,55 +802,101 @@ method draw*(ps: ParticleSystem) =
     gl.depthMask(true)
 
 
-method deserialize*(ps: ParticleSystem, j: JsonNode) =
+method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
 
-    j.getSerializedValue("duration", ps.duration)
-    j.getSerializedValue("isLooped", ps.isLooped)
-    j.getSerializedValue("isPlayed", ps.isPlayed)
-    j.getSerializedValue("birthRate", ps.birthRate)
-    j.getSerializedValue("lifetime", ps.lifetime)
-    j.getSerializedValue("startVelocity", ps.startVelocity)
-    j.getSerializedValue("randVelocityFrom", ps.randVelocityFrom)
-    j.getSerializedValue("randVelocityTo", ps.randVelocityTo)
-    j.getSerializedValue("is3dRotation", ps.is3dRotation)
-    j.getSerializedValue("randRotVelocityFrom", ps.randRotVelocityFrom)
-    j.getSerializedValue("randRotVelocityTo", ps.randRotVelocityTo)
-    j.getSerializedValue("startScale", ps.startScale)
-    j.getSerializedValue("dstScale", ps.dstScale)
-    j.getSerializedValue("randScaleFrom", ps.randScaleFrom)
-    j.getSerializedValue("randScaleTo", ps.randScaleTo)
-    j.getSerializedValue("startColor", ps.startColor)
-    j.getSerializedValue("dstColor", ps.dstColor)
-    j.getSerializedValue("isBlendAdd", ps.isBlendAdd)
-    j.getSerializedValue("gravity", ps.gravity)
+    s.deserializeValue(j, "duration", ps.duration)
+    s.deserializeValue(j, "isLooped", ps.isLooped)
+    s.deserializeValue(j, "isPlayed", ps.isPlayed)
+    s.deserializeValue(j, "birthRate", ps.birthRate)
+    s.deserializeValue(j, "lifetime", ps.lifetime)
+    s.deserializeValue(j, "startVelocity", ps.startVelocity)
+    s.deserializeValue(j, "randVelocityFrom", ps.randVelocityFrom)
+    s.deserializeValue(j, "randVelocityTo", ps.randVelocityTo)
+    s.deserializeValue(j, "is3dRotation", ps.is3dRotation)
+    s.deserializeValue(j, "randRotVelocityFrom", ps.randRotVelocityFrom)
+    s.deserializeValue(j, "randRotVelocityTo", ps.randRotVelocityTo)
+    s.deserializeValue(j, "startScale", ps.startScale)
+    s.deserializeValue(j, "dstScale", ps.dstScale)
+    s.deserializeValue(j, "randScaleFrom", ps.randScaleFrom)
+    s.deserializeValue(j, "randScaleTo", ps.randScaleTo)
+    s.deserializeValue(j, "startColor", ps.startColor)
+    s.deserializeValue(j, "dstColor", ps.dstColor)
+    s.deserializeValue(j, "isBlendAdd", ps.isBlendAdd)
+    s.deserializeValue(j, "gravity", ps.gravity)
+    s.deserializeValue(j, "airDensity", ps.airDensity)
 
-    j.getSerializedValue("texture", ps.texture)
-    j.getSerializedValue("isTextureAnimated", ps.isTextureAnimated)
-    j.getSerializedValue("texSize", ps.frameSize)
-    j.getSerializedValue("animColumns", ps.animColumns)
-    j.getSerializedValue("framesCount", ps.framesCount)
-    j.getSerializedValue("fps", ps.fps)
+    s.deserializeValue(j, "texture", ps.texture)
+    s.deserializeValue(j, "isTextureAnimated", ps.isTextureAnimated)
+    s.deserializeValue(j, "texSize", ps.frameSize)
+    s.deserializeValue(j, "animColumns", ps.animColumns)
+    s.deserializeValue(j, "framesCount", ps.framesCount)
+    s.deserializeValue(j, "fps", ps.fps)
 
-    j.getSerializedValue("genShapeNode", ps.genShapeNode)
-    j.getSerializedValue("attractorNode", ps.attractorNode)
+    var genShapeName, attractorName: string
+    s.deserializeValue(j, "genShapeNode", genShapeName)
+    s.deserializeValue(j, "attractorNode", attractorName)
+    addNodeRef(ps.genShapeNode, genShapeName)
+    addNodeRef(ps.attractorNode, attractorName)
 
-    j.getSerializedValue("isMove", ps.isMove)
-    j.getSerializedValue("amplitude", ps.amplitude)
-    j.getSerializedValue("frequency", ps.frequency)
-    j.getSerializedValue("distance", ps.distance)
-    j.getSerializedValue("speed", ps.speed)
+    s.deserializeValue(j, "isMove", ps.isMove)
+    s.deserializeValue(j, "amplitude", ps.amplitude)
+    s.deserializeValue(j, "frequency", ps.frequency)
+    s.deserializeValue(j, "distance", ps.distance)
+    s.deserializeValue(j, "speed", ps.speed)
 
-    var scaleM, colorM: int
-    j.getSerializedValue("scaleMode", scaleM)
-    j.getSerializedValue("colorMode", colorM)
-    ps.scaleMode = ParticleModeEnum(scaleM)
-    ps.colorMode = ParticleModeEnum(colorM)
-    j.getSerializedValue("scaleSeq", ps.scaleSeq)
-    j.getSerializedValue("colorSeq", ps.colorSeq)
+    s.deserializeValue(j, "scaleMode", ps.scaleMode)
+    s.deserializeValue(j, "colorMode", ps.colorMode)
+    s.deserializeValue(j, "scaleSeq", ps.scaleSeq)
+    s.deserializeValue(j, "colorSeq", ps.colorSeq)
 
     # ps.initSystem()
+
+method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("duration", s.getValue(c.duration))
+    result.add("isLooped", s.getValue(c.isLooped))
+    result.add("isPlayed", s.getValue(c.isPlayed))
+    result.add("birthRate", s.getValue(c.birthRate))
+    result.add("lifetime", s.getValue(c.lifetime))
+    result.add("startVelocity", s.getValue(c.startVelocity))
+    result.add("randVelocityFrom", s.getValue(c.randVelocityFrom))
+    result.add("randVelocityTo", s.getValue(c.randVelocityTo))
+    result.add("is3dRotation", s.getValue(c.is3dRotation))
+    result.add("randRotVelocityFrom", s.getValue(c.randRotVelocityFrom))
+    result.add("randRotVelocityTo", s.getValue(c.randRotVelocityTo))
+    result.add("startScale", s.getValue(c.startScale))
+    result.add("dstScale", s.getValue(c.dstScale))
+    result.add("randScaleFrom", s.getValue(c.randScaleFrom))
+    result.add("randScaleTo", s.getValue(c.randScaleTo))
+    result.add("startColor", s.getValue(c.startColor))
+    result.add("dstColor", s.getValue(c.dstColor))
+    result.add("isBlendAdd", s.getValue(c.isBlendAdd))
+    result.add("gravity", s.getValue(c.gravity))
+    result.add("airDensity", s.getValue(c.airDensity))
+
+    result.add("scaleMode", s.getValue(c.scaleMode))
+    result.add("colorMode", s.getValue(c.colorMode))
+    result.add("scaleSeq", s.getValue(c.scaleSeq))
+    result.add("colorSeq", s.getValue(c.colorSeq))
+
+    if c.texture.filePath().len > 0:
+        result.add("texture", s.getValue(s.getRelativeResourcePath(c.texture.filePath())))
+        result.add("isTextureAnimated", s.getValue(c.isTextureAnimated))
+        result.add("texSize", s.getValue(c.frameSize))
+        result.add("animColumns", s.getValue(c.animColumns))
+        result.add("framesCount", s.getValue(c.framesCount))
+        result.add("fps", s.getValue(c.fps))
+
+    result.add("attractorNode", s.getValue(c.attractorNode))
+    result.add("genShapeNode", s.getValue(c.genShapeNode))
+
+    result.add("isMove", s.getValue(c.isMove))
+    result.add("amplitude", s.getValue(c.amplitude))
+    result.add("frequency", s.getValue(c.frequency))
+    result.add("distance", s.getValue(c.distance))
+    result.add("speed", s.getValue(c.speed))
 
 method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     proc onLoopedChange() =
@@ -886,6 +947,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("randScaleTo", ps.randScaleTo)
     p.visitProperty("isBlendAdd", ps.isBlendAdd)
     p.visitProperty("gravity", ps.gravity)
+    p.visitProperty("airDensity", ps.airDensity)
     p.visitProperty("texture", ps.texture, onTextureChange)
     p.visitProperty("isTexAnim", ps.isTextureAnimated, toCalculateVertexDesc)
     p.visitProperty("texSize", ps.frameSize)

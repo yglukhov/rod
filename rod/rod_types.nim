@@ -14,17 +14,18 @@ const maxLightsCount* = 8
 
 type
     Node3D* = ref object
-        translation*: Vector3
-        rotation*: Quaternion
-        scale*: Vector3
+        mTranslation*: Vector3
+        mRotation*: Quaternion
+        mScale*: Vector3
         components*: TableRef[string, Component]
         children*: seq[Node3D]
-        parent*: Node3D
+        mParent*: Node3D
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
         alpha*: Coord
-        mMetaData*: MetaData
+        mMatrix*: Matrix4
+        isDirty*: bool
 
     Node2D* = Node3D
 
@@ -37,11 +38,14 @@ type
         shader*: ProgramRef
         setupProc*: proc(c: Component)
         drawProc*: proc(c: Component)
+        depthImage*: SelfContainedImage
+        depthMatrix*: Matrix4
 
     SceneView* = ref object of View
         viewMatrixCached*: Matrix4
         mCamera*: Camera
         mRootNode*: Node3D
+        animationRunner*: AnimationRunner
         #view*: View
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int

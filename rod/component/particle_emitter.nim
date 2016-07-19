@@ -8,12 +8,12 @@ import rod.quaternion
 import rod.node
 import rod.component
 import rod.rod_types
-import rod.property_visitor
 
 import nimx.matrixes
 import nimx.animation
 import nimx.context
 import nimx.types
+import nimx.property_visitor
 
 type ParticleData = tuple
     coord: Vector3
@@ -121,7 +121,7 @@ template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: fl
 
 template drawParticle(p: ParticleEmitter, part: ParticleData) =
     let proto = p.particlePrototype
-    proto.translation = part.coord
+    proto.position = part.coord
     proto.rotation = part.rotation
     proto.scale = part.scale
     let pc = proto.component(Particle)

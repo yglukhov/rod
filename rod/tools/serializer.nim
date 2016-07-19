@@ -9,17 +9,10 @@ import nimx.image
 import nimx.types
 import nimx.pathutils
 import nimx.matrixes
+import nimx.portable_gl
 
 import rod.rod_types
-import rod.component
-import rod.component.material
-import rod.component.sprite
-import rod.component.light
-import rod.component.text_component
-import rod.component.mesh_component
-import rod.component.particle_system
-import rod.component.particle_helpers
-import rod.component.animation.skeleton
+import rod.quaternion
 
 type Serializer* = ref object
     savePath*: string
@@ -35,6 +28,9 @@ proc `%`*(n: Node): JsonNode =
     else:
         result = newJString("")
 
+proc `%`*[T: enum](v: T): JsonNode =
+    result = newJInt(v.ord)
+
 proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
     result = vectorToJNode(vec)
 
@@ -46,17 +42,7 @@ proc `%`*(v: Color): JsonNode =
     for k, val in v.fieldPairs:
         result.add( %val )
 
-proc `%`*[T](elements: openArray[T]): JsonNode =
-    result = newJArray()
-    for elem in elements:
-        result.add(%elem)
-
-proc colorToJNode(color:Color): JsonNode =
-    result = newJArray()
-    for k, v in color.fieldPairs:
-        result.add( %v )
-
-proc getRelativeResourcePath(s: Serializer, path: string): string =
+proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path
     when not defined(js) and not defined(android) and not defined(ios):
         resourcePath = parentDir(s.savePath)
@@ -64,246 +50,108 @@ proc getRelativeResourcePath(s: Serializer, path: string): string =
     result = relativePathToPath(resourcePath, path)
     echo "save path = ", resourcePath, "  relative = ", result
 
-method getComponentData(s: Serializer, c: Component): JsonNode {.base.} =
-    result = newJObject()
 
-method getComponentData(s: Serializer, c: Text): JsonNode =
-    result = newJObject()
-    result.add("text", %c.text)
-    result.add("color", colorToJNode(c.color))
-    result.add("shadowX", %c.shadowX)
-    result.add("shadowY", %c.shadowY)
-    result.add("shadowColor", colorToJNode(c.shadowColor))
-    result.add("Tracking Amount", %c.trackingAmount)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getStr(nil)
 
-method getComponentData(s: Serializer, c: Sprite): JsonNode =
-    result = newJObject()
-    result.add("currentFrame", %c.currentFrame)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getNum().int
 
-    var imagesNode = newJArray()
-    result.add("fileNames", imagesNode)
-    for img in c.images:
-        imagesNode.add( %s.getRelativeResourcePath(img.filePath()) )
+proc getDeserialized[T: enum](s: Serializer, j: JsonNode, name: string, val: var T) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = T(jN.getNum().int)
 
-method getComponentData(s: Serializer, c: LightSource): JsonNode =
-    result = newJObject()
-    result.add("ambient", %c.lightAmbient)
-    result.add("diffuse", %c.lightDiffuse)
-    result.add("specular", %c.lightSpecular)
-    result.add("constant", %c.lightConstant)
-    result.add("linear", %c.lightLinear)
-    result.add("quadratic", %c.lightQuadratic)
-    result.add("is_precomp_attenuation", %c.lightAttenuationInited)
-    result.add("attenuation", %c.lightAttenuation)
-    result.add("color", %c.lightColor)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var float32) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getFnum()
 
-method getComponentData(s: Serializer, c: ParticleSystem): JsonNode =
-    result = newJObject()
-    result.add("duration", %c.duration)
-    result.add("isLooped", %c.isLooped)
-    result.add("isPlayed", %c.isPlayed)
-    result.add("birthRate", %c.birthRate)
-    result.add("lifetime", %c.lifetime)
-    result.add("startVelocity", %c.startVelocity)
-    result.add("randVelocityFrom", %c.randVelocityFrom)
-    result.add("randVelocityTo", %c.randVelocityTo)
-    result.add("is3dRotation", %c.is3dRotation)
-    result.add("randRotVelocityFrom", %c.randRotVelocityFrom)
-    result.add("randRotVelocityTo", %c.randRotVelocityTo)
-    result.add("startScale", %c.startScale)
-    result.add("dstScale", %c.dstScale)
-    result.add("randScaleFrom", %c.randScaleFrom)
-    result.add("randScaleTo", %c.randScaleTo)
-    result.add("startColor", %c.startColor)
-    result.add("dstColor", %c.dstColor)
-    result.add("isBlendAdd", %c.isBlendAdd)
-    result.add("gravity", %c.gravity)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var float) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getFnum()
 
-    result.add("scaleMode", %c.scaleMode.ord)
-    result.add("colorMode", %c.colorMode.ord)
-    result.add("scaleSeq", %c.scaleSeq)
-    result.add("colorSeq", %c.colorSeq)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Vector3) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newVector3(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum())
 
-    if c.texture.filePath().len > 0:
-        result.add("texture", %s.getRelativeResourcePath(c.texture.filePath()))
-        result.add("isTextureAnimated", %c.isTextureAnimated)
-        result.add("texSize", %c.frameSize)
-        result.add("animColumns", %c.animColumns)
-        result.add("framesCount", %c.framesCount)
-        result.add("fps", %c.fps)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Quaternion) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newQuaternion(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum(), jN[3].getFnum())
 
-    result.add("attractorNode", %c.attractorNode)
-    result.add("genShapeNode", %c.genShapeNode)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Size) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newSize(jN[0].getFnum(), jN[1].getFnum())
 
-    result.add("isMove", %c.isMove)
-    result.add("amplitude", %c.amplitude)
-    result.add("frequency", %c.frequency)
-    result.add("distance", %c.distance)
-    result.add("speed", %c.speed)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Image) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = imageWithResource(jN.getStr())
 
-method getComponentData(s: Serializer, c: ConePSGenShape): JsonNode =
-    result = newJObject()
-    result.add("angle", %c.angle)
-    result.add("radius", %c.radius)
-    result.add("is2D", %c.is2D)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var bool) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getBVal()
 
-method getComponentData(s: Serializer, c: SpherePSGenShape): JsonNode =
-    result = newJObject()
-    result.add("radius", %c.radius)
-    result.add("isRandPos", %c.isRandPos)
-    result.add("isRandDir", %c.isRandDir)
-    result.add("is2D", %c.is2D)
+# proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Node) =
+#     let jN = j{name}
+    # if not jN.isNil and jN.getStr().len > 0:
+    #     val = newNode(jN.getStr())
 
-method getComponentData(s: Serializer, c: BoxPSGenShape): JsonNode =
-    result = newJObject()
-    result.add("dimension", %c.dimension)
-    result.add("is2D", %c.is2D)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Color) =
+    let jN = j{name}
+    if not jN.isNil:
+        val.r = jN[0].getFNum()
+        val.g = jN[1].getFNum()
+        val.b = jN[2].getFNum()
+        if jN.len > 3: #TODO: new format should always have 4 components for color.
+            val.a = jN[3].getFNum()
+        else:
+            val.a = 1.0
 
-method getComponentData(s: Serializer, c: WavePSAttractor): JsonNode =
-    result = newJObject()
-    result.add("forceValue", %c.forceValue)
-    result.add("frequence", %c.frequence)
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Matrix4) =
+    let jN = j{name}
+    if not jN.isNil:
+        for i in 0 ..< jN.len:
+            val[i] = jN[i].getFnum()
 
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var seq[Glfloat]) =
+    let jN = j{name}
+    if not jN.isNil:
+        for i in 0 ..< jN.len:
+            val.add( jN[i].getFnum() )
 
-proc getAnimationTrackData(s: Serializer, track: AnimationTrack): JsonNode =
-    result = newJArray()
-    for frame in track.frames:
-        var frameNode = newJObject()
-        frameNode.add("time", %frame.time)
-        frameNode.add("matrix", %frame.matrix)
-        result.add(frameNode)
+proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: var seq[T]) =
+    let jN = j{name}
+    if not jN.isNil:
+        for i in 0 ..< jN.len:
+            var seqVal: T
+            const vecLen = high(T) + 1
+            for j in 0 ..< vecLen:
+                seqVal[j] = jN[i][j].getFnum()
 
-proc getBonesData(s: Serializer, bone: Bone): JsonNode =
-    result = newJObject()
-    result.add("name", %bone.name)
-    result.add("id", %bone.id)
-    result.add("startMatrix", %bone.startMatrix)
-    result.add("invMatrix", %bone.invMatrix)
-    result.add("animTrack", s.getAnimationTrackData(bone.animTrack))
+            val.add( seqVal )
 
-    var childrenNode = newJArray()
-    result.add("children", childrenNode)
-    for child in bone.children:
-        childrenNode.add( s.getBonesData(child) )
+proc getValue*[T](s: Serializer, v: T): JsonNode =
+    result = %v
 
-proc getSkeletonData(s: Serializer, skeleton: Skeleton): JsonNode =
-    result = newJObject()
-    result.add("animDuration", %skeleton.animDuration)
-    result.add("rootBone", s.getBonesData(skeleton.rootBone))
+template deserializeValue*(s: Serializer, j: JsonNode, name: string, val: untyped) =
+    var tmp = val
+    s.getDeserialized(j, name, tmp)
+    val = tmp
 
-method getComponentData(s: Serializer, c: MeshComponent): JsonNode =
-    result = newJObject()
-
-    result.add("emission", colorToJNode(c.material.emission))
-    result.add("ambient", colorToJNode(c.material.ambient))
-    result.add("diffuse", colorToJNode(c.material.diffuse))
-    result.add("specular", colorToJNode(c.material.specular))
-    result.add("shininess", %c.material.shininess)
-    result.add("rim_density", %c.material.rim_density)
-
-    result.add("culling", %c.material.bEnableBackfaceCulling)
-    result.add("light", %c.material.isLightReceiver)
-    result.add("blend", %c.material.blendEnable)
-    result.add("depth_test", %c.material.depthEnable)
-    result.add("wireframe", %c.material.isWireframe)
-    result.add("RIM", %c.material.isRIM)
-    result.add("rimColor", colorToJNode(c.material.rimColor))
-
-    result.add("sRGB_normal", %c.material.isNormalSRGB)
-
-    result.add("matcapPercent", %c.material.matcapPercent)
-    result.add("matcapInterpolatePercent", %c.material.matcapInterpolatePercent)
-    result.add("albedoPercent", %c.material.albedoPercent)
-    result.add("glossPercent", %c.material.glossPercent)
-    result.add("specularPercent", %c.material.specularPercent)
-    result.add("normalPercent", %c.material.normalPercent)
-    result.add("bumpPercent", %c.material.bumpPercent)
-    result.add("reflectionPercent", %c.material.reflectionPercent)
-    result.add("falloffPercent", %c.material.falloffPercent)
-    result.add("maskPercent", %c.material.maskPercent)
-
-    result.add("matcapMixPercent", %c.material.matcapMixPercent)
-
-    if not c.material.matcapTexture.isNil:
-        result.add("matcapTexture",  %s.getRelativeResourcePath(c.material.matcapTexture.filePath()))
-    if not c.material.matcapInterpolateTexture.isNil:
-        result.add("matcapInterpolateTexture",  %s.getRelativeResourcePath(c.material.matcapInterpolateTexture.filePath()))
-    if not c.material.albedoTexture.isNil:
-        result.add("albedoTexture",  %s.getRelativeResourcePath(c.material.albedoTexture.filePath()))
-    if not c.material.glossTexture.isNil:
-        result.add("glossTexture",  %s.getRelativeResourcePath(c.material.glossTexture.filePath()))
-    if not c.material.specularTexture.isNil:
-        result.add("specularTexture",  %s.getRelativeResourcePath(c.material.specularTexture.filePath()))
-    if not c.material.normalTexture.isNil:
-        result.add("normalTexture",  %s.getRelativeResourcePath(c.material.normalTexture.filePath()))
-    if not c.material.bumpTexture.isNil:
-        result.add("bumpTexture",  %s.getRelativeResourcePath(c.material.bumpTexture.filePath()))
-    if not c.material.reflectionTexture.isNil:
-        result.add("reflectionTexture",  %s.getRelativeResourcePath(c.material.reflectionTexture.filePath()))
-    if not c.material.falloffTexture.isNil:
-        result.add("falloffTexture",  %s.getRelativeResourcePath(c.material.falloffTexture.filePath()))
-    if not c.material.maskTexture.isNil:
-        result.add("maskTexture",  %s.getRelativeResourcePath(c.material.maskTexture.filePath()))
-
-    var data = c.getVBDataFromVRAM()
-
-    proc needsKey(name: string): bool =
-        case name
-        of "vertex_coords": return c.vboData.vertInfo.numOfCoordPerVert > 0 or false
-        of "tex_coords": return c.vboData.vertInfo.numOfCoordPerTexCoord > 0  or false
-        of "normals": return c.vboData.vertInfo.numOfCoordPerNormal > 0  or false
-        of "tangents": return c.vboData.vertInfo.numOfCoordPerTangent > 0  or false
-        else: return false
-
-    template addInfo(name: string, f: typed) =
-        if needsKey(name):
-            result[name] = %f(c, data)
-
-    addInfo("vertex_coords", extractVertCoords)
-    addInfo("tex_coords", extractTexCoords)
-    addInfo("normals", extractNormals)
-    addInfo("tangents", extractTangents)
-
-    var ib = c.getIBDataFromVRAM()
-    var ibNode = newJArray()
-    result.add("indices", ibNode)
-    for v in ib:
-        ibNode.add(%int32(v))
-
-    if not c.skeleton.isNil:
-        result.add("skeleton", s.getSkeletonData(c.skeleton))
-        result["vertexWeights"] = %c.vertexWeights
-        result["boneIDs"] = %c.boneIDs
-
-proc getNodeData(s: Serializer, n: Node): JsonNode =
-    result = newJObject()
-    result.add("name", %n.name)
-    result.add("translation", vectorToJNode(n.translation))
-    result.add("scale", vectorToJNode(n.scale))
-    result.add("rotation", vectorToJNode(n.rotation))
-    result.add("alpha", %n.alpha)
-
-    if not n.components.isNil:
-        var componentsNode = newJObject()
-        result.add("components", componentsNode)
-
-        for k, v in n.components:
-            var jcomp: JsonNode
-            jcomp = s.getComponentData( v )
-
-            if not jcomp.isNil:
-                componentsNode.add(k, jcomp)
-
-    var childsNode = newJArray()
-    result.add("children", childsNode)
-    for child in n.children:
-        childsNode.add( s.getNodeData(child) )
-
-
-proc save*(s: Serializer, n: Node, path: string) =
+proc save*(s: Serializer, n: JsonNode, path: string) =
     when not defined(js) and not defined(android) and not defined(ios):
         s.savePath = path
-        var nd = s.getNodeData(n)
+        var nd = n #s.getNodeData(n)
         var str = nd.pretty()
 
         var fs = newFileStream(path, fmWrite)
