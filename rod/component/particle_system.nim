@@ -102,7 +102,6 @@ varying float vAlpha;
 
 void main()
 {
-    vAlpha = aLifeTime;
     vAlpha = aAlpha;
     vColor = aColor;
     vec3 vertexOffset;
@@ -124,13 +123,12 @@ void main()
     if (aID == 2.0) { vertexOffset = vec3( 0.5,  -0.5, 0); }
     if (aID == 3.0) { vertexOffset = vec3(-0.5,  -0.5, 0); }
 
-#ifdef TEXTURED
-    texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
-#endif
+    #ifdef TEXTURED
+        texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
+    #endif
 #endif
 
-    vertexOffset = vertexOffset * uNodeScale;
-    vertexOffset = vertexOffset * aScale;
+    vertexOffset = vertexOffset * uNodeScale * aScale;
 
     mat4 rMatrix = getRotationMatrix(aRotation);
     vec4 rotatedVertexOffset = rMatrix * vec4(vertexOffset, 1.0);
@@ -153,7 +151,7 @@ void main()
 const ParticleFragmentShader = """
 #ifdef GL_ES
     #extension GL_OES_standard_derivatives : enable
-    precision mediump float;
+    precision highp float;
     varying highp float vColor;
 #else
     varying float vColor;
@@ -181,9 +179,11 @@ void main()
 {
 #ifdef TEXTURED
     vec4 tex_color = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * texCoords);
-    gl_FragColor = tex_color * vec4(encodeRgbFromFloat(vColor), vAlpha);
+    vec3 color = encodeRgbFromFloat(vColor);
+    gl_FragColor = tex_color * vec4(color.xyz, vAlpha);
 #else
-    gl_FragColor = vec4(encodeRgbFromFloat(vColor), vAlpha);
+    vec3 color = encodeRgbFromFloat(vColor);
+    gl_FragColor = vec4(color.xyz, vAlpha);
 #endif
 }
 """
@@ -374,8 +374,7 @@ proc initSystem(ps: ParticleSystem) =
             (2.GLuint, "aScale"),
             (3.GLuint, "aAlpha"),
             (4.GLuint, "aColor"),
-            (5.GLuint, "aID"),
-            (6.GLuint, "aLifeTime")])
+            (5.GLuint, "aID")])
 
     ps.genShapeNode = ps.node
 
@@ -736,6 +735,8 @@ method draw*(ps: ParticleSystem) =
     offset += ps.vertexDesc.idSize * sizeof(GLfloat)
 
     if ps.isTextureAnimated:
+        ps.shader.bindAttribLocation(6, "aLifeTime")
+
         gl.enableVertexAttribArray(6)
         gl.vertexAttribPointer(6, ps.vertexDesc.lifeTimeSize, gl.FLOAT, false, stride.GLsizei , offset)
 
@@ -763,11 +764,12 @@ method draw*(ps: ParticleSystem) =
     if not ps.texture.isNil:
         ps.shader.setUniform("uTexUnitCoords", theQuad)
         ps.shader.setUniform("texUnit", 0)
-        var fs = newSize(ps.frameSize.width / ps.texture.size.width, ps.frameSize.height / ps.texture.size.height)
-        ps.shader.setUniform("uFrameSize", fs)
-        ps.shader.setUniform("uAnimColumns", ps.animColumns)
-        ps.shader.setUniform("uFramesCount", ps.framesCount)
-        ps.shader.setUniform("uFPS", ps.fps)
+        if ps.isTextureAnimated:
+            var fs = newSize(ps.frameSize.width / ps.texture.size.width, ps.frameSize.height / ps.texture.size.height)
+            ps.shader.setUniform("uFrameSize", fs)
+            ps.shader.setUniform("uAnimColumns", ps.animColumns)
+            ps.shader.setUniform("uFramesCount", ps.framesCount)
+            ps.shader.setUniform("uFPS", ps.fps)
 
     ps.shader.setTransformUniform()
 
