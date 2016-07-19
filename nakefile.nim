@@ -7,7 +7,7 @@ beforeBuild = proc(b: Builder) =
     b.originalResourcePath = "editor/res"
 
 afterBuild = proc(b: Builder) =
-    shell "cat ./build/js/main.js"
+    shell "head -n 2000 ./build/js/main.js"
 
 task "tests", "Build and run autotests":
     let b = newBuilder()
