@@ -2,9 +2,12 @@ import nimx.naketools
 import osproc
 
 beforeBuild = proc(b: Builder) =
-    b.disableClosureCompiler = false
+    b.disableClosureCompiler = true
     b.mainFile = "editor/rodedit"
     b.originalResourcePath = "editor/res"
+
+afterBuild = proc(b: Builder) =
+    shell "cat ./build/js/main.js"
 
 task "tests", "Build and run autotests":
     let b = newBuilder()
