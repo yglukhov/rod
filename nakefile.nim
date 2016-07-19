@@ -6,9 +6,6 @@ beforeBuild = proc(b: Builder) =
     b.mainFile = "editor/rodedit"
     b.originalResourcePath = "editor/res"
 
-afterBuild = proc(b: Builder) =
-    shell "head -n 2000 ./build/js/main.js"
-
 task "tests", "Build and run autotests":
     let b = newBuilder()
 
