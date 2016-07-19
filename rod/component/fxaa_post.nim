@@ -6,9 +6,9 @@ import nimx.image
 import nimx.animation
 import nimx.portable_gl
 import nimx.render_to_image
+import nimx.property_visitor
 
 import rod.node
-import rod.property_visitor
 import rod.viewport
 import rod.quaternion
 import rod.component

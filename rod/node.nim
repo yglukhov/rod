@@ -11,11 +11,11 @@ import nimx.animation
 import nimx.image
 import nimx.portable_gl
 import nimx.view
+import nimx.property_visitor
 
 import quaternion
-import property_visitor
 import ray
-import meta_data
+import rod.tools.serializer
 
 import rod_types
 export Node
@@ -26,11 +26,94 @@ import rod.component
 
 proc newNode*(name: string = nil): Node =
     result.new()
-    result.scale = newVector3(1, 1, 1)
-    result.rotation = newQuaternion()
+    result.mScale = newVector3(1, 1, 1)
+    result.mRotation = newQuaternion()
     result.children = @[]
     result.name = name
     result.alpha = 1.0
+    result.isDirty = true
+
+proc setDirty(n: Node) =
+    if n.isDirty == false:
+        n.isDirty = true
+        for c in n.children:
+            c.setDirty()
+
+template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
+proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
+    n.mTranslation = p
+    n.setDirty()
+
+proc `translate=`*(n: Node, p: Vector3) =
+    n.mTranslation += p
+    n.setDirty()
+proc `translateX=`*(n: Node, vx: float) =
+    n.mTranslation.x += vx
+    n.setDirty()
+proc `translateY=`*(n: Node, vy: float) =
+    n.mTranslation.y += vy
+    n.setDirty()
+proc `translateZ=`*(n: Node, vz: float) =
+    n.mTranslation.z += vz
+    n.setDirty()
+
+proc position*(n: Node): Vector3 = n.mTranslation
+proc positionX*(n: Node): Coord = n.mTranslation.x
+proc positionY*(n: Node): Coord = n.mTranslation.y
+proc positionZ*(n: Node): Coord = n.mTranslation.z
+
+proc `position=`*(n: Node, p: Vector3) =
+    n.mTranslation = p
+    n.setDirty()
+proc `positionX=`*(n: Node, x: Coord) =
+    n.mTranslation.x = x
+    n.setDirty()
+proc `positionY=`*(n: Node, y: Coord) =
+    n.mTranslation.y = y
+    n.setDirty()
+proc `positionZ=`*(n: Node, z: Coord) =
+    n.mTranslation.z = z
+    n.setDirty()
+
+proc rotation*(n: Node): Quaternion = n.mRotation
+proc `rotation=`*(n: Node, r: Quaternion) =
+    n.mRotation = r
+    n.setDirty()
+proc `rotationX=`*(n: Node, vx: float) =
+    n.mRotation.x = vx
+    n.setDirty()
+proc `rotationY=`*(n: Node, vy: float) =
+    n.mRotation.y = vy
+    n.setDirty()
+proc `rotationZ=`*(n: Node, vz: float) =
+    n.mRotation.z = vz
+    n.setDirty()
+proc `rotationW=`*(n: Node, vw: float) =
+    n.mRotation.w = vw
+    n.setDirty()
+
+template scale*(n: Node): Vector3 = n.mScale
+proc scaleX*(n: Node): Coord = n.mScale.x
+proc scaleY*(n: Node): Coord = n.mScale.y
+proc scaleZ*(n: Node): Coord = n.mScale.z
+
+proc `scale=`*(n: Node, s: Vector3) =
+    n.mScale = s
+    n.setDirty()
+proc `scaleX=`*(n: Node, value: Coord) =
+    n.mScale.x = value
+    n.setDirty()
+proc `scaleY=`*(n: Node, value: Coord) =
+    n.mScale.y = value
+    n.setDirty()
+proc `scaleZ=`*(n: Node, value: Coord) =
+    n.mScale.z = value
+    n.setDirty()
+
+proc parent*(n: Node): Node = n.mParent
+proc `parent=`*(n: Node, p: Node) =
+    n.mParent = p
+    n.setDirty()
 
 proc createComponentForNode(n: Node, name: string): Component =
     result = createComponent(name)
@@ -94,13 +177,13 @@ proc recursiveUpdate*(n: Node) =
     for c in n.children: c.recursiveUpdate()
 
 proc makeTransform(n: Node): Matrix4 =
-    var rot = n.rotation.toMatrix4()
+    var rot = n.mRotation.toMatrix4()
 
     # // Set up final matrix with scale, rotation and translation
-    result[0] = n.scale.x * rot[0]; result[1] = n.scale.x * rot[1]; result[2] = n.scale.x * rot[2];
-    result[4] = n.scale.y * rot[4]; result[5] = n.scale.y * rot[5]; result[6] = n.scale.y * rot[6];
-    result[8] = n.scale.z * rot[8]; result[9] = n.scale.z * rot[9]; result[10] = n.scale.z * rot[10];
-    result[12] = n.translation.x;  result[13] = n.translation.y; result[14] = n.translation.z;
+    result[0] = n.mScale.x * rot[0]; result[1] = n.mScale.x * rot[1]; result[2] = n.mScale.x * rot[2];
+    result[4] = n.mScale.y * rot[4]; result[5] = n.mScale.y * rot[5]; result[6] = n.mScale.y * rot[6];
+    result[8] = n.mScale.z * rot[8]; result[9] = n.mScale.z * rot[9]; result[10] = n.mScale.z * rot[10];
+    result[12] = n.position.x;  result[13] = n.position.y; result[14] = n.position.z;
 
     # // No projection term
     result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
@@ -111,16 +194,19 @@ proc getTransform*(n: Node, mat: var Matrix4) =
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
-    result.loadIdentity()
-    n.getTransform(result)
+    if n.isDirty:
+        n.mMatrix = n.makeTransform()
+        n.isDirty = false
+
+    return n.mMatrix
 
 proc recursiveDraw*(n: Node) =
     if n.alpha < 0.0000001: return
     let c = currentContext()
-    var tr = c.transform
+    var tr = c.transform * n.transform()#c.transform #
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
-    n.getTransform(tr)
+    #n.getTransform(tr)
 
     c.withTransform tr:
         var hasPosteffectComponent = false
@@ -131,6 +217,30 @@ proc recursiveDraw*(n: Node) =
         if not hasPosteffectComponent:
             for c in n.children: c.recursiveDraw()
     c.alpha = oldAlpha
+
+proc findNode*(n: Node, p: proc(n: Node): bool): Node =
+    if p(n):
+        result = n
+    else:
+        for c in n.children:
+            result = c.findNode(p)
+            if not result.isNil: break
+
+proc findNode*(n: Node, name: string): Node =
+    n.findNode proc(n: Node): bool =
+        n.name == name
+
+
+let nodeLoadRefTable = newTable[string, proc(nodeValue: Node)]()
+template addNodeRef*(refNode: var Node, name: string) =
+    let refProc = proc(nodeValue: Node) = refNode = nodeValue
+    nodeLoadRefTable[name] = refProc
+
+proc checkNodeRefs(view: SceneView) =
+    for k, v in nodeLoadRefTable:
+        let foundNode = view.mRootNode.findNode(k)
+        if not foundNode.isNil:
+            v(foundNode)
 
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     if not n.components.isNil:
@@ -171,6 +281,7 @@ proc addChild*(n, c: Node) =
     c.removeFromParent()
     n.children.safeAdd(c)
     c.parent = n
+    c.setDirty()
     if not n.mSceneView.isNil:
         c.nodeWasAddedToSceneView(n.mSceneView)
 
@@ -182,20 +293,9 @@ proc insertChild*(n, c: Node, index: int) =
     c.removeFromParent()
     n.children.insert(c, index)
     c.parent = n
+    c.setDirty()
     if not n.mSceneView.isNil:
         c.nodeWasAddedToSceneView(n.mSceneView)
-
-proc findNode*(n: Node, p: proc(n: Node): bool): Node =
-    if p(n):
-        result = n
-    else:
-        for c in n.children:
-            result = c.findNode(p)
-            if not result.isNil: break
-
-proc findNode*(n: Node, name: string): Node =
-    n.findNode proc(n: Node): bool =
-        n.name == name
 
 proc childNamed*(n: Node, name: string): Node =
     for c in n.children:
@@ -226,29 +326,32 @@ proc worldPos*(n: Node): Vector3 =
     result = n.localToWorld(newVector3())
 
 proc `worldPos=`(n: Node, p: Vector3) =
-    n.translation = n.parent.worldToLocal(p)
+    if n.parent.isNil:
+        n.mTranslation = p
+    else:
+        n.mTranslation = n.parent.worldToLocal(p)
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
-    p.visitProperty("translation", n.translation)
+    p.visitProperty("translation", n.position)
     p.visitProperty("worldPos", n.worldPos)
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
     p.visitProperty("alpha", n.alpha)
 
-    p.visitProperty("tX", n.translation.x, { pfAnimatable })
-    p.visitProperty("tY", n.translation.y, { pfAnimatable })
-    p.visitProperty("tZ", n.translation.z, { pfAnimatable })
-    p.visitProperty("sX", n.scale.x, { pfAnimatable })
-    p.visitProperty("sY", n.scale.y, { pfAnimatable })
-    p.visitProperty("sZ", n.scale.z, { pfAnimatable })
+    p.visitProperty("tX", n.positionX, { pfAnimatable })
+    p.visitProperty("tY", n.positionY, { pfAnimatable })
+    p.visitProperty("tZ", n.positionZ, { pfAnimatable })
+    p.visitProperty("sX", n.scaleX, { pfAnimatable })
+    p.visitProperty("sY", n.scaleY, { pfAnimatable })
+    p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
 
 proc reparentTo*(n, newParent: Node) =
     # Change parent of a node preserving its world transform
     let oldWorldTransform = n.worldTransform
     newParent.addChild(n)
     let newTransform = newParent.worldTransform.inversed() * oldWorldTransform
-    n.translation = translationFromMatrix(newTransform)
+    n.mTranslation = translationFromMatrix(newTransform)
 
 proc animationNamed*(n: Node, name: string, preserveHandlers: bool = false): Animation =
     if not n.animations.isNil:
@@ -266,21 +369,19 @@ proc getGlobalAlpha*(n: Node): float =
         result = result * n.parent.getGlobalAlpha()
 
 # Serialization
-proc newNodeFromJson*(j: JsonNode): Node
-proc deserialize*(n: Node, j: JsonNode)
+proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
+proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
 proc loadComposition*(n: Node, resourceName: string) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(resourceName)
-        n.deserialize(j)
+        let serializer = Serializer.new()
+        n.deserialize(j, serializer)
         popParentResource()
 
 import ae_animation
 
 # proc deserialize*(n: Node, s: Serializer) =
-#     proc toValue(j: JsonNode, s: var string) =
-#         s = j.str
-
 #     proc toValue(j: JsonNode, s: var string) =
 #         s = j.str
 
@@ -294,30 +395,23 @@ import ae_animation
 #         jNode{jsonNameForPropName(k)}.toValue(v)
 
 
-proc deserialize*(n: Node, j: JsonNode) =
+proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if n.name.isNil:
-        n.name = j["name"].getStr(nil)
-    var v = j{"translation"}
-    if not v.isNil:
-        n.translation = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j{"scale"}
-    if not v.isNil:
-        n.scale = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    v = j{"rotation"}
-    if not v.isNil:
-        n.rotation = newQuaternion(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
-    v = j{"alpha"}
-    if not v.isNil:
-        n.alpha = v.getFNum()
-    v = j{"children"}
+        s.deserializeValue(j, "name", n.name)
+    s.deserializeValue(j, "translation", n.position)
+    s.deserializeValue(j, "scale", n.mScale)
+    s.deserializeValue(j, "rotation", n.mRotation)
+    s.deserializeValue(j, "alpha", n.alpha)
+
+    var v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
-            n.addChild(newNodeFromJson(v[i]))
+            n.addChild(newNodeFromJson(v[i], s))
     v = j{"components"}
     if not v.isNil:
         for k, c in v:
             let comp = n.component(k)
-            comp.deserialize(c)
+            comp.deserialize(c, s)
 
     let animations = j{"animations"}
     if not animations.isNil and animations.len > 0:
@@ -329,9 +423,9 @@ proc deserialize*(n: Node, j: JsonNode) =
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 
-proc newNodeFromJson*(j: JsonNode): Node =
+proc newNodeFromJson*(j: JsonNode, s: Serializer): Node =
     result = newNode()
-    result.deserialize(j)
+    result.deserialize(j, s)
 
 proc newNodeWithResource*(name: string): Node =
     result = newNode()
@@ -340,6 +434,30 @@ proc newNodeWithResource*(name: string): Node =
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
     result.loadComposition("compositions/" & name & ".json")
+
+proc serialize*(n: Node, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("name", s.getValue(n.name))
+    result.add("translation", s.getValue(n.position))
+    result.add("scale", s.getValue(n.scale))
+    result.add("rotation", s.getValue(n.rotation))
+    result.add("alpha", s.getValue(n.alpha))
+
+    if not n.components.isNil:
+        var componentsNode = newJObject()
+        result.add("components", componentsNode)
+
+        for key, value in n.components:
+            var jcomp: JsonNode
+            jcomp = value.serialize( s )
+
+            if not jcomp.isNil:
+                componentsNode.add(key, jcomp)
+
+    var childsNode = newJArray()
+    result.add("children", childsNode)
+    for child in n.children:
+        childsNode.add( child.serialize(s) )
 
 proc getDepth*(n: Node): int =
     result = 0

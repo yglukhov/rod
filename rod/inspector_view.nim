@@ -5,22 +5,23 @@ import nimx.button
 import nimx.matrixes
 import nimx.menu
 import nimx.scroll_view
+import nimx.panel_view
+import nimx.linear_layout
+import nimx.property_visitor
 
 import variant
 
 export view
 
-import panel_view
 import node
 import component
 import rod_types
 
-import property_visitor
-import property_editors.propedit_registry
-import property_editors.standard_editors
+import rod.property_editors.propedit_registry
+import rod.property_editors.standard_editors
+
 
 type InspectorView* = ref object of PanelView
-    nameTextField: TextField
 
 method init*(i: InspectorView, r: Rect) =
     procCall i.PanelView.init(r)
@@ -32,19 +33,32 @@ method init*(i: InspectorView, r: Rect) =
     i.addSubview(title)
     i.autoresizingMask = { afFlexibleMaxX }
 
-proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string): View
-proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): View
+proc newSectionTitle(inspector: InspectorView, n: Node3D, name: string): View
+proc createNewComponentButton(inspector: InspectorView, n: Node3D): View
+
+proc moveSubviewToBack(v, s: View) =
+    let i = v.subviews.find(s)
+    if i != -1:
+        v.subviews.delete(i)
+        v.subviews.insert(s, 0)
 
 proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
-    if i.subviews.len > 1:
-        i.subviews[1].removeFromSuperview()
+    # TODO: This is a hacky hardcode! Here we assume that inspector can have either
+    # 2 subviews (no node edited) or 3 subviews, first of which is the scrollview
+    # with property editors. We want to remove the scrollview.
+    if i.subviews.len > 2:
+        i.subviews[0].removeFromSuperview()
 
     if not n.isNil:
-        let propView = View.new(newRect(1, 0, i.bounds.width - 6, 20))
+        let propView = newVerticalLayout(newRect(0, 0, i.bounds.width, 20))
         propView.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+        propView.topMargin = 5
+        propView.bottomMargin = 5
+        propView.leftMargin = 5
+        propView.rightMargin = 5
 
-        var y = Coord(0)
-        var pv: View
+        proc changeInspectorView() =
+            i.inspectedNode = n
 
         proc cahngeInspectorView() =
             i.inspectedNode = n
@@ -55,75 +69,61 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            pv = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, cahngeInspectorView)
-            pv.setFrameOrigin(newPoint(6, y))
-            pv.setFrameSize(newSize(pv.frame.width - 16.Coord, pv.frame.height))
-            y += pv.frame.height
-            propView.addSubview(pv)
+            propView.addSubview(propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView))
 
         n.visitProperties(visitor)
 
         if not n.components.isNil:
             for k, v in n.components:
-                y += 12
-                pv = newSectionTitle(y, i, n, k)
-                y += pv.frame.height
-                propView.addSubview(pv)
+                propView.addSubview(newSectionTitle(i, n, k))
                 v.visitProperties(visitor)
 
-        y += 24
-        pv = createNewComponentButton(y, i, n)
-        pv.setFrameSize(newSize(pv.frame.width - 16, pv.frame.height))
-        y += pv.frame.height
-        propView.addSubview(pv)
+        propView.addSubview(createNewComponentButton(i, n))
 
         var fs = propView.frame.size
-        fs.height = y + 15
-        propView.setFrameSize(fs)
-        i.addSubview(propView)
 
-        i.contentHeight = if fs.height + i.titleHeight <= i.window.frame.height: fs.height else: i.window.frame.height - i.titleHeight
+        i.contentHeight = if fs.height + i.titleHeight + i.frame.y <= i.window.frame.height: fs.height else: i.window.frame.height - i.titleHeight - i.frame.y
         i.collapsed = false
 
         let scView = newScrollView(propView)
         scView.horizontalScrollBar = nil
+        scView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
         scView.setFrameOrigin(newPoint(scView.frame.x, i.titleHeight))
         scView.setFrameSize(newSize(i.frame.width, i.contentHeight))
         i.addSubview(scView)
+        i.moveSubviewToBack(scView)
     else:
         i.collapsed = true
 
-proc newSectionTitle(y: Coord, inspector: InspectorView, n: Node3D, name: string): View =
-    result = View.new(newRect(0, y, 324, 17))
-    let v = newLabel(newRect(120, 0, 100, 15))
+proc newSectionTitle(inspector: InspectorView, n: Node3D, name: string): View =
+    result = View.new(newRect(0, 0, 324, 18))
+    let v = newLabel(newRect(100, 0, 100, 15))
     v.text = name
     v.textColor = newColor(1.0, 1.0, 0.5)
     result.addSubview(v)
 
-    let removeButton = newButton(newRect(result.bounds.width - 40, -2, 24, 24))
-    removeButton.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
+    let removeButton = newButton(newRect(result.bounds.width - 18, 0, 18, 18))
+    removeButton.autoresizingMask = {afFlexibleMinX, afFlexibleMinY}
     removeButton.title = "-"
     removeButton.onAction do():
         n.removeComponent(name)
         inspector.inspectedNode = n
     result.addSubview(removeButton)
 
-proc createNewComponentButton(y: Coord, inspector: InspectorView, n: Node3D): View =
-    let b = Button.new(newRect(6, y, inspector.frame.width - 12, 24))
+proc createNewComponentButton(inspector: InspectorView, n: Node3D): View =
+    let b = Button.new(newRect(0, 30, 0, 20))
     b.title = "New component"
     b.onAction do():
         var menu : Menu
         menu.new()
         var items = newSeq[MenuItem]()
         for i, c in registeredComponents():
-            let menuItem = newMenuItem(c)
-            let pWorkaroundForJS = proc(mi: MenuItem): proc() =
-                result = proc() =
-                    discard n.component(mi.title)
+            closureScope:
+                let menuItem = newMenuItem(c)
+                menuItem.action = proc() =
+                    discard n.component(menuItem.title)
                     inspector.inspectedNode = n
-
-            menuItem.action = pWorkaroundForJS(menuItem)
-            items.add(menuItem)
+                items.add(menuItem)
 
         menu.items = items
         menu.popupAtPoint(inspector, newPoint(0, 27))

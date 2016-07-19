@@ -10,11 +10,11 @@ import nimasset.collada
 import nimx.animation
 import nimx.types
 import nimx.matrixes
+import nimx.property_visitor
 
 import rod_types
 import node
 import component
-import property_visitor
 import quaternion
 
 type AnimProcSetter = proc(progress: float)

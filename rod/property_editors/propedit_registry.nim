@@ -1,10 +1,11 @@
-import json
 import nimx.view
-import nimx.text_field
+import nimx.property_editors.propedit_registry as npr
+
+export npr
 
 import rod.node
-import rod.property_visitor
 import variant
+<<<<<<< HEAD
 import tables
 import rod.meta_data
 
@@ -33,21 +34,6 @@ proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCall
     result.addSubview(label)
     if creator.isNil:
         label.text = title & " - Unknown property"
-    else:
-        let editor = creator(n, v)
-        var sz = result.frame.size
-        sz.height = editor.frame.height
-        editor.setFrameOrigin(newPoint(label.frame.width, 12))
-        editor.setFrameSize(sz)
-        sz = newSize(result.bounds.width - label.frame.width - 12, editor.frame.height)
-        editor.setFrameSize(sz)
-        editor.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
-        result.addSubview(editor)
 
-        sz = result.frame.size
-        sz.height = editor.frame.height + 5
-        result.setFrameSize(sz)
-
-        editor.onChange = onChangeCallback
-        editor.changeInspector = changeInspectorCallback
-
+proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCallback, changeInspectorCallback: proc()): View =
+    propertyEditorForProperty(newVariant(n), title, v, onChangeCallback, changeInspectorCallback)

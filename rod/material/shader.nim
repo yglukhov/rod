@@ -63,6 +63,9 @@ proc newShader*(vs, fs: string, attributes: seq[tuple[index: GLuint, name: strin
 
     result.createShader()
 
+proc bindAttribLocation*(sh: Shader, index: GLuint, name: string) =
+    currentContext().gl.bindAttribLocation(sh.program, index, name)
+
 proc addDefine*(sh: Shader, def: string) =
     sh.shaderMacroFlags.incl(def)
     sh.needUpdate = true
@@ -97,6 +100,11 @@ template setUniform*(sh: Shader, name: string, uniform: Vector3) =
 template setUniform*(sh: Shader, name: string, uniform: Vector4) =
     let gl = currentContext().gl
     gl.uniform4fv(gl.getUniformLocation(sh.program, name), uniform)
+
+template setUniform*(sh: Shader, name: string, uniform: Color) =
+    let gl = currentContext().gl
+    let arr = [uniform.r, uniform.g, uniform.b, uniform.a]
+    gl.uniform4fv(gl.getUniformLocation(sh.program, name), arr)
 
 template setUniform*(sh: Shader, name: string, uniform: Size) =
     currentContext().setPointUniform(gl.getUniformLocation(sh.program, name), newPoint(uniform.width, uniform.height))

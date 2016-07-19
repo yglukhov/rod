@@ -8,7 +8,12 @@
 
 if [ "$GH_KEY" \!= "" ]
 then
+    export GIT_DIR=/tmp/gh-pages.tmp
+    rm -rf "$GIT_DIR"
+    mkdir -p "$GIT_DIR"
+
     cd "$1"
+    export GIT_WORK_TREE=$(pwd)
     git init
 
     git config user.name "Travis CI"

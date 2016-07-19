@@ -69,7 +69,7 @@ var gExportFolderPath = ""
 proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string =
     var path = $footageSource.projectPath
     if path[^1] != '/': path &= "/"
-    result = relativePathToPath(gCompExportPath, path & $decodeURIComponent(file.name))
+    result = relativePathToPath("/" & gCompExportPath, path & $decodeURIComponent(file.name))
 
 proc `%`[T: string | SomeNumber](s: openarray[T]): JsonNode =
     result = newJArray()
@@ -95,13 +95,14 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                     imageFileRelativeExportPaths.add(%getExportPathFromSourceFile(footageSource, f))
 
                     # Copy the file to the resources
-                    let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
-                    logi "Copying: ", resourcePath
-                    let targetFile = newFile(resourcePath)
-                    if not targetFile.parent.create():
-                        logi "ERROR: Could not create folder for ", resourcePath
-                    if not f.copy(targetFile):
-                        logi "ERROR: Could not copy ", resourcePath
+                    if app.settings.getSetting("rodExport", "copyResources") == "true":
+                        let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
+                        logi "Copying: ", resourcePath
+                        let targetFile = newFile(resourcePath)
+                        if not targetFile.parent.create():
+                            logi "ERROR: Could not create folder for ", resourcePath
+                        if not f.copy(targetFile):
+                            logi "ERROR: Could not copy ", resourcePath
 
                 var sprite = newJObject()
                 sprite["fileNames"] = imageFileRelativeExportPaths
@@ -156,6 +157,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         var textDoc = text.property("Source Text", TextDocument).value
         var txt = newJObject()
         txt["text"] = % $textDoc.text
+        txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
         case textDoc.justification
@@ -171,7 +173,18 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
             let alpha = shadow.property("Opacity", float32).valueAtTime(0) / 100
             txt["shadowColor"] = %[color.x, color.y, color.z, alpha]
             let radAngle = degToRad(angle + 180)
-            txt["shadowOff"] = %[distance * cos(radAngle), - distance * sin(radAngle)]
+            # txt["shadowOff"] = %[distance * cos(radAngle), - distance * sin(radAngle)]
+            txt["shadowX"] = %(distance * cos(radAngle))
+            txt["shadowY"] = %(- distance * sin(radAngle))
+
+        let stroke = layer.propertyGroup("Layer Styles").propertyGroup("Stroke")
+        if not stroke.isNil:
+            logi "Stroke  "
+            let size = stroke.property("Size", float32).valueAtTime(0)
+            let color = stroke.property("Color", Vector4).valueAtTime(0)
+            let alpha = stroke.property("Opacity", float32).valueAtTime(0) / 100
+            txt["strokeColor"] = %[color.x, color.y, color.z, alpha]
+            txt["strokeSize"] = %size
 
         result["Text"] = txt
 
@@ -456,7 +469,9 @@ proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float, length: int): i
     if relTime < 0: relTime = 0
     if relTime >= f.duration: relTime = f.duration - 0.01
 
-    result = int(relTime / f.frameDuration) mod length
+    result = round(relTime / f.frameDuration mod length.float).int
+    if result >= length:
+        result.dec()
 
 proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
     var animationStartTime = marker.time
@@ -479,6 +494,7 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
 
     let anim = newJObject()
     anim["duration"] = %(animationEndTime - animationStartTime)
+    anim["frameLerp"] = %false
     anim["values"] = sampledPropertyValues
     if marker.loops != 0: anim["numberOfLoops"] = %marker.loops
 
@@ -609,6 +625,15 @@ function buildUI(contextObj) {
 
   var filePath = topGroup.add("statictext");
   filePath.alignment = ["fill", "fill"];
+
+  var isCopyResources = topGroup.add("checkbox", undefined, "Copy resources");
+  isCopyResources.alignment = ["right", "center"];
+  isCopyResources.value = true
+  app.settings.saveSetting("rodExport", "copyResources", "true")
+
+  isCopyResources.onClick = function(e) {
+    app.settings.saveSetting("rodExport", "copyResources", isCopyResources.value + "");
+  }
 
   var exportButton = topGroup.add("button", undefined,
     "Export selected compositions");
