@@ -37,15 +37,15 @@ type
     Attrib = enum
         aPosition
     Tracer* = ref object of Component
-        color*: Vector4
+        color*: Color
         indexBuffer: BufferRef
         vertexBuffer: BufferRef
         numberOfIndexes: GLsizei
         vertexOffset: int32
         indexOffset: int32
         prevTransform: Vector3
-        traceStep*: int32
-        traceStepCounter: int32
+        traceStep*: int
+        traceStepCounter: int
 
 proc newTracer(): Tracer =
     new(result, proc(t: Tracer) =
@@ -62,7 +62,7 @@ proc newTracer(): Tracer =
 method init*(t: Tracer) =
     procCall t.Component.init()
 
-    t.color = newVector4(0, 0, 0, 1)
+    t.color = newColor(0, 0, 0, 1)
     t.numberOfIndexes = 0.GLsizei
     t.traceStep = 5
     t.vertexOffset = 0
@@ -169,8 +169,6 @@ method draw*(t: Tracer) =
     if t.numberOfIndexes > 0:
         gl.enable(gl.DEPTH_TEST)
 
-        gl.enable(gl.DEPTH_TEST)
-
         gl.bindBuffer(gl.ARRAY_BUFFER, t.vertexBuffer)
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.indexBuffer)
         gl.enableVertexAttribArray(aPosition.GLuint)
@@ -181,7 +179,7 @@ method draw*(t: Tracer) =
             gl.enable(gl.BLEND)
             gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
-        gl.uniform4fv(gl.getUniformLocation(tracerShader, "uColor"), t.color)
+        c.setColorUniform(tracerShader, "uColor", t.color)
 
         let vp = t.node.sceneView
         let mvpMatrix = vp.getViewProjectionMatrix()

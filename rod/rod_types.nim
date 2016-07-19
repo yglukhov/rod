@@ -38,6 +38,8 @@ type
         shader*: ProgramRef
         setupProc*: proc(c: Component)
         drawProc*: proc(c: Component)
+        depthImage*: SelfContainedImage
+        depthMatrix*: Matrix4
 
     SceneView* = ref object of View
         viewMatrixCached*: Matrix4
