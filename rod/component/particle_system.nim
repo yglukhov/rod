@@ -128,8 +128,7 @@ void main()
     #endif
 #endif
 
-    vertexOffset = vertexOffset * 1.0;
-    vertexOffset = vertexOffset * aScale;
+    vertexOffset = vertexOffset * uNodeScale * aScale;
 
     mat4 rMatrix = getRotationMatrix(aRotation);
     vec4 rotatedVertexOffset = rMatrix * vec4(vertexOffset, 1.0);

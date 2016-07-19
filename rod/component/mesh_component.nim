@@ -299,9 +299,7 @@ method draw*(m: MeshComponent) =
 
 proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
-        when defined(js):
-            asm "`gl`.BufferSubData(`target`, `offset`, new Uint16Array(`data`));"
-        elif defined(android) or defined(ios):
+        when defined(android) or defined(ios) or defined(js) or defined(emscripten):
             echo "android and iOS dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
@@ -322,9 +320,7 @@ proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
         return c.initMesh
 
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLfloat]) =
-        when defined(js):
-            asm "`gl`.BufferSubData(`target`, `offset`, new Float32Array(`data`));"
-        elif defined(android) or defined(ios):
+        when defined(android) or defined(ios) or defined(js) or defined(emscripten):
             echo "android and iOS dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
