@@ -1,3 +1,4 @@
+import algorithm
 import strutils, tables
 import nimx.view
 import nimx.text_field
@@ -114,7 +115,9 @@ proc createNewComponentButton(inspector: InspectorView, n: Node3D): View =
         var menu : Menu
         menu.new()
         var items = newSeq[MenuItem]()
-        for i, c in registeredComponents():
+        var components = registeredComponents()
+        sort(components, system.cmp)
+        for i, c in components:
             closureScope:
                 let menuItem = newMenuItem(c)
                 menuItem.action = proc() =
