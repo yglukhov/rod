@@ -202,14 +202,6 @@ type
         idSize: int32
         lifeTimeSize: int32
 
-    Particle = ref object
-        position: Vector3
-        rotation, rotationVelocity: Vector3 #deg per sec
-        scale: Vector3
-        lifetime: float
-        velocity: Vector3
-        randStartScale: float
-
     ParticleSystem* = ref object of Component
         animation*: Animation
         count: int32
@@ -250,8 +242,8 @@ type
         isPlayed*: bool
         is3dRotation*: bool
 
-        attractorNode*: Node
-        attractor*: PSAttractor
+        modifierNode*: Node
+        modifier*: PSModifier
 
         genShapeNode*: Node
         genShape: PSGenShape
@@ -314,6 +306,7 @@ proc calculateVertexDesc(ps: ParticleSystem): VertexDesc =
 
 proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle =
     result = Particle.new()
+    result.node = ps.node
 
     var interpolatePos: Vector3
     var interpolateDt: float
@@ -534,19 +527,15 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
                 ps.particlesVertexBuff.add(0.0)
 
         ps.particles[i].lifetime -= dt
-        let normLifeTime = ps.particles[i].lifetime / ps.lifetime
-        let oneMinusNormLifeTime = 1.0 - normLifeTime
+        ps.particles[i].normalizedLifeTime = ps.particles[i].lifetime / ps.lifetime
+        let oneMinusNormLifeTime = 1.0 - ps.particles[i].normalizedLifeTime
 
         v1 = vertexSize* (4 * ps.count + 0) # vertexSize (vertexCount * index + vertexNum)
         v2 = vertexSize* (4 * ps.count + 1)
         v3 = vertexSize* (4 * ps.count + 2)
         v4 = vertexSize* (4 * ps.count + 3)
-        var offset = 0
 
         # positions
-        if not ps.attractor.isNil:
-            ps.particles[i].velocity += ps.attractor.getForceAtPoint(ps.particles[i].position)
-
         if ps.airDensity > 0.0:
             var density_vec = ps.particles[i].velocity
             density_vec.normalize()
@@ -559,6 +548,37 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         ps.particles[i].position.y += ps.particles[i].velocity.y*dt
         ps.particles[i].position.z += ps.particles[i].velocity.z*dt
 
+        # rotation
+        if ps.is3dRotation:
+            ps.particles[i].rotation += ps.particles[i].rotationVelocity * dt
+        else:
+            ps.particles[i].rotation.z += ps.particles[i].rotationVelocity.z * dt
+
+        # scale
+        if ps.scaleMode == ParticleModeEnum.TimeSequence:
+            let sc = ps.scaleSeq.getValueAtTime(oneMinusNormLifeTime)
+            ps.particles[i].scale.x = sc[1]
+            ps.particles[i].scale.y = sc[2]
+        else:
+            ps.particles[i].scale.x = (ps.startScale.x + ps.particles[i].randStartScale) * ps.particles[i].normalizedLifeTime + ps.dstScale.x * oneMinusNormLifeTime
+            ps.particles[i].scale.y = (ps.startScale.y + ps.particles[i].randStartScale) * ps.particles[i].normalizedLifeTime + ps.dstScale.y * oneMinusNormLifeTime
+
+        # alpha and color
+        if ps.colorMode == ParticleModeEnum.TimeSequence:
+            let sc = ps.colorSeq.getValueAtTime(oneMinusNormLifeTime)
+            ps.particles[i].color.r = sc[1]
+            ps.particles[i].color.g = sc[2]
+            ps.particles[i].color.b = sc[3]
+            ps.particles[i].color.a = sc[4]
+        else:
+            ps.particles[i].color = ps.startColor * ps.particles[i].normalizedLifeTime + ps.dstColor * oneMinusNormLifeTime
+
+        # Modifiers
+        if not ps.modifier.isNil:
+            ps.modifier.updateParticle(ps.particles[i])
+
+        var offset = 0
+        # position
         ps.particlesVertexBuff.setVector3ToBuffer(v1 + offset, ps.particles[i].position)
         ps.particlesVertexBuff.setVector3ToBuffer(v2 + offset, ps.particles[i].position)
         ps.particlesVertexBuff.setVector3ToBuffer(v3 + offset, ps.particles[i].position)
@@ -567,65 +587,37 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
 
         # rotation
         if ps.is3dRotation:
-            ps.particles[i].rotation.x += ps.particles[i].rotationVelocity.x * dt
-            ps.particles[i].rotation.y += ps.particles[i].rotationVelocity.y * dt
-            ps.particles[i].rotation.z += ps.particles[i].rotationVelocity.z * dt
-
             ps.particlesVertexBuff.setVector3ToBuffer(v1 + offset, ps.particles[i].rotation)
             ps.particlesVertexBuff.setVector3ToBuffer(v2 + offset, ps.particles[i].rotation)
             ps.particlesVertexBuff.setVector3ToBuffer(v3 + offset, ps.particles[i].rotation)
             ps.particlesVertexBuff.setVector3ToBuffer(v4 + offset, ps.particles[i].rotation)
         else:
-            ps.particles[i].rotation.z += ps.particles[i].rotationVelocity.z * dt
             ps.particlesVertexBuff[v1 + offset] = ps.particles[i].rotation.z
             ps.particlesVertexBuff[v2 + offset] = ps.particles[i].rotation.z
             ps.particlesVertexBuff[v3 + offset] = ps.particles[i].rotation.z
             ps.particlesVertexBuff[v4 + offset] = ps.particles[i].rotation.z
-
         offset += ps.vertexDesc.rotationSize
 
         # scale
-        if ps.scaleMode == ParticleModeEnum.TimeSequence:
-            let sc = ps.scaleSeq.getValueAtTime(1.0 - normLifeTime)
-            ps.particles[i].scale.x = sc[1]
-            ps.particles[i].scale.y = sc[2]
-        else:
-            ps.particles[i].scale.x = (ps.startScale.x + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.x * oneMinusNormLifeTime
-            ps.particles[i].scale.y = (ps.startScale.y + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.y * oneMinusNormLifeTime
         ps.particlesVertexBuff[v1 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v1 + offset + 1] = ps.particles[i].scale.y
-
         ps.particlesVertexBuff[v2 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v2 + offset + 1] = ps.particles[i].scale.y
-
         ps.particlesVertexBuff[v3 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v3 + offset + 1] = ps.particles[i].scale.y
-
         ps.particlesVertexBuff[v4 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v4 + offset + 1] = ps.particles[i].scale.y
         offset += ps.vertexDesc.scaleSize
 
-        # alpha and color
-        var alpha: float
-        var color: Color
-        if ps.colorMode == ParticleModeEnum.TimeSequence:
-            let sc = ps.colorSeq.getValueAtTime(1.0 - normLifeTime)
-            color.r = sc[1]
-            color.g = sc[2]
-            color.b = sc[3]
-            alpha = sc[4]
-        else:
-            color = ps.startColor * normLifeTime + ps.dstColor * oneMinusNormLifeTime
-            alpha = color.a * normLifeTime + color.a * oneMinusNormLifeTime
-
-        alpha *= ps.node.alpha
+        # color
+        let alpha = ps.particles[i].color.a * ps.node.alpha
         ps.particlesVertexBuff[v1 + offset] = alpha
         ps.particlesVertexBuff[v2 + offset] = alpha
         ps.particlesVertexBuff[v3 + offset] = alpha
         ps.particlesVertexBuff[v4 + offset] = alpha
         offset += ps.vertexDesc.alphaSize
 
-        let encoded_color = rgbToFloat(color)
+        let encoded_color = rgbToFloat(ps.particles[i].color)
         ps.particlesVertexBuff[v1 + offset] = encoded_color
         ps.particlesVertexBuff[v2 + offset] = encoded_color
         ps.particlesVertexBuff[v3 + offset] = encoded_color
@@ -670,8 +662,8 @@ proc update(ps: ParticleSystem, dt: float) =
     if not ps.genShapeNode.isNil:
         ps.genShape = ps.genShapeNode.getComponent(PSGenShape)
 
-    if not ps.attractorNode.isNil:
-        ps.attractor = ps.attractorNode.getComponent(PSAttractor)
+    if not ps.modifierNode.isNil:
+        ps.modifier = ps.modifierNode.getComponent(PSModifier)
 
     # chek IB size (need for runtime property editing)
     if ps.indexBufferSize < int(ceil(ps.birthRate) * ceil(ps.lifetime)):
@@ -834,11 +826,11 @@ method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "framesCount", ps.framesCount)
     s.deserializeValue(j, "fps", ps.fps)
 
-    var genShapeName, attractorName: string
+    var genShapeName, modifierName: string
     s.deserializeValue(j, "genShapeNode", genShapeName)
-    s.deserializeValue(j, "attractorNode", attractorName)
+    s.deserializeValue(j, "modifierNode", modifierName)
     addNodeRef(ps.genShapeNode, genShapeName)
-    addNodeRef(ps.attractorNode, attractorName)
+    addNodeRef(ps.modifierNode, modifierName)
 
     s.deserializeValue(j, "isMove", ps.isMove)
     s.deserializeValue(j, "amplitude", ps.amplitude)
@@ -889,7 +881,7 @@ method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
         result.add("framesCount", s.getValue(c.framesCount))
         result.add("fps", s.getValue(c.fps))
 
-    result.add("attractorNode", s.getValue(c.attractorNode))
+    result.add("modifierNode", s.getValue(c.modifierNode))
     result.add("genShapeNode", s.getValue(c.genShapeNode))
 
     result.add("isMove", s.getValue(c.isMove))
@@ -934,7 +926,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("isLooped", ps.isLooped, onLoopedChange)
     p.visitProperty("isPlayed", ps.isPlayed, onPlayedChange)
     p.visitProperty("genShapeNode", ps.genShapeNode)
-    p.visitProperty("attractorNode", ps.attractorNode)
+    p.visitProperty("modifierNode", ps.modifierNode)
     p.visitProperty("birthRate", ps.birthRate)
     p.visitProperty("lifetime", ps.lifetime)
     p.visitProperty("startVelocity", ps.startVelocity)
