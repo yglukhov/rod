@@ -75,15 +75,25 @@ varying vec3 vBinormal;
 #ifdef WITH_V_TEXCOORD
 varying vec2 vTexCoord;
 #endif
-#ifdef WITH_MATCAP_SAMPLER
-uniform sampler2D matcapUnit;
-uniform vec4 uMatcapUnitCoords;
-uniform float uMatcapPercent;
+#ifdef WITH_MATCAP_R
+uniform sampler2D matcapUnitR;
+uniform vec4 uMatcapUnitCoordsR;
+uniform float uMatcapPercentR;
 #endif
-#ifdef WITH_MATCAP_INTERPOLATE_SAMPLER
-uniform sampler2D matcapUnitInterpolate;
-uniform vec4 uMatcapUnitCoordsInterpolate;
-uniform float uMatcapPercentInterpolate;
+#ifdef WITH_MATCAP_G
+uniform sampler2D matcapUnitG;
+uniform vec4 uMatcapUnitCoordsG;
+uniform float uMatcapPercentG;
+#endif
+#ifdef WITH_MATCAP_B
+uniform sampler2D matcapUnitB;
+uniform vec4 uMatcapUnitCoordsB;
+uniform float uMatcapPercentB;
+#endif
+#ifdef WITH_MATCAP_A
+uniform sampler2D matcapUnitA;
+uniform vec4 uMatcapUnitCoordsA;
+uniform float uMatcapPercentA;
 #endif
 #ifdef WITH_MATCAP_MASK_SAMPLER
 uniform sampler2D matcapMaskUnit;
@@ -373,10 +383,12 @@ vec3 computeNormal() {
 
 vec4 computeTexel() {
     #ifdef WITH_MASK_SAMPLER
-        float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a * uMaskPercent;
-        if ( mask < 0.001 ) {
-            discard;
-        }
+        #ifdef WITH_V_TEXCOORD
+            float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * vTexCoord, mipBias).a * uMaskPercent;
+            if ( mask < 0.001 ) {
+                discard;
+            }
+        #endif
     #endif
 
     vec4 texel = vec4(0.0, 0.0, 0.0, 0.0);
@@ -396,8 +408,14 @@ vec4 computeTexel() {
     #ifdef WITH_MATERIAL_DIFFUSE
         #ifdef WITH_AMBIENT_SAMPLER
             vec4 diffTextureTexel = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * vTexCoord, mipBias) * uTexUnitPercent;
-            diffTextureTexel *= uMaterialDiffuse;
-            diffuse = diffTextureTexel;
+            #ifndef WITH_MATCAP_MASK_SAMPLER
+                diffTextureTexel *= uMaterialDiffuse;
+            #else
+                #ifdef WITH_LIGHT_POSITION
+                    diffTextureTexel *= uMaterialDiffuse;
+                #endif
+            #endif
+            diffuse = diffTextureTexel * diffTextureTexel.a;
         #else
             diffuse = uMaterialDiffuse;
         #endif
@@ -422,7 +440,7 @@ vec4 computeTexel() {
             reflection = reflectColor;
         #endif
 
-        #ifdef WITH_MATCAP_SAMPLER
+        #ifdef WITH_MATCAP_R
             vec3 matcapBivector = -vPosition.xyz;
             vec3 matcapL = normalize(matcapBivector);
             vec3 matcapReflected = normalize(-reflect(matcapL, normal));
@@ -430,11 +448,10 @@ vec4 computeTexel() {
             vec2 matcapUV = matcapReflected.xy / mtcp + 0.5;
             matcapUV = vec2(matcapUV.x, 1.0 - matcapUV.y);
 
-            vec4 matcap = vec4(texture2D(matcapUnit, uMatcapUnitCoords.xy + (uMatcapUnitCoords.zw - uMatcapUnitCoords.xy) * matcapUV, mipBias).rgb, uMaterialTransparency) * uMatcapPercent;
+            vec4 matcapR = vec4(texture2D(matcapUnitR, uMatcapUnitCoordsR.xy + (uMatcapUnitCoordsR.zw - uMatcapUnitCoordsR.xy) * matcapUV, mipBias).rgb, uMaterialTransparency) * uMatcapPercentR;
         #endif
-
-        #ifdef WITH_MATCAP_INTERPOLATE_SAMPLER
-            #ifndef WITH_MATCAP_SAMPLER
+        #ifdef WITH_MATCAP_G
+            #ifndef WITH_MATCAP_R
                 vec3 matcapBivector = -vPosition.xyz;
                 vec3 matcapL = normalize(matcapBivector);
                 vec3 matcapReflected = normalize(-reflect(matcapL, normal));
@@ -442,31 +459,76 @@ vec4 computeTexel() {
                 vec2 matcapUV = matcapReflected.xy / mtcp + 0.5;
                 matcapUV = vec2(matcapUV.x, 1.0 - matcapUV.y);
             #endif
+            vec4 matcapG = vec4(texture2D(matcapUnitG, uMatcapUnitCoordsG.xy + (uMatcapUnitCoordsG.zw - uMatcapUnitCoordsG.xy) * matcapUV, mipBias).rgb, uMaterialTransparency) * uMatcapPercentG;
+        #endif
+        #ifdef WITH_MATCAP_B
+            #ifndef WITH_MATCAP_R
+                #ifndef WITH_MATCAP_G
+                    vec3 matcapBivector = -vPosition.xyz;
+                    vec3 matcapL = normalize(matcapBivector);
+                    vec3 matcapReflected = normalize(-reflect(matcapL, normal));
+                    float mtcp = 2.0 * sqrt( pow(matcapReflected.x, 2.0) + pow(matcapReflected.y, 2.0) + pow(matcapReflected.z + 1.0, 2.0) );
+                    vec2 matcapUV = matcapReflected.xy / mtcp + 0.5;
+                    matcapUV = vec2(matcapUV.x, 1.0 - matcapUV.y);
+                #endif
+            #endif
+            vec4 matcapB = vec4(texture2D(matcapUnitB, uMatcapUnitCoordsB.xy + (uMatcapUnitCoordsB.zw - uMatcapUnitCoordsB.xy) * matcapUV, mipBias).rgb, uMaterialTransparency) * uMatcapPercentB;
+        #endif
+        #ifdef WITH_MATCAP_A
+            #ifndef WITH_MATCAP_R
+                #ifndef WITH_MATCAP_G
+                    #ifndef WITH_MATCAP_B
+                        vec3 matcapBivector = -vPosition.xyz;
+                        vec3 matcapL = normalize(matcapBivector);
+                        vec3 matcapReflected = normalize(-reflect(matcapL, normal));
+                        float mtcp = 2.0 * sqrt( pow(matcapReflected.x, 2.0) + pow(matcapReflected.y, 2.0) + pow(matcapReflected.z + 1.0, 2.0) );
+                        vec2 matcapUV = matcapReflected.xy / mtcp + 0.5;
+                        matcapUV = vec2(matcapUV.x, 1.0 - matcapUV.y);
+                    #endif
+                #endif
+            #endif
+            vec4 matcapA = vec4(texture2D(matcapUnitA, uMatcapUnitCoordsA.xy + (uMatcapUnitCoordsA.zw - uMatcapUnitCoordsA.xy) * matcapUV, mipBias).rgb, uMaterialTransparency) * uMatcapPercentA;
+        #endif
 
-            vec4 matcapInter = vec4(texture2D(matcapUnitInterpolate, uMatcapUnitCoordsInterpolate.xy + (uMatcapUnitCoordsInterpolate.zw - uMatcapUnitCoordsInterpolate.xy) * matcapUV, mipBias).rgb, uMaterialTransparency) * uMatcapPercentInterpolate;
+        #ifndef WITH_V_TEXCOORD
+            #ifdef WITH_MASK_SAMPLER
+                float mask = texture2D(maskMapUnit, uMaskUnitCoords.xy + (uMaskUnitCoords.zw - uMaskUnitCoords.xy) * matcapUV, mipBias).a * uMaskPercent;
+                if ( mask < 0.001 ) {
+                    discard;
+                }
+            #endif
         #endif
 
         #ifdef WITH_MATCAP_MASK_SAMPLER
-            float matcapMask = texture2D(matcapMaskUnit, uMatcapMaskUnitCoords.xy + (uMatcapMaskUnitCoords.zw - uMatcapMaskUnitCoords.xy) * vTexCoord, mipBias).a * uMatcapMaskPercent;
-
-            #ifdef WITH_MATCAP_SAMPLER
-                #ifdef WITH_MATCAP_INTERPOLATE_SAMPLER
-                    matcap = mix(matcap, matcapInter, matcapMask);
-                    diffuse += matcap;
-                #endif
+            vec4 matcapMask = texture2D(matcapMaskUnit, uMatcapMaskUnitCoords.xy + (uMatcapMaskUnitCoords.zw - uMatcapMaskUnitCoords.xy) * vTexCoord, mipBias) * uMatcapMaskPercent;
+            #ifdef WITH_MATCAP_R
+                diffuse += matcapMask.r * matcapR;
+            #endif
+            #ifdef WITH_MATCAP_G
+                diffuse += matcapMask.g * matcapG;
+            #endif
+            #ifdef WITH_MATCAP_B
+                diffuse += matcapMask.b * matcapB;
+            #endif
+            #ifdef WITH_MATCAP_A
+                diffuse += matcapMask.a * matcapA;
             #endif
         #else
-            #ifdef WITH_MATCAP_SAMPLER
-                diffuse += matcap;
+            #ifdef WITH_MATCAP_R
+                diffuse += matcapR;
             #endif
-
-            #ifdef WITH_MATCAP_INTERPOLATE_SAMPLER
-                diffuse += matcapInter;
+            #ifdef WITH_MATCAP_G
+                diffuse += matcapG;
+            #endif
+            #ifdef WITH_MATCAP_B
+                diffuse += matcapB;
+            #endif
+            #ifdef WITH_MATCAP_A
+                diffuse += matcapA;
             #endif
         #endif
 
         #ifdef WITH_LIGHT_POSITION
-
             vec3 lightAmbient = vec3(0.0,0.0,0.0);
             vec3 lightDiffuse = vec3(0.0,0.0,0.0);
             vec3 lightSpecular = vec3(0.0,0.0,0.0);
