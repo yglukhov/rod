@@ -373,8 +373,9 @@ proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
 proc loadComposition*(n: Node, resourceName: string) =
+    let fullPath = pathForResource(resourceName)
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
-        pushParentResource(resourceName)
+        pushParentResource(fullPath)
         let serializer = Serializer.new()
         n.deserialize(j, serializer)
         popParentResource()
