@@ -198,24 +198,36 @@ method name*(v: SceneView): string =
 
 method onTouchEv*(v: SceneView, e: var Event): bool =
     if v.uiComponents.len > 0:
-        let r = v.rayWithScreenCoords(e.localPosition)
-        type Inter = tuple[i: Vector3, c: UIComponent]
-        var intersections = newSeq[Inter]()
-        for c in v.uiComponents:
-            var inter : Vector3
-            if c.intersectsWithUINode(r, inter):
-                intersections.add((inter, c))
-        template dist(a, b): expr = (b - a).length
-        if intersections.len > 0:
-            intersections.sort(proc (x, y: Inter): int =
-                result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
-                if result == 0:
-                    result = getTreeDistance(x.c.node, y.c.node)
-            )
+        if e.buttonState == bsDown:
+            let r = v.rayWithScreenCoords(e.localPosition)
+            type Inter = tuple[i: Vector3, c: UIComponent]
+            var intersections = newSeq[Inter]()
+            for c in v.uiComponents:
+                var inter : Vector3
+                if c.intersectsWithUINode(r, inter):
+                    intersections.add((inter, c))
 
-            for i in intersections:
-                result = i.c.handleTouchEv(r, e, i.i)
-                if result: break
+            template dist(a, b): expr = (a - b).length
+            if intersections.len > 0:
+                intersections.sort(proc (x, y: Inter): int =
+                    result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
+                    if result == 0:
+                        result = getTreeDistance(x.c.node, y.c.node)
+                )
+
+                for i in intersections:
+                    result = i.c.handleTouchEv(r, e, i.i)
+                    if result:
+                        v.touchTarget = i.c.mView
+                        break
+        else:
+            if not v.touchTarget.isNil:
+                let target = v.touchTarget
+                var localPosition = e.localPosition
+                e.localPosition = target.convertPointFromParent(localPosition)
+                result = target.processTouchEvent(e)
+                e.localPosition = localPosition
+
     if not result:
         result = procCall v.View.onTouchEv(e)
 

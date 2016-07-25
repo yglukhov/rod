@@ -63,6 +63,9 @@ proc newShader*(vs, fs: string, attributes: seq[tuple[index: GLuint, name: strin
 
     result.createShader()
 
+proc bindAttribLocation*(sh: Shader, index: GLuint, name: string) =
+    currentContext().gl.bindAttribLocation(sh.program, index, name)
+
 proc addDefine*(sh: Shader, def: string) =
     sh.shaderMacroFlags.incl(def)
     sh.needUpdate = true

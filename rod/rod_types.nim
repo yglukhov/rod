@@ -90,3 +90,14 @@ type
         lightLinearInited*: bool
         lightQuadraticInited*: bool
         mLightAttenuationInited*: bool
+
+    Particle* = ref object
+        node*: Node
+        position*: Vector3
+        rotation*, rotationVelocity*: Vector3 #deg per sec
+        scale*: Vector3
+        lifetime*: float
+        normalizedLifeTime*: float
+        color*: Color
+        velocity*: Vector3
+        randStartScale*: float

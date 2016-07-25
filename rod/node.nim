@@ -236,9 +236,9 @@ template addNodeRef*(refNode: var Node, name: string) =
     let refProc = proc(nodeValue: Node) = refNode = nodeValue
     nodeLoadRefTable[name] = refProc
 
-proc checkNodeRefs(view: SceneView) =
+proc checkNodeRefs(n: Node) =
     for k, v in nodeLoadRefTable:
-        let foundNode = view.mRootNode.findNode(k)
+        let foundNode = n.findNode(k)
         if not foundNode.isNil:
             v(foundNode)
 
@@ -430,6 +430,9 @@ proc newNodeFromJson*(j: JsonNode, s: Serializer): Node =
 proc newNodeWithResource*(name: string): Node =
     result = newNode()
     result.loadComposition(name)
+
+    result.checkNodeRefs()
+    nodeLoadRefTable.clear()
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
