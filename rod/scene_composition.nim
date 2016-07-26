@@ -454,12 +454,13 @@ proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
 # --------------- TODO ------
 proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
     let colladaScene = findCachedResource[ColladaScene](resourceName)
+    let fullResourcePath = pathForResource(resourceName)
 
     if colladaScene.isNil:
         resourceNotCached(resourceName)
 
         loadResourceAsync resourceName, proc(s: Stream) =
-            pushParentResource(resourceName)
+            pushParentResource(fullResourcePath)
 
             let colladaScene = loadColladaFromStream(s, resourceName)
             registerResource(resourceName, colladaScene)
@@ -473,7 +474,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
             popParentResource()
             handler(res)
     else:
-        pushParentResource(resourceName)
+        pushParentResource(fullResourcePath)
 
         var hasSkeletalAnimation = false
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene, hasSkeletalAnimation)
@@ -485,8 +486,9 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
         handler(res)
 
 registerResourcePreloader(["dae"]) do(name: string, callback: proc(r: ColladaScene)):
+    let fullResourcePath = pathForResource(name)
     loadResourceAsync(name) do(s: Stream):
-        pushParentResource(name)
+        pushParentResource(fullResourcePath)
         let colladaScene = loadColladaFromStream(s, name)
         popParentResource()
         callback(colladaScene)
