@@ -415,7 +415,7 @@ vec4 computeTexel() {
                     diffTextureTexel *= uMaterialDiffuse;
                 #endif
             #endif
-            diffuse = diffTextureTexel * diffTextureTexel.a;
+            diffuse = diffTextureTexel;
         #else
             diffuse = uMaterialDiffuse;
         #endif
