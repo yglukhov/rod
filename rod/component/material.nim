@@ -535,6 +535,7 @@ proc setupSamplerAttributes(m: Material) =
     if not m.albedoTexture.isNil:
         if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_AMBIENT_SAMPLER)
+            m.shaderMacroFlags.incl(WITH_V_TEXCOORD)
         else:
             if m.albedoTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))

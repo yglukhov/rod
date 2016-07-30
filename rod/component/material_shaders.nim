@@ -353,33 +353,35 @@ vec3 toSRGB(vec3 c) {
     return vec3(sRGB(c.x),sRGB(c.y),sRGB(c.z));
 }
 
-vec3 computeNormal() {
-    #ifdef WITH_V_TANGENT
-        #ifdef WITH_NORMAL_SAMPLER
-            mat3 TBN = mat3(vTangent, vBinormal, vNormal);
-            vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
-            vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0 * uNormalPercent;
-            vec3 normal = TBN * bumpNormal;
-            #ifdef WITH_NORMALMAP_TO_SRGB
-                normal = toSRGB(normal);
-            #endif
-            normal = normalize(normal);
-        #else
-            vec3 normal = normalize(vNormal);
-        #endif
-    #else
-        #ifdef WITH_V_NORMAL
-            vec3 normal = normalize(vNormal);
-
+#ifdef WITH_V_POSITION
+    vec3 computeNormal() {
+        #ifdef WITH_V_TANGENT
             #ifdef WITH_NORMAL_SAMPLER
-                #ifdef WITH_TBN_FROM_NORMALS
-                    normal = perturb_normal(normal, vPosition, uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
+                mat3 TBN = mat3(vTangent, vBinormal, vNormal);
+                vec2 normalTexcoord = vec2(uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
+                vec3 bumpNormal = vec4(texture2D(normalMapUnit, normalTexcoord, mipBias)).xyz * 255.0/127.0 - 128.0/127.0 * uNormalPercent;
+                vec3 normal = TBN * bumpNormal;
+                #ifdef WITH_NORMALMAP_TO_SRGB
+                    normal = toSRGB(normal);
+                #endif
+                normal = normalize(normal);
+            #else
+                vec3 normal = normalize(vNormal);
+            #endif
+        #else
+            #ifdef WITH_V_NORMAL
+                vec3 normal = normalize(vNormal);
+
+                #ifdef WITH_NORMAL_SAMPLER
+                    #ifdef WITH_TBN_FROM_NORMALS
+                        normal = perturb_normal(normal, vPosition, uNormalUnitCoords.xy + (uNormalUnitCoords.zw - uNormalUnitCoords.xy) * vTexCoord);
+                    #endif
                 #endif
             #endif
         #endif
-    #endif
-    return normal;
-}
+        return normal;
+    }
+#endif
 
 vec4 computeTexel() {
     #ifdef WITH_MASK_SAMPLER
