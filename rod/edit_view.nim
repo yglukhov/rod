@@ -35,7 +35,7 @@ import viewport
 import variant
 
 when defined(js):
-    import dom except Event
+    from dom import alert
 elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
@@ -79,15 +79,27 @@ method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
 
 
 type Editor* = ref object
-    rootNode*: Node3D
+    rootNode*: Node
     eventCatchingView*: EventCatchingView
     treeView*: View
     animationEditView*: View
     toolbar*: Toolbar
     sceneView*: SceneView
-    selectedNode*: Node3D
+    mSelectedNode: Node
     outlineView*:OutlineView
+    inspector*: InspectorView
     cameraController*: EditorCameraController
+
+proc `selectedNode=`*(e: Editor, n: Node) =
+    if n != e.mSelectedNode:
+        if not e.mSelectedNode.isNil and e.mSelectedNode.componentIfAvailable(LightSource).isNil:
+            e.mSelectedNode.removeComponent(NodeSelector)
+        e.mSelectedNode = n
+        if not e.mSelectedNode.isNil:
+            discard e.mSelectedNode.component(NodeSelector)
+        e.inspector.inspectedNode = n
+
+template selectedNode*(e: Editor): Node = e.mSelectedNode
 
 proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
@@ -138,7 +150,7 @@ proc loadNode(editor: Editor): bool =
 
     return false
 
-proc newAnimationEditView(e: Editor, inspector: InspectorView): PanelView =
+proc newAnimationEditView(e: Editor): PanelView =
     result = PanelView.new(newRect(0, 0, 800, 300)) #700
     result.collapsible = true
     let title = newLabel(newRect(22, 6, 108, 15))
@@ -150,7 +162,7 @@ proc newAnimationEditView(e: Editor, inspector: InspectorView): PanelView =
     ae.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
     result.addSubview(ae)
 
-proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
+proc newTreeView(e: Editor): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 500)) #700
     result.collapsible = true
 
@@ -197,18 +209,7 @@ proc newTreeView(e: Editor, inspector: InspectorView): PanelView =
                 outlineView.itemAtIndexPath(ip).get(Node3D)
             else:
                 nil
-
-        if not n.isNil:
-            if not e.selectedNode.isNil and e.selectedNode.componentIfAvailable(LightSource).isNil:
-                e.selectedNode.removeComponent(NodeSelector)
-                if e.selectedNode != n:
-                    e.selectedNode = n
-                    discard e.selectedNode.component(NodeSelector)
-            else:
-                e.selectedNode = n
-                discard e.selectedNode.component(NodeSelector)
-
-        inspector.inspectedNode = n
+        e.selectedNode = n
 
     outlineView.onDragAndDrop = proc(fromIp, toIp: openarray[int]) =
         let f = outlineView.itemAtIndexPath(fromIp).get(Node3D)
@@ -368,7 +369,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
 
     const toolbarHeight = 30
 
-    let inspectorView = InspectorView.new(newRect(200, toolbarHeight, 340, 700))
+    editor.inspector = InspectorView.new(newRect(200, toolbarHeight, 340, 700))
 
     editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
 
@@ -397,11 +398,11 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
 
     v.window.addSubview(editor.eventCatchingView)
 
-    editor.treeView = newTreeView(editor, inspectorView)
+    editor.treeView = newTreeView(editor)
     editor.treeView.setFrameOrigin(newPoint(0, toolbarHeight))
     v.window.addSubview(editor.treeView)
 
-    editor.animationEditView = newAnimationEditView(editor, inspectorView)
+    editor.animationEditView = newAnimationEditView(editor)
     editor.animationEditView.setFrameOrigin(newPoint(0, editor.treeView.frame.maxY))
 
     editor.createOpenAndSaveButtons()
@@ -409,7 +410,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.createToggleAnimationEditorButton()
     editor.createChangeBackgroundColorButton()
 
-    v.window.addSubview(inspectorView)
+    v.window.addSubview(editor.inspector)
     v.window.addSubview(editor.toolbar)
 
     if startFromGame:
@@ -420,7 +421,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
             editor.eventCatchingView.removeFromSuperview()
             editor.treeView.removeFromSuperview()
             editor.toolbar.removeFromSuperview()
-            inspectorView.removeFromSuperview()
+            editor.inspector.removeFromSuperview()
             closeEditorButton.removeFromSuperview()
 
     let fpsAnimation = newAnimation()
