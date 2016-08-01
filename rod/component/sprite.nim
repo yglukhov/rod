@@ -6,7 +6,7 @@ import nimx.property_visitor
 
 import json, strutils
 
-import rod_types
+import rod.rod_types
 import rod.node
 import rod.ray
 import rod.tools.serializer
