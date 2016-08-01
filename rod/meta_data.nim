@@ -42,7 +42,7 @@ proc validateRecursive(md: MetaData, jn: JsonNode) =
         if not v{"NodeSelector"}.isNil:
             v.delete("NodeSelector")
 
-        pushParentResource(md.resourcePath)
+        pushParentResource(pathForResource(md.resourcePath))
         # validate image pathes (make relative)
         if not v{"image"}.isNil:
             when not defined(js) and not defined(android) and not defined(ios):

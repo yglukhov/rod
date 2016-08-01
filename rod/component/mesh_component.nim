@@ -394,8 +394,10 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "wireframe", m.material.isWireframe)
     s.deserializeValue(j, "RIM", m.material.isRIM)
     s.deserializeValue(j, "sRGB_normal", m.material.isNormalSRGB)
-    s.deserializeValue(j, "matcapPercent", m.material.matcapPercent)
-    s.deserializeValue(j, "matcapInterpolatePercent", m.material.matcapInterpolatePercent)
+    s.deserializeValue(j, "matcapPercentR", m.material.matcapPercentR)
+    s.deserializeValue(j, "matcapPercentG", m.material.matcapPercentG)
+    s.deserializeValue(j, "matcapPercentB", m.material.matcapPercentB)
+    s.deserializeValue(j, "matcapPercentA", m.material.matcapPercentA)
     s.deserializeValue(j, "matcapMaskPercent", m.material.matcapMaskPercent)
     s.deserializeValue(j, "albedoPercent", m.material.albedoPercent)
     s.deserializeValue(j, "glossPercent", m.material.glossPercent)
@@ -411,8 +413,10 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
         if not jNode.isNil:
             result = imageWithResource(jNode.getStr())
 
-    m.material.matcapTexture = getTexture("matcapTexture")
-    m.material.matcapInterpolateTexture = getTexture("matcapInterpolateTexture")
+    m.material.matcapTextureR = getTexture("matcapTextureR")
+    m.material.matcapTextureG = getTexture("matcapTextureG")
+    m.material.matcapTextureB = getTexture("matcapTextureB")
+    m.material.matcapTextureA = getTexture("matcapTextureA")
     m.material.matcapMaskTexture = getTexture("matcapMaskTexture")
     m.material.albedoTexture = getTexture("albedoTexture")
     m.material.glossTexture = getTexture("glossTexture")
@@ -506,8 +510,10 @@ method serialize*(c: MeshComponent, s: Serializer): JsonNode =
 
     result.add("sRGB_normal", s.getValue(c.material.isNormalSRGB))
 
-    result.add("matcapPercent", s.getValue(c.material.matcapPercent))
-    result.add("matcapInterpolatePercent", s.getValue(c.material.matcapInterpolatePercent))
+    result.add("matcapPercentR", s.getValue(c.material.matcapPercentR))
+    result.add("matcapPercentG", s.getValue(c.material.matcapPercentG))
+    result.add("matcapPercentB", s.getValue(c.material.matcapPercentB))
+    result.add("matcapPercentA", s.getValue(c.material.matcapPercentA))
     result.add("matcapMaskPercent", s.getValue(c.material.matcapMaskPercent))
     result.add("albedoPercent", s.getValue(c.material.albedoPercent))
     result.add("glossPercent", s.getValue(c.material.glossPercent))
@@ -518,10 +524,14 @@ method serialize*(c: MeshComponent, s: Serializer): JsonNode =
     result.add("falloffPercent", s.getValue(c.material.falloffPercent))
     result.add("maskPercent", s.getValue(c.material.maskPercent))
 
-    if not c.material.matcapTexture.isNil:
-        result.add("matcapTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapTexture.filePath())))
-    if not c.material.matcapInterpolateTexture.isNil:
-        result.add("matcapInterpolateTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapInterpolateTexture.filePath())))
+    if not c.material.matcapTextureR.isNil:
+        result.add("matcapTextureR",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureR.filePath())))
+    if not c.material.matcapTextureG.isNil:
+        result.add("matcapTextureG",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureG.filePath())))
+    if not c.material.matcapTextureB.isNil:
+        result.add("matcapTextureB",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureB.filePath())))
+    if not c.material.matcapTextureA.isNil:
+        result.add("matcapTextureA",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureA.filePath())))
     if not c.material.matcapMaskTexture.isNil:
         result.add("matcapMaskTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapMaskTexture.filePath())))
     if not c.material.albedoTexture.isNil:
@@ -572,9 +582,6 @@ method serialize*(c: MeshComponent, s: Serializer): JsonNode =
         result["boneIDs"] = s.getValue(c.boneIDs)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
-
-    # p.visitProperty("material", m.material)
-
     p.visitProperty("emission", m.material.emission)
     p.visitProperty("ambient", m.material.ambient)
     p.visitProperty("diffuse", m.material.diffuse)
@@ -591,8 +598,10 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("normalTexture", (m.material.normalTexture, m.material.normalPercent))
     p.visitProperty("reflectionTexture", (m.material.reflectionTexture, m.material.reflectionPercent))
     p.visitProperty("maskTexture", (m.material.maskTexture, m.material.maskPercent))
-    p.visitProperty("matcapTexture", (m.material.matcapTexture, m.material.matcapPercent))
-    p.visitProperty("matcapInterTexture", (m.material.matcapInterpolateTexture, m.material.matcapInterpolatePercent))
+    p.visitProperty("matcapTextureR", (m.material.matcapTextureR, m.material.matcapPercentR))
+    p.visitProperty("matcapTextureG", (m.material.matcapTextureG, m.material.matcapPercentG))
+    p.visitProperty("matcapTextureB", (m.material.matcapTextureB, m.material.matcapPercentB))
+    p.visitProperty("matcapTextureA", (m.material.matcapTextureA, m.material.matcapPercentA))
     p.visitProperty("matcapMixMask", (m.material.matcapMaskTexture, m.material.matcapMaskPercent))
 
     p.visitProperty("sRGB normal", m.material.isNormalSRGB)

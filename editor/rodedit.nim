@@ -36,17 +36,8 @@ proc runAutoTestsIfNeeded() =
     when defined(runAutoTests):
         startRegisteredTests()
 
-proc registerAnimation(n: Node, v: EditView) =
-    if not isNil(n.animations):
-        for anim in n.animations.values():
-            v.window.addAnimation(anim)
-
-    if not n.children.isNil:
-       for child in n.children:
-            registerAnimation(child, v)
-
 proc startApplication() =
-    when isMobile:
+    when isMobile or defined(js):
         var mainWindow = newFullscreenWindow()
     else:
         var mainWindow = newWindow(newRect(40, 40, 1200, 600))

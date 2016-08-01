@@ -77,24 +77,21 @@ when not defined(android) and not defined(ios):
         result.addSubview(bOpen)
         result.addSubview(bRemove)
 
-        let editedNode = editedObject.get(Node)
-        let meshComp = editedNode.componentIfAvailable(MeshComponent)
-        if not meshComp.isNil:
-            let tf = newNumericTextField(newRect(180, 0, 50, editorRowHeight))
-            tf.text = toStr(getter().v, tf.precision)
-            tf.onAction do():
-                try:
-                    var v: float32
-                    fromStr(tf.text, v)
-                    var t:ImagePercent
-                    t.s = if not loadedImage.isNil: loadedImage else: getter().s
-                    t.v = v.float32
-                    setter(t)
-                    if not pv.onChange.isNil:
-                        pv.onChange()
-                except ValueError:
-                    discard
-            result.addSubview(tf)
+        let tf = newNumericTextField(newRect(180, 0, 50, editorRowHeight))
+        tf.text = toStr(getter().v, tf.precision)
+        tf.onAction do():
+            try:
+                var v: float32
+                fromStr(tf.text, v)
+                var t:ImagePercent
+                t.s = if not loadedImage.isNil: loadedImage else: getter().s
+                t.v = v.float32
+                setter(t)
+                if not pv.onChange.isNil:
+                    pv.onChange()
+            except ValueError:
+                discard
+        result.addSubview(tf)
 
     registerPropertyEditor(newMaterialImagePropertyView)
 

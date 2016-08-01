@@ -37,8 +37,10 @@ type ShaderMacro = enum
     WITH_V_NORMAL
     WITH_V_BINORMAL
     WITH_V_TANGENT
-    WITH_MATCAP_SAMPLER
-    WITH_MATCAP_INTERPOLATE_SAMPLER
+    WITH_MATCAP_R
+    WITH_MATCAP_G
+    WITH_MATCAP_B
+    WITH_MATCAP_A
     WITH_MATCAP_MASK_SAMPLER
     WITH_AMBIENT_SAMPLER
     WITH_GLOSS_SAMPLER
@@ -89,8 +91,10 @@ type
         shininessInited: bool
 
     Material* = ref object of RootObj
-        matcapTexture: Image
-        matcapInterpolateTexture: Image
+        matcapTextureR: Image
+        matcapTextureG: Image
+        matcapTextureB: Image
+        matcapTextureA: Image
         matcapMaskTexture: Image
         albedoTexture: Image
         glossTexture: Image
@@ -101,8 +105,10 @@ type
         falloffTexture: Image
         maskTexture: Image
 
-        matcapPercent*: float32
-        matcapInterpolatePercent*: float32
+        matcapPercentR*: float32
+        matcapPercentG*: float32
+        matcapPercentB*: float32
+        matcapPercentA*: float32
         matcapMaskPercent*: float32
         albedoPercent*: float32
         glossPercent*: float32
@@ -155,8 +161,10 @@ proc specular*(m: Material): Color = result = m.color.specular
 proc shininess*(m: Material): Coord = result = m.color.shininess
 proc rimDensity*(m: Material): Coord = result = m.rimDensity
 proc rimColor*(m: Material): Color = result = m.rimColor
-proc matcapTexture*(m: Material): Image = result = m.matcapTexture
-proc matcapInterpolateTexture*(m: Material): Image = result = m.matcapInterpolateTexture
+proc matcapTextureR*(m: Material): Image = result = m.matcapTextureR
+proc matcapTextureG*(m: Material): Image = result = m.matcapTextureG
+proc matcapTextureB*(m: Material): Image = result = m.matcapTextureB
+proc matcapTextureA*(m: Material): Image = result = m.matcapTextureA
 proc matcapMaskTexture*(m: Material): Image = result = m.matcapMaskTexture
 proc albedoTexture*(m: Material): Image = result = m.albedoTexture
 proc glossTexture*(m: Material): Image = result = m.glossTexture
@@ -202,21 +210,37 @@ template `rimDensity=`*(m: Material, val: Coord) =
     m.rimDensity = val
 template `rimColor=`*(m: Material, val: Color) =
     m.rimColor = val
-template `matcapTexture=`*(m: Material, i: Image) =
-    if m.matcapTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_MATCAP_SAMPLER)
+template `matcapTextureR=`*(m: Material, i: Image) =
+    if m.matcapTextureR.isNil:
+        m.shaderMacroFlags.incl(WITH_MATCAP_R)
         m.bShaderNeedUpdate = true
-    m.matcapTexture = i
-    if m.matcapTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_MATCAP_SAMPLER)
+    m.matcapTextureR = i
+    if m.matcapTextureR.isNil:
+        m.shaderMacroFlags.excl(WITH_MATCAP_R)
         m.bShaderNeedUpdate = true
-template `matcapInterpolateTexture=`*(m: Material, i: Image) =
-    if m.matcapInterpolateTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_MATCAP_INTERPOLATE_SAMPLER)
+template `matcapTextureG=`*(m: Material, i: Image) =
+    if m.matcapTextureG.isNil:
+        m.shaderMacroFlags.incl(WITH_MATCAP_G)
         m.bShaderNeedUpdate = true
-    m.matcapInterpolateTexture = i
-    if m.matcapInterpolateTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_MATCAP_INTERPOLATE_SAMPLER)
+    m.matcapTextureG = i
+    if m.matcapTextureG.isNil:
+        m.shaderMacroFlags.excl(WITH_MATCAP_G)
+        m.bShaderNeedUpdate = true
+template `matcapTextureB=`*(m: Material, i: Image) =
+    if m.matcapTextureB.isNil:
+        m.shaderMacroFlags.incl(WITH_MATCAP_B)
+        m.bShaderNeedUpdate = true
+    m.matcapTextureB = i
+    if m.matcapTextureB.isNil:
+        m.shaderMacroFlags.excl(WITH_MATCAP_B)
+        m.bShaderNeedUpdate = true
+template `matcapTextureA=`*(m: Material, i: Image) =
+    if m.matcapTextureA.isNil:
+        m.shaderMacroFlags.incl(WITH_MATCAP_A)
+        m.bShaderNeedUpdate = true
+    m.matcapTextureA = i
+    if m.matcapTextureA.isNil:
+        m.shaderMacroFlags.excl(WITH_MATCAP_A)
         m.bShaderNeedUpdate = true
 template `matcapMaskTexture=`*(m: Material, i: Image) =
     if m.matcapMaskTexture.isNil:
@@ -391,8 +415,10 @@ proc newDefaultMaterial*(): Material =
     result.isLightReceiver = true
     result.bEnableBackfaceCulling = true
     result.color.new()
-    result.matcapPercent = 1.0
-    result.matcapInterpolatePercent = 1.0
+    result.matcapPercentR = 1.0
+    result.matcapPercentG = 1.0
+    result.matcapPercentB = 1.0
+    result.matcapPercentA = 1.0
     result.matcapMaskPercent = 1.0
     result.albedoPercent = 1.0
     result.glossPercent = 1.0
@@ -451,27 +477,49 @@ proc setupSamplerAttributes(m: Material) =
     var theQuad {.noinit.}: array[4, GLfloat]
     var textureIndex : GLint = 0
 
-    if not m.matcapTexture.isNil:
+    if not m.matcapTextureR.isNil:
         if m.shader == invalidProgram:
-            m.shaderMacroFlags.incl(WITH_MATCAP_SAMPLER)
+            m.shaderMacroFlags.incl(WITH_MATCAP_R)
         else:
-            if m.matcapTexture.isLoaded:
+            if m.matcapTextureR.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
-                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercent"), m.matcapPercent)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureR, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsR"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitR"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentR"), m.matcapPercentR)
                 inc textureIndex
-    if not m.matcapInterpolateTexture.isNil:
+    if not m.matcapTextureG.isNil:
         if m.shader == invalidProgram:
-            m.shaderMacroFlags.incl(WITH_MATCAP_INTERPOLATE_SAMPLER)
+            m.shaderMacroFlags.incl(WITH_MATCAP_G)
         else:
-            if m.matcapInterpolateTexture.isLoaded:
+            if m.matcapTextureG.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
-                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapInterpolateTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsInterpolate"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitInterpolate"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentInterpolate"), m.matcapInterpolatePercent)
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureG, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsG"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitG"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentG"), m.matcapPercentG)
+                inc textureIndex
+    if not m.matcapTextureB.isNil:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATCAP_B)
+        else:
+            if m.matcapTextureB.isLoaded:
+                gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureB, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsB"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitB"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentB"), m.matcapPercentB)
+                inc textureIndex
+    if not m.matcapTextureA.isNil:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATCAP_A)
+        else:
+            if m.matcapTextureA.isLoaded:
+                gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
+                gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureA, gl, theQuad))
+                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsA"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitA"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentA"), m.matcapPercentA)
                 inc textureIndex
     if not m.matcapMaskTexture.isNil:
         if m.shader == invalidProgram:
@@ -487,6 +535,7 @@ proc setupSamplerAttributes(m: Material) =
     if not m.albedoTexture.isNil:
         if m.shader == invalidProgram:
             m.shaderMacroFlags.incl(WITH_AMBIENT_SAMPLER)
+            m.shaderMacroFlags.incl(WITH_V_TEXCOORD)
         else:
             if m.albedoTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
@@ -852,7 +901,6 @@ method updateSetup*(m: Material, n: Node) {.base.} =
         m.setupLightAttributes(n.sceneView)
     if m.isRIM:
         m.setupRIMLightTechnique()
-    # m.setupTransform(n)
 
     if n.alpha < 1.0 or m.blendEnable:
         gl.enable(gl.BLEND)
