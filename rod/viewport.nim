@@ -7,6 +7,7 @@ import nimx.animation
 import nimx.window
 import nimx.view_event_handling
 import nimx.view_event_handling_new
+import nimx.notification_center
 
 import tables
 import rod_types
@@ -17,6 +18,13 @@ import ray
 export Viewport
 export SceneView
 
+
+var deltaTime = 0.0
+var oldTime = 0.0
+var deltaTimeAnimation: Animation
+
+proc getDeltaTime*(): float =
+    return deltaTime
 
 method init*(v: SceneView, frame: Rect) =
     procCall v.View.init(frame)
@@ -265,6 +273,24 @@ method viewDidMoveToWindow*(v:SceneView)=
     if not v.window.isNil:
         v.viewOnEnter()
         v.window.addAnimationRunner(v.animationRunner)
+
+    # sharedNotificationCenter().addObserver("AW_FOCUS_ENTER", v, proc(args: Variant)=
+    #     v.animationRunner.resumeAnimations()
+    #     )
+    # sharedNotificationCenter().addObserver("AW_FOCUS_LEAVE", v, proc(args: Variant)=
+    #     v.animationRunner.pauseAnimations()
+    #     )
+
+    if deltaTimeAnimation.isNil:
+        deltaTimeAnimation = newAnimation()
+        deltaTimeAnimation.numberOfLoops = -1
+        deltaTimeAnimation.loopDuration = 1.0
+        deltaTimeAnimation.onAnimate = proc(p: float) =
+            deltaTime = deltaTimeAnimation.curLoop.float + p - oldTime
+            oldTime = deltaTimeAnimation.curLoop.float + p
+            # echo "loop ", deltaTimeAnimation.curLoop, "  progress ",p
+
+        v.addAnimation(deltaTimeAnimation)
 
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
     if w.isNil:

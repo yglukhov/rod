@@ -45,13 +45,15 @@ type
         color: Color
 
     PSModifierSpiral* = ref object of PSModifier
-        speed: float32
+        force: float32
+
+    PSModifierRandWind* = ref object of PSModifier
+        force: Vector3
 
 method generate*(pgs: PSGenShape): ParticleGenerationData {.base.} = discard
 
 method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.base.} = discard
 method updateParticle*(attr: PSModifier, part: Particle) {.base.} = discard
-
 
 # -------------------- cone generator --------------------------
 method init(pgs: ConePSGenShape) =
@@ -240,9 +242,8 @@ method visitProperties*(attr: PSModifierColor, p: var PropertyVisitor) =
 
 # -------------------- Spiral Modifier --------------------------
 method init(attr: PSModifierSpiral) =
-    attr.speed = 1
+    attr.force = 100
 
-var g_angle = 0.0
 method updateParticle*(attr: PSModifierSpiral, part: Particle) =
     var distance_vec = newVector3()
     # distance_vec.x = part.position.x - attr.node.worldPos.x
@@ -257,22 +258,46 @@ method updateParticle*(attr: PSModifierSpiral, part: Particle) =
     distance_vec.y = 0.0
     let distance = distance_vec.length()
     distance_vec.normalize()
-    let force = distance_vec * (attr.speed / 60.0) / (distance * distance)
+    let force = distance_vec * (attr.force / 60.0) / (distance * distance)
     part.velocity -= force
 
 
 method deserialize*(attr: PSModifierSpiral, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
-    s.deserializeValue(j, "speed", attr.speed)
+    s.deserializeValue(j, "speed", attr.force) # deprecated
+    s.deserializeValue(j, "force", attr.force)
 
 method serialize*(c: PSModifierSpiral, s: Serializer): JsonNode =
     result = newJObject()
-    result.add("speed", s.getValue(c.speed))
+    result.add("force", s.getValue(c.force))
 
 method visitProperties*(attr: PSModifierSpiral, p: var PropertyVisitor) =
-    p.visitProperty("speed", attr.speed)
+    p.visitProperty("force", attr.force)
 
+
+# -------------------- Random Wind Modifier --------------------------
+method init(attr: PSModifierRandWind) =
+    attr.force = newVector3(1,1,1)
+
+method updateParticle*(attr: PSModifierRandWind, part: Particle) =
+    var force: Vector3
+    force.x = random(-attr.force.x .. attr.force.x)
+    force.y = random(-attr.force.y .. attr.force.y)
+    force.z = random(-attr.force.z .. attr.force.z)
+    part.velocity += force / 60.0
+
+method deserialize*(attr: PSModifierRandWind, j: JsonNode, s: Serializer) =
+    if j.isNil:
+        return
+    s.deserializeValue(j, "force", attr.force)
+
+method serialize*(c: PSModifierRandWind, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("force", s.getValue(c.force))
+
+method visitProperties*(attr: PSModifierRandWind, p: var PropertyVisitor) =
+    p.visitProperty("force", attr.force)
 
 
 registerComponent[ConePSGenShape]()
@@ -282,3 +307,4 @@ registerComponent[BoxPSGenShape]()
 registerComponent[PSModifierWave]()
 registerComponent[PSModifierColor]()
 registerComponent[PSModifierSpiral]()
+registerComponent[PSModifierRandWind]()

@@ -297,6 +297,14 @@ method draw*(m: MeshComponent) =
     if m.debugSkeleton and not m.skeleton.isNil:
         m.skeleton.debugDraw()
 
+
+method getBBox*(c: MeshComponent): BBox =
+    result = newBBox()
+    result.maxPoint = c.vboData.maxCoord
+    result.minPoint = c.vboData.minCoord
+
+# --------- read data from VBO ------------
+
 proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
         when defined(android) or defined(ios) or defined(js) or defined(emscripten):
@@ -313,8 +321,6 @@ proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
 
     getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
 
-
-# --------- read data from VBO ------------
 proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
     if not c.skeleton.isNil:
         return c.initMesh
@@ -362,17 +368,6 @@ proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] {.proc
     let size = (int32)c.vboData.vertInfo.numOfCoordPerTangent
     let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord + c.vboData.vertInfo.numOfCoordPerNormal
     result = c.extractVertexData(size, offset, data)
-
-method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
-    var inv_mat: Matrix4
-    if tryInverse (c.node.worldTransform(), inv_mat) == false:
-        return false
-
-    let localRay = r.transform(inv_mat)
-    if c.node.getGlobalAlpha() < 0.0001:
-        result = false
-    else:
-        result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
 
 
 method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =

@@ -26,13 +26,19 @@ type
         alpha*: Coord
         mMatrix*: Matrix4
         isDirty*: bool
+        layer*: int
 
     Node2D* = Node3D
 
     Node* = Node3D
 
+    BBox* = ref object of RootObj
+        maxPoint*: Vector3
+        minPoint*: Vector3
+
     Component* = ref object of RootObj
         node*: Node3D
+        bbox*: BBox
 
     PostprocessContext* = ref object
         shader*: ProgramRef
