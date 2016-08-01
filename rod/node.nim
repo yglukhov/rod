@@ -21,6 +21,8 @@ import rod_types
 export Node
 
 proc sceneView*(n: Node): SceneView = n.mSceneView
+proc getGlobalAlpha*(n: Node): float
+proc worldTransform*(n: Node): Matrix4
 
 import rod.component
 
@@ -203,10 +205,9 @@ proc transform*(n: Node): Matrix4 =
 proc recursiveDraw*(n: Node) =
     if n.alpha < 0.0000001: return
     let c = currentContext()
-    var tr = c.transform * n.transform()#c.transform #
+    var tr = c.transform * n.transform()
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
-    #n.getTransform(tr)
 
     c.withTransform tr:
         var hasPosteffectComponent = false
@@ -214,6 +215,7 @@ proc recursiveDraw*(n: Node) =
             for v in values(n.components):
                 v.draw()
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
+
         if not hasPosteffectComponent:
             for c in n.children: c.recursiveDraw()
     c.alpha = oldAlpha
@@ -345,6 +347,8 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("sX", n.scaleX, { pfAnimatable })
     p.visitProperty("sY", n.scaleY, { pfAnimatable })
     p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
+
+    p.visitProperty("layer", n.layer)
 
 proc reparentTo*(n, newParent: Node) =
     # Change parent of a node preserving its world transform
@@ -514,7 +518,6 @@ proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
 
     for c in n.children:
         c.rayCast(r, castResult)
-
 
 # Debugging
 proc recursiveChildrenCount*(n: Node): int =

@@ -6,6 +6,7 @@ import nimx.property_visitor
 
 import json, strutils
 
+import rod_types
 import rod.node
 import rod.ray
 import rod.tools.serializer
@@ -70,6 +71,15 @@ proc createFrameAnimation(s: Sprite) =
         s.currentFrame = int(float(s.images.len - 1) * p)
     s.node.registerAnimation("sprite", a)
 
+method getBBox*(s: Sprite): BBox =
+    let img = s.image
+    if img.isNil:
+        return nil
+
+    result = newBBox()
+    result.maxPoint = newVector3(-s.offset.x, -s.offset.y, 0.0)
+    result.minPoint = newVector3(img.size.width - s.offset.x, img.size.height - s.offset.y, 0.01)
+
 method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
     if not v.isNil:
@@ -113,24 +123,6 @@ method serialize*(c: Sprite, s: Serializer): JsonNode =
     result.add("fileNames", s.getValue(imagesNode))
     for img in c.images:
         imagesNode.add( s.getValue(s.getRelativeResourcePath(img.filePath())) )
-
-method rayCast*(s: Sprite, r: Ray, distance: var float32): bool =
-    let img = s.image
-    if img.isNil:
-        return false
-
-    var inv_mat: Matrix4
-    if tryInverse (s.node.worldTransform(), inv_mat) == false:
-        return false
-
-    let localRay = r.transform(inv_mat)
-    var minCoord = newVector3(-s.offset.x, -s.offset.y, 0.0)
-    var maxCoord = newVector3(img.size.width - s.offset.x, img.size.height - s.offset.y, 0.01)
-    if s.node.getGlobalAlpha() < 0.0001:
-        result = false
-    else:
-        result = localRay.intersectWithAABB(minCoord, maxCoord, distance)
-
 
 method visitProperties*(t: Sprite, p: var PropertyVisitor) =
     p.visitProperty("image", t.image)

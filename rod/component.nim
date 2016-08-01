@@ -4,6 +4,7 @@ import json
 
 import nimx.types
 import nimx.property_visitor
+import nimx.matrixes
 
 import node
 import rod_types
@@ -44,12 +45,21 @@ method isPosteffectComponent*(c: Component): bool {.base.} = false
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} = discard
 method serialize*(c: Component, s: Serializer): JsonNode {.base.} = discard
+method getBBox*(c: Component): BBox {.base.} = discard
 
 type UpdateProcComponent = ref object of Component
     updateProc: proc()
 
 type DrawProcComponent = ref object of Component
     drawProc: proc()
+
+proc newBBox*(): BBox =
+    result.new()
+
+proc newBBox*(min, max: Vector3): BBox =
+    result.new()
+    result.minPoint = min
+    result.maxPoint = max
 
 proc newComponentWithUpdateProc*(p: proc()): Component =
     var r : UpdateProcComponent
@@ -78,4 +88,16 @@ method componentNodeWillBeRemovedFromSceneView*(c: OverlayComponent) =
     dec c.node.sceneView.numberOfNodesWithBackComposition
 
 method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
-    result = false
+    let bbox = c.getBBox()
+    if bbox.isNil:
+        return false
+
+    var inv_mat: Matrix4
+    if tryInverse (c.node.worldTransform(), inv_mat) == false:
+        return false
+
+    let localRay = r.transform(inv_mat)
+    if c.node.getGlobalAlpha() < 0.0001:
+        result = false
+    else:
+        result = localRay.intersectWithAABB(bbox.minPoint, bbox.maxPoint, distance)
