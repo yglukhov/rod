@@ -76,6 +76,9 @@ method componentNodeWasAddedToSceneView*(ls: LightSource) =
 method componentNodeWillBeRemovedFromSceneView(ls: LightSource) =
     ls.node.sceneView.removeLightSource(ls)
 
+method getBBox*(ls: LightSource): BBox =
+    result = newBBox(newVector3(-3, -3, -3), newVector3(3, 3, 3))
+
 method deserialize*(ls: LightSource, j: JsonNode, s: Serializer) =
     var v = j{"ambient"}
     if not v.isNil:

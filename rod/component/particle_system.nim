@@ -234,8 +234,6 @@ type
         gravity*: Vector3
         airDensity*: float32
 
-        currentTime: float # to calculate normal dt
-        lastTime: float
         duration*: float
         remainingDuration: float
         isLooped*: bool
@@ -257,11 +255,8 @@ type
         colorSeq*: seq[TVector[5, Coord]] # time, color
 
         isBlendAdd*: bool
-        # debug data
-        isMove*: bool
-        amplitude*, frequency*, distance*, speed*: float
 
-
+# -------------------- Particle System --------------------------
 proc randomBetween(fromV, toV: float32): float32 =
     result = random(fromV - toV) + toV
 
@@ -371,8 +366,6 @@ proc initSystem(ps: ParticleSystem) =
 
     ps.genShapeNode = ps.node
 
-    ps.currentTime = epochTime()
-    ps.lastTime = epochTime()
     ps.remainingDuration = ps.duration
     ps.lastBirthTime = epochTime()
 
@@ -429,12 +422,6 @@ method init(ps: ParticleSystem) =
 
     ps.isBlendAdd = false
 
-    ps.isMove = false
-    ps.amplitude = 5.0
-    ps.frequency = 0.4
-    ps.distance = 40.0
-    ps.speed = 9.0
-
     ps.scaleMode = ParticleModeEnum.BeetwenValue
     ps.colorMode = ParticleModeEnum.BeetwenValue
     ps.scaleSeq = newSeq[TVector[4, Coord]]()
@@ -444,8 +431,6 @@ method init(ps: ParticleSystem) =
 proc start*(ps: ParticleSystem) =
     ps.isPlayed = true
 
-    ps.currentTime = epochTime()
-    ps.lastTime = epochTime()
     ps.lastBirthTime = epochTime()
     ps.remainingDuration = ps.duration
 
@@ -536,7 +521,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         v4 = vertexSize* (4 * ps.count + 3)
 
         # positions
-        if ps.airDensity > 0.0:
+        if abs(ps.airDensity) > 0.0:
             var density_vec = ps.particles[i].velocity
             density_vec.normalize()
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
@@ -646,12 +631,6 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         ps.particles.add(ps.newParticles[i])
 
 proc update(ps: ParticleSystem, dt: float) =
-    if ps.isMove:
-        ps.node.positionX = ps.node.positionX + ps.speed * dt
-        ps.node.positionY = ps.amplitude * cos(ps.node.positionX * ps.frequency)
-        if ps.node.positionX > ps.distance / 2.0:
-            ps.node.positionX = -ps.distance / 2.0;
-
     let perParticleTime = 1.0 / ps.birthRate
     let curTime = epochTime()
 
@@ -684,9 +663,7 @@ proc update(ps: ParticleSystem, dt: float) =
 
 
 method draw*(ps: ParticleSystem) =
-    ps.currentTime = epochTime()
-    let dt = ps.currentTime - ps.lastTime
-    ps.lastTime = ps.currentTime
+    let dt = getDeltaTime() #ps.currentTime - ps.lastTime
     ps.node.sceneView.setNeedsDisplay()
     let gl = currentContext().gl
 
@@ -793,6 +770,8 @@ method draw*(ps: ParticleSystem) =
     gl.enable(gl.BLEND)
     gl.depthMask(true)
 
+method getBBox*(ps: ParticleSystem): BBox =
+    result = newBBox(newVector3(-3, -3, -3), newVector3(3, 3, 3))
 
 method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     if j.isNil:
@@ -831,12 +810,6 @@ method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "modifierNode", modifierName)
     addNodeRef(ps.genShapeNode, genShapeName)
     addNodeRef(ps.modifierNode, modifierName)
-
-    s.deserializeValue(j, "isMove", ps.isMove)
-    s.deserializeValue(j, "amplitude", ps.amplitude)
-    s.deserializeValue(j, "frequency", ps.frequency)
-    s.deserializeValue(j, "distance", ps.distance)
-    s.deserializeValue(j, "speed", ps.speed)
 
     s.deserializeValue(j, "scaleMode", ps.scaleMode)
     s.deserializeValue(j, "colorMode", ps.colorMode)
@@ -883,12 +856,6 @@ method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
 
     result.add("modifierNode", s.getValue(c.modifierNode))
     result.add("genShapeNode", s.getValue(c.genShapeNode))
-
-    result.add("isMove", s.getValue(c.isMove))
-    result.add("amplitude", s.getValue(c.amplitude))
-    result.add("frequency", s.getValue(c.frequency))
-    result.add("distance", s.getValue(c.distance))
-    result.add("speed", s.getValue(c.speed))
 
 method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     proc onLoopedChange() =
@@ -947,11 +914,80 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("framesCount", ps.framesCount)
     p.visitProperty("fps", ps.fps)
 
-    p.visitProperty("isMove", ps.isMove)
-    p.visitProperty("amplitude", ps.amplitude)
-    p.visitProperty("frequency", ps.frequency)
-    p.visitProperty("distance", ps.distance)
-    p.visitProperty("speed", ps.speed)
+# -------------------- PSHolder --------------------------
+type
+    PSHolder* = ref object of Component
+        played*: bool
+        oldValue: bool
+
+        # debug data
+        isMove*: bool
+        amplitude*, frequency*, distance*, speed*: float
+
+method init(h: PSHolder) =
+    h.played = true
+    h.oldValue = true
+
+    h.isMove = false
+    h.amplitude = 5.0
+    h.frequency = 0.4
+    h.distance = 40.0
+    h.speed = 9.0
+
+proc recursiveDoProc(n: Node, pr: proc(ps: ParticleSystem) ) =
+    let ps = n.getComponent(ParticleSystem)
+    if not ps.isNil:
+        ps.pr()
+
+    for child in n.children:
+        child.recursiveDoProc(pr)
+
+method draw*(h: PSHolder) =
+    if h.isMove:
+        h.node.positionX = h.node.positionX + h.speed * getDeltaTime()
+        h.node.positionY = h.amplitude * cos(h.node.positionX * h.frequency)
+        if h.node.positionX > h.distance / 2.0:
+            h.node.positionX = -h.distance / 2.0;
+
+    if h.played != h.oldValue:
+        if h.played:
+            h.node.recursiveDoProc(start)
+        else:
+            h.node.recursiveDoProc(stop)
+
+    h.oldValue = h.played
+
+method deserialize*(h: PSHolder, j: JsonNode, s: Serializer) =
+    if j.isNil:
+        return
+    s.deserializeValue(j, "played", h.played)
+
+    s.deserializeValue(j, "isMove", h.isMove)
+    s.deserializeValue(j, "amplitude", h.amplitude)
+    s.deserializeValue(j, "frequency", h.frequency)
+    s.deserializeValue(j, "distance", h.distance)
+    s.deserializeValue(j, "speed", h.speed)
+
+method serialize*(h: PSHolder, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("played", s.getValue(h.played))
+
+    result.add("isMove", s.getValue(h.isMove))
+    result.add("amplitude", s.getValue(h.amplitude))
+    result.add("frequency", s.getValue(h.frequency))
+    result.add("distance", s.getValue(h.distance))
+    result.add("speed", s.getValue(h.speed))
+
+method visitProperties*(h: PSHolder, p: var PropertyVisitor) =
+    p.visitProperty("played", h.played)
+
+    p.visitProperty("isMove", h.isMove)
+    p.visitProperty("amplitude", h.amplitude)
+    p.visitProperty("frequency", h.frequency)
+    p.visitProperty("distance", h.distance)
+    p.visitProperty("speed", h.speed)
+
+registerComponent[PSHolder]()
 
 registerComponent[ParticleSystem](proc(): Component =
     result = newParticleSystem()

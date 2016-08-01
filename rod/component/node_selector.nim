@@ -1,3 +1,4 @@
+import tables
 import nimx.context
 import nimx.portable_gl
 import nimx.types
@@ -29,8 +30,8 @@ uniform vec4 uColor;
 void main() { gl_FragColor = uColor; }
 """
 
-let vertexData = [-0.5.GLfloat,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
-                  -0.5        ,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5]
+# let vertexData = [-0.5.GLfloat,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
+#                   -0.5        ,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5]
 let indexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
 
 var selectorSharedIndexBuffer: BufferRef
@@ -43,6 +44,7 @@ type Attrib = enum
 
 type NodeSelector* = ref object of Component
     modelMatrix*: Matrix4
+    vertexData: seq[GLfloat]
     color*: Color
 
 proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
@@ -67,11 +69,10 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
             let size = 10.0
             ns.color = light.lightColor
             ns.modelMatrix = n.worldTransform()
-            # ns.modelMatrix.translate(newVector3(size/2.0, size/2.0, size/2.0) )
             ns.modelMatrix.scale(newVector3(size, size, size))
             return true
 
-proc createVBO() =
+proc createVBO(ns: NodeSelector) =
     let c = currentContext()
     let gl = c.gl
 
@@ -81,7 +82,7 @@ proc createVBO() =
 
     selectorSharedVertexBuffer = gl.createBuffer()
     gl.bindBuffer(gl.ARRAY_BUFFER, selectorSharedVertexBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
+    gl.bufferData(gl.ARRAY_BUFFER, ns.vertexData, gl.STATIC_DRAW)
     selectorSharedNumberOfIndexes = indexData.len.GLsizei
 
 method init*(ns: NodeSelector) =
@@ -89,15 +90,32 @@ method init*(ns: NodeSelector) =
     ns.modelMatrix.loadIdentity()
     procCall ns.Component.init()
 
+proc createBoxes(ns: NodeSelector) =
+    for k, v in ns.node.components:
+        let bbox = v.getBBox()
+        if not bbox.isNil:
+            # echo "node ", ns.node.name, "  min  ", bbox.minPoint, "  max  ", bbox.maxPoint
+            ns.vertexData = newSeq[GLfloat]()
+            ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.minPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.minPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
+            ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
+
+            ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
+            ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
+
+            ns.createVBO()
+
+method componentNodeWasAddedToSceneView*(ns: NodeSelector) =
+    ns.createBoxes()
+
 method draw*(ns: NodeSelector) =
-    if ns.trySetupTransformfromNode(ns.node):
+    if not ns.vertexData.isNil:
         let c = currentContext()
         let gl = c.gl
-
-        if selectorSharedIndexBuffer == invalidBuffer:
-            createVBO()
-            if selectorSharedIndexBuffer == invalidBuffer:
-                return
+        ns.modelMatrix = ns.node.worldTransform()
 
         if selectorSharedShader == invalidProgram:
             selectorSharedShader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition)])
