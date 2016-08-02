@@ -6,25 +6,13 @@ import animation_chart_view
 
 type DopesheetView* = ref object of AnimationChartView
     rowHeight*: Coord
+    selectedCurve: int
+    selectedKey: int
 
 method init*(v: DopesheetView, r: Rect) =
     procCall v.AnimationChartView.init(r)
     v.rowHeight = 20
     v.gridSize.height = 0
-
-    var curve = newAnimationCurve()
-    curve.addKey(0.0, 100)
-    curve.addKey(0.5, 200)
-    curve.addKey(1.0, 100)
-    curve.color = newColor(1.0, 0, 0)
-    v.curves.add(curve)
-
-    curve = newAnimationCurve()
-    curve.addKey(0.0, 150)
-    curve.addKey(0.5, 250)
-    curve.addKey(1.0, 150)
-    curve.color = newColor(0.0, 1, 0)
-    v.curves.add(curve)
 
 proc curvePointToLocal(v: DopesheetView, p: Point): Point =
     result.x = (p.x - v.fromX) / (v.toX - v.fromX) * v.bounds.width
@@ -34,6 +22,8 @@ proc localPointToCurve(v: DopesheetView, p: Point): Point =
     result.x = v.fromX + p.x / v.bounds.width * (v.toX - v.fromX)
     result.y = p.y
 
+proc rowMaxY(v: DopesheetView, row: int): Coord = Coord(row + 1) * v.rowHeight + rulerHeight
+
 method draw*(v: DopesheetView, r: Rect) =
     procCall v.AnimationChartView.draw(r)
     let c = currentContext()
@@ -41,11 +31,14 @@ method draw*(v: DopesheetView, r: Rect) =
 
     c.strokeWidth = 0
     for i, curve in v.curves:
-        c.fillColor = newColor(0, 0, 1)
-        let rowMaxY = Coord(i + 1) * v.rowHeight + rulerHeight
-        for k in curve.keys:
+        let rowMaxY = v.rowMaxY(i)
+        for j, k in curve.keys:
             var p = v.curvePointToLocal(k.point)
             p.y = rowMaxY - v.rowHeight / 2
+            if i == v.selectedCurve and j == v.selectedKey:
+                c.fillColor = newColor(0.7, 0.7, 1)
+            else:
+                c.fillColor = newGrayColor(0.5)
             c.drawEllipseInRect(rectAtPoint(p, 4))
         c.fillColor = v.gridColor
         c.drawRect(newRect(0, rowMaxY, v.bounds.width, 1))
@@ -53,17 +46,26 @@ method draw*(v: DopesheetView, r: Rect) =
     v.drawTimeRuler()
     v.drawCursor()
 
-method onTouchEv(v: DopesheetView, e: var Event): bool =
-    discard procCall v.View.onTouchEv(e)
+proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
+    result = proc(e: Event): bool =
+        for i, curve in v.curves:
+            let rowMaxY = v.rowMaxY(i)
+            for j, k in curve.keys:
+                var p = v.curvePointToLocal(k.point)
+                p.y = rowMaxY - v.rowHeight / 2
+                if e.localPosition.inRect(rectAtPoint(p, 4)):
+                    v.selectedCurve = i
+                    v.selectedKey = j
+                    break
+
+method onTouchEv*(v: DopesheetView, e: var Event): bool =
     if e.buttonState == bsDown:
         let pos = e.localPosition
         if pos.y < rulerHeight:
             v.mouseTrackingHandler = v.cursorTrackingHandler
         else:
-            v.mouseTrackingHandler = proc(e: Event): bool =
-                discard
-    result = v.mouseTrackingHandler(e)
-    if not result: v.mouseTrackingHandler = nil
+            v.mouseTrackingHandler = v.dopesheetSelectionTrackingHandler
+    result = procCall v.AnimationChartView.onTouchEv(e)
 
 method onScroll*(v: DopesheetView, e: var Event): bool =
     let cp = v.localPointToCurve(e.localPosition)
@@ -72,3 +74,14 @@ method onScroll*(v: DopesheetView, e: var Event): bool =
     v.toX = cp.x + (v.toX - cp.x) * k
     v.setNeedsDisplay()
     result = true
+
+method acceptsFirstResponder*(v: DopesheetView): bool = true
+
+method onKeyDown*(v: DopesheetView, e: var Event): bool =
+    if e.keyCode == VirtualKey.Delete:
+        if v.selectedCurve < v.curves.len and v.selectedKey < v.curves[v.selectedCurve].keys.len:
+            v.curves[v.selectedCurve].keys.delete(v.selectedKey)
+            v.setNeedsDisplay()
+            result = true
+
+registerClass(DopesheetView)
