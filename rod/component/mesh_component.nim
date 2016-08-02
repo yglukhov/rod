@@ -342,7 +342,7 @@ proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
 
 proc extractVertexData*(c: MeshComponent, size, offset: int32, data: seq[float32]): seq[float32] =
     let dataStride = int(c.vboData.vertInfo.stride / sizeof(float32))
-    let vertCount = int (data.len / dataStride)
+    let vertCount = int(data.len / dataStride)
 
     result = newSeq[float32](vertCount * size)
     for i in 0 ..< vertCount:
