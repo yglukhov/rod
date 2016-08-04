@@ -44,6 +44,8 @@ type EventCatchingView* = ref object of View
     keyDownDelegate*: proc (event: var Event)
     mouseScrrollDelegate*: proc (event: var Event)
 
+registerClass(EventCatchingView)
+
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
 
@@ -82,7 +84,8 @@ type Editor* = ref object
     rootNode*: Node
     eventCatchingView*: EventCatchingView
     treeView*: View
-    animationEditView*: View
+    animationEditView*: AnimationEditView
+    animationEditPanel: View
     toolbar*: Toolbar
     sceneView*: SceneView
     mSelectedNode: Node
@@ -98,6 +101,7 @@ proc `selectedNode=`*(e: Editor, n: Node) =
         if not e.mSelectedNode.isNil:
             discard e.mSelectedNode.component(NodeSelector)
         e.inspector.inspectedNode = n
+        e.animationEditView.editedNode = n
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 
@@ -157,10 +161,11 @@ proc newAnimationEditView(e: Editor): PanelView =
     title.textColor = whiteColor()
     title.text = "Animation"
     result.addSubview(title)
-
     let ae = AnimationEditView.new(newRect(0, result.titleHeight, result.bounds.width, result.contentHeight))
     ae.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
+    e.animationEditView = ae
     result.addSubview(ae)
+    ae.moveToBack()
 
 proc newTreeView(e: Editor): PanelView =
     result = PanelView.new(newRect(0, 0, 200, 500)) #700
@@ -342,10 +347,10 @@ proc createZoomSelectionButton(e: Editor) =
 
 proc createToggleAnimationEditorButton(e: Editor) =
     e.newToolbarButton("Animations").onAction do():
-        if e.animationEditView.window.isNil:
-            e.toolbar.window.addSubview(e.animationEditView)
+        if e.animationEditPanel.window.isNil:
+            e.toolbar.window.addSubview(e.animationEditPanel)
         else:
-            e.animationEditView.removeFromSuperview()
+            e.animationEditPanel.removeFromSuperview()
 
 proc createChangeBackgroundColorButton(e: Editor) =
     var cPicker: ColorPickerView
@@ -402,8 +407,8 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.treeView.setFrameOrigin(newPoint(0, toolbarHeight))
     v.window.addSubview(editor.treeView)
 
-    editor.animationEditView = newAnimationEditView(editor)
-    editor.animationEditView.setFrameOrigin(newPoint(0, editor.treeView.frame.maxY))
+    editor.animationEditPanel = newAnimationEditView(editor)
+    editor.animationEditPanel.setFrameOrigin(newPoint(0, editor.treeView.frame.maxY))
 
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()

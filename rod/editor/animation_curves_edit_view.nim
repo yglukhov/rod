@@ -15,19 +15,6 @@ type AnimationCurvesEditView* = ref object of AnimationChartView
 
 method init*(v: AnimationCurvesEditView, r: Rect) =
     procCall v.AnimationChartView.init(r)
-    var curve = newAnimationCurve()
-    curve.addKey(0.0, 100)
-    curve.addKey(0.5, 200)
-    curve.addKey(1.0, 100)
-    curve.color = newColor(1.0, 0, 0)
-    v.curves.add(curve)
-
-    curve = newAnimationCurve()
-    curve.addKey(0.0, 150)
-    curve.addKey(0.5, 250)
-    curve.addKey(1.0, 150)
-    curve.color = newColor(0.0, 1, 0)
-    v.curves.add(curve)
 
 proc `*`(p: Point, c: Coord): Point = newPoint(p.x * c, p.y * c)
 
@@ -134,26 +121,27 @@ proc curvePointTrackingHandler(v: AnimationCurvesEditView): proc(e: Event): bool
         of bsUnknown, bsUp:
             case draggedTangent
             of 0:
-                v.curves[draggedCurve].keys[draggedKey].point = v.localPointToCurve(e.localPosition)
+                var p = v.localPointToCurve(e.localPosition)
+                p.x = round(p.x / v.gridSize.width) * v.gridSize.width
+                v.curves[draggedCurve].keys[draggedKey].point = p
             of 1:
                 v.curves[draggedCurve].keys[draggedKey].outTangent = v.localPointToCurve(e.localPosition) - v.curves[draggedCurve].keys[draggedKey].point
             else:
                 v.curves[draggedCurve].keys[draggedKey].inTangent = v.localPointToCurve(e.localPosition) - v.curves[draggedCurve].keys[draggedKey].point
+            if not v.onCursorPosChange.isNil: v.onCursorPosChange()
             v.setNeedsDisplay()
             if e.buttonState == bsUp:
                 draggedCurve = -1
         result = draggedCurve != -1
 
-method onTouchEv(v: AnimationCurvesEditView, e: var Event): bool =
-    discard procCall v.View.onTouchEv(e)
+method onTouchEv*(v: AnimationCurvesEditView, e: var Event): bool =
     if e.buttonState == bsDown:
         let pos = e.localPosition
         if pos.y < rulerHeight:
             v.mouseTrackingHandler = v.cursorTrackingHandler
         else:
             v.mouseTrackingHandler = v.curvePointTrackingHandler
-    result = v.mouseTrackingHandler(e)
-    if not result: v.mouseTrackingHandler = nil
+    result = procCall v.AnimationChartView.onTouchEv(e)
 
 method onScroll*(v: AnimationCurvesEditView, e: var Event): bool =
     when defined(macosx):
@@ -173,3 +161,5 @@ method onScroll*(v: AnimationCurvesEditView, e: var Event): bool =
 
     v.setNeedsDisplay()
     result = true
+
+registerClass(AnimationCurvesEditView)
