@@ -1,5 +1,6 @@
 import math
 import algorithm
+import strutils
 
 import nimx.view
 import nimx.types
@@ -92,6 +93,8 @@ type Editor* = ref object
     outlineView*:OutlineView
     inspector*: InspectorView
     cameraController*: EditorCameraController
+    gizmo: Node
+    gizmoAxis: Vector3
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -278,7 +281,8 @@ proc newTreeView(e: Editor): PanelView =
         outlineView.reloadData()
     result.addSubview(refreshButton)
 
-proc onTouch*(editor: Editor, e: var Event) =
+import tables
+proc onTouchDown*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
     editor.outlineView.reloadData()
 
@@ -288,16 +292,43 @@ proc onTouch*(editor: Editor, e: var Event) =
 
     if castResult.len > 0:
         castResult.sort( proc (x, y: RayCastInfo): int =
-            result = int(x.distance > y.distance)
-            if abs(x.distance - y.distance) < 0.00001:
-                result = getTreeDistance(x.node, y.node) )
+            result = int(x.node.layer < y.node.layer)
+            if x.node.layer == y.node.layer:
+                result = int(x.distance > y.distance)
+                if abs(x.distance - y.distance) < 0.00001:
+                    result = getTreeDistance(x.node, y.node) )
 
+        #work with gizmo
+        if castResult[0].node.name.contains("gizmo_axis"):
+            let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
+            if not nodeSelector.isNil:
+                nodeSelector.startTransform(castResult[0].node, e.position)
+            return
+
+        # make node select
         var indexPath = newSeq[int]()
         editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
 
         if indexPath.len > 1:
             editor.outlineView.selectItemAtIndexPath(indexPath)
             editor.outlineView.expandBranch(indexPath)
+
+
+proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
+    if editor.selectedNode.isNil:
+        return
+
+    let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
+    if not nodeSelector.isNil:
+        nodeSelector.proccesTransform(e.position)
+
+proc onTouchUp*(editor: Editor, e: var Event) =
+    if editor.selectedNode.isNil:
+        return
+
+    let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
+    if not nodeSelector.isNil:
+        nodeSelector.stopTransform()
 
 proc newToolbarButton(e: Editor, title: string): Button =
     let f = systemFont()
@@ -386,11 +417,13 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.eventCatchingView.addGestureDetector(newScrollGestureDetector( eventListner ))
 
     eventListner.tapDownDelegate = proc (event: var Event) =
-        editor.onTouch(event)
+        editor.onTouchDown(event)
         editor.cameraController.onTapDown(event)
     eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
+        editor.onScroll(dx, dy, e)
         editor.cameraController.onScrollProgress(dx, dy, e)
     eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
+        editor.onTouchUp(e)
         editor.cameraController.onTapUp(dx, dy, e)
     editor.eventCatchingView.mouseScrrollDelegate = proc (event: var Event) =
         editor.cameraController.onMouseScrroll(event)
