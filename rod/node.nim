@@ -248,11 +248,12 @@ proc recursiveDraw*(n: Node, drawTable: var TableRef[int, seq[Node]]) =
                 c.recursiveDraw(drawTable)
 
     else:
-        if drawTable.hasKey(n.layer):
-            drawTable[n.layer].add(n)
-        else:
-            drawTable[n.layer] = newSeq[Node]()
-            drawTable[n.layer].add(n)
+        var drawNodes = drawTable.getOrDefault(n.layer)
+        if drawNodes.isNil:
+            drawNodes = newSeq[Node]()
+
+        drawNodes.add(n)
+        drawTable[n.layer] = drawNodes
 
         for c in n.children:
             c .recursiveDraw(drawTable)
