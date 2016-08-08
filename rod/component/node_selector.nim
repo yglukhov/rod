@@ -130,8 +130,6 @@ proc updateGizmo(ns: NodeSelector) =
 method componentNodeWasAddedToSceneView*(ns: NodeSelector) =
     ns.createBoxes()
 
-    let path = "Jsondata/gizmo_axis.json"
-    # ns.gizmo = newNodeWithResource(path)
     ns.gizmo = newNode()
     ns.gizmo.loadComposition( getMoveAxisJson() )
     ns.node.mSceneView.rootNode.addChild(ns.gizmo)
@@ -191,15 +189,15 @@ proc startTransform*(ns: NodeSelector, selectedGizmo: Node, position: Point) =
     offset = ns.gizmo.worldPos - ns.node.sceneView.screenToWorldPoint(newVector3(position.x, position.y, screenPoint.z))
 
 proc proccesTransform*(ns: NodeSelector, position: Point) =
-        let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
-        let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
+    let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
+    let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
 
-        let curScreenPoint = newVector3(position.x, position.y, screenPoint.z)
-        var curPosition: Vector3
-        curPosition = ns.node.sceneView.screenToWorldPoint(curScreenPoint) + offset
-        curPosition = curPosition - ns.gizmo.worldPos
-        ns.gizmo.position = ns.gizmo.worldPos + curPosition * ns.gizmoAxis
-        ns.node.position = ns.node.parent.worldToLocal(ns.gizmo.position)
+    let curScreenPoint = newVector3(position.x, position.y, screenPoint.z)
+    var curPosition: Vector3
+    curPosition = ns.node.sceneView.screenToWorldPoint(curScreenPoint) + offset
+    curPosition = curPosition - ns.gizmo.worldPos
+    ns.gizmo.position = ns.gizmo.worldPos + curPosition * ns.gizmoAxis
+    ns.node.position = ns.node.parent.worldToLocal(ns.gizmo.position)
 
 proc stopTransform*(ns: NodeSelector) =
     ns.gizmoAxis = newVector3(0.0, 0.0, 0.0)
