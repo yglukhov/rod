@@ -1,13 +1,16 @@
-import sequtils, intsets
+import sequtils, intsets, tables
 import nimx.view, nimx.table_view, nimx.scroll_view, nimx.button, nimx.text_field
+import nimx.menu, nimx.event, nimx.property_visitor
 import variant
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view
 import animation_editor_types
 
-import rod.node
+import rod.node, rod.component
 
 type SplitView* = ref object of View
+
+registerClass(SplitView)
 
 const leftPaneWidth = 200
 
@@ -24,6 +27,30 @@ type
         editedProperties: seq[EditedProperty]
         mCurveEditingMode: bool
         mEditedNode*: Node
+
+proc `editedNode=`*(v: AnimationEditView, n: Node) =
+    v.mEditedNode = n
+
+proc findAnimatableProperty(n: Node, propName: string): Variant =
+    var res : Variant
+    var visitor : PropertyVisitor
+    visitor.requireName = true
+    visitor.requireSetter = true
+    visitor.requireGetter = true
+    visitor.flags = { pfAnimatable }
+    visitor.commit = proc() =
+        if res.isEmpty:
+            if visitor.name == propName:
+                res = visitor.setterAndGetter
+
+    n.visitProperties(visitor)
+
+    if res.isEmpty and not n.components.isNil:
+        for k, v in n.components:
+            v.visitProperties(visitor)
+            if not res.isEmpty: break
+
+    result = res
 
 proc currentLeftPaneView(v: AnimationEditView): AnimationChartView =
     if v.mCurveEditingMode:
@@ -58,11 +85,38 @@ proc addEditedProperty(v: AnimationEditView, name: string) =
     ep.name = name
     ep.curve = newAnimationCurve()
     ep.curve.color = colors[v.editedProperties.len mod colors.len]
+    ep.sng = findAnimatableProperty(v.mEditedNode, name)
     v.editedProperties.add(ep)
     v.propertyTableView.reloadData()
     var curves = newSeq[AnimationCurve]()
     for p in v.editedProperties: curves.add(p.curve)
     v.dopesheetView.curves = curves
+
+proc createAddPropertyButton(v: AnimationEditView): Button =
+    let b = Button.new(zeroRect)
+    b.title = "+"
+    b.onAction do():
+        if not v.mEditedNode.isNil:
+            var menu : Menu
+            menu.new()
+            var items = newSeq[MenuItem]()
+            let props = @["tX", "tY", "tZ"]
+            for i, p in props:
+                closureScope:
+                    let prop = p
+                    let menuItem = newMenuItem(prop)
+                    menuItem.action = proc() =
+                        v.addEditedProperty(prop)
+                    items.add(menuItem)
+            menu.items = items
+            menu.popupAtPoint(b, newPoint(0, 27))
+    result = b
+
+proc onCursorPosChange(v: AnimationEditView, pos: float) =
+    for ep in v.editedProperties:
+        let sng = ep.sng.get(SetterAndGetter[Coord])
+        if ep.curve.keys.len > 1:
+            sng.setter(ep.curve.valueAtPos(pos))
 
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
@@ -105,10 +159,21 @@ method init*(v: AnimationEditView, r: Rect) =
 
     v.propertyTableView.defaultRowHeight = 20
 
-    let addPropertyButton = Button.new(newRect(0, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
-    addPropertyButton.title = "+"
+    let addPropertyButton = v.createAddPropertyButton()
+    addPropertyButton.setFrame(newRect(0, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
     addPropertyButton.autoresizingMask = { afFlexibleMaxX, afFlexibleMinY }
     leftPaneView.addSubview(addPropertyButton)
+
+    let removePropertyButton = Button.new(newRect(25, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
+    removePropertyButton.title = "-"
+    removePropertyButton.autoresizingMask = { afFlexibleMaxX, afFlexibleMinY }
+    removePropertyButton.onAction do():
+        let selectedRows = toSeq(items(v.propertyTableView.selectedRows))
+        if selectedRows.len > 0:
+            v.editedProperties.delete(selectedRows[0])
+            v.propertyTableView.reloadData()
+
+    leftPaneView.addSubview(removePropertyButton)
 
     let toggleCurveModeButton = Button.new(newRect(leftPaneView.bounds.maxX - 25, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
     toggleCurveModeButton.title = "o"
@@ -119,11 +184,28 @@ method init*(v: AnimationEditView, r: Rect) =
 
     v.curveEditView = AnimationCurvesEditView.new(newRect(0, 0, 100, 100))
     v.curveEditView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    v.curveEditView.onCursorPosChange = proc() =
+        v.onCursorPosChange(v.curveEditView.cursorPos)
     v.dopesheetView = DopesheetView.new(newRect(0, 0, 100, 100))
     v.dopesheetView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    v.dopesheetView.onCursorPosChange = proc() =
+        v.onCursorPosChange(v.dopesheetView.cursorPos)
 
     v.mCurveEditingMode = true
     v.curveEditingMode = false
 
-    v.addEditedProperty("tX")
-    v.addEditedProperty("tY")
+method acceptsFirstResponder*(v: AnimationEditView): bool = true
+
+proc insertKeyframeAtCurPos(v: AnimationEditView) =
+    let cursorPos = v.currentLeftPaneView.cursorPos
+    for ep in v.editedProperties:
+        let sng = ep.sng.get(SetterAndGetter[Coord])
+        ep.curve.addKey(cursorPos, sng.getter())
+    v.setNeedsDisplay()
+
+method onKeyDown*(v: AnimationEditView, e: var Event): bool =
+    if e.keyCode == VirtualKey.K:
+        v.insertKeyframeAtCurPos()
+        result = true
+
+registerClass(AnimationEditView)
