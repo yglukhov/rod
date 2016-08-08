@@ -25,6 +25,7 @@ type
         mSceneView*: SceneView
         alpha*: Coord
         mMatrix*: Matrix4
+        worldMatrix*: Matrix4
         isDirty*: bool
         layer*: int
 
@@ -49,6 +50,7 @@ type
 
     SceneView* = ref object of View
         viewMatrixCached*: Matrix4
+        viewProjMatrix*: Matrix4
         mCamera*: Camera
         mRootNode*: Node3D
         animationRunner*: AnimationRunner
@@ -73,6 +75,7 @@ type
         projectionMode*: CameraProjection
         zNear*, zFar*, fov*: Coord
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
+        viewportSize*: Size
 
     UIComponent* = ref object of Component
         mView*: View

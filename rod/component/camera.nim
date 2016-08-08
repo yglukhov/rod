@@ -18,7 +18,11 @@ method init*(c: Camera) =
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
     case c.projectionMode
     of cpOrtho:
-        mat.ortho(-viewportBounds.width / 2, viewportBounds.width / 2, -viewportBounds.height / 2, viewportBounds.height / 2, c.zNear, c.zFar)
+        if c.viewportSize.height > 0:
+            let logicalWidth = viewportBounds.width / (viewportBounds.height / c.viewportSize.height)
+            mat.ortho(-logicalWidth / 2, logicalWidth / 2, c.viewportSize.height / 2, -c.viewportSize.height / 2, c.zNear, c.zFar)
+        else:
+            mat.ortho(-viewportBounds.width / 2, viewportBounds.width / 2, -viewportBounds.height / 2, viewportBounds.height / 2, c.zNear, c.zFar)
     of cpPerspective:
         mat.perspective(c.fov, viewportBounds.width / viewportBounds.height, c.zNear, c.zFar)
     of cpManual:
@@ -32,5 +36,6 @@ proc `manualGetProjectionMatrix=`*(c: Camera, p: proc(viewportBounds: Rect, mat:
 method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("zNear", c.zNear)
     p.visitProperty("zFar", c.zFar)
+    p.visitProperty("projMode", c.projectionMode)
 
 registerComponent[Camera]()
