@@ -153,6 +153,7 @@ proc loadNode(editor: Editor): bool =
                 editor.selectedNode.addChild(ln)
             else:
                 editor.rootNode.addChild(ln)
+            editor.outlineView.reloadData()
             return true
 
     return false
