@@ -26,17 +26,6 @@ proc logi(args: varargs[string, `$`]) =
     text &= "\n"
     logTextField.text = text
 
-proc blendMode*(layer: Layer): BlendingMode =
-    var bm = 0
-    {.emit: """
-        `bm` = `layer`.blendingMode;
-    """.}
-    case bm
-    of 5220:
-        result = BlendingMode.ADD
-    else:
-        result = BlendingMode.NORMAL
-
 proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
