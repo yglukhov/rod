@@ -287,6 +287,9 @@ proc onTouchDown*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
     editor.outlineView.reloadData()
 
+    if e.keyCode != VirtualKey.MouseButtonPrimary:
+        return
+
     let r = editor.sceneView.rayWithScreenCoords(e.localPosition)
     var castResult = newSeq[RayCastInfo]()
     editor.sceneView.rootNode().rayCast(r, castResult)
@@ -299,6 +302,7 @@ proc onTouchDown*(editor: Editor, e: var Event) =
                 if abs(x.distance - y.distance) < 0.00001:
                     result = getTreeDistance(x.node, y.node) )
 
+        echo "cast ", castResult[0].node.name
         #work with gizmo
         if castResult[0].node.name.contains("gizmo_axis"):
             let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
