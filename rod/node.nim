@@ -196,16 +196,16 @@ proc getTransform*(n: Node, mat: var Matrix4) =
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
-    if n.isDirty:
-        n.mMatrix = n.makeTransform()
-        n.isDirty = false
+    # if n.isDirty:
+    n.mMatrix = n.makeTransform()
+        # n.isDirty = false
 
     return n.mMatrix
 
 proc recursiveDraw*(n: Node) =
     if n.alpha < 0.0000001: return
     let c = currentContext()
-    var tr = c.transform * n.transform()
+    var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
 
@@ -216,9 +216,47 @@ proc recursiveDraw*(n: Node) =
                 v.draw()
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
 
-        if not hasPosteffectComponent:
-            for c in n.children: c.recursiveDraw()
+    if not hasPosteffectComponent:
+        for c in n.children: c.recursiveDraw()
     c.alpha = oldAlpha
+
+
+proc drawNode*(n: Node): bool =
+    if n.alpha < 0.0000001: return
+    let c = currentContext()
+    var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+    let oldAlpha = c.alpha
+    c.alpha *= n.alpha
+
+    c.withTransform tr:
+        var hasPosteffectComponent = false
+        if not n.components.isNil:
+            for v in values(n.components):
+                v.draw()
+                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
+
+    c.alpha = oldAlpha
+    result = hasPosteffectComponent
+
+proc recursiveDraw*(n: Node, drawTable: var TableRef[int, seq[Node]]) =
+    if n.layer == 0:
+        if n.alpha < 0.0000001: return
+        var hasPosteffectComponent = n.drawNode()
+
+        if not hasPosteffectComponent:
+            for c in n.children:
+                c.recursiveDraw(drawTable)
+
+    else:
+        var drawNodes = drawTable.getOrDefault(n.layer)
+        if drawNodes.isNil:
+            drawNodes = newSeq[Node]()
+
+        drawNodes.add(n)
+        drawTable[n.layer] = drawNodes
+
+        for c in n.children:
+            c .recursiveDraw(drawTable)
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
@@ -306,11 +344,15 @@ proc childNamed*(n: Node, name: string): Node =
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 
 proc worldTransform*(n: Node): Matrix4 =
-    if n.parent.isNil:
-        result = n.transform
-    else:
-        let w = n.parent.worldTransform
-        w.multiply(n.transform, result)
+    if n.isDirty:
+        n.isDirty = false
+        if n.parent.isNil:
+            n.worldMatrix = n.transform
+        else:
+            let w = n.parent.worldTransform
+            w.multiply(n.transform, n.worldMatrix)
+
+    result = n.worldMatrix
 
 proc localToWorld*(n: Node, p: Vector3): Vector3 =
     result = n.worldTransform * p
@@ -327,11 +369,11 @@ proc tryWorldToLocal*(n: Node, p: Vector3, res: var Vector3): bool =
 proc worldPos*(n: Node): Vector3 =
     result = n.localToWorld(newVector3())
 
-proc `worldPos=`(n: Node, p: Vector3) =
+proc `worldPos=`*(n: Node, p: Vector3) =
     if n.parent.isNil:
-        n.mTranslation = p
+        n.position = p
     else:
-        n.mTranslation = n.parent.worldToLocal(p)
+        n.position = n.parent.worldToLocal(p)
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
@@ -384,6 +426,10 @@ proc loadComposition*(n: Node, resourceName: string) =
         n.deserialize(j, serializer)
         popParentResource()
 
+proc loadComposition*(n: Node, j: JsonNode) =
+    let serializer = Serializer.new()
+    n.deserialize(j, serializer)
+
 import ae_animation
 
 # proc deserialize*(n: Node, s: Serializer) =
@@ -407,6 +453,7 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "scale", n.mScale)
     s.deserializeValue(j, "rotation", n.mRotation)
     s.deserializeValue(j, "alpha", n.alpha)
+    s.deserializeValue(j, "layer", n.layer)
 
     var v = j{"children"}
     if not v.isNil:
@@ -415,6 +462,8 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     v = j{"components"}
     if not v.isNil:
         for k, c in v:
+            if k == "NodeSelector":
+                continue
             let comp = n.component(k)
             comp.deserialize(c, s)
 
@@ -450,6 +499,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("scale", s.getValue(n.scale))
     result.add("rotation", s.getValue(n.rotation))
     result.add("alpha", s.getValue(n.alpha))
+    result.add("layer", s.getValue(n.layer))
 
     if not n.components.isNil:
         var componentsNode = newJObject()

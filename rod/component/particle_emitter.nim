@@ -76,7 +76,7 @@ template randomSign(): float =
     if random(2) == 1: 1.0 else: -1.0
 
 template createParticle(p: ParticleEmitter, part: var ParticleData) =
-    part.coord = newVector3(0, 0)
+    part.coord = p.node.worldPos
     part.scale = newVector3(1, 1, 1)
     part.rotation = newQuaternion()
     part.pid = random(1.0)
@@ -136,6 +136,11 @@ method `oneShot=`*(p:ParticleEmitter, value: bool) {.inline.}=
         p.oneShot = value
         p.currentParticles = 0
 
+proc recursiveSetViewToPrototype(n: Node, v: SceneView) =
+    n.mSceneView = v
+    for child in n.children:
+        child.recursiveSetViewToPrototype(v)
+
 method draw*(p: ParticleEmitter) =
     if p.particlePrototype.isNil: return
     if p.particles.isNil:
@@ -146,13 +151,16 @@ method draw*(p: ParticleEmitter) =
 
     var attractorOrigin : Vector3
     if p.attractor != nil and p.node != nil:
-        attractorOrigin = p.node.worldToLocal(p.attractor.node.worldPos())
+        attractorOrigin = p.attractor.node.worldPos()
 
     if not p.oneShot:
         p.currentParticles = 0
 
     let curTime = epochTime()
     let timeDiff = curTime - p.lastDrawTime
+
+    if p.particlePrototype.mSceneView.isNil:
+        p.particlePrototype.recursiveSetViewToPrototype(p.node.mSceneView)
 
     for i in 0 ..< p.particles.len:
         var needsToDraw = false

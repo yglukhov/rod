@@ -89,6 +89,11 @@ type
         pvtMarker, pvtShape, pvtTextDocument,
         pvt1d, pvt2d, pvt2dSpatial, pvt3d, pvt3dSpatial
 
+    KeyframeInterpolationType* = enum
+        kitLinear
+        kitBezier
+        hitHold
+
     AbstractProperty* = ref AbstractPropertyObj
     AbstractPropertyObj {.importc.} = object of PropertyBaseObj
         expression*: cstring
@@ -96,6 +101,7 @@ type
         isTimeVarying*: bool
         dimensionsSeparated*: bool
         isSeparationLeader*: bool
+        numKeys*: int
 
     Property*[T] = ref PropertyObj[T]
     PropertyObj[T] = object of AbstractPropertyObj
@@ -128,6 +134,15 @@ type
 
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
+
+    KeyframeEase* = ref KeyframeEaseObj
+    KeyframeEaseObj {.importc.} = object of RootObj
+        ## The speed value of the keyframe. The units depend on the type of keyframe,
+        ## and are displayed in the Keyframe Velocity dialog box.
+        speed*: float
+        ## The influence value of the keyframe, as shown in the Keyframe Velocity dialog box.
+        ## Value in the range [0.1..100.0]
+        influence*: float
 
 template `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
 template len*[T](c: Collection[T]): int = cast[seq[type(c.fieldToCheckType)]](c).len
@@ -226,6 +241,40 @@ template property*(owner: PropertyOwner, i: int, T: typedesc): auto =
     let p = owner.property(i)
     if p.isNil: nil else: p.toPropertyOfType(T)
 
+proc nearestKeyIndex*(p: AbstractProperty, t: float): int {.importcpp.}
+proc keyTime*(p: AbstractProperty, i: int): float {.importcpp.}
+
+proc keyValue*[T](p: Property[T], i: int): T {.importcpp.}
+proc keyRoving*(p: AbstractProperty, i: int): bool {.importcpp.}
+proc keySelected*(p: AbstractProperty, i: int): bool {.importcpp.}
+proc keyTemporalAutoBezier*(p: AbstractProperty, i: int): bool {.importcpp.}
+proc keyTemporalContinuous*(p: AbstractProperty, i: int): bool {.importcpp.}
+proc keySpatialAutoBezier*(p: AbstractProperty, i: int): bool {.importcpp.}
+proc keySpatialContinuous*(p: AbstractProperty, i: int): bool {.importcpp.}
+
+
+proc nativeKeyframeInterpolationTypeToNim(t: RootRef): KeyframeInterpolationType =
+    {.emit: """
+    switch(`t`) {
+        case KeyInInterpolationType.LINEAR: `result` = 0; break;
+        case KeyInInterpolationType.BEZIER: `result` = 1; break;
+        case KeyInInterpolationType.HOLD: `result` = 2; break;
+    }
+    """.}
+
+proc nativeKeyInInterpolationType(p: AbstractProperty, i: int): RootRef {.importcpp: "keyInInterpolationType".}
+proc nativeKeyOutInterpolationType(p: AbstractProperty, i: int): RootRef {.importcpp: "keyOutInterpolationType".}
+
+proc keyInInterpolationType*(p: AbstractProperty, i: int): KeyframeInterpolationType =
+    nativeKeyframeInterpolationTypeToNim(p.nativeKeyInInterpolationType(i))
+proc keyOutInterpolationType*(p: AbstractProperty, i: int): KeyframeInterpolationType =
+    nativeKeyframeInterpolationTypeToNim(p.nativeKeyOutInterpolationType(i))
+
+proc keyInTemporalEase*(p: AbstractProperty, i: int): seq[KeyframeEase] {.importcpp.}
+proc keyOutTemporalEase*(p: AbstractProperty, i: int): seq[KeyframeEase] {.importcpp.}
+
+#proc isInterpolationTypeValid*(p: AbstractProperty, kit: KeyframeInterpolationType): bool =
+
 proc value*[T](p: Property[T]): T = {.emit: "`result` = `p`.value;".}
 proc valueAtTime*[T](p: Property[T], t: float, e: bool = false): T =
     {.emit: "`result` = `p`.valueAtTime(`t`, `e`);".}
@@ -244,6 +293,8 @@ proc addNull*(col: Collection[Layer], duration: float): Layer {.importcpp.}
 proc addNull*(col: Collection[Layer]): Layer {.importcpp.}
 
 proc newTextDocument*(text: cstring = ""): TextDocument {.importc: "new TextDocument".}
+proc newKeyframeEase*(speed, influence: float): KeyframeEase {.importc: "new KeyframeEase".}
+proc `$`*(k: KeyframeEase): string = "{speed: " & $k.speed & ", influence: " & $k.influence & "}"
 
 proc getProtoName*(y: ref object): cstring {.importc: "Object.prototype.toString.call".}
 
@@ -362,3 +413,11 @@ proc projectPath*(i: Item): string =
         if not result.endsWith("/"):
             result &= "/"
         result &= $i.parentFolder.name
+
+proc beginUndoGroup*(a: Application, name: cstring) {.importcpp.}
+proc endUndoGroup*(a: Application) {.importcpp.}
+
+proc executeCommand(a: Application, c: int) {.importcpp.}
+proc undo*(a: Application, name: string) =
+    ## This function uses undocumented API. Use at your own risk.
+    a.executeCommand(16)

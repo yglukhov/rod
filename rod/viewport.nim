@@ -9,16 +9,40 @@ import nimx.view_event_handling
 import nimx.view_event_handling_new
 import nimx.notification_center
 
+import times
 import tables
 import rod_types
 import node
 import component.camera
+import rod.material.shader
 
 import ray
 export Viewport
 export SceneView
 
+const GridVertexShader = """
+attribute vec3 aPosition;
 
+uniform mat4 modelViewProjectionMatrix;
+
+void main()
+{
+    gl_Position = modelViewProjectionMatrix * vec4(aPosition, 1.0);
+}
+"""
+const GridFragmentShader = """
+#ifdef GL_ES
+#extension GL_OES_standard_derivatives : enable
+precision mediump float;
+#endif
+
+void main()
+{
+    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.3);
+}
+"""
+
+var gridShader: Shader
 var deltaTime = 0.0
 var oldTime = 0.0
 var deltaTimeAnimation: Animation
@@ -29,6 +53,7 @@ proc getDeltaTime*(): float =
 method init*(v: SceneView, frame: Rect) =
     procCall v.View.init(frame)
     v.animationRunner = newAnimationRunner()
+    gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
 
 proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
@@ -73,6 +98,9 @@ proc prepareFramebuffers(v: SceneView) =
         gl.bindFramebuffer(v.mActiveFrameBuffer, false)
         gl.clearWithColor(0, 0, 0, 0)
 
+proc getProjectionMatrix*(v: SceneView): Matrix4 =
+    v.camera.getProjectionMatrix(v.bounds, result)
+
 proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
     let cam = v.camera
     doAssert(not cam.isNil)
@@ -81,18 +109,103 @@ proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
     cam.getProjectionMatrix(v.bounds, projTransform)
     result = projTransform * v.viewMatrixCached
 
+proc worldToScreenPoint*(v: SceneView, point: Vector3): Vector3 =
+    let clipSpacePos = v.viewProjMatrix * newVector4(point.x, point.y, point.z, 1.0)
+    var ndcSpacePos: Vector3
+    if clipSpacePos[3] > 0:
+        ndcSpacePos = newVector3(clipSpacePos[0] / clipSpacePos[3], clipSpacePos[1] / clipSpacePos[3], clipSpacePos[2] / clipSpacePos[3])
+    else:
+        ndcSpacePos = newVector3(clipSpacePos[0], clipSpacePos[1], clipSpacePos[2])
+
+    result.x = ((ndcSpacePos.x + 1.0) / 2.0) * v.bounds.width
+    result.y = ((1.0 - ndcSpacePos.y) / 2.0) * v.bounds.height
+    result.z = (1.0 + ndcSpacePos.z) * 0.5
+
+proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
+    let matViewProj = v.viewProjMatrix
+    var matInverse: Matrix4
+    if tryInverse (matViewProj, matInverse) == false:
+        return
+
+    var oIn: Vector4
+
+    oIn[0] = point.x / v.bounds.width * 2.0 - 1.0
+    oIn[1] = 1.0 - point.y / v.bounds.height * 2.0
+    oIn[2] = 2.0 * point.z - 1.0
+    oIn[3] = 1.0
+
+    let vIn = newVector4(oIn[0], oIn[1], oIn[2], oIn[3])
+    var pos = matInverse * vIn
+    pos[3] = 1.0 / pos[3]
+
+    result.x = pos.x * pos[3]
+    result.y = pos.y * pos[3]
+    result.z = pos.z * pos[3]
+
 template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProjectionMatrix()
 
 proc swapCompositingBuffers*(v: SceneView)
 
+const gridLineCount = 10
+var gridPoints: array[6 * gridLineCount * 2, float32]
+proc drawGrid(v: SceneView) =
+    let gl = currentContext().gl
+
+    for i in 0 .. gridLineCount-1:
+        var p1 = newVector3(10.0 * i.float, 0.0, 45.0)
+        var p2 = newVector3(10.0 * i.float, 0.0, -45.0)
+        p1.x -= gridLineCount / 2.0 * 10.0 - 5
+        p2.x -= gridLineCount / 2.0 * 10.0 - 5
+        gridPoints[6 * i + 0] = p1.x
+        gridPoints[6 * i + 1] = p1.y
+        gridPoints[6 * i + 2] = p1.z
+        gridPoints[6 * i + 3] = p2.x
+        gridPoints[6 * i + 4] = p2.y
+        gridPoints[6 * i + 5] = p2.z
+
+    for i in 0 .. gridLineCount-1:
+        var p1 = newVector3(45.0, 0.0, 10.0 * i.float)
+        var p2 = newVector3(-45.0, 0.0, 10.0 * i.float)
+        p1.z -= gridLineCount / 2.0 * 10.0 - 5
+        p2.z -= gridLineCount / 2.0 * 10.0 - 5
+        let index = 6 * i + (gridLineCount) * 6
+        gridPoints[index + 0] = p1.x
+        gridPoints[index + 1] = p1.y
+        gridPoints[index + 2] = p1.z
+        gridPoints[index + 3] = p2.x
+        gridPoints[index + 4] = p2.y
+        gridPoints[index + 5] = p2.z
+
+    gridShader.bindShader()
+    gridShader.setTransformUniform()
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, false, 0, gridPoints)
+
+    gl.depthMask(true)
+    gl.enable(gl.DEPTH_TEST)
+    gl.drawArrays(gl.LINES, 0, 2 * 2 * gridLineCount)
+
+    gl.disable(gl.DEPTH_TEST)
+    gl.depthMask(true)
+
+import tables
+var drawTable*: TableRef[int, seq[Node]]
 method draw*(v: SceneView, r: Rect) =
     if v.rootNode.isNil: return
 
     let c = currentContext()
     v.prepareFramebuffers()
 
-    c.withTransform v.getViewProjectionMatrix():
-        v.rootNode.recursiveDraw()
+    drawTable = newTable[int, seq[Node]]()
+    v.viewProjMatrix = v.getViewProjectionMatrix()
+    c.withTransform v.viewProjMatrix:
+        v.drawGrid()
+        v.rootNode.recursiveDraw(drawTable)
+        for k, v in drawTable:
+            c.gl.clearDepthStencil()
+            for node in v:
+                discard node.drawNode()
 
     if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
         # When some compositing nodes are optimized away, we have
@@ -101,6 +214,21 @@ method draw*(v: SceneView, r: Rect) =
         v.swapCompositingBuffers()
 
 proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
+    if v.camera.projectionMode == cpOrtho:
+        var logicalWidth = v.bounds.width / (v.bounds.height / v.camera.viewportSize.height)
+        # let viewCoords = newVector3(coords.x - v.bounds.width / 2.0, coords.y - v.bounds.height / 2.0, 0.0)
+        var viewCoords:Vector3
+        viewCoords.x = coords.x / v.bounds.width * logicalWidth  - logicalWidth / 2.0
+        viewCoords.y = coords.y / v.bounds.height * v.camera.viewportSize.height - v.camera.viewportSize.height / 2.0
+        viewCoords.z = 10.0
+
+        result.origin = v.camera.node.worldTransform * viewCoords
+        let dirPoint = v.camera.node.worldTransform * newVector3(viewCoords.x, viewCoords.y, -1.0)
+
+        result.direction = dirPoint - result.origin
+        result.direction.normalize()
+        return
+
     result.origin = v.camera.node.localToWorld(newVector3())
     let x = (2.0 * coords.x) / v.bounds.width - 1.0
     let y = 1.0 - (2.0 * coords.y) / v.bounds.height
@@ -281,7 +409,8 @@ method viewDidMoveToWindow*(v:SceneView)=
     #     v.animationRunner.pauseAnimations()
     #     )
 
-    if deltaTimeAnimation.isNil:
+    # echo "add animation to scene view"
+    # if deltaTimeAnimation.isNil:
         deltaTimeAnimation = newAnimation()
         deltaTimeAnimation.numberOfLoops = -1
         deltaTimeAnimation.loopDuration = 1.0
