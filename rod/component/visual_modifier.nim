@@ -2,10 +2,11 @@ import nimx.types
 import nimx.context
 import nimx.portable_gl
 import opengl
-
+import json
 import rod.node
 import rod.component
 import rod.postprocess_context
+import rod.tools.serializer
 
 type BlendMode * = enum
     COLOR_ADD = GL_ONE
@@ -33,5 +34,13 @@ method draw*(vm: VisualModifier) =
     gl.blendFunc(gl.SRC_ALPHA, COLOR_MULTIPLY.GLenum)
 
 method isPosteffectComponent*(vm: VisualModifier): bool = true
+
+method deserialize*(vm: VisualModifier, j: JsonNode, serealizer: Serializer) =
+    var v = j{"blendMode"}
+    if not v.isNil:
+        let bm = v.getStr()
+        case bm
+        of "ADD": vm.blendMode = COLOR_ADD
+        else: discard
 
 registerComponent[VisualModifier]()
