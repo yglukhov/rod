@@ -192,7 +192,6 @@ proc propertyValueType*(p: AbstractProperty): PropertyValueType =
 template valueTypeFromType(t: typedesc[array[2, float32]]): expr = [pvt2d, pvt2dSpatial]
 template valueTypeFromType(t: typedesc[array[3, float32]]): expr = [pvt3d, pvt3dSpatial]
 template valueTypeFromType(t: typedesc[array[4, float32]]): expr = [pvtColor]
-template valueTypeFromType(t: typedesc[array[8, float32]]): expr = [array[2,pvtColor]]
 template valueTypeFromType(t: typedesc[float32]): expr = [pvt1d]
 template valueTypeFromType(t: typedesc[float]): expr = [pvt1d]
 template valueTypeFromType(t: typedesc[cstring]): expr = [pvt1d]
