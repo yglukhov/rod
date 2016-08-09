@@ -111,7 +111,12 @@ proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
 
 proc worldToScreenPoint*(v: SceneView, point: Vector3): Vector3 =
     let clipSpacePos = v.viewProjMatrix * newVector4(point.x, point.y, point.z, 1.0)
-    let ndcSpacePos = newVector3(clipSpacePos[0] / clipSpacePos[3], clipSpacePos[1] / clipSpacePos[3], clipSpacePos[2] / clipSpacePos[3])
+    var ndcSpacePos: Vector3
+    if clipSpacePos[3] > 0:
+        ndcSpacePos = newVector3(clipSpacePos[0] / clipSpacePos[3], clipSpacePos[1] / clipSpacePos[3], clipSpacePos[2] / clipSpacePos[3])
+    else:
+        ndcSpacePos = newVector3(clipSpacePos[0], clipSpacePos[1], clipSpacePos[2])
+
     result.x = ((ndcSpacePos.x + 1.0) / 2.0) * v.bounds.width
     result.y = ((1.0 - ndcSpacePos.y) / 2.0) * v.bounds.height
     result.z = (1.0 + ndcSpacePos.z) * 0.5

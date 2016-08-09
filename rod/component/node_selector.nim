@@ -131,8 +131,10 @@ method componentNodeWasAddedToSceneView*(ns: NodeSelector) =
     ns.createBoxes()
 
     ns.gizmo = newNode()
-    ns.gizmo.loadComposition( getMoveAxisJson() )
-    ns.node.mSceneView.rootNode.addChild(ns.gizmo)
+    let distance = (ns.node.worldPos - ns.node.sceneView.camera.node.worldPos).length()
+    if distance > 0.1:
+        ns.gizmo.loadComposition( getMoveAxisJson() )
+        ns.node.mSceneView.rootNode.addChild(ns.gizmo)
     ns.updateGizmo()
 
 method componentNodeWillBeRemovedFromSceneView*(ns: NodeSelector) =
@@ -197,7 +199,10 @@ proc proccesTransform*(ns: NodeSelector, position: Point) =
     curPosition = ns.node.sceneView.screenToWorldPoint(curScreenPoint) + offset
     curPosition = curPosition - ns.gizmo.worldPos
     ns.gizmo.position = ns.gizmo.worldPos + curPosition * ns.gizmoAxis
-    ns.node.position = ns.node.parent.worldToLocal(ns.gizmo.position)
+    if not ns.node.parent.isNil:
+        ns.node.position = ns.node.parent.worldToLocal(ns.gizmo.position)
+    else:
+        ns.node.position = ns.gizmo.position
 
 proc stopTransform*(ns: NodeSelector) =
     ns.gizmoAxis = newVector3(0.0, 0.0, 0.0)

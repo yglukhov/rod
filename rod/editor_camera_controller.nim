@@ -26,11 +26,11 @@ proc newEditorCameraController*(camera: Node) : EditorCameraController =
     result.camera = camera
     result.camPivot = newNode("EditorCameraPivot")
     result.camAnchor = newNode("EditorCameraAnchor")
-    result.camAnchor.position = camera.position
-    result.startPos = camera.position
+    result.camAnchor.worldPos = camera.worldPos
+    result.startPos = camera.worldPos
     result.currentAngle = newVector3(0)
 
-    camera.parent.addChild(result.camPivot)
+    camera.sceneView.rootNode.addChild(result.camPivot)
     result.camPivot.addChild(result.camAnchor)
 
 proc updateCamera(cc: EditorCameraController) =
@@ -41,12 +41,11 @@ proc updateCamera(cc: EditorCameraController) =
     discard worldMat.tryGetTranslationFromModel(pos)
     discard worldMat.tryGetScaleRotationFromModel(scale, rot)
 
-    cc.camera.position = pos
+    cc.camera.worldPos = pos
     cc.camera.rotation = newQuaternion(rot.x, rot.y, rot.z, rot.w)
 
 proc setToNode*(cc: EditorCameraController, n: Node) =
     cc.currNode = n
-    echo "setToNode  "
     if not cc.currNode.isNil:
         cc.camPivot.position = cc.currNode.worldPos
     else:
@@ -57,10 +56,10 @@ proc setToNode*(cc: EditorCameraController, n: Node) =
 var prev_x = 0.0
 var prev_y = 0.0
 proc onTapDown*(cc: EditorCameraController, e : var Event) =
+    cc.camAnchor.worldPos = cc.camera.worldPos
     cc.currMouseKey = e.keyCode
     prev_x = 0.0
     prev_y = 0.0
-
 
 proc onTapUp*(cc: EditorCameraController, dx, dy : float32, e : var Event) =
     cc.currMouseKey = 0.VirtualKey
@@ -69,7 +68,7 @@ proc onKeyDown*(cc: EditorCameraController, e: var Event) =
     cc.currKey = e.keyCode
     if e.keyCode == VirtualKey.F:
         if not cc.currNode.isNil:
-            cc.camPivot.position = cc.currNode.position
+            cc.camPivot.position = cc.currNode.worldPos
         else:
             cc.camPivot.position = newVector3(0.0)
 
@@ -77,7 +76,7 @@ proc onKeyUp*(cc: EditorCameraController, e: var Event) =
     if e.keyCode == VirtualKey.R:
         cc.camPivot.rotation = newQuaternion(0.0, 0.0, 0.0, 1.0)
         cc.camPivot.position = newVector3(0.0)
-        cc.camAnchor.position = cc.startPos
+        cc.camAnchor.worldPos = cc.startPos
         cc.currentAngle = newVector3(0.0)
 
         cc.updateCamera()
@@ -105,9 +104,9 @@ proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event
     cc.updateCamera()
 
 proc onMouseScrroll*(cc: EditorCameraController, e : var Event) =
-    var dir = -cc.camAnchor.position
+    var dir = -cc.camAnchor.worldPos
     dir.normalize()
-    cc.camAnchor.position = cc.camAnchor.position + dir * e.offset.y
+    cc.camAnchor.worldPos = cc.camAnchor.worldPos + dir * e.offset.y
 
     cc.updateCamera()
 
