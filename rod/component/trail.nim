@@ -662,7 +662,7 @@ method draw*(t: Trail) =
     var viewMatrix = vp.viewMatrixCached
 
     var projMatrix : Matrix4
-    projMatrix.perspective(cam.fov, vp.bounds.width / vp.bounds.height, cam.zNear, cam.zFar)
+    cam.getProjectionMatrix(vp.bounds, projMatrix)
 
     let mvMatrix = viewMatrix * modelMatrix
 
