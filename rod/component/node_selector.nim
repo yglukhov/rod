@@ -131,8 +131,10 @@ method componentNodeWasAddedToSceneView*(ns: NodeSelector) =
     ns.createBoxes()
 
     ns.gizmo = newNode()
-    ns.gizmo.loadComposition( getMoveAxisJson() )
-    ns.node.mSceneView.rootNode.addChild(ns.gizmo)
+    let distance = (ns.node.worldPos - ns.node.sceneView.camera.node.worldPos).length()
+    if distance > 0.1:
+        ns.gizmo.loadComposition( getMoveAxisJson() )
+        ns.node.mSceneView.rootNode.addChild(ns.gizmo)
     ns.updateGizmo()
 
 method componentNodeWillBeRemovedFromSceneView*(ns: NodeSelector) =
