@@ -135,6 +135,9 @@ type
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
 
+    BlendingMode* {.pure.} = enum
+        NORMAL, ADD
+
     KeyframeEase* = ref KeyframeEaseObj
     KeyframeEaseObj {.importc.} = object of RootObj
         ## The speed value of the keyframe. The units depend on the type of keyframe,
@@ -383,6 +386,17 @@ proc trackMatteType*(layer: Layer): TrackMatteType =
         case TrackMatteType.LUMA_INVERTED: `result` = 4; break;
     }
     """.}
+
+proc blendMode*(layer: Layer): BlendingMode =
+    var bm = 0
+    {.emit: """
+        `bm` = `layer`.blendingMode;
+    """.}
+    case bm
+    of 5220:
+        result = BlendingMode.ADD
+    else:
+        result = BlendingMode.NORMAL
 
 proc getSetting*(s: Settings, sectionName, keyName: cstring): cstring {.importcpp.}
 proc saveSetting*(s: Settings, sectionName, keyName, value: cstring) {.importcpp.}
