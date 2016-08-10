@@ -15,7 +15,7 @@ proc transform*(r:Ray, mat:Matrix4): Ray =
     result.direction.x = r.direction.x * mat[0] + r.direction.y * mat[4] + r.direction.z * mat[8]
     result.direction.y = r.direction.x * mat[1] + r.direction.y * mat[5] + r.direction.z * mat[9]
     result.direction.z = r.direction.x * mat[2] + r.direction.y * mat[6] + r.direction.z * mat[10]
-    result.direction.normalize()
+    # result.direction.normalize()
 
     result.origin = mat * r.origin
 
