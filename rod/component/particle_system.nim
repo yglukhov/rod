@@ -342,6 +342,8 @@ proc fillIBuffer(ps: ParticleSystem) =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ib, gl.STATIC_DRAW)
 
+var particleShader: Shader
+
 proc initSystem(ps: ParticleSystem) =
     let gl = currentContext().gl
     ps.animation = newAnimation()
@@ -356,7 +358,8 @@ proc initSystem(ps: ParticleSystem) =
     ps.newParticles = newSeq[Particle]()
     ps.particles = newSeq[Particle]( int(ceil(ps.birthRate) * ceil(ps.lifetime)) )
 
-    ps.shader = newShader(ParticleVertexShader, ParticleFragmentShader,
+    if particleShader.isNil:
+        particleShader = newShader(ParticleVertexShader, ParticleFragmentShader,
             @[(0.GLuint, "aPosition"),
             (1.GLuint, "aRotation"),
             (2.GLuint, "aScale"),
@@ -364,6 +367,7 @@ proc initSystem(ps: ParticleSystem) =
             (4.GLuint, "aColor"),
             (5.GLuint, "aID")])
 
+    ps.shader = particleShader
     ps.genShapeNode = ps.node
 
     ps.remainingDuration = ps.duration
@@ -671,6 +675,9 @@ method draw*(ps: ParticleSystem) =
         ps.initSystem()
 
     ps.update(dt)
+
+    if ps.count < 1:
+        return
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, ps.vertexBuffer)
