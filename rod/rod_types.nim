@@ -8,7 +8,6 @@ import nimx.image
 import nimx.portable_gl
 
 import quaternion
-import meta_data
 
 const maxLightsCount* = 8
 
