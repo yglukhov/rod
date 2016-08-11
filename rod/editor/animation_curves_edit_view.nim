@@ -47,7 +47,7 @@ proc drawBezierCurve(c: GraphicsContext, points: array[4, Point]) =
         c.drawLine(tmpPoints[i], tmpPoints[i + 1])
 
 import macros
-macro dumpVars(args: varargs[typed]): stmt =
+macro dumpVars(args: varargs[typed]): untyped =
     result = newCall("echo")
     for a in args:
         result.add(newLit($a))
@@ -61,13 +61,14 @@ method draw(v: AnimationCurvesEditView, r: Rect) =
     v.drawGrid()
 
     c.strokeWidth = 1
+    let dimension = 0
     for curve in v.curves:
-        for i in 0 ..< curve.keys.len - 1:
-            let p1 = v.curvePointToLocal(newPoint(curve.keys[i].p, curve.keys[i].v))
-            let p2 = v.curvePointToLocal(newPoint(curve.keys[i + 1].p, curve.keys[i + 1].v))
+        for i in 0 ..< curve.numberOfKeys - 1:
+            let p1 = v.curvePointToLocal(curve.keyPoint(i, dimension))
+            let p2 = v.curvePointToLocal(curve.keyPoint(i + 1, dimension))
 
-            let c1 = v.curvePointToLocal(curve.keys[i].outTangentAbs)
-            let c2 = v.curvePointToLocal(curve.keys[i + 1].inTangentAbs)
+            let c1 = v.curvePointToLocal(curve.keyOutTangentAbs(i, dimension))
+            let c2 = v.curvePointToLocal(curve.keyInTangentAbs(i + 1, dimension))
 
             let points = [p1, c1, c2, p2]
 
@@ -98,22 +99,24 @@ method draw(v: AnimationCurvesEditView, r: Rect) =
 proc getCurveAtPoint(v: AnimationCurvesEditView, p: Point, curve, key, tangent: var int) =
     for i, c in v.curves:
         curve = i
-        for j, k in c.keys:
+        let dimension = 0
+        let numKeys = c.numberOfKeys
+        for j in 0 ..< numKeys:
             key = j
-            if p.inRect(rectAtPoint(v.curvePointToLocal(k.point), 4)):
+            if p.inRect(rectAtPoint(v.curvePointToLocal(c.keyPoint(j, dimension)), 4)):
                 tangent = 0
                 return
-            elif p.inRect(rectAtPoint(v.curvePointToLocal(k.inTangentAbs), 4)):
+            elif j > 0 and p.inRect(rectAtPoint(v.curvePointToLocal(c.keyInTangentAbs(j, dimension)), 4)):
                 tangent = -1
                 return
-            elif p.inRect(rectAtPoint(v.curvePointToLocal(k.outTangentAbs), 4)):
+            elif j < numKeys - 1 and p.inRect(rectAtPoint(v.curvePointToLocal(c.keyOutTangentAbs(j, dimension)), 4)):
                 tangent = 1
                 return
     curve = -1
     key = -1
 
 proc curvePointTrackingHandler(v: AnimationCurvesEditView): proc(e: Event): bool =
-    var draggedCurve, draggedKey, draggedTangent: int
+    var draggedCurve, draggedKey, draggedTangent, draggedDimension: int
     result = proc(e: Event): bool =
         case e.buttonState
         of bsDown:
@@ -123,11 +126,11 @@ proc curvePointTrackingHandler(v: AnimationCurvesEditView): proc(e: Event): bool
             of 0:
                 var p = v.localPointToCurve(e.localPosition)
                 p.x = round(p.x / v.gridSize.width) * v.gridSize.width
-                v.curves[draggedCurve].keys[draggedKey].point = p
+                v.curves[draggedCurve].setKeyPoint(draggedKey, draggedDimension, p)
             of 1:
-                v.curves[draggedCurve].keys[draggedKey].outTangent = v.localPointToCurve(e.localPosition) - v.curves[draggedCurve].keys[draggedKey].point
+                v.curves[draggedCurve].setKeyOutTangentAbs(draggedKey, draggedDimension, v.localPointToCurve(e.localPosition))
             else:
-                v.curves[draggedCurve].keys[draggedKey].inTangent = v.localPointToCurve(e.localPosition) - v.curves[draggedCurve].keys[draggedKey].point
+                v.curves[draggedCurve].setKeyInTangentAbs(draggedKey, draggedDimension, v.localPointToCurve(e.localPosition))
             if not v.onCursorPosChange.isNil: v.onCursorPosChange()
             v.setNeedsDisplay()
             if e.buttonState == bsUp:

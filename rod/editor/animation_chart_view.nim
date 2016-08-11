@@ -13,7 +13,7 @@ import animation_editor_types
 const rulerHeight* = 25
 
 type AnimationChartView* = ref object of View
-    curves*: seq[AnimationCurve]
+    curves*: seq[AbstractAnimationCurve]
     fromX*, toX*: Coord
     fromY*, toY*: Coord
     cursorPos*: Coord

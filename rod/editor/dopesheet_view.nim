@@ -29,11 +29,13 @@ method draw*(v: DopesheetView, r: Rect) =
     let c = currentContext()
     v.drawGrid()
 
+    let dimension = 0
+
     c.strokeWidth = 0
     for i, curve in v.curves:
         let rowMaxY = v.rowMaxY(i)
-        for j, k in curve.keys:
-            var p = v.curvePointToLocal(k.point)
+        for j in 0 ..< curve.numberOfKeys:
+            var p = v.curvePointToLocal(curve.keyPoint(j, dimension))
             p.y = rowMaxY - v.rowHeight / 2
             if i == v.selectedCurve and j == v.selectedKey:
                 c.fillColor = newColor(0.7, 0.7, 1)
@@ -48,10 +50,12 @@ method draw*(v: DopesheetView, r: Rect) =
 
 proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
     result = proc(e: Event): bool =
+        let dimension = 0
+
         for i, curve in v.curves:
             let rowMaxY = v.rowMaxY(i)
-            for j, k in curve.keys:
-                var p = v.curvePointToLocal(k.point)
+            for j in 0 ..< curve.numberOfKeys:
+                var p = v.curvePointToLocal(curve.keyPoint(j, dimension))
                 p.y = rowMaxY - v.rowHeight / 2
                 if e.localPosition.inRect(rectAtPoint(p, 4)):
                     v.selectedCurve = i
@@ -79,8 +83,8 @@ method acceptsFirstResponder*(v: DopesheetView): bool = true
 
 method onKeyDown*(v: DopesheetView, e: var Event): bool =
     if e.keyCode == VirtualKey.Delete:
-        if v.selectedCurve < v.curves.len and v.selectedKey < v.curves[v.selectedCurve].keys.len:
-            v.curves[v.selectedCurve].keys.delete(v.selectedKey)
+        if v.selectedCurve < v.curves.len and v.selectedKey < v.curves[v.selectedCurve].numberOfKeys:
+            v.curves[v.selectedCurve].deleteKey(v.selectedKey)
             v.setNeedsDisplay()
             result = true
 
