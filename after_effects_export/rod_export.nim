@@ -195,6 +195,8 @@ proc requiresAuxParent(layer: Layer): bool =
     let ap = layer.property("Anchor Point", Vector3)
     if ap.value != newVector3(0, 0, 0):
         result = true
+    if layer.blendMode != BlendingMode.NORMAL:
+        result = true
 
 var layerNames = initTable[int, string]()
 
@@ -272,6 +274,11 @@ proc serializeLayer(layer: Layer): JsonNode =
 
         result["translation"] = % (- layer.property("Anchor Point", Vector3).valueAtTime(0))
         auxNode["children"] = % [result]
+
+        let blendMode = layer.blendMode
+        if blendMode != BlendingMode.NORMAL:
+            auxNode["components"] = %*{"VisualModifier": {"blendMode": % $blendMode}}
+
         result = auxNode
 
 type Marker = object

@@ -102,7 +102,6 @@ varying float vAlpha;
 
 void main()
 {
-    vAlpha = aLifeTime;
     vAlpha = aAlpha;
     vColor = aColor;
     vec3 vertexOffset;
@@ -124,13 +123,12 @@ void main()
     if (aID == 2.0) { vertexOffset = vec3( 0.5,  -0.5, 0); }
     if (aID == 3.0) { vertexOffset = vec3(-0.5,  -0.5, 0); }
 
-#ifdef TEXTURED
-    texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
-#endif
+    #ifdef TEXTURED
+        texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
+    #endif
 #endif
 
-    vertexOffset = vertexOffset * uNodeScale;
-    vertexOffset = vertexOffset * aScale;
+    vertexOffset = vertexOffset * uNodeScale * aScale;
 
     mat4 rMatrix = getRotationMatrix(aRotation);
     vec4 rotatedVertexOffset = rMatrix * vec4(vertexOffset, 1.0);
@@ -153,7 +151,7 @@ void main()
 const ParticleFragmentShader = """
 #ifdef GL_ES
     #extension GL_OES_standard_derivatives : enable
-    precision mediump float;
+    precision highp float;
     varying highp float vColor;
 #else
     varying float vColor;
@@ -181,9 +179,11 @@ void main()
 {
 #ifdef TEXTURED
     vec4 tex_color = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * texCoords);
-    gl_FragColor = tex_color * vec4(encodeRgbFromFloat(vColor), vAlpha);
+    vec3 color = encodeRgbFromFloat(vColor);
+    gl_FragColor = tex_color * vec4(color.xyz, vAlpha);
 #else
-    gl_FragColor = vec4(encodeRgbFromFloat(vColor), vAlpha);
+    vec3 color = encodeRgbFromFloat(vColor);
+    gl_FragColor = vec4(color.xyz, vAlpha);
 #endif
 }
 """
@@ -201,14 +201,6 @@ type
         colorSize: int32
         idSize: int32
         lifeTimeSize: int32
-
-    Particle = ref object
-        position: Vector3
-        rotation, rotationVelocity: Vector3 #deg per sec
-        scale: Vector3
-        lifetime: float
-        velocity: Vector3
-        randStartScale: float
 
     ParticleSystem* = ref object of Component
         animation*: Animation
@@ -242,16 +234,14 @@ type
         gravity*: Vector3
         airDensity*: float32
 
-        currentTime: float # to calculate normal dt
-        lastTime: float
         duration*: float
         remainingDuration: float
         isLooped*: bool
         isPlayed*: bool
         is3dRotation*: bool
 
-        attractorNode*: Node
-        attractor*: PSAttractor
+        modifierNode*: Node
+        modifier*: PSModifier
 
         genShapeNode*: Node
         genShape: PSGenShape
@@ -265,11 +255,8 @@ type
         colorSeq*: seq[TVector[5, Coord]] # time, color
 
         isBlendAdd*: bool
-        # debug data
-        isMove*: bool
-        amplitude*, frequency*, distance*, speed*: float
 
-
+# -------------------- Particle System --------------------------
 proc randomBetween(fromV, toV: float32): float32 =
     result = random(fromV - toV) + toV
 
@@ -314,6 +301,7 @@ proc calculateVertexDesc(ps: ParticleSystem): VertexDesc =
 
 proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle =
     result = Particle.new()
+    result.node = ps.node
 
     var interpolatePos: Vector3
     var interpolateDt: float
@@ -354,6 +342,8 @@ proc fillIBuffer(ps: ParticleSystem) =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ib, gl.STATIC_DRAW)
 
+var particleShader: Shader
+
 proc initSystem(ps: ParticleSystem) =
     let gl = currentContext().gl
     ps.animation = newAnimation()
@@ -368,19 +358,18 @@ proc initSystem(ps: ParticleSystem) =
     ps.newParticles = newSeq[Particle]()
     ps.particles = newSeq[Particle]( int(ceil(ps.birthRate) * ceil(ps.lifetime)) )
 
-    ps.shader = newShader(ParticleVertexShader, ParticleFragmentShader,
+    if particleShader.isNil:
+        particleShader = newShader(ParticleVertexShader, ParticleFragmentShader,
             @[(0.GLuint, "aPosition"),
             (1.GLuint, "aRotation"),
             (2.GLuint, "aScale"),
             (3.GLuint, "aAlpha"),
             (4.GLuint, "aColor"),
-            (5.GLuint, "aID"),
-            (6.GLuint, "aLifeTime")])
+            (5.GLuint, "aID")])
 
+    ps.shader = particleShader
     ps.genShapeNode = ps.node
 
-    ps.currentTime = epochTime()
-    ps.lastTime = epochTime()
     ps.remainingDuration = ps.duration
     ps.lastBirthTime = epochTime()
 
@@ -437,12 +426,6 @@ method init(ps: ParticleSystem) =
 
     ps.isBlendAdd = false
 
-    ps.isMove = false
-    ps.amplitude = 5.0
-    ps.frequency = 0.4
-    ps.distance = 40.0
-    ps.speed = 9.0
-
     ps.scaleMode = ParticleModeEnum.BeetwenValue
     ps.colorMode = ParticleModeEnum.BeetwenValue
     ps.scaleSeq = newSeq[TVector[4, Coord]]()
@@ -452,8 +435,6 @@ method init(ps: ParticleSystem) =
 proc start*(ps: ParticleSystem) =
     ps.isPlayed = true
 
-    ps.currentTime = epochTime()
-    ps.lastTime = epochTime()
     ps.lastBirthTime = epochTime()
     ps.remainingDuration = ps.duration
 
@@ -535,20 +516,16 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
                 ps.particlesVertexBuff.add(0.0)
 
         ps.particles[i].lifetime -= dt
-        let normLifeTime = ps.particles[i].lifetime / ps.lifetime
-        let oneMinusNormLifeTime = 1.0 - normLifeTime
+        ps.particles[i].normalizedLifeTime = ps.particles[i].lifetime / ps.lifetime
+        let oneMinusNormLifeTime = 1.0 - ps.particles[i].normalizedLifeTime
 
         v1 = vertexSize* (4 * ps.count + 0) # vertexSize (vertexCount * index + vertexNum)
         v2 = vertexSize* (4 * ps.count + 1)
         v3 = vertexSize* (4 * ps.count + 2)
         v4 = vertexSize* (4 * ps.count + 3)
-        var offset = 0
 
         # positions
-        if not ps.attractor.isNil:
-            ps.particles[i].velocity += ps.attractor.getForceAtPoint(ps.particles[i].position)
-
-        if ps.airDensity > 0.0:
+        if abs(ps.airDensity) > 0.0:
             var density_vec = ps.particles[i].velocity
             density_vec.normalize()
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
@@ -560,6 +537,37 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         ps.particles[i].position.y += ps.particles[i].velocity.y*dt
         ps.particles[i].position.z += ps.particles[i].velocity.z*dt
 
+        # rotation
+        if ps.is3dRotation:
+            ps.particles[i].rotation += ps.particles[i].rotationVelocity * dt
+        else:
+            ps.particles[i].rotation.z += ps.particles[i].rotationVelocity.z * dt
+
+        # scale
+        if ps.scaleMode == ParticleModeEnum.TimeSequence:
+            let sc = ps.scaleSeq.getValueAtTime(oneMinusNormLifeTime)
+            ps.particles[i].scale.x = sc[1]
+            ps.particles[i].scale.y = sc[2]
+        else:
+            ps.particles[i].scale.x = (ps.startScale.x + ps.particles[i].randStartScale) * ps.particles[i].normalizedLifeTime + ps.dstScale.x * oneMinusNormLifeTime
+            ps.particles[i].scale.y = (ps.startScale.y + ps.particles[i].randStartScale) * ps.particles[i].normalizedLifeTime + ps.dstScale.y * oneMinusNormLifeTime
+
+        # alpha and color
+        if ps.colorMode == ParticleModeEnum.TimeSequence:
+            let sc = ps.colorSeq.getValueAtTime(oneMinusNormLifeTime)
+            ps.particles[i].color.r = sc[1]
+            ps.particles[i].color.g = sc[2]
+            ps.particles[i].color.b = sc[3]
+            ps.particles[i].color.a = sc[4]
+        else:
+            ps.particles[i].color = ps.startColor * ps.particles[i].normalizedLifeTime + ps.dstColor * oneMinusNormLifeTime
+
+        # Modifiers
+        if not ps.modifier.isNil:
+            ps.modifier.updateParticle(ps.particles[i])
+
+        var offset = 0
+        # position
         ps.particlesVertexBuff.setVector3ToBuffer(v1 + offset, ps.particles[i].position)
         ps.particlesVertexBuff.setVector3ToBuffer(v2 + offset, ps.particles[i].position)
         ps.particlesVertexBuff.setVector3ToBuffer(v3 + offset, ps.particles[i].position)
@@ -568,65 +576,37 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
 
         # rotation
         if ps.is3dRotation:
-            ps.particles[i].rotation.x += ps.particles[i].rotationVelocity.x * dt
-            ps.particles[i].rotation.y += ps.particles[i].rotationVelocity.y * dt
-            ps.particles[i].rotation.z += ps.particles[i].rotationVelocity.z * dt
-
             ps.particlesVertexBuff.setVector3ToBuffer(v1 + offset, ps.particles[i].rotation)
             ps.particlesVertexBuff.setVector3ToBuffer(v2 + offset, ps.particles[i].rotation)
             ps.particlesVertexBuff.setVector3ToBuffer(v3 + offset, ps.particles[i].rotation)
             ps.particlesVertexBuff.setVector3ToBuffer(v4 + offset, ps.particles[i].rotation)
         else:
-            ps.particles[i].rotation.z += ps.particles[i].rotationVelocity.z * dt
             ps.particlesVertexBuff[v1 + offset] = ps.particles[i].rotation.z
             ps.particlesVertexBuff[v2 + offset] = ps.particles[i].rotation.z
             ps.particlesVertexBuff[v3 + offset] = ps.particles[i].rotation.z
             ps.particlesVertexBuff[v4 + offset] = ps.particles[i].rotation.z
-
         offset += ps.vertexDesc.rotationSize
 
         # scale
-        if ps.scaleMode == ParticleModeEnum.TimeSequence:
-            let sc = ps.scaleSeq.getValueAtTime(1.0 - normLifeTime)
-            ps.particles[i].scale.x = sc[1]
-            ps.particles[i].scale.y = sc[2]
-        else:
-            ps.particles[i].scale.x = (ps.startScale.x + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.x * oneMinusNormLifeTime
-            ps.particles[i].scale.y = (ps.startScale.y + ps.particles[i].randStartScale) * normLifeTime + ps.dstScale.y * oneMinusNormLifeTime
         ps.particlesVertexBuff[v1 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v1 + offset + 1] = ps.particles[i].scale.y
-
         ps.particlesVertexBuff[v2 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v2 + offset + 1] = ps.particles[i].scale.y
-
         ps.particlesVertexBuff[v3 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v3 + offset + 1] = ps.particles[i].scale.y
-
         ps.particlesVertexBuff[v4 + offset + 0] = ps.particles[i].scale.x
         ps.particlesVertexBuff[v4 + offset + 1] = ps.particles[i].scale.y
         offset += ps.vertexDesc.scaleSize
 
-        # alpha and color
-        var alpha: float
-        var color: Color
-        if ps.colorMode == ParticleModeEnum.TimeSequence:
-            let sc = ps.colorSeq.getValueAtTime(1.0 - normLifeTime)
-            color.r = sc[1]
-            color.g = sc[2]
-            color.b = sc[3]
-            alpha = sc[4]
-        else:
-            color = ps.startColor * normLifeTime + ps.dstColor * oneMinusNormLifeTime
-            alpha = color.a * normLifeTime + color.a * oneMinusNormLifeTime
-
-        alpha *= ps.node.alpha
+        # color
+        let alpha = ps.particles[i].color.a * ps.node.alpha
         ps.particlesVertexBuff[v1 + offset] = alpha
         ps.particlesVertexBuff[v2 + offset] = alpha
         ps.particlesVertexBuff[v3 + offset] = alpha
         ps.particlesVertexBuff[v4 + offset] = alpha
         offset += ps.vertexDesc.alphaSize
 
-        let encoded_color = rgbToFloat(color)
+        let encoded_color = rgbToFloat(ps.particles[i].color)
         ps.particlesVertexBuff[v1 + offset] = encoded_color
         ps.particlesVertexBuff[v2 + offset] = encoded_color
         ps.particlesVertexBuff[v3 + offset] = encoded_color
@@ -655,12 +635,6 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         ps.particles.add(ps.newParticles[i])
 
 proc update(ps: ParticleSystem, dt: float) =
-    if ps.isMove:
-        ps.node.positionX = ps.node.positionX + ps.speed * dt
-        ps.node.positionY = ps.amplitude * cos(ps.node.positionX * ps.frequency)
-        if ps.node.positionX > ps.distance / 2.0:
-            ps.node.positionX = -ps.distance / 2.0;
-
     let perParticleTime = 1.0 / ps.birthRate
     let curTime = epochTime()
 
@@ -671,8 +645,8 @@ proc update(ps: ParticleSystem, dt: float) =
     if not ps.genShapeNode.isNil:
         ps.genShape = ps.genShapeNode.getComponent(PSGenShape)
 
-    if not ps.attractorNode.isNil:
-        ps.attractor = ps.attractorNode.getComponent(PSAttractor)
+    if not ps.modifierNode.isNil:
+        ps.modifier = ps.modifierNode.getComponent(PSModifier)
 
     # chek IB size (need for runtime property editing)
     if ps.indexBufferSize < int(ceil(ps.birthRate) * ceil(ps.lifetime)):
@@ -693,9 +667,7 @@ proc update(ps: ParticleSystem, dt: float) =
 
 
 method draw*(ps: ParticleSystem) =
-    ps.currentTime = epochTime()
-    let dt = ps.currentTime - ps.lastTime
-    ps.lastTime = ps.currentTime
+    let dt = getDeltaTime() #ps.currentTime - ps.lastTime
     ps.node.sceneView.setNeedsDisplay()
     let gl = currentContext().gl
 
@@ -703,6 +675,9 @@ method draw*(ps: ParticleSystem) =
         ps.initSystem()
 
     ps.update(dt)
+
+    if ps.count < 1:
+        return
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, ps.vertexBuffer)
@@ -736,6 +711,8 @@ method draw*(ps: ParticleSystem) =
     offset += ps.vertexDesc.idSize * sizeof(GLfloat)
 
     if ps.isTextureAnimated:
+        ps.shader.bindAttribLocation(6, "aLifeTime")
+
         gl.enableVertexAttribArray(6)
         gl.vertexAttribPointer(6, ps.vertexDesc.lifeTimeSize, gl.FLOAT, false, stride.GLsizei , offset)
 
@@ -763,11 +740,12 @@ method draw*(ps: ParticleSystem) =
     if not ps.texture.isNil:
         ps.shader.setUniform("uTexUnitCoords", theQuad)
         ps.shader.setUniform("texUnit", 0)
-        var fs = newSize(ps.frameSize.width / ps.texture.size.width, ps.frameSize.height / ps.texture.size.height)
-        ps.shader.setUniform("uFrameSize", fs)
-        ps.shader.setUniform("uAnimColumns", ps.animColumns)
-        ps.shader.setUniform("uFramesCount", ps.framesCount)
-        ps.shader.setUniform("uFPS", ps.fps)
+        if ps.isTextureAnimated:
+            var fs = newSize(ps.frameSize.width / ps.texture.size.width, ps.frameSize.height / ps.texture.size.height)
+            ps.shader.setUniform("uFrameSize", fs)
+            ps.shader.setUniform("uAnimColumns", ps.animColumns)
+            ps.shader.setUniform("uFramesCount", ps.framesCount)
+            ps.shader.setUniform("uFPS", ps.fps)
 
     ps.shader.setTransformUniform()
 
@@ -799,6 +777,8 @@ method draw*(ps: ParticleSystem) =
     gl.enable(gl.BLEND)
     gl.depthMask(true)
 
+method getBBox*(ps: ParticleSystem): BBox =
+    result = newBBox(newVector3(-3, -3, -3), newVector3(3, 3, 3))
 
 method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     if j.isNil:
@@ -832,17 +812,11 @@ method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "framesCount", ps.framesCount)
     s.deserializeValue(j, "fps", ps.fps)
 
-    var genShapeName, attractorName: string
+    var genShapeName, modifierName: string
     s.deserializeValue(j, "genShapeNode", genShapeName)
-    s.deserializeValue(j, "attractorNode", attractorName)
+    s.deserializeValue(j, "modifierNode", modifierName)
     addNodeRef(ps.genShapeNode, genShapeName)
-    addNodeRef(ps.attractorNode, attractorName)
-
-    s.deserializeValue(j, "isMove", ps.isMove)
-    s.deserializeValue(j, "amplitude", ps.amplitude)
-    s.deserializeValue(j, "frequency", ps.frequency)
-    s.deserializeValue(j, "distance", ps.distance)
-    s.deserializeValue(j, "speed", ps.speed)
+    addNodeRef(ps.modifierNode, modifierName)
 
     s.deserializeValue(j, "scaleMode", ps.scaleMode)
     s.deserializeValue(j, "colorMode", ps.colorMode)
@@ -887,14 +861,8 @@ method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
         result.add("framesCount", s.getValue(c.framesCount))
         result.add("fps", s.getValue(c.fps))
 
-    result.add("attractorNode", s.getValue(c.attractorNode))
+    result.add("modifierNode", s.getValue(c.modifierNode))
     result.add("genShapeNode", s.getValue(c.genShapeNode))
-
-    result.add("isMove", s.getValue(c.isMove))
-    result.add("amplitude", s.getValue(c.amplitude))
-    result.add("frequency", s.getValue(c.frequency))
-    result.add("distance", s.getValue(c.distance))
-    result.add("speed", s.getValue(c.speed))
 
 method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     proc onLoopedChange() =
@@ -932,7 +900,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("isLooped", ps.isLooped, onLoopedChange)
     p.visitProperty("isPlayed", ps.isPlayed, onPlayedChange)
     p.visitProperty("genShapeNode", ps.genShapeNode)
-    p.visitProperty("attractorNode", ps.attractorNode)
+    p.visitProperty("modifierNode", ps.modifierNode)
     p.visitProperty("birthRate", ps.birthRate)
     p.visitProperty("lifetime", ps.lifetime)
     p.visitProperty("startVelocity", ps.startVelocity)
@@ -953,11 +921,80 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("framesCount", ps.framesCount)
     p.visitProperty("fps", ps.fps)
 
-    p.visitProperty("isMove", ps.isMove)
-    p.visitProperty("amplitude", ps.amplitude)
-    p.visitProperty("frequency", ps.frequency)
-    p.visitProperty("distance", ps.distance)
-    p.visitProperty("speed", ps.speed)
+# -------------------- PSHolder --------------------------
+type
+    PSHolder* = ref object of Component
+        played*: bool
+        oldValue: bool
+
+        # debug data
+        isMove*: bool
+        amplitude*, frequency*, distance*, speed*: float
+
+method init(h: PSHolder) =
+    h.played = true
+    h.oldValue = true
+
+    h.isMove = false
+    h.amplitude = 5.0
+    h.frequency = 0.4
+    h.distance = 40.0
+    h.speed = 9.0
+
+proc recursiveDoProc(n: Node, pr: proc(ps: ParticleSystem) ) =
+    let ps = n.getComponent(ParticleSystem)
+    if not ps.isNil:
+        ps.pr()
+
+    for child in n.children:
+        child.recursiveDoProc(pr)
+
+method draw*(h: PSHolder) =
+    if h.isMove:
+        h.node.positionX = h.node.positionX + h.speed * getDeltaTime()
+        h.node.positionY = h.amplitude * cos(h.node.positionX * h.frequency)
+        if h.node.positionX > h.distance / 2.0:
+            h.node.positionX = -h.distance / 2.0;
+
+    if h.played != h.oldValue:
+        if h.played:
+            h.node.recursiveDoProc(start)
+        else:
+            h.node.recursiveDoProc(stop)
+
+    h.oldValue = h.played
+
+method deserialize*(h: PSHolder, j: JsonNode, s: Serializer) =
+    if j.isNil:
+        return
+    s.deserializeValue(j, "played", h.played)
+
+    s.deserializeValue(j, "isMove", h.isMove)
+    s.deserializeValue(j, "amplitude", h.amplitude)
+    s.deserializeValue(j, "frequency", h.frequency)
+    s.deserializeValue(j, "distance", h.distance)
+    s.deserializeValue(j, "speed", h.speed)
+
+method serialize*(h: PSHolder, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("played", s.getValue(h.played))
+
+    result.add("isMove", s.getValue(h.isMove))
+    result.add("amplitude", s.getValue(h.amplitude))
+    result.add("frequency", s.getValue(h.frequency))
+    result.add("distance", s.getValue(h.distance))
+    result.add("speed", s.getValue(h.speed))
+
+method visitProperties*(h: PSHolder, p: var PropertyVisitor) =
+    p.visitProperty("played", h.played)
+
+    p.visitProperty("isMove", h.isMove)
+    p.visitProperty("amplitude", h.amplitude)
+    p.visitProperty("frequency", h.frequency)
+    p.visitProperty("distance", h.distance)
+    p.visitProperty("speed", h.speed)
+
+registerComponent[PSHolder]()
 
 registerComponent[ParticleSystem](proc(): Component =
     result = newParticleSystem()

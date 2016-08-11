@@ -7,6 +7,7 @@ import rod.quaternion
 import rod.component
 import rod.rod_types
 import rod.tools.serializer
+import rod.node
 
 import nimx.matrixes
 import nimx.animation
@@ -33,16 +34,26 @@ type
     BoxPSGenShape* = ref object of PSGenShape
         dimension*: Vector3
 
-    PSAttractor* = ref object of Component
-        position*: Vector3
+    PSModifier* = ref object of Component
+
+    PSModifierWave* = ref object of PSModifier
+        frequence*: float32
         forceValue*: float
 
-    WavePSAttractor* = ref object of PSAttractor
-        frequence*: float32
+    PSModifierColor* = ref object of PSModifier
+        distance: float32
+        color: Color
+
+    PSModifierSpiral* = ref object of PSModifier
+        force: float32
+
+    PSModifierRandWind* = ref object of PSModifier
+        force: Vector3
 
 method generate*(pgs: PSGenShape): ParticleGenerationData {.base.} = discard
-method getForceAtPoint*(attr: PSAttractor, point: Vector3): Vector3 {.base.} = discard
 
+method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.base.} = discard
+method updateParticle*(attr: PSModifier, part: Particle) {.base.} = discard
 
 # -------------------- cone generator --------------------------
 method init(pgs: ConePSGenShape) =
@@ -180,35 +191,120 @@ method visitProperties*(pgs: BoxPSGenShape, p: var PropertyVisitor) =
     p.visitProperty("dimension", pgs.dimension)
     p.visitProperty("is2D", pgs.is2D)
 
-# -------------------- wave attractor --------------------------
-method init(attr: WavePSAttractor) =
+# -------------------- wave Modifier --------------------------
+method init(attr: PSModifierWave) =
     attr.forceValue = 0.1
     attr.frequence = 1
 
-method getForceAtPoint*(attr: WavePSAttractor, point: Vector3): Vector3 =
-    # result.y = -point.y * attr.forceValue
-    result.y = cos(point.x / attr.frequence) * attr.forceValue
+method updateParticle*(attr: PSModifierWave, part: Particle) =
+    part.position.y += cos( (part.position.x + attr.node.position.x) / attr.frequence) * attr.forceValue
 
-method deserialize*(attr: WavePSAttractor, j: JsonNode, s: Serializer) =
+method deserialize*(attr: PSModifierWave, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
-
     s.deserializeValue(j, "forceValue", attr.forceValue)
     s.deserializeValue(j, "frequence", attr.frequence)
 
-method serialize*(c: WavePSAttractor, s: Serializer): JsonNode =
+method serialize*(c: PSModifierWave, s: Serializer): JsonNode =
     result = newJObject()
     result.add("forceValue", s.getValue(c.forceValue))
     result.add("frequence", s.getValue(c.frequence))
 
-method visitProperties*(attr: WavePSAttractor, p: var PropertyVisitor) =
+method visitProperties*(attr: PSModifierWave, p: var PropertyVisitor) =
     p.visitProperty("forceValue", attr.forceValue)
     p.visitProperty("frequence", attr.frequence)
 
+# -------------------- Color Modifier --------------------------
+method init(attr: PSModifierColor) =
+    attr.distance = 1
+    attr.color = newColor(1.0, 1.0, 1.0, 1.0)
+
+method updateParticle*(attr: PSModifierColor, part: Particle) =
+    let distance_vec = attr.node.position - part.position
+    var distance = distance_vec.length()
+    distance = min(distance / attr.distance, 1.0)
+    part.color = part.color * distance + attr.color * (1.0 - distance)
+
+method deserialize*(attr: PSModifierColor, j: JsonNode, s: Serializer) =
+    if j.isNil:
+        return
+    s.deserializeValue(j, "distance", attr.distance)
+    s.deserializeValue(j, "color", attr.color)
+
+method serialize*(c: PSModifierColor, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("distance", s.getValue(c.distance))
+    result.add("color", s.getValue(c.color))
+
+method visitProperties*(attr: PSModifierColor, p: var PropertyVisitor) =
+    p.visitProperty("distance", attr.distance)
+    p.visitProperty("color", attr.color)
+
+# -------------------- Spiral Modifier --------------------------
+method init(attr: PSModifierSpiral) =
+    attr.force = 100
+
+method updateParticle*(attr: PSModifierSpiral, part: Particle) =
+    var distance_vec = newVector3()
+    # distance_vec.x = part.position.x - attr.node.worldPos.x
+    # distance_vec.y = part.position.z - attr.node.worldPos.z
+    # let distance = distance_vec.length()
+    # var angle = arctan2(distance_vec.y, distance_vec.x)
+    # let speed_rad = degToRad(attr.speed)
+    # part.position.x = distance * cos(angle + speed_rad) + attr.node.position.x
+    # part.position.z = distance * sin(angle + speed_rad) + attr.node.position.z
+
+    distance_vec = part.position - attr.node.worldPos
+    distance_vec.y = 0.0
+    let distance = distance_vec.length()
+    distance_vec.normalize()
+    let force = distance_vec * (attr.force / 60.0) / (distance * distance)
+    part.velocity -= force
+
+
+method deserialize*(attr: PSModifierSpiral, j: JsonNode, s: Serializer) =
+    if j.isNil:
+        return
+    s.deserializeValue(j, "speed", attr.force) # deprecated
+    s.deserializeValue(j, "force", attr.force)
+
+method serialize*(c: PSModifierSpiral, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("force", s.getValue(c.force))
+
+method visitProperties*(attr: PSModifierSpiral, p: var PropertyVisitor) =
+    p.visitProperty("force", attr.force)
+
+
+# -------------------- Random Wind Modifier --------------------------
+method init(attr: PSModifierRandWind) =
+    attr.force = newVector3(1,1,1)
+
+method updateParticle*(attr: PSModifierRandWind, part: Particle) =
+    var force: Vector3
+    force.x = random(-attr.force.x .. attr.force.x)
+    force.y = random(-attr.force.y .. attr.force.y)
+    force.z = random(-attr.force.z .. attr.force.z)
+    part.velocity += force / 60.0
+
+method deserialize*(attr: PSModifierRandWind, j: JsonNode, s: Serializer) =
+    if j.isNil:
+        return
+    s.deserializeValue(j, "force", attr.force)
+
+method serialize*(c: PSModifierRandWind, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("force", s.getValue(c.force))
+
+method visitProperties*(attr: PSModifierRandWind, p: var PropertyVisitor) =
+    p.visitProperty("force", attr.force)
 
 
 registerComponent[ConePSGenShape]()
 registerComponent[SpherePSGenShape]()
 registerComponent[BoxPSGenShape]()
 
-registerComponent[WavePSAttractor]()
+registerComponent[PSModifierWave]()
+registerComponent[PSModifierColor]()
+registerComponent[PSModifierSpiral]()
+registerComponent[PSModifierRandWind]()

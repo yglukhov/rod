@@ -25,22 +25,32 @@ type
         mSceneView*: SceneView
         alpha*: Coord
         mMatrix*: Matrix4
+        worldMatrix*: Matrix4
         isDirty*: bool
+        layer*: int
 
     Node2D* = Node3D
 
     Node* = Node3D
 
+    BBox* = ref object of RootObj
+        maxPoint*: Vector3
+        minPoint*: Vector3
+
     Component* = ref object of RootObj
         node*: Node3D
+        bbox*: BBox
 
     PostprocessContext* = ref object
         shader*: ProgramRef
         setupProc*: proc(c: Component)
         drawProc*: proc(c: Component)
+        depthImage*: SelfContainedImage
+        depthMatrix*: Matrix4
 
     SceneView* = ref object of View
         viewMatrixCached*: Matrix4
+        viewProjMatrix*: Matrix4
         mCamera*: Camera
         mRootNode*: Node3D
         animationRunner*: AnimationRunner
@@ -65,6 +75,7 @@ type
         projectionMode*: CameraProjection
         zNear*, zFar*, fov*: Coord
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
+        viewportSize*: Size
 
     UIComponent* = ref object of Component
         mView*: View
@@ -88,3 +99,14 @@ type
         lightLinearInited*: bool
         lightQuadraticInited*: bool
         mLightAttenuationInited*: bool
+
+    Particle* = ref object
+        node*: Node
+        position*: Vector3
+        rotation*, rotationVelocity*: Vector3 #deg per sec
+        scale*: Vector3
+        lifetime*: float
+        normalizedLifeTime*: float
+        color*: Color
+        velocity*: Vector3
+        randStartScale*: float

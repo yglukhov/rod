@@ -1,3 +1,6 @@
+import tables
+import strutils
+
 import nimx.context
 import nimx.portable_gl
 import nimx.types
@@ -14,6 +17,7 @@ import rod.component.camera
 import rod.component.sprite
 import rod.node
 import rod.viewport
+import rod.editor.gizmos.move_axis
 
 const vertexShader = """
 attribute vec4 aPosition;
@@ -29,8 +33,8 @@ uniform vec4 uColor;
 void main() { gl_FragColor = uColor; }
 """
 
-let vertexData = [-0.5.GLfloat,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
-                  -0.5        ,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5]
+# let vertexData = [-0.5.GLfloat,-0.5, 0.5,  0.5,-0.5, 0.5,  0.5,0.5, 0.5,  -0.5,0.5, 0.5,
+#                   -0.5        ,-0.5,-0.5,  0.5,-0.5,-0.5,  0.5,0.5,-0.5,  -0.5,0.5,-0.5]
 let indexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
 
 var selectorSharedIndexBuffer: BufferRef
@@ -43,7 +47,10 @@ type Attrib = enum
 
 type NodeSelector* = ref object of Component
     modelMatrix*: Matrix4
+    vertexData: seq[GLfloat]
     color*: Color
+    gizmo: Node
+    gizmoAxis: Vector3
 
 proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
     if not n.isNil:
@@ -67,11 +74,10 @@ proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
             let size = 10.0
             ns.color = light.lightColor
             ns.modelMatrix = n.worldTransform()
-            # ns.modelMatrix.translate(newVector3(size/2.0, size/2.0, size/2.0) )
             ns.modelMatrix.scale(newVector3(size, size, size))
             return true
 
-proc createVBO() =
+proc createVBO(ns: NodeSelector) =
     let c = currentContext()
     let gl = c.gl
 
@@ -81,7 +87,7 @@ proc createVBO() =
 
     selectorSharedVertexBuffer = gl.createBuffer()
     gl.bindBuffer(gl.ARRAY_BUFFER, selectorSharedVertexBuffer)
-    gl.bufferData(gl.ARRAY_BUFFER, vertexData, gl.STATIC_DRAW)
+    gl.bufferData(gl.ARRAY_BUFFER, ns.vertexData, gl.STATIC_DRAW)
     selectorSharedNumberOfIndexes = indexData.len.GLsizei
 
 method init*(ns: NodeSelector) =
@@ -89,15 +95,59 @@ method init*(ns: NodeSelector) =
     ns.modelMatrix.loadIdentity()
     procCall ns.Component.init()
 
+proc createBoxes(ns: NodeSelector) =
+    for k, v in ns.node.components:
+        let bbox = v.getBBox()
+        if not bbox.isNil:
+            # echo "node ", ns.node.name, "  min  ", bbox.minPoint, "  max  ", bbox.maxPoint
+            ns.vertexData = newSeq[GLfloat]()
+            ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.minPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.minPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
+            ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
+
+            ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
+            ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
+            ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
+
+            ns.createVBO()
+
+proc updateGizmo(ns: NodeSelector) =
+    var projConstant = 0.005
+    ns.gizmo.position = ns.node.worldPos
+
+    var size = (ns.node.sceneView.camera.node.worldPos - ns.node.worldPos).length
+    if size < 0.01:
+        size = 0.01
+
+    if ns.node.sceneView.camera.projectionMode == cpPerspective:
+        ns.gizmo.scale = newVector3(size, size, size) * projConstant
+    else:
+        size = 10
+        ns.gizmo.scale = newVector3(size, size, size)
+
+method componentNodeWasAddedToSceneView*(ns: NodeSelector) =
+    ns.createBoxes()
+
+    ns.gizmo = newNode()
+    let distance = (ns.node.worldPos - ns.node.sceneView.camera.node.worldPos).length()
+    if distance > 0.1:
+        ns.gizmo.loadComposition( getMoveAxisJson() )
+        ns.node.mSceneView.rootNode.addChild(ns.gizmo)
+    ns.updateGizmo()
+
+method componentNodeWillBeRemovedFromSceneView*(ns: NodeSelector) =
+    if not ns.gizmo.isNil:
+        ns.gizmo.removeFromParent()
+
 method draw*(ns: NodeSelector) =
-    if ns.trySetupTransformfromNode(ns.node):
+    if not ns.vertexData.isNil:
+        ns.updateGizmo()
+
         let c = currentContext()
         let gl = c.gl
-
-        if selectorSharedIndexBuffer == invalidBuffer:
-            createVBO()
-            if selectorSharedIndexBuffer == invalidBuffer:
-                return
+        ns.modelMatrix = ns.node.worldTransform()
 
         if selectorSharedShader == invalidProgram:
             selectorSharedShader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition)])
@@ -127,6 +177,35 @@ method draw*(ns: NodeSelector) =
 
         #TODO to default settings
         gl.disable(gl.DEPTH_TEST)
+
+var screenPoint, offset: Vector3
+proc startTransform*(ns: NodeSelector, selectedGizmo: Node, position: Point) =
+    if selectedGizmo.name.contains("gizmo_axis_x"):
+        ns.gizmoAxis = newVector3(1.0, 0.0, 0.0)
+    elif selectedGizmo.name.contains("gizmo_axis_y"):
+        ns.gizmoAxis = newVector3(0.0, 1.0, 0.0)
+    elif selectedGizmo.name.contains("gizmo_axis_z"):
+        ns.gizmoAxis = newVector3(0.0, 0.0, 1.0)
+
+    screenPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
+    offset = ns.gizmo.worldPos - ns.node.sceneView.screenToWorldPoint(newVector3(position.x, position.y, screenPoint.z))
+
+proc proccesTransform*(ns: NodeSelector, position: Point) =
+    let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
+    let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
+
+    let curScreenPoint = newVector3(position.x, position.y, screenPoint.z)
+    var curPosition: Vector3
+    curPosition = ns.node.sceneView.screenToWorldPoint(curScreenPoint) + offset
+    curPosition = curPosition - ns.gizmo.worldPos
+    ns.gizmo.position = ns.gizmo.worldPos + curPosition * ns.gizmoAxis
+    if not ns.node.parent.isNil:
+        ns.node.position = ns.node.parent.worldToLocal(ns.gizmo.position)
+    else:
+        ns.node.position = ns.gizmo.position
+
+proc stopTransform*(ns: NodeSelector) =
+    ns.gizmoAxis = newVector3(0.0, 0.0, 0.0)
 
 method visitProperties*(ns: NodeSelector, p: var PropertyVisitor) =
     p.visitProperty("color", ns.color)

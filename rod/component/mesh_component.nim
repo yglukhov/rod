@@ -128,7 +128,6 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
     else:
         loadFunc()
 
-
 proc loadMeshComponent(m: MeshComponent, resourceName: string) =
     if not vboCache.contains(m.resourceName):
         loadResourceAsync resourceName, proc(s: Stream) =
@@ -227,6 +226,8 @@ proc setupAndDraw*(m: MeshComponent) =
 
     m.material.setupVertexAttributes(m.vboData.vertInfo)
     m.material.updateSetup(m.node)
+    m.material.setupTransform(m.node)
+
     if m.material.bEnableBackfaceCulling:
         gl.enable(gl.CULL_FACE)
 
@@ -274,6 +275,8 @@ method draw*(m: MeshComponent) =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
 
     if not m.bProccesPostEffects or m.node.sceneView.isNil or m.node.sceneView.postprocessContext.isNil or m.node.sceneView.postprocessContext.shader == invalidProgram:
+        if not m.node.sceneView.isNil and not m.node.sceneView.postprocessContext.isNil:
+            m.material.setupShadow(m.node.sceneView.postprocessContext)
         m.setupAndDraw()
     else:
         m.node.sceneView.postprocessContext.drawProc(m)
@@ -294,12 +297,18 @@ method draw*(m: MeshComponent) =
     if m.debugSkeleton and not m.skeleton.isNil:
         m.skeleton.debugDraw()
 
+
+method getBBox*(c: MeshComponent): BBox =
+    result = newBBox()
+    result.maxPoint = c.vboData.maxCoord
+    result.minPoint = c.vboData.minCoord
+
+# --------- read data from VBO ------------
+
 proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
-        when defined(js):
-            asm "`gl`.BufferSubData(`target`, `offset`, new Uint16Array(`data`));"
-        elif defined(android):
-            echo "android dont't suport glGetBufferSubData"
+        when defined(android) or defined(ios) or defined(js) or defined(emscripten):
+            echo "android and iOS dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
 
@@ -312,17 +321,13 @@ proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
 
     getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
 
-
-# --------- read data from VBO ------------
 proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
     if not c.skeleton.isNil:
         return c.initMesh
 
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLfloat]) =
-        when defined(js):
-            asm "`gl`.BufferSubData(`target`, `offset`, new Float32Array(`data`));"
-        elif defined(android):
-            echo "android dont't suport glGetBufferSubData"
+        when defined(android) or defined(ios) or defined(js) or defined(emscripten):
+            echo "android and iOS dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
 
@@ -337,7 +342,7 @@ proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
 
 proc extractVertexData*(c: MeshComponent, size, offset: int32, data: seq[float32]): seq[float32] =
     let dataStride = int(c.vboData.vertInfo.stride / sizeof(float32))
-    let vertCount = int (data.len / dataStride)
+    let vertCount = int(data.len / dataStride)
 
     result = newSeq[float32](vertCount * size)
     for i in 0 ..< vertCount:
@@ -364,17 +369,6 @@ proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] {.proc
     let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord + c.vboData.vertInfo.numOfCoordPerNormal
     result = c.extractVertexData(size, offset, data)
 
-method rayCast*(c: MeshComponent, r: Ray, distance: var float32): bool =
-    var inv_mat: Matrix4
-    if tryInverse (c.node.worldTransform(), inv_mat) == false:
-        return false
-
-    let localRay = r.transform(inv_mat)
-    if c.node.getGlobalAlpha() < 0.0001:
-        result = false
-    else:
-        result = localRay.intersectWithAABB(c.vboData.minCoord, c.vboData.maxCoord, distance)
-
 
 method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     if j.isNil:
@@ -395,10 +389,11 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "wireframe", m.material.isWireframe)
     s.deserializeValue(j, "RIM", m.material.isRIM)
     s.deserializeValue(j, "sRGB_normal", m.material.isNormalSRGB)
-
-    s.deserializeValue(j, "matcapPercent", m.material.matcapPercent)
-    s.deserializeValue(j, "matcapInterpolatePercent", m.material.matcapInterpolatePercent)
-    s.deserializeValue(j, "matcapMixPercent", m.material.matcapMixPercent)
+    s.deserializeValue(j, "matcapPercentR", m.material.matcapPercentR)
+    s.deserializeValue(j, "matcapPercentG", m.material.matcapPercentG)
+    s.deserializeValue(j, "matcapPercentB", m.material.matcapPercentB)
+    s.deserializeValue(j, "matcapPercentA", m.material.matcapPercentA)
+    s.deserializeValue(j, "matcapMaskPercent", m.material.matcapMaskPercent)
     s.deserializeValue(j, "albedoPercent", m.material.albedoPercent)
     s.deserializeValue(j, "glossPercent", m.material.glossPercent)
     s.deserializeValue(j, "specularPercent", m.material.specularPercent)
@@ -413,8 +408,11 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
         if not jNode.isNil:
             result = imageWithResource(jNode.getStr())
 
-    m.material.matcapTexture = getTexture("matcapTexture")
-    m.material.matcapInterpolateTexture = getTexture("matcapInterpolateTexture")
+    m.material.matcapTextureR = getTexture("matcapTextureR")
+    m.material.matcapTextureG = getTexture("matcapTextureG")
+    m.material.matcapTextureB = getTexture("matcapTextureB")
+    m.material.matcapTextureA = getTexture("matcapTextureA")
+    m.material.matcapMaskTexture = getTexture("matcapMaskTexture")
     m.material.albedoTexture = getTexture("albedoTexture")
     m.material.glossTexture = getTexture("glossTexture")
     m.material.specularTexture = getTexture("specularTexture")
@@ -507,8 +505,11 @@ method serialize*(c: MeshComponent, s: Serializer): JsonNode =
 
     result.add("sRGB_normal", s.getValue(c.material.isNormalSRGB))
 
-    result.add("matcapPercent", s.getValue(c.material.matcapPercent))
-    result.add("matcapInterpolatePercent", s.getValue(c.material.matcapInterpolatePercent))
+    result.add("matcapPercentR", s.getValue(c.material.matcapPercentR))
+    result.add("matcapPercentG", s.getValue(c.material.matcapPercentG))
+    result.add("matcapPercentB", s.getValue(c.material.matcapPercentB))
+    result.add("matcapPercentA", s.getValue(c.material.matcapPercentA))
+    result.add("matcapMaskPercent", s.getValue(c.material.matcapMaskPercent))
     result.add("albedoPercent", s.getValue(c.material.albedoPercent))
     result.add("glossPercent", s.getValue(c.material.glossPercent))
     result.add("specularPercent", s.getValue(c.material.specularPercent))
@@ -518,12 +519,16 @@ method serialize*(c: MeshComponent, s: Serializer): JsonNode =
     result.add("falloffPercent", s.getValue(c.material.falloffPercent))
     result.add("maskPercent", s.getValue(c.material.maskPercent))
 
-    result.add("matcapMixPercent", s.getValue(c.material.matcapMixPercent))
-
-    if not c.material.matcapTexture.isNil:
-        result.add("matcapTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapTexture.filePath())))
-    if not c.material.matcapInterpolateTexture.isNil:
-        result.add("matcapInterpolateTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapInterpolateTexture.filePath())))
+    if not c.material.matcapTextureR.isNil:
+        result.add("matcapTextureR",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureR.filePath())))
+    if not c.material.matcapTextureG.isNil:
+        result.add("matcapTextureG",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureG.filePath())))
+    if not c.material.matcapTextureB.isNil:
+        result.add("matcapTextureB",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureB.filePath())))
+    if not c.material.matcapTextureA.isNil:
+        result.add("matcapTextureA",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureA.filePath())))
+    if not c.material.matcapMaskTexture.isNil:
+        result.add("matcapMaskTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapMaskTexture.filePath())))
     if not c.material.albedoTexture.isNil:
         result.add("albedoTexture",  s.getValue(s.getRelativeResourcePath(c.material.albedoTexture.filePath())))
     if not c.material.glossTexture.isNil:
@@ -572,9 +577,6 @@ method serialize*(c: MeshComponent, s: Serializer): JsonNode =
         result["boneIDs"] = s.getValue(c.boneIDs)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
-
-    # p.visitProperty("material", m.material)
-
     p.visitProperty("emission", m.material.emission)
     p.visitProperty("ambient", m.material.ambient)
     p.visitProperty("diffuse", m.material.diffuse)
@@ -591,10 +593,11 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("normalTexture", (m.material.normalTexture, m.material.normalPercent))
     p.visitProperty("reflectionTexture", (m.material.reflectionTexture, m.material.reflectionPercent))
     p.visitProperty("maskTexture", (m.material.maskTexture, m.material.maskPercent))
-    p.visitProperty("matcapTexture", (m.material.matcapTexture, m.material.matcapPercent))
-    p.visitProperty("matcapInterTexture", (m.material.matcapInterpolateTexture, m.material.matcapInterpolatePercent))
-
-    p.visitProperty("matcapInterPercent", m.material.matcapMixPercent)
+    p.visitProperty("matcapTextureR", (m.material.matcapTextureR, m.material.matcapPercentR))
+    p.visitProperty("matcapTextureG", (m.material.matcapTextureG, m.material.matcapPercentG))
+    p.visitProperty("matcapTextureB", (m.material.matcapTextureB, m.material.matcapPercentB))
+    p.visitProperty("matcapTextureA", (m.material.matcapTextureA, m.material.matcapPercentA))
+    p.visitProperty("matcapMixMask", (m.material.matcapMaskTexture, m.material.matcapMaskPercent))
 
     p.visitProperty("sRGB normal", m.material.isNormalSRGB)
 
