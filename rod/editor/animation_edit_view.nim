@@ -1,6 +1,6 @@
 import sequtils, intsets, tables
 import nimx.view, nimx.table_view, nimx.scroll_view, nimx.button, nimx.text_field
-import nimx.popup_button
+import nimx.popup_button, nimx.window
 import nimx.menu, nimx.event, nimx.property_visitor
 import variant
 
@@ -40,6 +40,7 @@ proc `editedNode=`*(v: AnimationEditView, n: Node) =
         for k, v in v.mEditedNode.animations:
             items.add(k)
     v.animationSelector.items = items
+    v.animationSelector.sendAction()
 
 proc currentLeftPaneView(v: AnimationEditView): AnimationChartView =
     if v.mCurveEditingMode:
@@ -76,16 +77,22 @@ proc updateDopesheetCurves(v: AnimationEditView) =
 
 proc addEditedProperty(v: AnimationEditView, name: string) =
     var ep: EditedProperty
+    var ap: AnimatedProperty
     ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, name)
     ep.name = name
-
+    ap.name = name
     template createCurve(T: typedesc): typed =
         ep.curve = newAnimationCurve[T]()
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
     switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
 
+    ap.sampler = ep.curve.getSampler()
+    ap.progressSetter = makeProgressSetter(ep.sng, ap.sampler)
+
     ep.curve.color = colors[v.editedProperties.len mod colors.len]
     v.editedProperties.add(ep)
+    if not v.mEditedAnimation.isNil:
+        v.mEditedAnimation.animatedProperties.add(ap)
     v.propertyTableView.reloadData()
     v.updateDopesheetCurves()
 
@@ -130,6 +137,16 @@ proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
     v.propertyTableView.reloadData()
     v.updateDopesheetCurves()
 
+const topPanelHeight = 25
+const bottomPanelHeight = 25
+
+proc createPlayButton(v: AnimationEditView): Button =
+    result = Button.new(newRect(0, 0, 50, topPanelHeight))
+    result.title = "Play"
+    result.onAction do():
+        if not v.mEditedAnimation.isNil:
+            v.window.addAnimation(v.mEditedAnimation)
+
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
     v.editedProperties = @[]
@@ -138,12 +155,8 @@ method init*(v: AnimationEditView, r: Rect) =
     mainSplitView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     v.addSubview(mainSplitView)
 
-    const topPanelHeight = 25
-    const bottomPanelHeight = 25
-
     let leftPaneView = View.new(newRect(0, 0, leftPaneWidth, v.bounds.height))
-    let playButton = Button.new(newRect(0, 0, 50, topPanelHeight))
-    playButton.title = "Play"
+    let playButton = v.createPlayButton()
     leftPaneView.addSubview(playButton)
     leftPaneView.autoresizingMask = { afFlexibleMaxX, afFlexibleHeight }
 
@@ -151,9 +164,12 @@ method init*(v: AnimationEditView, r: Rect) =
     v.animationSelector.autoresizingMask = { afFlexibleWidth, afFlexibleMaxY }
     leftPaneView.addSubview(v.animationSelector)
     v.animationSelector.onAction do():
-        let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem)
-        if a of PropertyAnimation:
-            v.editedAnimation = PropertyAnimation(a)
+        if v.animationSelector.selectedIndex >= 0:
+            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem)
+            if a of PropertyAnimation:
+                v.editedAnimation = PropertyAnimation(a)
+            else:
+                v.editedAnimation = nil
         else:
             v.editedAnimation = nil
 

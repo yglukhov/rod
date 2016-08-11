@@ -130,7 +130,7 @@ proc findAnimatablePropertyForSubtree*(n: Node, propName: string): Variant =
     if result.isEmpty:
         raise newException(Exception, "Animated property not found: " & propName)
 
-proc makeProgressSetter(sng: Variant, s: AbstractAnimationSampler): proc(p: float) =
+proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: float) =
     template makeSetter(T: typedesc) =
         let setter = sng.get(SetterAndGetter[T]).setter
         let sampler = AnimationSampler[T](s)
