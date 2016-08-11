@@ -142,8 +142,23 @@ type
         tempShaderMacroFlags: set[ShaderMacro]
         shaderMacroFlags: set[ShaderMacro]
         useManualShaderComposing*: bool
+        uniformLocationCache*: Table[cstring, UniformLocation]
 
 var shadersCache = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
+
+proc getUniformLocation*(gl: GL, m: Material, name: cstring): UniformLocation =
+    if not m.uniformLocationCache.hasKey(name):
+        m.uniformLocationCache[name] = gl.getUniformLocation(m.shader, name)
+    return m.uniformLocationCache[name]
+
+proc setColorUniform(c: GraphicsContext, m: Material, name: cstring, col: Color) =
+    var ul: UniformLocation
+    if not m.uniformLocationCache.hasKey(name):
+        ul = c.gl.getUniformLocation(m.shader, name)
+        m.uniformLocationCache[name] = ul
+    else:
+        ul = m.uniformLocationCache[name]
+    c.setColorUniform(ul, col)
 
 proc hash(sm: set[ShaderMacro]): Hash =
     var sum = ""
@@ -383,8 +398,8 @@ template setupRIMLightTechnique*(m: Material) =
     if m.shader == invalidProgram:
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
     else:
-        gl.uniform1f(gl.getUniformLocation(m.shader, "uRimDensity"), m.rimDensity.GLfloat)
-        c.setColorUniform(m.shader, "uRimColor", m.rimColor)
+        gl.uniform1f(gl.getUniformLocation(m, "uRimDensity"), m.rimDensity.GLfloat)
+        c.setColorUniform(m, "uRimColor", m.rimColor)
 
 template setupNormalMappingTechniqueWithoutPrecomputedTangents*(m: Material) =
     if m.shader == invalidProgram:
@@ -428,6 +443,7 @@ proc newDefaultMaterial*(): Material =
     result.reflectionPercent = 1.0
     result.falloffPercent = 1.0
     result.maskPercent = 1.0
+    result.uniformLocationCache = initTable[cstring, UniformLocation]()
 
 proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
     let c = currentContext()
@@ -484,9 +500,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.matcapTextureR.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureR, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsR"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitR"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentR"), m.matcapPercentR)
+                gl.uniform4fv(gl.getUniformLocation(m, "uMatcapUnitCoordsR"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "matcapUnitR"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uMatcapPercentR"), m.matcapPercentR)
                 inc textureIndex
     if not m.matcapTextureG.isNil:
         if m.shader == invalidProgram:
@@ -495,9 +511,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.matcapTextureG.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureG, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsG"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitG"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentG"), m.matcapPercentG)
+                gl.uniform4fv(gl.getUniformLocation(m, "uMatcapUnitCoordsG"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "matcapUnitG"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uMatcapPercentG"), m.matcapPercentG)
                 inc textureIndex
     if not m.matcapTextureB.isNil:
         if m.shader == invalidProgram:
@@ -506,9 +522,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.matcapTextureB.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureB, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsB"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitB"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentB"), m.matcapPercentB)
+                gl.uniform4fv(gl.getUniformLocation(m, "uMatcapUnitCoordsB"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "matcapUnitB"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uMatcapPercentB"), m.matcapPercentB)
                 inc textureIndex
     if not m.matcapTextureA.isNil:
         if m.shader == invalidProgram:
@@ -517,9 +533,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.matcapTextureA.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapTextureA, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapUnitCoordsA"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapUnitA"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapPercentA"), m.matcapPercentA)
+                gl.uniform4fv(gl.getUniformLocation(m, "uMatcapUnitCoordsA"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "matcapUnitA"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uMatcapPercentA"), m.matcapPercentA)
                 inc textureIndex
     if not m.matcapMaskTexture.isNil:
         if m.shader == invalidProgram:
@@ -528,9 +544,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.matcapMaskTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.matcapMaskTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMatcapMaskUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "matcapMaskUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMatcapMaskPercent"), m.matcapMaskPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uMatcapMaskUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "matcapMaskUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uMatcapMaskPercent"), m.matcapMaskPercent)
                 inc textureIndex
     if not m.albedoTexture.isNil:
         if m.shader == invalidProgram:
@@ -540,9 +556,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.albedoTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.albedoTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uTexUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "texUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uTexUnitPercent"), m.albedoPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uTexUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "texUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uTexUnitPercent"), m.albedoPercent)
                 inc textureIndex
     if not m.glossTexture.isNil:
         if m.shader == invalidProgram:
@@ -551,9 +567,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.glossTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.glossTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uGlossUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "glossMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uGlossPercent"), m.glossPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uGlossUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "glossMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uGlossPercent"), m.glossPercent)
                 inc textureIndex
     if not m.specularTexture.isNil:
         if m.shader == invalidProgram:
@@ -562,9 +578,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.specularTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.specularTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uSpecularUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "specularMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uSpecularPercent"), m.specularPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uSpecularUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "specularMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uSpecularPercent"), m.specularPercent)
                 inc textureIndex
     if not m.normalTexture.isNil:
         if m.shader == invalidProgram:
@@ -574,9 +590,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.normalTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.normalTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uNormalUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "normalMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uNormalPercent"), m.normalPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uNormalUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "normalMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uNormalPercent"), m.normalPercent)
                 inc textureIndex
     if not m.bumpTexture.isNil:
         if m.shader == invalidProgram:
@@ -586,9 +602,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.bumpTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.bumpTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uBumpUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "bumpMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uBumpPercent"), m.bumpPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uBumpUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "bumpMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uBumpPercent"), m.bumpPercent)
                 inc textureIndex
     if not m.reflectionTexture.isNil:
         if m.shader == invalidProgram:
@@ -598,9 +614,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.reflectionTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.reflectionTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uReflectUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "reflectMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uReflectionPercent"), m.reflectionPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uReflectUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "reflectMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uReflectionPercent"), m.reflectionPercent)
                 inc textureIndex
     if not m.falloffTexture.isNil:
         if m.shader == invalidProgram:
@@ -610,9 +626,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.falloffTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.falloffTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uFallofUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "falloffMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uFalloffPercent"), m.falloffPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uFallofUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "falloffMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uFalloffPercent"), m.falloffPercent)
                 inc textureIndex
     if not m.maskTexture.isNil:
         if m.shader == invalidProgram:
@@ -622,9 +638,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.maskTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.maskTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaskUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "maskMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMaskPercent"), m.maskPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uMaskUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "maskMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uMaskPercent"), m.maskPercent)
                 inc textureIndex
     if not m.maskTexture.isNil:
         if m.shader == invalidProgram:
@@ -634,9 +650,9 @@ proc setupSamplerAttributes(m: Material) =
             if m.maskTexture.isLoaded:
                 gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
                 gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(m.maskTexture, gl, theQuad))
-                gl.uniform4fv(gl.getUniformLocation(m.shader, "uMaskUnitCoords"), theQuad)
-                gl.uniform1i(gl.getUniformLocation(m.shader, "maskMapUnit"), textureIndex)
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMaskPercent"), m.maskPercent)
+                gl.uniform4fv(gl.getUniformLocation(m, "uMaskUnitCoords"), theQuad)
+                gl.uniform1i(gl.getUniformLocation(m, "maskMapUnit"), textureIndex)
+                gl.uniform1f(gl.getUniformLocation(m, "uMaskPercent"), m.maskPercent)
                 inc textureIndex
     if not postContext.isNil and not postContext.depthImage.isNil:
         if not m.shaderMacroFlags.contains(WITH_SHADOW):
@@ -648,11 +664,11 @@ proc setupSamplerAttributes(m: Material) =
         else:
             gl.activeTexture(GLenum(int(gl.TEXTURE0) + textureIndex))
             gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(postContext.depthImage, gl, theQuad))
-            gl.uniform4fv(gl.getUniformLocation(m.shader, "uDepthUnitCoords"), theQuad)
-            gl.uniform1i(gl.getUniformLocation(m.shader, "depthMapUnit"), textureIndex)
+            gl.uniform4fv(gl.getUniformLocation(m, "uDepthUnitCoords"), theQuad)
+            gl.uniform1i(gl.getUniformLocation(m, "depthMapUnit"), textureIndex)
             inc textureIndex
 
-            gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "lightMatrix"), false, postContext.depthMatrix)
+            gl.uniformMatrix4fv(gl.getUniformLocation(m, "lightMatrix"), false, postContext.depthMatrix)
 
 proc setupMaterialAttributes(m: Material) =
     if not m.color.isNil:
@@ -663,29 +679,29 @@ proc setupMaterialAttributes(m: Material) =
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
             else:
-                c.setColorUniform(m.shader, "uMaterialAmbient", m.color.ambient)
+                c.setColorUniform(m, "uMaterialAmbient", m.color.ambient)
         if m.color.emissionInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
             else:
-                c.setColorUniform(m.shader, "uMaterialEmission", m.color.emission)
+                c.setColorUniform(m, "uMaterialEmission", m.color.emission)
         if m.color.diffuseInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
             else:
-                c.setColorUniform(m.shader, "uMaterialDiffuse", m.color.diffuse)
+                c.setColorUniform(m, "uMaterialDiffuse", m.color.diffuse)
         if m.color.specularInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
             else:
-                c.setColorUniform(m.shader, "uMaterialSpecular", m.color.specular)
+                c.setColorUniform(m, "uMaterialSpecular", m.color.specular)
         if m.color.shininessInited:
             if m.shader == invalidProgram:
                 m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
             else:
-                gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialShininess"), m.color.shininess)
+                gl.uniform1f(gl.getUniformLocation(m, "uMaterialShininess"), m.color.shininess)
         if m.shader != invalidProgram:
-            gl.uniform1f(gl.getUniformLocation(m.shader, "uMaterialTransparency"), c.alpha)
+            gl.uniform1f(gl.getUniformLocation(m, "uMaterialTransparency"), c.alpha)
 
 proc setupLightAttributes(m: Material, v: SceneView) =
     var lightsCount = 0
@@ -785,22 +801,20 @@ template setupTransform*(m: Material, n: Node) =
     else:
         normalMatrix.loadIdentity()
 
-    gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelMatrix"), false, n.worldTransform)
-    gl.uniformMatrix4fv(gl.getUniformLocation(m.shader, "modelViewMatrix"), false, modelViewMatrix)
-    gl.uniformMatrix3fv(gl.getUniformLocation(m.shader, "normalMatrix"), false, normalMatrix)
+    gl.uniformMatrix4fv(gl.getUniformLocation(m, "modelMatrix"), false, n.worldTransform)
+    gl.uniformMatrix4fv(gl.getUniformLocation(m, "modelViewMatrix"), false, modelViewMatrix)
+    gl.uniformMatrix3fv(gl.getUniformLocation(m, "normalMatrix"), false, normalMatrix)
     c.setTransformUniform(m.shader) # setup modelViewProjectionMatrix
 
-    let worldCamPos = n.sceneView.camera.node.worldPos
-    let camPos = newVector4(worldCamPos.x, worldCamPos.y, worldCamPos.z, 1.0)
-    gl.uniform4fv(gl.getUniformLocation(m.shader, "uCamPosition"), camPos)
-
 proc createShader(m: Material) =
+    for key, val in mpairs m.uniformLocationCache:
+        m.uniformLocationCache.del(key)
+
     let c = currentContext()
     let gl = c.gl
 
     if not shadersCache.contains(m.shaderMacroFlags):
-        var commonShaderDefines = ""
-
+        var commonShaderDefines = "#version 100" & "\n"
         for mcrs in m.shaderMacroFlags:
             commonShaderDefines &= """#define """ & $mcrs & "\n"
 

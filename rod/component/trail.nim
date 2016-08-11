@@ -371,6 +371,8 @@ template checkShader(t: Trail) =
     if not t.matcap.isNil and not t.image.isNil:
         t.shader = TrailMatcapShaderMask
 
+    currentContext().gl.useProgram(t.shader)
+
 proc vertexData(t: Trail): seq[GLfloat] =
     var worldMat = t.node.worldTransform
     worldMat[12] = t.currPos[0]

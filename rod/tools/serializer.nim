@@ -144,9 +144,11 @@ proc getValue*[T](s: Serializer, v: T): JsonNode =
     result = %v
 
 template deserializeValue*(s: Serializer, j: JsonNode, name: string, val: untyped) =
-    var tmp = val
-    s.getDeserialized(j, name, tmp)
-    val = tmp
+    let jN = j{name}
+    if not jN.isNil:
+        var tmp = val
+        s.getDeserialized(j, name, tmp)
+        val = tmp
 
 proc save*(s: Serializer, n: JsonNode, path: string) =
     when not defined(js) and not defined(android) and not defined(ios):

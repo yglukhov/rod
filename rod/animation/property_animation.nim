@@ -4,7 +4,7 @@ import nimx.animation
 import nimx.property_visitor
 
 import variant
-import node, component, animation.animation_sampler
+import rod.node, rod.component, rod.animation.animation_sampler
 
 type
     AnimatedProperty* = ref object
