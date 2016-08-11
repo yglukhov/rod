@@ -275,6 +275,18 @@ type
         bStretch*: bool
         isWireframe: bool
 
+        uniformLocationCache*: seq[UniformLocation]
+        iUniform: int
+
+template getUniformLocation(gl: GL, t: Trail, name: cstring): UniformLocation =
+    inc t.iUniform
+    if t.uniformLocationCache.len - 1 < t.iUniform:
+        t.uniformLocationCache.add(gl.getUniformLocation(t.shader, name))
+    t.uniformLocationCache[t.iUniform]
+
+template setColorUniform(c: GraphicsContext, t: Trail, name: cstring, col: Color) =
+    c.setColorUniform(c.gl.getUniformLocation(t, name), col)
+
 proc cleanup(b: Buffer) =
     let c = currentContext()
     let gl = c.gl
@@ -372,6 +384,7 @@ template checkShader(t: Trail) =
         t.shader = TrailMatcapShaderMask
 
     currentContext().gl.useProgram(t.shader)
+    t.uniformLocationCache = @[]
 
 proc vertexData(t: Trail): seq[GLfloat] =
     var worldMat = t.node.worldTransform
@@ -589,6 +602,8 @@ method draw*(t: Trail) =
     let c = currentContext()
     let gl = c.gl
 
+    t.iUniform = -1
+
     # init
     if TrailShader == invalidProgram:
         TrailShader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
@@ -641,17 +656,17 @@ method draw*(t: Trail) =
         var theQuad {.noinit.}: array[4, GLfloat]
         gl.activeTexture(GLenum(int(gl.TEXTURE0)))
         gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(t.image, gl, theQuad))
-        gl.uniform4fv(gl.getUniformLocation(t.shader, "uTexUnitCoords"), theQuad)
-        gl.uniform1i(gl.getUniformLocation(t.shader, "texUnit"), 0.GLint)
-        gl.uniform1f(gl.getUniformLocation(t.shader, "uImagePercent"), t.imagePercent)
+        gl.uniform4fv(gl.getUniformLocation(t, "uTexUnitCoords"), theQuad)
+        gl.uniform1i(gl.getUniformLocation(t, "texUnit"), 0.GLint)
+        gl.uniform1f(gl.getUniformLocation(t, "uImagePercent"), t.imagePercent)
 
     if not t.matcap.isNil and t.matcap.isLoaded :
         var theQuad {.noinit.}: array[4, GLfloat]
         gl.activeTexture(GLenum(int(gl.TEXTURE0)+1))
         gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(t.matcap, gl, theQuad))
-        gl.uniform4fv(gl.getUniformLocation(t.shader, "uMatcapUnitCoords"), theQuad)
-        gl.uniform1i(gl.getUniformLocation(t.shader, "matcapUnit"), 1.GLint)
-        gl.uniform1f(gl.getUniformLocation(t.shader, "uMatcapPercent"), t.matcapPercent)
+        gl.uniform4fv(gl.getUniformLocation(t, "uMatcapUnitCoords"), theQuad)
+        gl.uniform1i(gl.getUniformLocation(t, "matcapUnit"), 1.GLint)
+        gl.uniform1f(gl.getUniformLocation(t, "uMatcapPercent"), t.matcapPercent)
 
 
     var modelMatrix = t.directRotation.toMatrix4
@@ -676,15 +691,15 @@ method draw*(t: Trail) =
         normalMatrix.transpose()
     else:
         normalMatrix.loadIdentity()
-    gl.uniformMatrix3fv(gl.getUniformLocation(t.shader, "normalMatrix"), false, normalMatrix)
+    gl.uniformMatrix3fv(gl.getUniformLocation(t, "normalMatrix"), false, normalMatrix)
 
-    gl.uniformMatrix4fv(gl.getUniformLocation(t.shader, "mvpMatrix"), false, mvpMatrix)
+    gl.uniformMatrix4fv(gl.getUniformLocation(t, "mvpMatrix"), false, mvpMatrix)
 
-    gl.uniformMatrix4fv(gl.getUniformLocation(t.shader, "mvMatrix"), false, mvMatrix)
+    gl.uniformMatrix4fv(gl.getUniformLocation(t, "mvMatrix"), false, mvMatrix)
 
-    gl.uniform1f(gl.getUniformLocation(t.shader, "uAlpha"), c.alpha)
+    gl.uniform1f(gl.getUniformLocation(t, "uAlpha"), c.alpha)
 
-    c.setColorUniform(t.shader, "uColor", t.color)
+    c.setColorUniform(t, "uColor", t.color)
 
     var drawVertices = t.quadsToDraw * 2
 
@@ -724,11 +739,12 @@ method draw*(t: Trail) =
         t.prevVertexData = vertexData
 
     template setupUniforms() =
-        gl.uniform1f(gl.getUniformLocation(t.shader, "uCropOffset"), t.cropOffset)
-        gl.uniform1f(gl.getUniformLocation(t.shader, "uLength"), t.totalLen)
+        gl.uniform1f(gl.getUniformLocation(t, "uCropOffset"), t.cropOffset)
+        gl.uniform1f(gl.getUniformLocation(t, "uLength"), t.totalLen)
 
     template singleBufferDraw(currBuff: DataInBuffer) =
-        t.buffers[currBuff.int].bindBuffer()
+        gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[currBuff.int].indexBuffer)
         updateLastVertex(currBuff)
         setupAttribArray()
         setupUniforms()

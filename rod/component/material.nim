@@ -142,23 +142,19 @@ type
         tempShaderMacroFlags: set[ShaderMacro]
         shaderMacroFlags: set[ShaderMacro]
         useManualShaderComposing*: bool
-        uniformLocationCache*: Table[cstring, UniformLocation]
+        uniformLocationCache*: seq[UniformLocation]
+        iUniform: int
 
 var shadersCache = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
 
-proc getUniformLocation*(gl: GL, m: Material, name: cstring): UniformLocation =
-    if not m.uniformLocationCache.hasKey(name):
-        m.uniformLocationCache[name] = gl.getUniformLocation(m.shader, name)
-    return m.uniformLocationCache[name]
+template getUniformLocation(gl: GL, m: Material, name: cstring): UniformLocation =
+    inc m.iUniform
+    if m.uniformLocationCache.len - 1 < m.iUniform:
+        m.uniformLocationCache.add(gl.getUniformLocation(m.shader, name))
+    m.uniformLocationCache[m.iUniform]
 
-proc setColorUniform(c: GraphicsContext, m: Material, name: cstring, col: Color) =
-    var ul: UniformLocation
-    if not m.uniformLocationCache.hasKey(name):
-        ul = c.gl.getUniformLocation(m.shader, name)
-        m.uniformLocationCache[name] = ul
-    else:
-        ul = m.uniformLocationCache[name]
-    c.setColorUniform(ul, col)
+template setColorUniform(c: GraphicsContext, m: Material, name: cstring, col: Color) =
+    c.setColorUniform(c.gl.getUniformLocation(m, name), col)
 
 proc hash(sm: set[ShaderMacro]): Hash =
     var sum = ""
@@ -443,7 +439,6 @@ proc newDefaultMaterial*(): Material =
     result.reflectionPercent = 1.0
     result.falloffPercent = 1.0
     result.maskPercent = 1.0
-    result.uniformLocationCache = initTable[cstring, UniformLocation]()
 
 proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
     let c = currentContext()
@@ -742,7 +737,6 @@ proc setupLightAttributes(m: Material, v: SceneView) =
                     m.shaderMacroFlags.incl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
                 else:
                     gl.uniform1f(gl.getUniformLocation(m.shader, "uAttenuation" & $lightsCount), ls.lightAttenuation)
-            # elif ls.lightConstantInited and ls.lightLinearInited and ls.lightQuadraticInited:
             else:
                 if not m.shaderMacroFlags.contains(WITH_LIGHT_DYNAMIC_ATTENUATION):
                     m.shaderMacroFlags.excl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
@@ -807,8 +801,8 @@ template setupTransform*(m: Material, n: Node) =
     c.setTransformUniform(m.shader) # setup modelViewProjectionMatrix
 
 proc createShader(m: Material) =
-    for key, val in mpairs m.uniformLocationCache:
-        m.uniformLocationCache.del(key)
+    m.uniformLocationCache = @[]
+    m.iUniform = -1
 
     let c = currentContext()
     let gl = c.gl
@@ -878,6 +872,8 @@ method initSetup*(m: Material) {.base.} = discard
 method updateSetup*(m: Material, n: Node) {.base.} =
     let c = currentContext()
     let gl = c.gl
+
+    m.iUniform = -1
 
     if (m.shader == invalidProgram or m.bShaderNeedUpdate) and not m.useManualShaderComposing:
         if m.shader != invalidProgram:
