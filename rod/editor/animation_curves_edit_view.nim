@@ -147,22 +147,7 @@ method onTouchEv*(v: AnimationCurvesEditView, e: var Event): bool =
     result = procCall v.AnimationChartView.onTouchEv(e)
 
 method onScroll*(v: AnimationCurvesEditView, e: var Event): bool =
-    when defined(macosx):
-        let zoomByY = not (alsoPressed(VirtualKey.LeftGUI) or alsoPressed(VirtualKey.RightGUI))
-    else:
-        let zoomByY = not (alsoPressed(VirtualKey.LeftControl) or alsoPressed(VirtualKey.RightControl))
-    let zoomByX = not (alsoPressed(VirtualKey.LeftShift) or alsoPressed(VirtualKey.RightShift))
-
-    let cp = v.localPointToCurve(e.localPosition)
-    let k = 1 + e.offset.y * 0.01
-    if zoomByX:
-        v.fromX = cp.x - (cp.x - v.fromX) * k
-        v.toX = cp.x + (v.toX - cp.x) * k
-    if zoomByY:
-        v.fromY = cp.y - (cp.y - v.fromY) * k
-        v.toY = cp.y + (v.toY - cp.y) * k
-
-    v.setNeedsDisplay()
+    v.processZoomEvent(e, true, true)
     result = true
 
 registerClass(AnimationCurvesEditView)

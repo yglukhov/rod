@@ -35,13 +35,17 @@ method draw*(v: DopesheetView, r: Rect) =
     for i, curve in v.curves:
         let rowMaxY = v.rowMaxY(i)
         for j in 0 ..< curve.numberOfKeys:
-            var p = v.curvePointToLocal(curve.keyPoint(j, dimension))
-            p.y = rowMaxY - v.rowHeight / 2
-            if i == v.selectedCurve and j == v.selectedKey:
-                c.fillColor = newColor(0.7, 0.7, 1)
-            else:
-                c.fillColor = newGrayColor(0.5)
-            c.drawEllipseInRect(rectAtPoint(p, 4))
+            let cp = curve.keyPoint(j, dimension)
+            if cp.x > v.toX:
+                break
+            elif cp.x >= v.fromX:
+                var p = v.curvePointToLocal(cp)
+                p.y = rowMaxY - v.rowHeight / 2
+                if i == v.selectedCurve and j == v.selectedKey:
+                    c.fillColor = newColor(0.7, 0.7, 1)
+                else:
+                    c.fillColor = newGrayColor(0.5)
+                c.drawEllipseInRect(rectAtPoint(p, 4))
         c.fillColor = v.gridColor
         c.drawRect(newRect(0, rowMaxY, v.bounds.width, 1))
 
@@ -72,11 +76,7 @@ method onTouchEv*(v: DopesheetView, e: var Event): bool =
     result = procCall v.AnimationChartView.onTouchEv(e)
 
 method onScroll*(v: DopesheetView, e: var Event): bool =
-    let cp = v.localPointToCurve(e.localPosition)
-    let k = 1 + e.offset.y * 0.01
-    v.fromX = cp.x - (cp.x - v.fromX) * k
-    v.toX = cp.x + (v.toX - cp.x) * k
-    v.setNeedsDisplay()
+    v.processZoomEvent(e, true, false)
     result = true
 
 method acceptsFirstResponder*(v: DopesheetView): bool = true
