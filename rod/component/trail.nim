@@ -23,6 +23,28 @@ import json
 
 const vertexShader = """
 attribute vec3 aPosition;
+attribute vec2 aTexCoord;
+
+varying vec2 vTexCoord;
+varying vec3 vNormal;
+varying vec3 vPosition;
+
+uniform mat4 mvpMatrix;
+uniform mat4 mvMatrix;
+uniform mat3 normalMatrix;
+
+void main() {
+    gl_Position = mvpMatrix * vec4(aPosition.xyz, 1.0);
+
+    vTexCoord = aTexCoord;
+
+    vec4 pos = mvMatrix * vec4(aPosition.xyz, 1.0);
+    vPosition = pos.xyz;
+}
+"""
+
+const vertexShaderWithNormal = """
+attribute vec3 aPosition;
 attribute vec3 aNormal;
 attribute vec2 aTexCoord;
 
@@ -52,7 +74,6 @@ precision mediump float;
 #endif
 
 varying vec3 vPosition;
-varying vec3 vNormal;
 varying vec2 vTexCoord;
 
 uniform sampler2D texUnit;
@@ -78,7 +99,6 @@ precision mediump float;
 #endif
 
 varying vec3 vPosition;
-varying vec3 vNormal;
 varying vec2 vTexCoord;
 
 uniform sampler2D texUnit;
@@ -187,17 +207,6 @@ void main() {
     matcapUV = vec2(matcapUV.x, 1.0 - matcapUV.y);
     vec4 matcap = texture2D(matcapUnit, uMatcapUnitCoords.xy + (uMatcapUnitCoords.zw - uMatcapUnitCoords.xy) * matcapUV) * uMatcapPercent;
     gl_FragColor = matcap * uColor * uAlpha;
-
-
-    //vec4 diffuse = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * uv);
-    //vec4 specular = vec4(1.0, 1.0, 1.0, 1.0);
-    //vec3 lightPosition = vec3(0,0,500);
-    //vec3 L = normalize(lightPosition.xyz - vPosition.xyz);
-    //vec3 E = normalize(-vPosition.xyz);
-    //vec3 R = normalize(-reflect(L, vNormal));
-    //diffuse.rgb *= max(dot(vNormal, L), 0.0);
-    //specular.rgb *= pow(max(dot(R, E), 0.0), 16.0);
-    //gl_FragColor = diffuse + specular;
 }
 """
 
@@ -208,7 +217,10 @@ var TrailMatcapShaderMask: ProgramRef
 
 const initialIndicesCount = 500
 const initialVerticesCount = 5 * initialIndicesCount
-const SINGLE_VERTEX_DATA_ELEMENTS = 16
+const POS_NORMAL_UV_ELEMENTS = 16
+const POS_UV_ELEMENTS = 10
+const IND_ELEMENTS = 2
+
 type
     Attrib = enum
         aPosition
@@ -259,6 +271,7 @@ type
 
         shader*: ProgramRef
 
+        currVertexData: seq[GLfloat]
         prevVertexData: seq[GLfloat]
 
         image*: Image
@@ -291,12 +304,10 @@ proc cleanup(b: Buffer) =
     let c = currentContext()
     let gl = c.gl
     if b.indexBuffer != invalidBuffer:
-        gl.bindBuffer(gl.ARRAY_BUFFER, b.indexBuffer)
         gl.deleteBuffer(b.indexBuffer)
         b.indexBuffer = invalidBuffer
 
     if b.vertexBuffer != invalidBuffer:
-        gl.bindBuffer(gl.ARRAY_BUFFER, b.vertexBuffer)
         gl.deleteBuffer(b.vertexBuffer)
         b.vertexBuffer = invalidBuffer
 
@@ -328,11 +339,11 @@ template releaseBuffer(b: Buffer) =
     if b.bActive:
         b.bActive = false
 
-proc tryAdd(b: Buffer, vertices: seq[GLfloat], indices: seq[GLushort]): bool =
-    let indcLen = indices.len()
+proc tryAdd(b: Buffer, vertices: openarray[GLfloat], indices: openarray[GLushort]): bool =
+    let indcLen = indices.len
     if (b.indices.curr + indcLen) > b.indices.max:
         return false
-    let vertLen = vertices.len()
+    let vertLen = vertices.len
     if (b.vertices.curr + vertLen) > b.vertices.max:
         return false
 
@@ -386,7 +397,7 @@ template checkShader(t: Trail) =
     currentContext().gl.useProgram(t.shader)
     t.uniformLocationCache = @[]
 
-proc vertexData(t: Trail): seq[GLfloat] =
+proc getVertexData(t: Trail, data: var openarray[GLfloat]) =
     var worldMat = t.node.worldTransform
     worldMat[12] = t.currPos[0]
     worldMat[13] = t.currPos[1]
@@ -395,45 +406,54 @@ proc vertexData(t: Trail): seq[GLfloat] =
     var left = worldMat * newVector3(0, -t.heightOffset/2.0, 0)
     var right = worldMat * newVector3(0, t.heightOffset/2.0, 0)
 
-    result = @[
-        left[0], left[1], left[2],
-        t.totalLen, 1.0,
-        right[0], right[1], right[2],
-        t.totalLen, 0.0
-    ]
+    var i = 0
+    template set(v: GLfloat) = data[i] = v; inc i
 
-proc vertexDataWithNormal(t: Trail): seq[GLfloat] =
-    var worldMat = t.node.worldTransform
-    worldMat[12] = t.currPos[0]
-    worldMat[13] = t.currPos[1]
-    worldMat[14] = t.currPos[2]
+    if not t.matcap.isNil:
+        var A = newVector3(t.prevVertexData[0], t.prevVertexData[1], t.prevVertexData[2])
+        var B = newVector3(t.prevVertexData[8], t.prevVertexData[9], t.prevVertexData[10])
+        var C = newVector3(left[0], left[1], left[2])
+        var normal = cross((A-B), (C-A))
+        normal.normalize()
 
-    var left = worldMat * newVector3(0, -t.heightOffset/2.0, 0)
-    var right = worldMat * newVector3(0, t.heightOffset/2.0, 0)
+        set left[0]
+        set left[1]
+        set left[2]
+        set normal[0]
+        set normal[1]
+        set normal[2]
+        set t.totalLen
+        set 1.0
+        set right[0]
+        set right[1]
+        set right[2]
+        set normal[0]
+        set normal[1]
+        set normal[2]
+        set t.totalLen
+        set 0.0
+    else:
+        set left[0]
+        set left[1]
+        set left[2]
+        set t.totalLen
+        set 1.0
+        set right[0]
+        set right[1]
+        set right[2]
+        set t.totalLen
+        set 0.0
 
-    var A = newVector3(t.prevVertexData[0], t.prevVertexData[1], t.prevVertexData[2])
-    var B = newVector3(t.prevVertexData[8], t.prevVertexData[9], t.prevVertexData[10])
-    var C = newVector3(left[0], left[1], left[2])
-    var normal = cross((A-B), (C-A))
-    normal.normalize()
-
-    result = @[
-        left[0], left[1], left[2],
-        normal[0], normal[1], normal[2],
-        t.totalLen, 1.0,
-        right[0], right[1], right[2],
-        normal[0], normal[1], normal[2],
-        t.totalLen, 0.0
-    ]
-
-proc indexData(t: Trail): seq[GLushort] =
-    result = @[
-        t.numberOfIndexes,
-        t.numberOfIndexes+1
-    ]
+proc getIndexData(t: Trail, data: var openarray[GLushort]) =
+    data[0] = t.numberOfIndexes
+    data[1] = t.numberOfIndexes+1
     t.numberOfIndexes += 2
 
 proc reset*(t: Trail) =
+    var vertexDataLen = if not t.matcap.isNil: POS_NORMAL_UV_ELEMENTS else: POS_UV_ELEMENTS
+    t.currVertexData = newSeq[GLfloat](vertexDataLen)
+    t.prevVertexData = newSeq[GLfloat](vertexDataLen)
+
     t.totalLen = 0.0
     t.cropOffset = 0.0
     t.currLength = 0.0
@@ -453,7 +473,9 @@ proc reset*(t: Trail) =
     t.currPos = t.node.worldPos() - t.gravityDirection
     t.prevPos = t.currPos
     t.prevRotation = t.node.rotation
-    t.prevVertexData = if not t.matcap.isNil: t.vertexDataWithNormal() else: t.vertexData()
+
+    t.getVertexData(t.currVertexData)
+    t.prevVertexData = t.currVertexData
 
     t.buffers[First.int].bValidData = false
     t.buffers[First.int].indices.curr = 0
@@ -462,11 +484,12 @@ proc reset*(t: Trail) =
     t.buffers[Second.int].indices.curr = 0
     t.buffers[Second.int].vertices.curr = 0
 
-    var vertexData = if not t.matcap.isNil: t.vertexDataWithNormal() else: t.vertexData()
-    var initialIndexData = t.indexData()
-    var offsetIndexData = t.indexData()
+    var initialIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
+    t.getIndexData(initialIndexData)
+    var offsetIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
+    t.getIndexData(offsetIndexData)
 
-    if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, initialIndexData) and t.buffers[t.currBuff.int].tryAdd(vertexData, offsetIndexData):
+    if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, initialIndexData) and t.buffers[t.currBuff.int].tryAdd(t.currVertexData, offsetIndexData):
         t.buffers[t.currBuff.int].bValidData = true
 
     t.checkShader()
@@ -511,7 +534,8 @@ method init*(t: Trail) =
     t.angleThreshold = 0.01
     t.quadsToDraw = 150
 
-    t.prevVertexData = newSeq[GLfloat](SINGLE_VERTEX_DATA_ELEMENTS)
+    t.currVertexData = newSeq[GLfloat](POS_NORMAL_UV_ELEMENTS)
+    t.prevVertexData = newSeq[GLfloat](POS_NORMAL_UV_ELEMENTS)
 
     t.gravityDirection = newVector3(0,0,0)
     t.directRotation = newQuaternion(0,0,0,1)
@@ -565,10 +589,12 @@ proc emitQuad(t: Trail) =
     if t.totalLen > t.widthOffset and not t.bStretch:
         t.cropOffset += t.currLength
 
-    var vertexData = if not t.matcap.isNil: t.vertexDataWithNormal() else: t.vertexData()
-    var indexData = t.indexData()
+    t.getVertexData(t.currVertexData)
 
-    if t.buffers[t.currBuff.int].tryAdd(vertexData, indexData):
+    var indexData {.noinit.}: array[IND_ELEMENTS, GLushort]
+    t.getIndexData(indexData)
+
+    if t.buffers[t.currBuff.int].tryAdd(t.currVertexData, indexData):
         t.buffers[t.currBuff.int].bValidData = true
     else:
         if t.currBuff == First:
@@ -581,10 +607,13 @@ proc emitQuad(t: Trail) =
 
         t.numberOfIndexes = 0
 
-        var initialIndexData = t.indexData()
-        var offsetIndexData = t.indexData()
+        var initialIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
+        t.getIndexData(initialIndexData)
+        var offsetIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
+        t.getIndexData(offsetIndexData)
 
-        if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, initialIndexData) and t.buffers[t.currBuff.int].tryAdd(vertexData, offsetIndexData):
+        if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, initialIndexData) and
+           t.buffers[t.currBuff.int].tryAdd(t.currVertexData, offsetIndexData):
             t.buffers[t.currBuff.int].bValidData = true
 
     if t.currBuff == First:
@@ -607,9 +636,9 @@ method draw*(t: Trail) =
     # init
     if TrailShader == invalidProgram:
         TrailShader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
-        TrailTextureShader = gl.newShaderProgram(vertexShader, fragmentShaderTexture, [(aPosition.GLuint, $aPosition), (aNormal.GLuint, $aNormal), (aTexCoord.GLuint, $aTexCoord)])
-        TrailMatcapShader = gl.newShaderProgram(vertexShader, fragmentShaderMatcap, [(aPosition.GLuint, $aPosition), (aNormal.GLuint, $aNormal), (aTexCoord.GLuint, $aTexCoord)])
-        TrailMatcapShaderMask = gl.newShaderProgram(vertexShader, fragmentShaderMatcapMask, [(aPosition.GLuint, $aPosition), (aNormal.GLuint, $aNormal), (aTexCoord.GLuint, $aTexCoord)])
+        TrailTextureShader = gl.newShaderProgram(vertexShader, fragmentShaderTexture, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
+        TrailMatcapShader = gl.newShaderProgram(vertexShaderWithNormal, fragmentShaderMatcap, [(aPosition.GLuint, $aPosition), (aNormal.GLuint, $aNormal), (aTexCoord.GLuint, $aTexCoord)])
+        TrailMatcapShaderMask = gl.newShaderProgram(vertexShaderWithNormal, fragmentShaderMatcapMask, [(aPosition.GLuint, $aPosition), (aNormal.GLuint, $aNormal), (aTexCoord.GLuint, $aTexCoord)])
         if TrailShader == invalidProgram or TrailTextureShader == invalidProgram or TrailMatcapShader == invalidProgram or TrailMatcapShaderMask == invalidProgram:
             return
         t.checkShader()
@@ -631,7 +660,7 @@ method draw*(t: Trail) =
         t.checkShader()
 
     # check transform
-    t.gravityDirection += t.gravity
+    t.gravityDirection += t.gravity * getDeltaTime()
 
     t.prevPos = t.currPos
     t.currPos = t.node.worldPos() - t.gravityDirection
@@ -691,14 +720,11 @@ method draw*(t: Trail) =
         normalMatrix.transpose()
     else:
         normalMatrix.loadIdentity()
+
     gl.uniformMatrix3fv(gl.getUniformLocation(t, "normalMatrix"), false, normalMatrix)
-
     gl.uniformMatrix4fv(gl.getUniformLocation(t, "mvpMatrix"), false, mvpMatrix)
-
     gl.uniformMatrix4fv(gl.getUniformLocation(t, "mvMatrix"), false, mvMatrix)
-
     gl.uniform1f(gl.getUniformLocation(t, "uAlpha"), c.alpha)
-
     c.setColorUniform(t, "uColor", t.color)
 
     var drawVertices = t.quadsToDraw * 2
@@ -728,15 +754,14 @@ method draw*(t: Trail) =
 
         if t.totalLen > t.widthOffset and not t.bStretch:
             t.cropOffset += t.currLength
-        var vertexData = if not t.matcap.isNil: t.vertexDataWithNormal() else: t.vertexData()
 
-        if t.buffers[currBuff.int].vertices.curr > vertexData.len:
-            gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
-            gl.bufferSubData(gl.ARRAY_BUFFER, ((t.buffers[currBuff.int].vertices.curr - vertexData.len) * sizeof(GLfloat)).int32, vertexData)
+        t.getVertexData(t.prevVertexData)
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
+        if t.buffers[currBuff.int].vertices.curr > t.prevVertexData.len:
+            gl.bufferSubData(gl.ARRAY_BUFFER, ((t.buffers[currBuff.int].vertices.curr - t.prevVertexData.len) * sizeof(GLfloat)).int32, t.prevVertexData)
         else:
-            gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
-            gl.bufferSubData(gl.ARRAY_BUFFER, 0.int32, vertexData)
-        t.prevVertexData = vertexData
+            gl.bufferSubData(gl.ARRAY_BUFFER, 0.int32, t.prevVertexData)
 
     template setupUniforms() =
         gl.uniform1f(gl.getUniformLocation(t, "uCropOffset"), t.cropOffset)
@@ -761,7 +786,8 @@ method draw*(t: Trail) =
         if indicesCount <= 0:
             t.buffers[currBuff.int].bValidData = false
         else:
-            t.buffers[currBuff.int].bindBuffer()
+            gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
+            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[currBuff.int].indexBuffer)
             setupAttribArray()
             setupUniforms()
             let indicesOffset = t.buffers[currBuff.int].indices.curr - indicesCount
