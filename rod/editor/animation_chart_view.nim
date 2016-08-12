@@ -144,7 +144,7 @@ method onTouchEv*(v: AnimationChartView, e: var Event): bool =
         else:
             v.mouseTrackingHandler = nil
 
-method onScroll*(v: AnimationChartView, e: var Event): bool =
+proc processZoomEvent*(v: AnimationChartView, e: var Event, allowZoomX, allowZoomY: bool) =
     when defined(macosx):
         let zoomByY = not (alsoPressed(VirtualKey.LeftGUI) or alsoPressed(VirtualKey.RightGUI))
     else:
@@ -153,12 +153,14 @@ method onScroll*(v: AnimationChartView, e: var Event): bool =
 
     let cp = v.localPointToCurve(e.localPosition)
     let k = 1 + e.offset.y * 0.01
-    if zoomByX:
+    if zoomByX and allowZoomX:
         v.fromX = cp.x - (cp.x - v.fromX) * k
         v.toX = cp.x + (v.toX - cp.x) * k
-    if zoomByY:
+        if v.fromX < 0:
+            v.toX += -v.fromX
+            v.fromX = 0
+    if zoomByY and allowZoomY:
         v.fromY = cp.y - (cp.y - v.fromY) * k
         v.toY = cp.y + (v.toY - cp.y) * k
 
     v.setNeedsDisplay()
-    result = true

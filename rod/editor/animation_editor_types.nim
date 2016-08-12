@@ -10,6 +10,9 @@ type
     AnimationCurve*[T] = ref object of AbstractAnimationCurve
         sampler*: BezierKeyFrameAnimationSampler[T]
 
+method getSampler*(a: AbstractAnimationCurve): AbstractAnimationSampler {.base.} = nil
+method getSampler*[T](a: AnimationCurve[T]): AbstractAnimationSampler = a.sampler
+
 method numberOfKeys*(c: AbstractAnimationCurve): int {.base.} = 0
 method numberOfKeys*[T](c: AnimationCurve[T]): int = c.sampler.keys.len
 

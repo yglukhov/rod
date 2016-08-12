@@ -257,7 +257,7 @@ proc drawStroke(t: Text, point: Point) =
     t.gradientAndStrokeShader.bindShader()
 
     t.gradientAndStrokeShader.setUniform("fillColor", t.strokeColor)
-    t.gradientAndStrokeShader.setUniform("strokeSize", t.strokeSize * t.font.scale / 15)
+    t.gradientAndStrokeShader.setUniform("strokeSize", t.strokeSize / 15)
     t.gradientAndStrokeShader.setTransformUniform()
 
     if t.isStrokeGradient:

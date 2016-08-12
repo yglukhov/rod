@@ -8,7 +8,6 @@ import nimx.image
 import nimx.portable_gl
 
 import quaternion
-import meta_data
 
 const maxLightsCount* = 8
 
@@ -54,6 +53,7 @@ type
         mCamera*: Camera
         mRootNode*: Node3D
         animationRunner*: AnimationRunner
+        deltaTimeAnimation*: Animation
         #view*: View
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int

@@ -123,6 +123,9 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
         gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
         m.vboData.numberOfIndices = indexData.len.GLsizei
 
+        gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+
     if currentContext().isNil:
         m.loadFunc = loadFunc
     else:
