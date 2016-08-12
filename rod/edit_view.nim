@@ -4,7 +4,7 @@ import strutils
 
 import nimx.view
 import nimx.types
-import nimx.button
+import nimx.button, nimx.popup_button
 import nimx.outline_view
 import nimx.toolbar
 import nimx.font
@@ -95,6 +95,7 @@ type Editor* = ref object
     cameraController*: EditorCameraController
     gizmo: Node
     gizmoAxis: Vector3
+    cameraSelector: PopupButton
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -128,6 +129,25 @@ proc getTreeViewIndexPathForNode(editor: Editor, n: Node3D, indexPath: var seq[i
 
     editor.getTreeViewIndexPathForNode(parent, indexPath)
 
+proc updateCameraSelector(e: Editor) =
+    var items = newSeq[string]()
+    var i = 0
+    var selectedIndex = -1
+    discard e.rootNode.findNode() do(n: Node) -> bool:
+        let cam = n.componentIfAvailable(Camera)
+        if not cam.isNil:
+            if not n.name.isNil:
+                if cam == n.sceneView.camera:
+                    selectedIndex = i
+                items.add(n.name)
+                inc i
+    e.cameraSelector.items = items
+    e.cameraSelector.selectedIndex = selectedIndex
+
+proc sceneTreeDidChange(e: Editor) =
+    e.outlineView.reloadData()
+    e.updateCameraSelector()
+
 when not defined(js) and not defined(android) and not defined(ios):
     import os
 import streams
@@ -153,7 +173,7 @@ proc loadNode(editor: Editor): bool =
                 editor.selectedNode.addChild(ln)
             else:
                 editor.rootNode.addChild(ln)
-            editor.outlineView.reloadData()
+            editor.sceneTreeDidChange()
             return true
 
     return false
@@ -237,7 +257,7 @@ proc newTreeView(e: Editor): PanelView =
         else:
             f.removeFromParent()
             t.insertChild(f, toIndex)
-        outlineView.reloadData()
+        e.sceneTreeDidChange()
 
     outlineView.reloadData()
 
@@ -258,7 +278,7 @@ proc newTreeView(e: Editor): PanelView =
         outlineView.expandRow(sip)
         discard n.newChild("New Node")
         sip.add(n.children.len - 1)
-        outlineView.reloadData()
+        e.sceneTreeDidChange()
         outlineView.selectItemAtIndexPath(sip)
     result.addSubview(createNodeButton)
 
@@ -272,14 +292,14 @@ proc newTreeView(e: Editor): PanelView =
             var sip = outlineView.selectedIndexPath
             sip.delete(sip.len-1)
             outlineView.selectItemAtIndexPath(sip)
-            outlineView.reloadData()
+            e.sceneTreeDidChange()
     result.addSubview(deleteNodeButton)
 
     let refreshButton = Button.new(newRect(46, result.bounds.height - 20, 60, 20))
     refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     refreshButton.title = "Refresh"
     refreshButton.onAction do():
-        outlineView.reloadData()
+        e.sceneTreeDidChange()
     result.addSubview(refreshButton)
 
 import tables
@@ -362,7 +382,7 @@ proc createOpenAndSaveButtons(e: Editor) =
                 if not isNil(path) and path != "":
                     loadSceneAsync path, proc(n: Node) =
                         p.addChild(n)
-                        e.outlineView.reloadData()
+                        e.sceneTreeDidChange()
 
         when not defined(js) and not defined(android) and not defined(ios):
             e.newToolbarButton("Save J").onAction do():
@@ -387,6 +407,19 @@ proc createToggleAnimationEditorButton(e: Editor) =
             e.toolbar.window.addSubview(e.animationEditPanel)
         else:
             e.animationEditPanel.removeFromSuperview()
+
+proc createCameraSelector(e: Editor) =
+    e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
+    e.updateCameraSelector()
+    e.toolbar.addSubview(e.cameraSelector)
+
+    e.cameraSelector.onAction do():
+        if e.cameraSelector.selectedIndex >= 0:
+            let n = e.rootNode.findNode(e.cameraSelector.selectedItem)
+            if not n.isNil:
+                let cam = n.componentIfAvailable(Camera)
+                if not cam.isNil:
+                    e.rootNode.sceneView.camera = cam
 
 proc createChangeBackgroundColorButton(e: Editor) =
     var cPicker: ColorPickerView
@@ -451,6 +484,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()
     editor.createToggleAnimationEditorButton()
+    editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
 
     v.window.addSubview(editor.inspector)

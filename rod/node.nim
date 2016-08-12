@@ -430,7 +430,7 @@ proc loadComposition*(n: Node, j: JsonNode) =
     let serializer = Serializer.new()
     n.deserialize(j, serializer)
 
-import ae_animation
+import rod.animation.property_animation
 
 # proc deserialize*(n: Node, s: Serializer) =
 #     proc toValue(j: JsonNode, s: var string) =
@@ -471,7 +471,7 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if not animations.isNil and animations.len > 0:
         n.animations = newTable[string, Animation]()
         for k, v in animations:
-            n.animations[k] = animationWithAEJson(n, v)
+            n.animations[k] = newPropertyAnimation(n, v)
 
     let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):

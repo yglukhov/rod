@@ -9,6 +9,11 @@ import rod.quaternion
 
 type File = after_effects.File
 
+const exportSampledAnimations = true
+const exportKeyframeAnimations = false
+
+const useObsoleteNullLayerCheck = false # Flip this if you have problems with exporting null layers
+
 proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item], typeName: string): seq[t] =
     for i in collection:
         if i.jsObjectType == typeName:
@@ -75,6 +80,16 @@ proc `%`[T: string | SomeNumber](s: openarray[T]): JsonNode =
     result = newJArray()
     for c in s: result.add(%c)
 
+proc isSolidLayer(layer: Layer): bool =
+    let source = FootageItem(layer.source)
+    when useObsoleteNullLayerCheck:
+        ($source.name).find("Null") != 0 and
+            not source.mainSource.isNil and
+            source.mainSource.jsObjectType == "SolidSource"
+    else:
+        not layer.nullLayer and not source.mainSource.isNil and
+            source.mainSource.jsObjectType == "SolidSource"
+
 proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJObject()
     var source = layer.source
@@ -107,9 +122,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                 var sprite = newJObject()
                 sprite["fileNames"] = imageFileRelativeExportPaths
                 result["Sprite"] = sprite
-            elif ($source.name).find("Null") != 0 and
-                    not footageSource.mainSource.isNil and
-                    footageSource.mainSource.jsObjectType == "SolidSource": # Solid source
+            elif layer.isSolidLayer:
                 var solid = newJObject()
                 let solidSource = SolidSource(footageSource.mainSource)
                 solid["color"] = %* solidSource.color
@@ -225,7 +238,7 @@ proc exportPath(c: Item): string =
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
 
-    logi ("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
+    logi("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
 
     result["name"] = % layer.mangledName
     result["translation"] = % layer.property("Position", Vector3).valueAtTime(0)
@@ -289,7 +302,10 @@ type Marker = object
     animation_end*: string
 
 proc getMarkers(comp: Composition): seq[Marker] =
-    result = newSeq[Marker]()
+    result = @[]
+
+    const undoGroupId = "__rod_export_script_undo_group__"
+    app.beginUndoGroup(undoGroupId)
     let tempLayer = comp.layers.addText()
 
     let tempText = tempLayer.propertyGroup("Text").property("Source Text", TextDocument)
@@ -305,7 +321,8 @@ proc getMarkers(comp: Composition): seq[Marker] =
           time: markerTime,
           comment: markerComment
         ))
-    tempLayer.remove()
+    app.endUndoGroup()
+    app.undo(undoGroupId)
 
 proc parseMarkerComment(comment: string, res: var Marker) =
     for ln in comment.splitLines:
@@ -319,27 +336,25 @@ proc parseMarkerComment(comment: string, res: var Marker) =
             of "animation_end": res.animation_end = v
             else: logi "Unknown marker key: ", k
 
-proc getAnimationEndMarkers(comp: Composition): seq[Marker] =
-    var markers = getMarkers(comp)
-
-    result = newSeq[Marker]()
-    for i in 0 ..< markers.len:
-        parseMarkerComment(markers[i].comment, markers[i])
-        if markers[i].animation_end.len > 0:
-            result.add(markers[i])
-
+proc getAnimationEndMarkersFromMarkers(markers: openarray[Marker]): seq[Marker] =
+    result = @[]
+    for m in markers:
+        if m.animation_end.len > 0:
+            result.add(m)
 
 proc getAnimationMarkers(comp: Composition): seq[Marker] =
     var markers = getMarkers(comp)
-    var end_markers = getAnimationEndMarkers(comp)
-
-    result = newSeq[Marker]()
     for i in 0 ..< markers.len:
         parseMarkerComment(markers[i].comment, markers[i])
-        if markers[i].animation.len == 0:
-            logi "WARNING: Marker ignored: ", markers[i].comment
+
+    var end_markers = getAnimationEndMarkersFromMarkers(markers)
+
+    result = @[]
+    for m in markers:
+        if m.animation.len == 0:
+            logi "WARNING: Marker ignored: ", m.comment
         else:
-            result.add(markers[i])
+            result.add(m)
 
     if result.len > 0:
         for i in 0 ..< result.len - 1:
@@ -347,13 +362,44 @@ proc getAnimationMarkers(comp: Composition): seq[Marker] =
 
         result[^1].duration = comp.duration - result[^1].time
 
-
     for em in end_markers:
         for i in 0 ..< result.len:
             if em.animation_end == result[i].animation:
                 doAssert(em.time > result[i].time)
                 result[i].duration = em.time - result[i].time
 
+proc jsonPropertyKeyValueAccessor(p: AbstractProperty): proc(k: int): JsonNode =
+    case $p.name
+    of "Rotation":
+        let cp = p.toPropertyOfType(float)
+        result = proc(k: int): JsonNode =
+            % quaternionWithZRotation(cp.keyValue(k))
+    of "Scale":
+        let cp = p.toPropertyOfType(Vector3)
+        result = proc(k: int): JsonNode =
+            % (cp.keyValue(k) / 100)
+    of "Opacity":
+        let cp = p.toPropertyOfType(float)
+        result = proc(k: int): JsonNode =
+            % (cp.keyValue(k) / 100)
+    else:
+        case p.propertyValueType
+        of pvt2d, pvt2dSpatial:
+            let cp = p.toPropertyOfType(Vector2)
+            result = proc(k: int): JsonNode =
+                % (cp.keyValue(k))
+
+        of pvt3d, pvt3dSpatial:
+            let cp = p.toPropertyOfType(Vector3)
+            result = proc(k: int): JsonNode =
+                % (cp.keyValue(k))
+
+        of pvt1d:
+            let cp = p.toPropertyOfType(float)
+            result = proc(k: int): JsonNode =
+                % (cp.keyValue(k))
+        else:
+            raise newException(Exception, "Unknown property type to convert: " & $p.propertyValueType)
 
 proc jsonPropertyAccessor(p: AbstractProperty): proc(t: float): JsonNode =
     case $p.name
@@ -389,6 +435,14 @@ proc jsonPropertyAccessor(p: AbstractProperty): proc(t: float): JsonNode =
         else:
             raise newException(Exception, "Unknown property type to convert: " & $p.propertyValueType)
 
+proc `%`(e: KeyframeEase): JsonNode =
+    const c = 0.66
+    let y = e.speed * (e.influence / 100) * c
+    result = %*[
+        e.influence / 100,
+        y
+    ]
+
 proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
     var animationStartTime = marker.time
     var animationEndTime = marker.time + marker.duration;
@@ -401,24 +455,58 @@ proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
     # return null;
     #}
 
-    var fps = 30.0;
-    var timeStep = 1.0 / fps;
-    var sampledPropertyValues = newJArray()
-    var accessor = jsonPropertyAccessor(prop)
-
-    var dEndTime = animationEndTime - 0.0001; # Due to floating point errors, we
-    # may hit end time, so prevent that.
-
-    var s = animationStartTime
-    while s < dEndTime:
-        sampledPropertyValues.add(accessor(s))
-        s += timeStep
-    #  logi(JSON.stringify(sampledPropertyValues));
-    #  sampledPropertyValues.push(converter(prop.valueAtTime(animationEndTime, false)));
-
     result = newJObject()
+
+    when exportKeyframeAnimations:
+        let nk = prop.numKeys
+        logi "prop: ", prop.name
+        logi "nk: ", nk
+        var keys = newJArray()
+
+        let lastKeyTime = prop.keyTime(prop.numKeys)
+
+        let keyValueAccessor = jsonPropertyKeyValueAccessor(prop)
+
+        for i in 1 .. nk:
+    #        const c = 0.66
+            # let oe = prop.keyOutTemporalEase(i)[0]
+            # let outY = oe.speed * (oe.influence / 100) * c
+            # let ie = prop.keyInTemporalEase(i)[0]
+            # let inY = - ie.speed * (ie.influence / 100) * c
+            let inEase = prop.keyInTemporalEase(i)
+            let outEase = prop.keyOutTemporalEase(i)
+            if inEase.len != 1 or outEase.len != 1:
+                logi "ERROR: Too many eases. Exported file might not be valid."
+            let key = %*{
+                "ie": inEase[0],
+                "oe": outEase[0],
+                "p": prop.keyTime(i) / lastKeyTime,
+                "v": keyValueAccessor(i)
+            }
+            keys.add(key)
+
+            # logi i, " in: ", inY
+            # logi i, " out: ", outY
+        result["keys"] = keys
+
+    when exportSampledAnimations:
+        var fps = 30.0;
+        var timeStep = 1.0 / fps;
+        var sampledPropertyValues = newJArray()
+        var accessor = jsonPropertyAccessor(prop)
+
+        var dEndTime = animationEndTime - 0.0001; # Due to floating point errors, we
+        # may hit end time, so prevent that.
+
+        var s = animationStartTime
+        while s < dEndTime:
+            sampledPropertyValues.add(accessor(s))
+            s += timeStep
+        #  logi(JSON.stringify(sampledPropertyValues));
+        #  sampledPropertyValues.push(converter(prop.valueAtTime(animationEndTime, false)));
+        result["values"] = sampledPropertyValues
+
     result["duration"] = %(animationEndTime - animationStartTime)
-    result["values"] = sampledPropertyValues
     if marker.loops != 0: result["numberOfLoops"] = %marker.loops
 
 proc mapPropertyName(name: string): string =

@@ -29,17 +29,23 @@ method draw*(v: DopesheetView, r: Rect) =
     let c = currentContext()
     v.drawGrid()
 
+    let dimension = 0
+
     c.strokeWidth = 0
     for i, curve in v.curves:
         let rowMaxY = v.rowMaxY(i)
-        for j, k in curve.keys:
-            var p = v.curvePointToLocal(k.point)
-            p.y = rowMaxY - v.rowHeight / 2
-            if i == v.selectedCurve and j == v.selectedKey:
-                c.fillColor = newColor(0.7, 0.7, 1)
-            else:
-                c.fillColor = newGrayColor(0.5)
-            c.drawEllipseInRect(rectAtPoint(p, 4))
+        for j in 0 ..< curve.numberOfKeys:
+            let cp = curve.keyPoint(j, dimension)
+            if cp.x > v.toX:
+                break
+            elif cp.x >= v.fromX:
+                var p = v.curvePointToLocal(cp)
+                p.y = rowMaxY - v.rowHeight / 2
+                if i == v.selectedCurve and j == v.selectedKey:
+                    c.fillColor = newColor(0.7, 0.7, 1)
+                else:
+                    c.fillColor = newGrayColor(0.5)
+                c.drawEllipseInRect(rectAtPoint(p, 4))
         c.fillColor = v.gridColor
         c.drawRect(newRect(0, rowMaxY, v.bounds.width, 1))
 
@@ -48,10 +54,12 @@ method draw*(v: DopesheetView, r: Rect) =
 
 proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
     result = proc(e: Event): bool =
+        let dimension = 0
+
         for i, curve in v.curves:
             let rowMaxY = v.rowMaxY(i)
-            for j, k in curve.keys:
-                var p = v.curvePointToLocal(k.point)
+            for j in 0 ..< curve.numberOfKeys:
+                var p = v.curvePointToLocal(curve.keyPoint(j, dimension))
                 p.y = rowMaxY - v.rowHeight / 2
                 if e.localPosition.inRect(rectAtPoint(p, 4)):
                     v.selectedCurve = i
@@ -68,19 +76,15 @@ method onTouchEv*(v: DopesheetView, e: var Event): bool =
     result = procCall v.AnimationChartView.onTouchEv(e)
 
 method onScroll*(v: DopesheetView, e: var Event): bool =
-    let cp = v.localPointToCurve(e.localPosition)
-    let k = 1 + e.offset.y * 0.01
-    v.fromX = cp.x - (cp.x - v.fromX) * k
-    v.toX = cp.x + (v.toX - cp.x) * k
-    v.setNeedsDisplay()
+    v.processZoomEvent(e, true, false)
     result = true
 
 method acceptsFirstResponder*(v: DopesheetView): bool = true
 
 method onKeyDown*(v: DopesheetView, e: var Event): bool =
     if e.keyCode == VirtualKey.Delete:
-        if v.selectedCurve < v.curves.len and v.selectedKey < v.curves[v.selectedCurve].keys.len:
-            v.curves[v.selectedCurve].keys.delete(v.selectedKey)
+        if v.selectedCurve < v.curves.len and v.selectedKey < v.curves[v.selectedCurve].numberOfKeys:
+            v.curves[v.selectedCurve].deleteKey(v.selectedKey)
             v.setNeedsDisplay()
             result = true
 

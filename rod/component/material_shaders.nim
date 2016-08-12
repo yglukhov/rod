@@ -258,9 +258,7 @@ uniform float uAttenuation7;
 uniform vec4 uLightColor7;
 #endif
 
-uniform vec4 uCamPosition;
-
-const float mipBias = -1000.0;
+#define mipBias -1000.0
 
 mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
     vec3 dp1 = vec3(dFdx(p.x),dFdx(p.y),dFdx(p.z));

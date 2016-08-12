@@ -1,80 +1,132 @@
 import algorithm
-import nimx.types, nimx.animation
+import nimx.types, nimx.matrixes, nimx.animation, nimx.property_visitor
+import variant
+
+import rod.animation.animation_sampler
 
 type
-    KeyFrame* = object
-        p*: float
-        v*: float
-        inTangent*: Point
-        outTangent*: Point
-
-    AnimationCurve* = ref object
-        keys*: seq[KeyFrame]
+    AbstractAnimationCurve* = ref object of RootObj
         color*: Color
+    AnimationCurve*[T] = ref object of AbstractAnimationCurve
+        sampler*: BezierKeyFrameAnimationSampler[T]
 
-proc point*(k: KeyFrame): Point = newPoint(k.p, k.v)
-proc inTangentAbs*(k: KeyFrame): Point = k.point + k.inTangent
-proc outTangentAbs*(k: KeyFrame): Point = k.point + k.outTangent
+method getSampler*(a: AbstractAnimationCurve): AbstractAnimationSampler {.base.} = nil
+method getSampler*[T](a: AnimationCurve[T]): AbstractAnimationSampler = a.sampler
 
-proc `point=`*(k: var KeyFrame, p: Point) =
-    k.p = p.x
-    k.v = p.y
+method numberOfKeys*(c: AbstractAnimationCurve): int {.base.} = 0
+method numberOfKeys*[T](c: AnimationCurve[T]): int = c.sampler.keys.len
 
-proc newAnimationCurve*(): AnimationCurve =
-    result.new()
-    result.keys = @[]
-
-proc addKey*(c: AnimationCurve, p, v: float) =
-    var k: KeyFrame
-    k.p = p
-    k.v = v
-    k.inTangent = newPoint(-0.5, 50)
-    k.outTangent = newPoint(0.5, -50)
-    let lb = lowerBound(c.keys, k) do(a, b: KeyFrame) -> int:
-        cmp(a.p, b.p)
-    c.keys.insert(k, lb)
-
-proc valueAtPos*(c: AnimationCurve, p: float): float =
-    let s = c
-    if p < 0:
-        return s.keys[0].v
-    elif p > 1:
-        return s.keys[^1].v
-
-    var k : KeyFrame
-    k.p = p
-    let lb = lowerBound(s.keys, k) do(a, b: KeyFrame) -> int:
-        cmp(a.p, b.p)
-
-    if lb >= s.keys.len: return s.keys[^1].v
-
-    var a, b : int
-    if p < s.keys[lb].p:
-        if lb == 0: return s.keys[0].v
-        a = lb - 1
-        b = lb
-    elif p > s.keys[lb].p:
-        a = lb
-        b = lb + 1
+method numberOfDimensions*(c: AbstractAnimationCurve): int {.base.} = 0
+method numberOfDimensions*[T](c: AnimationCurve[T]): int =
+    when T is Coord | int:
+        1
+    elif T is Vector2:
+        2
+    elif T is Vector3:
+        3
+    elif T is Vector4:
+        4
     else:
-        return s.keys[lb].v
+        {.error: "Unknown type".}
 
-    let temporalLength = s.keys[b].p - s.keys[a].p
-    let normalizedP = (p - s.keys[a].p) / temporalLength
+method keyTime*(c: AbstractAnimationCurve, i: int): float {.base.} = 0
+method keyTime*[T](c: AnimationCurve[T], i: int): float = c.sampler.keys[i].p
 
-    let spacialLength = abs(s.keys[b].v - s.keys[a].v)
+method setKeyTime*(c: AbstractAnimationCurve, i: int, t: float) {.base.} = discard
+method setKeyTime*[T](c: AnimationCurve[T], i: int, t: float) = c.sampler.keys[i].p = t
 
-    # echo "a: ", s.keys[a].v
-    # echo "b: ", s.keys[b].v
-    # echo "len: ", spacialLength
-    # echo "1: ", s.keys[a].outTangent.x / temporalLength, ", ", s.keys[a].outTangent.y / spacialLength
-    # echo "2: ", -s.keys[b].inTangent.x / temporalLength, ", ", s.keys[b].inTangent.y / spacialLength
-    # echo "p: ", normalizedP
-    result = bezierXForProgress(s.keys[a].outTangent.x / temporalLength,
-                        s.keys[a].outTangent.y / spacialLength,
-                        -s.keys[b].inTangent.x / temporalLength,
-                        s.keys[b].inTangent.y / spacialLength,
-                        normalizedP)
-    result = s.keys[a].v + result * spacialLength
-    # echo "result: ", result
-    #result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)
+method keyInTangent*(c: AbstractAnimationCurve, i: int): Point {.base.} = zeroPoint
+method keyInTangent*[T](c: AnimationCurve[T], i: int): Point = newPoint(c.sampler.keys[i].inX, c.sampler.keys[i].inY)
+
+method setKeyInTangent*(c: AbstractAnimationCurve, i: int, p: Point) {.base.} = discard
+method setKeyInTangent*[T](c: AnimationCurve[T], i: int, p: Point) =
+    c.sampler.keys[i].inX = p.x
+    c.sampler.keys[i].inY = p.y
+
+method keyOutTangent*(c: AbstractAnimationCurve, i: int): Point {.base.} = zeroPoint
+method keyOutTangent*[T](c: AnimationCurve[T], i: int): Point = newPoint(c.sampler.keys[i].outX, c.sampler.keys[i].outY)
+
+method setKeyOutTangent*(c: AbstractAnimationCurve, i: int, p: Point) {.base.} = discard
+method setKeyOutTangent*[T](c: AnimationCurve[T], i: int, p: Point) =
+    c.sampler.keys[i].outX = p.x
+    c.sampler.keys[i].outY = p.y
+
+method keyValue*(c: AbstractAnimationCurve, iKey, iDimension: int): Coord {.base.} = 0
+method keyValue*[T](c: AnimationCurve[T], iKey, iDimension: int): Coord =
+    when T is Coord | int:
+        Coord(c.sampler.keys[iKey].v)
+    elif T is Vector2 | Vector3 | Vector4:
+        Coord(c.sampler.keys[iKey].v[iDimension])
+    else:
+        {.error: "Unknown type".}
+
+method setKeyValue*(c: AbstractAnimationCurve, iKey, iDimension: int, v: Coord) {.base.} = discard
+method setKeyValue*[T](c: AnimationCurve[T], iKey, iDimension: int, v: Coord) =
+    when T is Coord | int:
+        c.sampler.keys[iKey].v = T(v)
+    elif T is Vector2 | Vector3 | Vector4:
+        c.sampler.keys[iKey].v[iDimension] = v
+    else:
+        {.error: "Unknown type".}
+
+proc keyPoint*(c: AbstractAnimationCurve, iKey, iDimension: int): Point =
+    result.x = c.keyTime(iKey)
+    result.y = c.keyValue(iKey, iDimension)
+
+proc setKeyPoint*(c: AbstractAnimationCurve, iKey, iDimension: int, p: Point) =
+    c.setKeyTime(iKey, p.x)
+    c.setKeyValue(iKey, iDimension, p.y)
+
+proc keyInTangentAbs*(c: AbstractAnimationCurve, iKey, iDimension: int): Point =
+    result = c.keyPoint(iKey, iDimension)
+    let p2 = c.keyPoint(iKey - 1, iDimension)
+    let t = c.keyInTangent(iKey)
+    result.x -= (result.x - p2.x) * t.x
+    result.y -= t.y
+
+proc keyOutTangentAbs*(c: AbstractAnimationCurve, iKey, iDimension: int): Point =
+    result = c.keyPoint(iKey, iDimension)
+    let p2 = c.keyPoint(iKey + 1, iDimension)
+    let t = c.keyOutTangent(iKey)
+    result.x += (p2.x - result.x) * t.x
+    result.y += t.y
+
+proc setKeyInTangentAbs*(c: AbstractAnimationCurve, iKey, iDimension: int, v: Point) =
+    let kp = c.keyPoint(iKey, iDimension)
+    let pp = c.keyPoint(iKey - 1, iDimension)
+    var relTangent = kp - v
+    relTangent.x /= kp.x - pp.x
+    c.setKeyInTangent(iKey, relTangent)
+
+proc setKeyOutTangentAbs*(c: AbstractAnimationCurve, iKey, iDimension: int, v: Point) =
+    let kp = c.keyPoint(iKey, iDimension)
+    let np = c.keyPoint(iKey + 1, iDimension)
+    var relTangent = v - kp
+    relTangent.x /= np.x - kp.x
+    c.setKeyOutTangent(iKey, relTangent)
+
+method deleteKey*(c: AbstractAnimationCurve, iKey: int) {.base.} = discard
+method deleteKey*[T](c: AnimationCurve[T], iKey: int) = c.sampler.keys.delete(iKey)
+
+method applyValueAtPosToSetter*(c: AbstractAnimationCurve, pos: float, sng: Variant) {.base.} = discard
+method applyValueAtPosToSetter*[T](c: AnimationCurve[T], pos: float, sng: Variant) =
+    sng.get(SetterAndGetter[T]).setter(c.sampler.sample(pos))
+
+method addKeyAtPosWithValueFromGetter*(c: AbstractAnimationCurve, pos: float, sng: Variant) {.base.} = discard
+method addKeyAtPosWithValueFromGetter*[T](c: AnimationCurve[T], pos: float, sng: Variant) =
+    var k: BezierKeyFrame[T]
+    k.p = pos
+    k.v = sng.get(SetterAndGetter[T]).getter()
+    k.inX = -0.5
+    k.inY = 50
+    k.outX = 0.5
+    k.outY = -50
+    let lb = lowerBound(c.sampler.keys, k) do(a, b: BezierKeyFrame[T]) -> int:
+        cmp(a.p, b.p)
+    c.sampler.keys.insert(k, lb)
+
+proc newAnimationCurve*[T](s: BezierKeyFrameAnimationSampler[T]): AnimationCurve[T] =
+    result.new()
+    result.sampler = s
+
+proc newAnimationCurve*[T](): AnimationCurve[T] = newAnimationCurve(newBezierKeyFrameAnimationSampler[T](@[]))

@@ -93,7 +93,7 @@ method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
         return false
 
     var inv_mat: Matrix4
-    if tryInverse (c.node.worldTransform(), inv_mat) == false:
+    if tryInverse(c.node.worldTransform(), inv_mat) == false:
         return false
 
     let localRay = r.transform(inv_mat)

@@ -2,3 +2,4 @@
 --opt:speed
 --stackTrace:on
 --lineTrace:on
+--d:nimTrMacros
