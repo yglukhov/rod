@@ -45,15 +45,9 @@ void main()
 var gridShader: Shader
 var deltaTime = 0.0
 var oldTime = 0.0
-var deltaTimeAnimation: Animation
 
 proc getDeltaTime*(): float =
     return deltaTime
-
-method init*(v: SceneView, frame: Rect) =
-    procCall v.View.init(frame)
-    v.animationRunner = newAnimationRunner()
-    gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
 
 proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
@@ -402,25 +396,6 @@ method viewDidMoveToWindow*(v:SceneView)=
         v.viewOnEnter()
         v.window.addAnimationRunner(v.animationRunner)
 
-    # sharedNotificationCenter().addObserver("AW_FOCUS_ENTER", v, proc(args: Variant)=
-    #     v.animationRunner.resumeAnimations()
-    #     )
-    # sharedNotificationCenter().addObserver("AW_FOCUS_LEAVE", v, proc(args: Variant)=
-    #     v.animationRunner.pauseAnimations()
-    #     )
-
-    # echo "add animation to scene view"
-    # if deltaTimeAnimation.isNil:
-        deltaTimeAnimation = newAnimation()
-        deltaTimeAnimation.numberOfLoops = -1
-        deltaTimeAnimation.loopDuration = 1.0
-        deltaTimeAnimation.onAnimate = proc(p: float) =
-            deltaTime = deltaTimeAnimation.curLoop.float + p - oldTime
-            oldTime = deltaTimeAnimation.curLoop.float + p
-            # echo "loop ", deltaTimeAnimation.curLoop, "  progress ",p
-
-        v.addAnimation(deltaTimeAnimation)
-
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
     if w.isNil:
         v.viewOnExit()
@@ -431,5 +406,20 @@ method viewWillMoveToWindow*(v: SceneView, w: Window) =
     procCall v.View.viewWillMoveToWindow(w)
     for c in v.uiComponents:
         c.sceneViewWillMoveToWindow(w)
+
+method init*(v: SceneView, frame: Rect) =
+    procCall v.View.init(frame)
+    v.animationRunner = newAnimationRunner()
+
+    v.deltaTimeAnimation = newAnimation()
+    v.deltaTimeAnimation.numberOfLoops = -1
+    v.deltaTimeAnimation.loopDuration = 1.0
+    v.deltaTimeAnimation.onAnimate = proc(p: float) =
+        deltaTime = v.deltaTimeAnimation.curLoop.float + p - oldTime
+        oldTime = v.deltaTimeAnimation.curLoop.float + p
+
+    v.addAnimation(v.deltaTimeAnimation)
+
+    gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
 
 import component.all_components
