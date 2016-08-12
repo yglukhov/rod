@@ -144,8 +144,10 @@ proc createPlayButton(v: AnimationEditView): Button =
     result = Button.new(newRect(0, 0, 50, topPanelHeight))
     result.title = "Play"
     result.onAction do():
-        if not v.mEditedAnimation.isNil:
-            v.window.addAnimation(v.mEditedAnimation)
+        if v.animationSelector.selectedIndex >= 0 and not v.mEditedNode.isNil:
+            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem)
+            if not a.isNil:
+                v.window.addAnimation(a)
 
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
