@@ -339,9 +339,11 @@ template releaseBuffer(b: Buffer) =
     if b.bActive:
         b.bActive = false
 
-proc tryAdd(b: Buffer, vertices: openarray[GLfloat], vertLen: int, indices: openarray[GLushort], indcLen: int): bool =
+proc tryAdd(b: Buffer, vertices: openarray[GLfloat], indices: openarray[GLushort]): bool =
+    let indcLen = indices.len
     if (b.indices.curr + indcLen) > b.indices.max:
         return false
+    let vertLen = vertices.len
     if (b.vertices.curr + vertLen) > b.vertices.max:
         return false
 
@@ -395,7 +397,7 @@ template checkShader(t: Trail) =
     currentContext().gl.useProgram(t.shader)
     t.uniformLocationCache = @[]
 
-proc vertexData(t: Trail, data: var openarray[GLfloat]) =
+proc getVertexData(t: Trail, data: var openarray[GLfloat]) =
     var worldMat = t.node.worldTransform
     worldMat[12] = t.currPos[0]
     worldMat[13] = t.currPos[1]
@@ -442,7 +444,7 @@ proc vertexData(t: Trail, data: var openarray[GLfloat]) =
         set t.totalLen
         set 0.0
 
-proc indexData(t: Trail, data: var openarray[GLushort]) =
+proc getIndexData(t: Trail, data: var openarray[GLushort]) =
     data[0] = t.numberOfIndexes
     data[1] = t.numberOfIndexes+1
     t.numberOfIndexes += 2
@@ -472,7 +474,7 @@ proc reset*(t: Trail) =
     t.prevPos = t.currPos
     t.prevRotation = t.node.rotation
 
-    t.vertexData(t.currVertexData)
+    t.getVertexData(t.currVertexData)
     t.prevVertexData = t.currVertexData
 
     t.buffers[First.int].bValidData = false
@@ -483,12 +485,11 @@ proc reset*(t: Trail) =
     t.buffers[Second.int].vertices.curr = 0
 
     var initialIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
-    t.indexData(initialIndexData)
+    t.getIndexData(initialIndexData)
     var offsetIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
-    t.indexData(offsetIndexData)
+    t.getIndexData(offsetIndexData)
 
-    if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, vertexDataLen, initialIndexData, IND_ELEMENTS) and
-       t.buffers[t.currBuff.int].tryAdd(t.currVertexData, vertexDataLen, offsetIndexData, IND_ELEMENTS):
+    if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, initialIndexData) and t.buffers[t.currBuff.int].tryAdd(t.currVertexData, offsetIndexData):
         t.buffers[t.currBuff.int].bValidData = true
 
     t.checkShader()
@@ -588,13 +589,12 @@ proc emitQuad(t: Trail) =
     if t.totalLen > t.widthOffset and not t.bStretch:
         t.cropOffset += t.currLength
 
-    var vertexDataLen = if not t.matcap.isNil: POS_NORMAL_UV_ELEMENTS else: POS_UV_ELEMENTS
-    t.vertexData(t.currVertexData)
+    t.getVertexData(t.currVertexData)
 
     var indexData {.noinit.}: array[IND_ELEMENTS, GLushort]
-    t.indexData(indexData)
+    t.getIndexData(indexData)
 
-    if t.buffers[t.currBuff.int].tryAdd(t.currVertexData, vertexDataLen, indexData, IND_ELEMENTS):
+    if t.buffers[t.currBuff.int].tryAdd(t.currVertexData, indexData):
         t.buffers[t.currBuff.int].bValidData = true
     else:
         if t.currBuff == First:
@@ -608,12 +608,12 @@ proc emitQuad(t: Trail) =
         t.numberOfIndexes = 0
 
         var initialIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
-        t.indexData(initialIndexData)
+        t.getIndexData(initialIndexData)
         var offsetIndexData {.noinit.}: array[IND_ELEMENTS, GLushort]
-        t.indexData(offsetIndexData)
+        t.getIndexData(offsetIndexData)
 
-        if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, vertexDataLen, initialIndexData, IND_ELEMENTS) and
-           t.buffers[t.currBuff.int].tryAdd(t.currVertexData, vertexDataLen, offsetIndexData, IND_ELEMENTS):
+        if t.buffers[t.currBuff.int].tryAdd(t.prevVertexData, initialIndexData) and
+           t.buffers[t.currBuff.int].tryAdd(t.currVertexData, offsetIndexData):
             t.buffers[t.currBuff.int].bValidData = true
 
     if t.currBuff == First:
@@ -755,12 +755,11 @@ method draw*(t: Trail) =
         if t.totalLen > t.widthOffset and not t.bStretch:
             t.cropOffset += t.currLength
 
-        var vertexDataLen = if not t.matcap.isNil: POS_NORMAL_UV_ELEMENTS else: POS_UV_ELEMENTS
-        t.vertexData(t.prevVertexData)
+        t.getVertexData(t.prevVertexData)
 
         gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
-        if t.buffers[currBuff.int].vertices.curr > vertexDataLen:
-            gl.bufferSubData(gl.ARRAY_BUFFER, ((t.buffers[currBuff.int].vertices.curr - vertexDataLen) * sizeof(GLfloat)).int32, t.prevVertexData)
+        if t.buffers[currBuff.int].vertices.curr > t.prevVertexData.len:
+            gl.bufferSubData(gl.ARRAY_BUFFER, ((t.buffers[currBuff.int].vertices.curr - t.prevVertexData.len) * sizeof(GLfloat)).int32, t.prevVertexData)
         else:
             gl.bufferSubData(gl.ARRAY_BUFFER, 0.int32, t.prevVertexData)
 
