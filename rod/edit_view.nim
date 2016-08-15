@@ -206,7 +206,7 @@ proc newTreeView(e: Editor): PanelView =
 
     let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 60))
     e.outlineView = outlineView
-    outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleMaxX }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
         if indexPath.len == 0:
             return 1
@@ -265,6 +265,7 @@ proc newTreeView(e: Editor): PanelView =
     outlineView.reloadData()
 
     let outlineScrollView = newScrollView(outlineView)
+    outlineScrollView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
     result.addSubview(outlineScrollView)
 
     let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
@@ -539,9 +540,6 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
             editor.toolbar.removeFromSuperview()
             editor.inspector.removeFromSuperview()
             closeEditorButton.removeFromSuperview()
-
-    let fpsAnimation = newAnimation()
-    v.SceneView.addAnimation(fpsAnimation)
 
     return editor
 

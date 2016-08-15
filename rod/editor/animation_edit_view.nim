@@ -1,6 +1,6 @@
 import sequtils, intsets, tables
 import nimx.view, nimx.table_view, nimx.scroll_view, nimx.button, nimx.text_field
-import nimx.popup_button, nimx.window
+import nimx.popup_button, nimx.window, nimx.linear_layout
 import nimx.menu, nimx.event, nimx.property_visitor
 import variant
 
@@ -11,9 +11,6 @@ import rod.node, rod.component
 import rod.animation.property_animation
 import rod.animation.animation_sampler
 
-type SplitView* = ref object of View
-
-registerClass(SplitView)
 
 const leftPaneWidth = 200
 
@@ -167,7 +164,8 @@ method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
     v.editedProperties = @[]
 
-    let mainSplitView = SplitView.new(v.bounds)
+    let mainSplitView = newHorizontalLayout(v.bounds)
+    mainSplitView.userResizeable = true
     mainSplitView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     v.addSubview(mainSplitView)
 
@@ -189,10 +187,9 @@ method init*(v: AnimationEditView, r: Rect) =
         else:
             v.editedAnimation = nil
 
-    v.propertyTableView = TableView.new(newRect(0, topPanelHeight, 200, leftPaneView.bounds.height - topPanelHeight - bottomPanelHeight))
-    v.propertyTableView.autoresizingMask = {afFlexibleMaxX, afFlexibleHeight}
+    v.propertyTableView = TableView.new(newRect(0, topPanelHeight, leftPaneWidth, leftPaneView.bounds.height - topPanelHeight - bottomPanelHeight))
+    v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
     let s = newScrollView(v.propertyTableView)
-    s.autoresizingMask = {afFlexibleMaxX, afFlexibleHeight}
     leftPaneView.addSubview(s)
     mainSplitView.addSubview(leftPaneView)
 
