@@ -1,4 +1,4 @@
-import math, algorithm, strutils, tables
+import math, algorithm, strutils, tables, json
 
 import nimx.view
 import nimx.types
@@ -28,6 +28,7 @@ import rod.component.mesh_component
 import rod.component.node_selector
 import rod.editor_camera_controller
 import rod.editor.animation_edit_view
+import tools.serializer
 
 import ray
 import nimx.view_event_handling_new
@@ -152,8 +153,7 @@ proc sceneTreeDidChange(e: Editor) =
     e.updateCameraSelector()
 
 when loadingAndSavingAvailable:
-    import os, json
-    import tools.serializer
+    import os
     proc saveNode(editor: Editor, selectedNode: Node3D) =
         let path = callDialogFileSave("Save Json")
         if not path.isNil:
