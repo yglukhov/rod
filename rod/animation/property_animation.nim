@@ -6,6 +6,8 @@ import nimx.property_visitor
 import variant
 import rod.node, rod.component, rod.animation.animation_sampler
 
+export animation
+
 type
     AnimatedProperty* = ref object
         name*: string
