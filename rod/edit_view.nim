@@ -169,15 +169,28 @@ proc saveNode(editor: Editor, selectedNode: Node3D): bool =
 
 proc loadNode(editor: Editor): bool =
     when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
-        let path = callDialogFileOpen("Select Json")
+        let path = callDialogFileOpen("Load Json or DAE")
         if not path.isNil:
-            let ln = newNodeWithResource(path)
-            if not editor.selectedNode.isNil:
-                editor.selectedNode.addChild(ln)
-            else:
-                editor.rootNode.addChild(ln)
-            editor.sceneTreeDidChange()
-            return true
+            if path.endsWith(".dae"):
+                var sip = editor.outlineView.selectedIndexPath
+                var p = editor.rootNode
+                if sip.len == 0:
+                    sip.add(0)
+                else:
+                    p = editor.outlineView.itemAtIndexPath(sip).get(Node3D)
+
+                editor.outlineView.expandRow(sip)
+                loadSceneAsync path, proc(n: Node) =
+                    p.addChild(n)
+                    editor.sceneTreeDidChange()
+            elif path.endsWith(".json"):
+                let ln = newNodeWithResource(path)
+                if not editor.selectedNode.isNil:
+                    editor.selectedNode.addChild(ln)
+                else:
+                    editor.rootNode.addChild(ln)
+                editor.sceneTreeDidChange()
+                return true
 
     return false
 
@@ -367,36 +380,15 @@ proc newToolbarButton(e: Editor, title: string): Button =
     e.toolbar.addSubview(result)
 
 proc createOpenAndSaveButtons(e: Editor) =
-    when not defined(android) and not defined(ios):
+    when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
         e.newToolbarButton("Load").onAction do():
-            when defined(js):
-                alert("Loading is currenlty availble in native version only.")
-            elif defined(emscripten):
-                discard
-            else:
-                var sip = e.outlineView.selectedIndexPath
-                var p = e.rootNode
-                if sip.len == 0:
-                    sip.add(0)
-                else:
-                    p = e.outlineView.itemAtIndexPath(sip).get(Node3D)
+            discard e.loadNode()
 
-                e.outlineView.expandRow(sip)
-                let path = callDialogFileOpen("Select file")
-                if not isNil(path) and path != "":
-                    loadSceneAsync path, proc(n: Node) =
-                        p.addChild(n)
-                        e.sceneTreeDidChange()
-
-        when not defined(js) and not defined(android) and not defined(ios):
-            e.newToolbarButton("Save J").onAction do():
-                if e.outlineView.selectedIndexPath.len > 0:
-                    var selectedNode = e.outlineView.itemAtIndexPath(e.outlineView.selectedIndexPath).get(Node3D)
-                    if not selectedNode.isNil:
-                        discard e.saveNode(selectedNode)
-
-            e.newToolbarButton("Load J").onAction do():
-                discard e.loadNode()
+        e.newToolbarButton("Save J").onAction do():
+            if e.outlineView.selectedIndexPath.len > 0:
+                var selectedNode = e.outlineView.itemAtIndexPath(e.outlineView.selectedIndexPath).get(Node3D)
+                if not selectedNode.isNil:
+                    discard e.saveNode(selectedNode)
 
 proc createZoomSelectionButton(e: Editor) =
     e.newToolbarButton("Zoom Selection").onAction do():
