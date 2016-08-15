@@ -146,11 +146,22 @@ const bottomPanelHeight = 25
 proc createPlayButton(v: AnimationEditView): Button =
     result = Button.new(newRect(0, 0, 50, topPanelHeight))
     result.title = "Play"
+    var currentlyPlayingAnimation: Animation
+    let b = result
     result.onAction do():
-        if v.animationSelector.selectedIndex >= 0 and not v.mEditedNode.isNil:
+        if not currentlyPlayingAnimation.isNil:
+            currentlyPlayingAnimation.cancel()
+            currentlyPlayingAnimation = nil
+            b.title = "Play"
+        elif v.animationSelector.selectedIndex >= 0 and not v.mEditedNode.isNil:
             let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem)
             if not a.isNil:
+                currentlyPlayingAnimation = a
+                a.onComplete do():
+                    b.title = "Play"
+                    currentlyPlayingAnimation = nil
                 v.window.addAnimation(a)
+                b.title = "Stop"
 
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
