@@ -22,6 +22,8 @@ import nimx.scroll_view
 import nimx.text_field
 import nimx.table_view_cell
 import nimx.gesture_detector_newtouch
+import nimx.key_commands
+import nimx.pasteboard.pasteboard
 
 import rod.scene_composition
 import rod.component.mesh_component
@@ -35,14 +37,16 @@ import viewport
 
 import variant
 
+const NodePboardKind = "io.github.yglukhov.rod.node"
+
 when defined(js):
     from dom import alert
 elif not defined(android) and not defined(ios) and not defined(emscripten):
     import native_dialogs
 
 type EventCatchingView* = ref object of View
-    keyUpDelegate*: proc (event: var Event)
-    keyDownDelegate*: proc (event: var Event)
+    keyDownDelegate*: proc (event: var Event): bool
+    keyUpDelegate*: proc (event: var Event): bool
     mouseScrrollDelegate*: proc (event: var Event)
 
 registerClass(EventCatchingView)
@@ -55,12 +59,12 @@ method acceptsFirstResponder(v: EventCatchingView): bool = true
 method onKeyUp(v: EventCatchingView, e : var Event): bool =
     echo "editor onKeyUp ", e.keyCode
     if not v.keyUpDelegate.isNil:
-        v.keyUpDelegate(e)
+        result = v.keyUpDelegate(e)
 
 method onKeyDown(v: EventCatchingView, e : var Event): bool =
     echo "editor onKeyUp ", e.keyCode
     if not v.keyDownDelegate.isNil:
-        v.keyDownDelegate(e)
+        result = v.keyDownDelegate(e)
 
 method onScroll*(v: EventCatchingView, e: var Event): bool =
     result = true
@@ -150,7 +154,6 @@ proc sceneTreeDidChange(e: Editor) =
 
 when not defined(js) and not defined(android) and not defined(ios):
     import os
-import streams
 import json
 import tools.serializer
 proc saveNode(editor: Editor, selectedNode: Node3D): bool =
@@ -436,6 +439,44 @@ proc createChangeBackgroundColorButton(e: Editor) =
             cPicker.removeFromSuperview()
             cPicker = nil
 
+proc onKeyDown(editor: Editor, e: var Event): bool =
+    editor.cameraController.onKeyDown(e)
+    let cmd = commandFromEvent(e)
+    result = true
+    case commandFromEvent(e):
+    of kcCopy, kcCut:
+        let n = editor.mSelectedNode
+        if not n.isNil:
+            var s = Serializer.new()
+            var sData = n.serialize(s)
+            let pbi = newPasteboardItem(NodePboardKind, $sData)
+            pasteboardWithName(PboardGeneral).write(pbi)
+            if cmd == kcCut:
+                n.removeFromParent()
+                editor.sceneTreeDidChange()
+    of kcPaste:
+        let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
+        if not pbi.isNil:
+            let j = parseJson(pbi.data)
+            let serializer = Serializer.new()
+            let n = newNode()
+            n.deserialize(j, serializer)
+            if not editor.mSelectedNode.isNil:
+                editor.mSelectedNode.addChild(n)
+                editor.sceneTreeDidChange()
+    of kcDelete:
+        let n = editor.mSelectedNode
+        if not n.isNil:
+            n.removeFromParent()
+            editor.sceneTreeDidChange()
+
+    else: result = false
+
+proc onKeyUp(editor: Editor, e: var Event): bool =
+    editor.cameraController.onKeyUp(e)
+    if e.keyCode == VirtualKey.F:
+        editor.cameraController.setToNode(editor.selectedNode)
+
 proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Editor =
     var editor = Editor.new()
     editor.rootNode = n
@@ -465,12 +506,10 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
         editor.cameraController.onTapUp(dx, dy, e)
     editor.eventCatchingView.mouseScrrollDelegate = proc (event: var Event) =
         editor.cameraController.onMouseScrroll(event)
-    editor.eventCatchingView.keyUpDelegate = proc (event: var Event) =
-        editor.cameraController.onKeyUp(event)
-        if event.keyCode == VirtualKey.F:
-            editor.cameraController.setToNode(editor.selectedNode)
-    editor.eventCatchingView.keyDownDelegate = proc (event: var Event) =
-        editor.cameraController.onKeyDown(event)
+    editor.eventCatchingView.keyUpDelegate = proc (event: var Event): bool =
+        editor.onKeyUp(event)
+    editor.eventCatchingView.keyDownDelegate = proc (event: var Event): bool =
+        editor.onKeyDown(event)
 
     v.window.addSubview(editor.eventCatchingView)
 
