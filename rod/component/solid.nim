@@ -15,6 +15,7 @@ type Solid* = ref object of Component
 
 method init*(s: Solid) =
     s.color = whiteColor()
+    s.size = newSize(10, 10)
 
 method deserialize*(s: Solid, j: JsonNode, serializer: Serializer) =
     var v = j{"color"}
@@ -39,5 +40,10 @@ method draw*(s: Solid) =
 method visitProperties*(c: Solid, p: var PropertyVisitor) =
     p.visitProperty("size", c.size)
     p.visitProperty("color", c.color)
+
+method serialize*(c: Solid, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("size", s.getValue(c.size))
+    result.add("color", s.getValue(c.color))
 
 registerComponent[Solid]()
