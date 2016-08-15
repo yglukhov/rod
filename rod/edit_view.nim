@@ -1,6 +1,4 @@
-import math
-import algorithm
-import strutils
+import math, algorithm, strutils, tables
 
 import nimx.view
 import nimx.types
@@ -39,9 +37,10 @@ import variant
 
 const NodePboardKind = "io.github.yglukhov.rod.node"
 
-when defined(js):
-    from dom import alert
-elif not defined(android) and not defined(ios) and not defined(emscripten):
+const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
+    not defined(emscripten) and not defined(js)
+
+when loadingAndSavingAvailable:
     import native_dialogs
 
 type EventCatchingView* = ref object of View
@@ -152,12 +151,10 @@ proc sceneTreeDidChange(e: Editor) =
     e.outlineView.reloadData()
     e.updateCameraSelector()
 
-when not defined(js) and not defined(android) and not defined(ios):
-    import os
-import json
-import tools.serializer
-proc saveNode(editor: Editor, selectedNode: Node3D): bool =
-    when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
+when loadingAndSavingAvailable:
+    import os, json
+    import tools.serializer
+    proc saveNode(editor: Editor, selectedNode: Node3D) =
         let path = callDialogFileSave("Save Json")
         if not path.isNil:
             var s = Serializer.new()
@@ -165,10 +162,7 @@ proc saveNode(editor: Editor, selectedNode: Node3D): bool =
             s.save(sData, path)
             # s.save(selectedNode, path)
 
-    return false
-
-proc loadNode(editor: Editor): bool =
-    when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
+    proc loadNode(editor: Editor) =
         let path = callDialogFileOpen("Load Json or DAE")
         if not path.isNil:
             if path.endsWith(".dae"):
@@ -182,17 +176,13 @@ proc loadNode(editor: Editor): bool =
                 editor.outlineView.expandRow(sip)
                 loadSceneAsync path, proc(n: Node) =
                     p.addChild(n)
-                    editor.sceneTreeDidChange()
             elif path.endsWith(".json"):
                 let ln = newNodeWithResource(path)
                 if not editor.selectedNode.isNil:
                     editor.selectedNode.addChild(ln)
                 else:
                     editor.rootNode.addChild(ln)
-                editor.sceneTreeDidChange()
-                return true
-
-    return false
+            editor.sceneTreeDidChange()
 
 proc newAnimationEditView(e: Editor): PanelView =
     result = PanelView.new(newRect(0, 0, 800, 300)) #700
@@ -319,7 +309,7 @@ proc newTreeView(e: Editor): PanelView =
         e.sceneTreeDidChange()
     result.addSubview(refreshButton)
 
-import tables
+#import tables
 proc onTouchDown*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
     editor.outlineView.reloadData()
@@ -380,15 +370,15 @@ proc newToolbarButton(e: Editor, title: string): Button =
     e.toolbar.addSubview(result)
 
 proc createOpenAndSaveButtons(e: Editor) =
-    when not defined(js) and not defined(emscripten) and not defined(android) and not defined(ios):
+    when loadingAndSavingAvailable:
         e.newToolbarButton("Load").onAction do():
-            discard e.loadNode()
+            e.loadNode()
 
         e.newToolbarButton("Save J").onAction do():
             if e.outlineView.selectedIndexPath.len > 0:
                 var selectedNode = e.outlineView.itemAtIndexPath(e.outlineView.selectedIndexPath).get(Node3D)
                 if not selectedNode.isNil:
-                    discard e.saveNode(selectedNode)
+                    e.saveNode(selectedNode)
 
 proc createZoomSelectionButton(e: Editor) =
     e.newToolbarButton("Zoom Selection").onAction do():
