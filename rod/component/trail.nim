@@ -517,6 +517,12 @@ proc `trailWidth=`*(t: Trail, v: float32) =
     t.widthOffset = v
     t.reset()
 
+proc trailHeight*(t: Trail): float32 =
+    result = t.heightOffset
+
+proc `trailHeight=`*(t: Trail, v: float32) =
+    t.heightOffset = v
+
 method init*(t: Trail) =
     procCall t.Component.init()
 
@@ -658,6 +664,8 @@ method draw*(t: Trail) =
         t.buffers[t.currBuff.int].bindBuffer()
         t.emitQuad()
         t.checkShader()
+
+        t.reset()
 
     # check transform
     t.gravityDirection += t.gravity * getDeltaTime()
@@ -870,7 +878,7 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
     p.visitProperty("color", t.color)
     p.visitProperty("image", (t.trailImage, t.imagePercent))
     p.visitProperty("matcap", (t.trailMatcap, t.matcapPercent))
-    p.visitProperty("height", t.heightOffset)
+    p.visitProperty("height", t.trailHeight)
     p.visitProperty("width", t.trailWidth)
     p.visitProperty("gravity", t.gravity)
     p.visitProperty("rotation", t.directRotation)
