@@ -53,6 +53,7 @@ type
         mCamera*: Camera
         mRootNode*: Node3D
         animationRunner*: AnimationRunner
+        deltaTimeAnimation*: Animation
         #view*: View
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int

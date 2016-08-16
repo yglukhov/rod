@@ -1,6 +1,6 @@
 import sequtils, intsets, tables
 import nimx.view, nimx.table_view, nimx.scroll_view, nimx.button, nimx.text_field
-import nimx.popup_button, nimx.window
+import nimx.popup_button, nimx.window, nimx.linear_layout
 import nimx.menu, nimx.event, nimx.property_visitor
 import variant
 
@@ -11,9 +11,6 @@ import rod.node, rod.component
 import rod.animation.property_animation
 import rod.animation.animation_sampler
 
-type SplitView* = ref object of View
-
-registerClass(SplitView)
 
 const leftPaneWidth = 200
 
@@ -129,7 +126,10 @@ proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
             ep.name = ap.name
             ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.name)
             template createCurve(T: typedesc): typed =
-                ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
+                if ap.sampler of BezierKeyFrameAnimationSampler[T]:
+                    ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
+                else:
+                    ep.curve = newAnimationCurve[T]()
             template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
             switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
             ep.curve.color = colors[v.editedProperties.len mod colors.len]
@@ -143,15 +143,29 @@ const bottomPanelHeight = 25
 proc createPlayButton(v: AnimationEditView): Button =
     result = Button.new(newRect(0, 0, 50, topPanelHeight))
     result.title = "Play"
+    var currentlyPlayingAnimation: Animation
+    let b = result
     result.onAction do():
-        if not v.mEditedAnimation.isNil:
-            v.window.addAnimation(v.mEditedAnimation)
+        if not currentlyPlayingAnimation.isNil:
+            currentlyPlayingAnimation.cancel()
+            currentlyPlayingAnimation = nil
+            b.title = "Play"
+        elif v.animationSelector.selectedIndex >= 0 and not v.mEditedNode.isNil:
+            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem)
+            if not a.isNil:
+                currentlyPlayingAnimation = a
+                a.onComplete do():
+                    b.title = "Play"
+                    currentlyPlayingAnimation = nil
+                v.window.addAnimation(a)
+                b.title = "Stop"
 
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
     v.editedProperties = @[]
 
-    let mainSplitView = SplitView.new(v.bounds)
+    let mainSplitView = newHorizontalLayout(v.bounds)
+    mainSplitView.userResizeable = true
     mainSplitView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     v.addSubview(mainSplitView)
 
@@ -173,10 +187,9 @@ method init*(v: AnimationEditView, r: Rect) =
         else:
             v.editedAnimation = nil
 
-    v.propertyTableView = TableView.new(newRect(0, topPanelHeight, 200, leftPaneView.bounds.height - topPanelHeight - bottomPanelHeight))
-    v.propertyTableView.autoresizingMask = {afFlexibleMaxX, afFlexibleHeight}
+    v.propertyTableView = TableView.new(newRect(0, topPanelHeight, leftPaneWidth, leftPaneView.bounds.height - topPanelHeight - bottomPanelHeight))
+    v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
     let s = newScrollView(v.propertyTableView)
-    s.autoresizingMask = {afFlexibleMaxX, afFlexibleHeight}
     leftPaneView.addSubview(s)
     mainSplitView.addSubview(leftPaneView)
 

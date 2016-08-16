@@ -90,6 +90,9 @@ proc createVBO(ns: NodeSelector) =
     gl.bufferData(gl.ARRAY_BUFFER, ns.vertexData, gl.STATIC_DRAW)
     selectorSharedNumberOfIndexes = indexData.len.GLsizei
 
+    gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+
 method init*(ns: NodeSelector) =
     ns.color = newColor(0, 0, 0, 1)
     ns.modelMatrix.loadIdentity()
