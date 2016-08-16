@@ -93,6 +93,15 @@ proc createVBO(ns: NodeSelector) =
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
 
+proc newNodeSelector*(): NodeSelector =
+    new(result, proc(ns: NodeSelector) =
+        let c = currentContext()
+        let gl = c.gl
+
+        if not ns.gizmo.isNil:
+            ns.gizmo.removeFromParent()
+    )
+
 method init*(ns: NodeSelector) =
     ns.color = newColor(0, 0, 0, 1)
     ns.modelMatrix.loadIdentity()
@@ -145,8 +154,9 @@ method componentNodeWillBeRemovedFromSceneView*(ns: NodeSelector) =
         ns.gizmo.removeFromParent()
 
 method draw*(ns: NodeSelector) =
+    ns.updateGizmo()
+
     if not ns.vertexData.isNil:
-        ns.updateGizmo()
 
         let c = currentContext()
         let gl = c.gl
@@ -213,4 +223,6 @@ proc stopTransform*(ns: NodeSelector) =
 method visitProperties*(ns: NodeSelector, p: var PropertyVisitor) =
     p.visitProperty("color", ns.color)
 
-registerComponent[NodeSelector]()
+registerComponent[NodeSelector](proc(): Component =
+    result = newNodeSelector()
+    )

@@ -331,7 +331,7 @@ proc onTouchDown*(editor: Editor, e: var Event) =
 
         echo "cast ", castResult[0].node.name
         #work with gizmo
-        if castResult[0].node.name.contains("gizmo_axis"):
+        if castResult[0].node.name.contains("gizmo_axis") and (not editor.selectedNode.isNil):
             let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
             if not nodeSelector.isNil:
                 nodeSelector.startTransform(castResult[0].node, e.position)
@@ -406,6 +406,7 @@ proc createCameraSelector(e: Editor) =
                 let cam = n.componentIfAvailable(Camera)
                 if not cam.isNil:
                     e.rootNode.sceneView.camera = cam
+                    e.cameraController.setCamera(cam.node)
 
 proc createChangeBackgroundColorButton(e: Editor) =
     var cPicker: ColorPickerView
@@ -471,8 +472,8 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
 
     editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
 
-    let cam = editor.rootNode.findNode("camera")
-    editor.cameraController = newEditorCameraController(cam)
+    # let cam = editor.rootNode.findNode("camera")
+    editor.cameraController = newEditorCameraController(editor.sceneView)
 
     editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
     let eventListner = editor.eventCatchingView.newEventCatchingListener()
@@ -522,6 +523,11 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
             editor.toolbar.removeFromSuperview()
             editor.inspector.removeFromSuperview()
             closeEditorButton.removeFromSuperview()
+
+            if not editor.selectedNode.isNil:
+                let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
+                if not nodeSelector.isNil:
+                    editor.selectedNode.removeComponent(NodeSelector)
 
     return editor
 
