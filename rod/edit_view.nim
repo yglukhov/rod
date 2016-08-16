@@ -21,6 +21,8 @@ import nimx.text_field
 import nimx.table_view_cell
 import nimx.gesture_detector_newtouch
 import nimx.key_commands
+import nimx.linear_layout
+import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
 
 import rod.scene_composition
@@ -37,6 +39,8 @@ import viewport
 import variant
 
 const NodePboardKind = "io.github.yglukhov.rod.node"
+
+const toolbarHeight = 30
 
 const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
     not defined(emscripten) and not defined(js)
@@ -423,6 +427,18 @@ proc createChangeBackgroundColorButton(e: Editor) =
             cPicker.removeFromSuperview()
             cPicker = nil
 
+proc createCloseEditorButton(e: Editor) =
+    e.newToolbarButton("x").onAction do():
+        e.eventCatchingView.removeFromSuperview()
+        e.treeView.removeFromSuperview()
+        e.toolbar.removeFromSuperview()
+        e.inspector.removeFromSuperview()
+
+        if not e.selectedNode.isNil:
+            let nodeSelector = e.selectedNode.getComponent(NodeSelector)
+            if not nodeSelector.isNil:
+                e.selectedNode.removeComponent(NodeSelector)
+
 proc onKeyDown(editor: Editor, e: var Event): bool =
     editor.cameraController.onKeyDown(e)
     let cmd = commandFromEvent(e)
@@ -461,73 +477,57 @@ proc onKeyUp(editor: Editor, e: var Event): bool =
     if e.keyCode == VirtualKey.F:
         editor.cameraController.setToNode(editor.selectedNode)
 
+proc createEventCatchingView(e: Editor) =
+    e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
+    let eventListner = e.eventCatchingView.newEventCatchingListener()
+    e.eventCatchingView.addGestureDetector(newScrollGestureDetector( eventListner ))
+
+    eventListner.tapDownDelegate = proc(evt: var Event) =
+        e.onTouchDown(evt)
+        e.cameraController.onTapDown(evt)
+    eventListner.scrollProgressDelegate = proc(dx, dy: float32, evt: var Event) =
+        e.onScroll(dx, dy, evt)
+        e.cameraController.onScrollProgress(dx, dy, evt)
+    eventListner.tapUpDelegate = proc(dx, dy: float32, evt: var Event) =
+        e.onTouchUp(evt)
+        e.cameraController.onTapUp(dx, dy, evt)
+    e.eventCatchingView.mouseScrrollDelegate = proc(evt: var Event) =
+        e.cameraController.onMouseScrroll(evt)
+    e.eventCatchingView.keyUpDelegate = proc(evt: var Event): bool =
+        e.onKeyUp(evt)
+    e.eventCatchingView.keyDownDelegate = proc(evt: var Event): bool =
+        e.onKeyDown(evt)
+
 proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Editor =
-    var editor = Editor.new()
+    let editor = Editor.new()
     editor.rootNode = n
     editor.sceneView = n.sceneView # Warning!
 
-    const toolbarHeight = 30
-
+    # Create widgets and stuff
     editor.inspector = InspectorView.new(newRect(200, toolbarHeight, 340, 700))
-
     editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
-
-    # let cam = editor.rootNode.findNode("camera")
     editor.cameraController = newEditorCameraController(editor.sceneView)
-
-    editor.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
-    let eventListner = editor.eventCatchingView.newEventCatchingListener()
-    editor.eventCatchingView.addGestureDetector(newScrollGestureDetector( eventListner ))
-
-    eventListner.tapDownDelegate = proc (event: var Event) =
-        editor.onTouchDown(event)
-        editor.cameraController.onTapDown(event)
-    eventListner.scrollProgressDelegate = proc (dx, dy : float32, e : var Event) =
-        editor.onScroll(dx, dy, e)
-        editor.cameraController.onScrollProgress(dx, dy, e)
-    eventListner.tapUpDelegate = proc ( dx, dy : float32, e : var Event) =
-        editor.onTouchUp(e)
-        editor.cameraController.onTapUp(dx, dy, e)
-    editor.eventCatchingView.mouseScrrollDelegate = proc (event: var Event) =
-        editor.cameraController.onMouseScrroll(event)
-    editor.eventCatchingView.keyUpDelegate = proc (event: var Event): bool =
-        editor.onKeyUp(event)
-    editor.eventCatchingView.keyDownDelegate = proc (event: var Event): bool =
-        editor.onKeyDown(event)
-
-    v.window.addSubview(editor.eventCatchingView)
-
+    editor.createEventCatchingView()
     editor.treeView = newTreeView(editor)
     editor.treeView.setFrameOrigin(newPoint(0, toolbarHeight))
-    v.window.addSubview(editor.treeView)
 
     editor.animationEditPanel = newAnimationEditView(editor)
     editor.animationEditPanel.setFrameOrigin(newPoint(0, editor.treeView.frame.maxY))
 
+    # Toolbar buttons
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()
     editor.createToggleAnimationEditorButton()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
+    if startFromGame:
+        editor.createCloseEditorButton()
 
+    # Add everything to window
+    v.window.addSubview(editor.eventCatchingView)
+    v.window.addSubview(editor.treeView)
     v.window.addSubview(editor.inspector)
     v.window.addSubview(editor.toolbar)
-
-    if startFromGame:
-        let closeEditorButton = Button.new(newRect(v.window.bounds.width - 23, 3, 20, 20))
-        closeEditorButton.title = "x"
-        editor.toolbar.addSubview(closeEditorButton)
-        closeEditorButton.onAction do():
-            editor.eventCatchingView.removeFromSuperview()
-            editor.treeView.removeFromSuperview()
-            editor.toolbar.removeFromSuperview()
-            editor.inspector.removeFromSuperview()
-            closeEditorButton.removeFromSuperview()
-
-            if not editor.selectedNode.isNil:
-                let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-                if not nodeSelector.isNil:
-                    editor.selectedNode.removeComponent(NodeSelector)
 
     return editor
 
