@@ -186,6 +186,7 @@ proc drawGrid(v: SceneView) =
 import tables
 var drawTable*: TableRef[int, seq[Node]]
 method draw*(v: SceneView, r: Rect) =
+    procCall v.View.draw(r)
     if v.rootNode.isNil: return
 
     let c = currentContext()
