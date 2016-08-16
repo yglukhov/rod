@@ -383,9 +383,7 @@ proc newParticleSystem(): ParticleSystem =
     new(result, proc(ps: ParticleSystem) =
         let c = currentContext()
         let gl = c.gl
-        gl.bindBuffer(gl.ARRAY_BUFFER, ps.indexBuffer)
         gl.deleteBuffer(ps.indexBuffer)
-        gl.bindBuffer(gl.ARRAY_BUFFER, ps.vertexBuffer)
         gl.deleteBuffer(ps.vertexBuffer)
         ps.indexBuffer = invalidBuffer
         ps.vertexBuffer = invalidBuffer

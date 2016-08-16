@@ -372,6 +372,12 @@ proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] {.proc
     let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord + c.vboData.vertInfo.numOfCoordPerNormal
     result = c.extractVertexData(size, offset, data)
 
+method rayCast*(ns: MeshComponent, r: Ray, distance: var float32): bool =
+    let distToCam = (ns.node.worldPos - ns.node.sceneView.camera.node.worldPos).length()
+    if distToCam < 0.1:
+        return false
+
+    result = procCall ns.Component.rayCast(r, distance)
 
 method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     if j.isNil:
