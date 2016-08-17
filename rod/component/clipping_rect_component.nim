@@ -53,7 +53,15 @@ method draw*(cl: ClippingRectComponent) =
     when clippingRectWithScissors:
         let gl = c.gl
         gl.enable(gl.SCISSOR_TEST)
-        gl.scissor(GLint(tl2.x), GLint(vpSize.height - br2.y), GLsizei(br2.x - tl2.x), GLSizei(br2.y - tl2.y))
+        var x = GLint(tl2.x)
+        var y = GLint(vpSize.height - br2.y)
+        var w = GLsizei(br2.x - tl2.x)
+        var h = GLSizei(br2.y - tl2.y)
+
+        try:
+            gl.scissor(x, y, w, h)
+        except:
+            discard
         for c in cl.node.children: c.recursiveDraw()
         gl.disable(gl.SCISSOR_TEST)
     else:
