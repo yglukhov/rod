@@ -145,8 +145,9 @@ method componentNodeWillBeRemovedFromSceneView*(ns: NodeSelector) =
         ns.gizmo.removeFromParent()
 
 method draw*(ns: NodeSelector) =
+    ns.updateGizmo()
+
     if not ns.vertexData.isNil:
-        ns.updateGizmo()
 
         let c = currentContext()
         let gl = c.gl
