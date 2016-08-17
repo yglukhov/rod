@@ -40,11 +40,12 @@ method convertPointToParent*(v: UICompView, p: Point): Point =
 
 method convertPointFromParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
-    let r = v.uiComp.node.sceneView.rayWithScreenCoords(p)
-    var res : Vector3
-    if v.uiComp.intersectsWithUINode(r, res):
-        if v.uiComp.node.tryWorldToLocal(res, res):
-            result = newPoint(res.x, res.y)
+    if not v.uiComp.node.sceneView.isNil:
+        let r = v.uiComp.node.sceneView.rayWithScreenCoords(p)
+        var res : Vector3
+        if v.uiComp.intersectsWithUINode(r, res):
+            if v.uiComp.node.tryWorldToLocal(res, res):
+                result = newPoint(res.x, res.y)
 
 method draw*(c: UIComponent) =
     if not c.mView.isNil:
