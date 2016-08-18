@@ -393,17 +393,21 @@ proc createChangeBackgroundColorButton(e: Editor) =
             cPicker.removeFromSuperview()
             cPicker = nil
 
+proc endEditing*(e: Editor) =
+    if not e.selectedNode.isNil:
+        let nodeSelector = e.selectedNode.getComponent(NodeSelector)
+        if not nodeSelector.isNil:
+            e.selectedNode.removeComponent(NodeSelector)
+
+    e.sceneView.removeFromSuperview()
+    e.sceneView.setFrame(e.workspaceView.frame)
+    let rootEditorView = e.workspaceView.superview
+    rootEditorView.replaceSubview(e.workspaceView, e.sceneView)
+    e.sceneView.editing = false
+
 proc createCloseEditorButton(e: Editor) =
     e.newToolbarButton("x").onAction do():
-        if not e.selectedNode.isNil:
-            let nodeSelector = e.selectedNode.getComponent(NodeSelector)
-            if not nodeSelector.isNil:
-                e.selectedNode.removeComponent(NodeSelector)
-
-        e.sceneView.removeFromSuperview()
-        e.sceneView.setFrame(e.workspaceView.frame)
-        let rootEditorView = e.workspaceView.superview
-        rootEditorView.replaceSubview(e.workspaceView, e.sceneView)
+        e.endEditing()
 
 proc onKeyDown(editor: Editor, e: var Event): bool =
     editor.cameraController.onKeyDown(e)
@@ -495,6 +499,7 @@ proc createWorkspaceLayout(e: Editor) =
     horizontalSplit.setDividerPosition(150, 0)
     horizontalSplit.setDividerPosition(v.bounds.width - 300, 1)
 
+    e.sceneView.editing = true
     let rootEditorView = e.sceneView.superview
     rootEditorView.replaceSubview(e.sceneView, v)
     e.sceneView.setFrame(sceneClipView.bounds)
@@ -550,6 +555,3 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.createWorkspaceLayout()
 
     return editor
-
-proc endEditing*(e: Editor) =
-    discard

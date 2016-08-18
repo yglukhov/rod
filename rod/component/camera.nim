@@ -18,7 +18,7 @@ method init*(c: Camera) =
     c.projectionMode = cpPerspective
     c.zNear = 1
     c.zFar = 10000
-    c.fov = 45
+    c.fov = 30
 
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
     case c.projectionMode
@@ -57,7 +57,7 @@ proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D)
         let nTop = c.zNear * top / Z
         let nBottom = c.zNear * bottom / Z
 
-        mat.perspective(nLeft, nRight, -nBottom, -nTop, c.zNear, c.zFar)
+        mat.frustum(nLeft, nRight, -nBottom, -nTop, c.zNear, c.zFar)
 
     of cpManual:
         doAssert(not c.mManualGetProjectionMatrix.isNil)

@@ -383,12 +383,12 @@ method viewOnExit*(v:SceneView){.base.} = discard
 
 method viewDidMoveToWindow*(v:SceneView)=
     procCall v.View.viewDidMoveToWindow()
-    if not v.window.isNil:
+    if not v.editing and not v.window.isNil:
         v.viewOnEnter()
-        v.window.addAnimationRunner(v.animationRunner)
+    v.window.addAnimationRunner(v.animationRunner)
 
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
-    if w.isNil:
+    if not v.editing and w.isNil:
         v.viewOnExit()
 
     if not v.window.isNil:
