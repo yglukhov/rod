@@ -54,7 +54,6 @@ type
         mRootNode*: Node3D
         animationRunner*: AnimationRunner
         deltaTimeAnimation*: Animation
-        #view*: View
         numberOfNodesWithBackComposition*: int
         numberOfNodesWithBackCompositionInCurrentFrame*: int
         mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
@@ -63,6 +62,7 @@ type
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]
         postprocessContext*: PostprocessContext
+        editing*: bool
 
     Viewport* {.deprecated.} = SceneView
 

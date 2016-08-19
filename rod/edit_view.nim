@@ -1,7 +1,7 @@
 import math, algorithm, strutils, tables, json
 
 import nimx.view
-import nimx.types
+import nimx.types, nimx.matrixes
 import nimx.button, nimx.popup_button
 import nimx.outline_view
 import nimx.toolbar
@@ -11,12 +11,10 @@ import node
 import inspector_view
 import rod_types
 
-import nimx.panel_view
 import nimx.animation
 import nimx.color_picker
-import nimx.context
-import nimx.portable_gl
 import nimx.scroll_view
+import nimx.clip_view
 import nimx.text_field
 import nimx.table_view_cell
 import nimx.gesture_detector_newtouch
@@ -49,11 +47,9 @@ when loadingAndSavingAvailable:
     import native_dialogs
 
 type EventCatchingView* = ref object of View
-    keyDownDelegate*: proc (event: var Event): bool
-    keyUpDelegate*: proc (event: var Event): bool
-    mouseScrrollDelegate*: proc (event: var Event)
-
-registerClass(EventCatchingView)
+    keyDownDelegate*: proc(event: var Event): bool
+    keyUpDelegate*: proc(event: var Event): bool
+    mouseScrrollDelegate*: proc(event: var Event)
 
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
@@ -91,18 +87,16 @@ method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
 
 type Editor* = ref object
     rootNode*: Node
+    workspaceView: View
     eventCatchingView*: EventCatchingView
     treeView*: View
     animationEditView*: AnimationEditView
-    animationEditPanel: View
     toolbar*: Toolbar
     sceneView*: SceneView
     mSelectedNode: Node
-    outlineView*:OutlineView
+    outlineView*: OutlineView
     inspector*: InspectorView
     cameraController*: EditorCameraController
-    gizmo: Node
-    gizmoAxis: Vector3
     cameraSelector: PopupButton
 
 proc `selectedNode=`*(e: Editor, n: Node) =
@@ -188,30 +182,9 @@ when loadingAndSavingAvailable:
                     editor.rootNode.addChild(ln)
             editor.sceneTreeDidChange()
 
-proc newAnimationEditView(e: Editor): PanelView =
-    result = PanelView.new(newRect(0, 0, 800, 300)) #700
-    result.collapsible = true
-    let title = newLabel(newRect(22, 6, 108, 15))
-    title.textColor = whiteColor()
-    title.text = "Animation"
-    result.addSubview(title)
-    let ae = AnimationEditView.new(newRect(0, result.titleHeight, result.bounds.width, result.contentHeight))
-    ae.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
-    e.animationEditView = ae
-    result.addSubview(ae)
-    ae.moveToBack()
-
-proc newTreeView(e: Editor): PanelView =
-    result = PanelView.new(newRect(0, 0, 200, 500)) #700
-    result.collapsible = true
-
-    let title = newLabel(newRect(22, 6, 108, 15))
-    title.textColor = whiteColor()
-    title.text = "Scene"
-
-    result.addSubview(title)
-
-    let outlineView = OutlineView.new(newRect(1, 28, result.bounds.width - 3, result.bounds.height - 60))
+proc newTreeView(e: Editor): View =
+    result = View.new(newRect(0, 0, 200, 500)) #700
+    let outlineView = OutlineView.new(newRect(0, 0, result.bounds.width, result.bounds.height - 20))
     e.outlineView = outlineView
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleMaxX }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
@@ -272,7 +245,7 @@ proc newTreeView(e: Editor): PanelView =
     outlineView.reloadData()
 
     let outlineScrollView = newScrollView(outlineView)
-    outlineScrollView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
+    outlineScrollView.resizingMask = "wh"
     result.addSubview(outlineScrollView)
 
     let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
@@ -391,13 +364,6 @@ proc createZoomSelectionButton(e: Editor) =
             if not cam.isNil:
                 e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
 
-proc createToggleAnimationEditorButton(e: Editor) =
-    e.newToolbarButton("Animations").onAction do():
-        if e.animationEditPanel.window.isNil:
-            e.toolbar.window.addSubview(e.animationEditPanel)
-        else:
-            e.animationEditPanel.removeFromSuperview()
-
 proc createCameraSelector(e: Editor) =
     e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
     e.updateCameraSelector()
@@ -419,7 +385,7 @@ proc createChangeBackgroundColorButton(e: Editor) =
         if cPicker.isNil:
             cPicker = newColorPickerView(newRect(0, 0, 300, 200))
             cPicker.onColorSelected = proc(c: Color) =
-                currentContext().gl.clearColor(c.r, c.g, c.b, c.a)
+                e.sceneView.backgroundColor = c
             let popupPoint = b.convertPointToWindow(newPoint(0, b.bounds.height + 5))
             cPicker.setFrameOrigin(popupPoint)
             b.window.addSubview(cPicker)
@@ -427,17 +393,21 @@ proc createChangeBackgroundColorButton(e: Editor) =
             cPicker.removeFromSuperview()
             cPicker = nil
 
+proc endEditing*(e: Editor) =
+    if not e.selectedNode.isNil:
+        let nodeSelector = e.selectedNode.getComponent(NodeSelector)
+        if not nodeSelector.isNil:
+            e.selectedNode.removeComponent(NodeSelector)
+
+    e.sceneView.removeFromSuperview()
+    e.sceneView.setFrame(e.workspaceView.frame)
+    let rootEditorView = e.workspaceView.superview
+    rootEditorView.replaceSubview(e.workspaceView, e.sceneView)
+    e.sceneView.editing = false
+
 proc createCloseEditorButton(e: Editor) =
     e.newToolbarButton("x").onAction do():
-        e.eventCatchingView.removeFromSuperview()
-        e.treeView.removeFromSuperview()
-        e.toolbar.removeFromSuperview()
-        e.inspector.removeFromSuperview()
-
-        if not e.selectedNode.isNil:
-            let nodeSelector = e.selectedNode.getComponent(NodeSelector)
-            if not nodeSelector.isNil:
-                e.selectedNode.removeComponent(NodeSelector)
+        e.endEditing()
 
 proc onKeyDown(editor: Editor, e: var Event): bool =
     editor.cameraController.onKeyDown(e)
@@ -477,18 +447,80 @@ proc onKeyUp(editor: Editor, e: var Event): bool =
     if e.keyCode == VirtualKey.F:
         editor.cameraController.setToNode(editor.selectedNode)
 
+proc newTabView(): TabView =
+    result = TabView.new(newRect(0, 0, 100, 100))
+    result.dockingTabs = true
+    result.userConfigurable = true
+
+proc createWorkspaceLayout(e: Editor) =
+    let v = View.new(e.sceneView.frame)
+    e.workspaceView = v
+    v.autoresizingMask = e.sceneView.autoresizingMask
+    # Initial setup:
+    # +---+--------+---+
+    # | p |   s    | i |
+    # |   |        |   |
+    # +---+--------+---+
+    # |       a        |
+    # +----------------+
+
+    # p - project (tree) view
+    # s - scene view
+    # i - inspector view
+    # a - animation view
+
+    let p = newTabView()
+    let s = newTabView()
+    let i = newTabView()
+    let a = newTabView()
+
+    let sceneClipView = ClipView.new(zeroRect)
+    p.addTab("Project", e.treeView)
+    s.addTab("Scene", sceneClipView)
+    i.addTab("Inspector", e.inspector)
+    a.addTab("Animation", e.animationEditView)
+
+    let verticalSplit = newVerticalLayout(newRect(0, toolbarHeight, v.bounds.width, v.bounds.height - toolbarHeight))
+    verticalSplit.userResizeable = true
+    let horizontalSplit = newHorizontalLayout(newRect(0, 0, 800, 200))
+    horizontalSplit.userResizeable = true
+
+    horizontalSplit.addSubview(p)
+    horizontalSplit.addSubview(s)
+    horizontalSplit.addSubview(i)
+
+    verticalSplit.resizingMask = "wh"
+    verticalSplit.addSubview(horizontalSplit)
+    verticalSplit.addSubview(a)
+
+    v.addSubview(e.toolbar)
+    v.addSubview(verticalSplit)
+    verticalSplit.setDividerPosition(v.bounds.height - 300, 0)
+    horizontalSplit.setDividerPosition(150, 0)
+    horizontalSplit.setDividerPosition(v.bounds.width - 300, 1)
+
+    e.sceneView.editing = true
+    let rootEditorView = e.sceneView.superview
+    rootEditorView.replaceSubview(e.sceneView, v)
+    e.sceneView.setFrame(sceneClipView.bounds)
+    e.eventCatchingView.setFrame(sceneClipView.bounds)
+    sceneClipView.addSubview(e.sceneView)
+    sceneClipView.addSubview(e.eventCatchingView)
+
 proc createEventCatchingView(e: Editor) =
     e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
-    let eventListner = e.eventCatchingView.newEventCatchingListener()
-    e.eventCatchingView.addGestureDetector(newScrollGestureDetector( eventListner ))
+    e.eventCatchingView.resizingMask = "wh"
+    #e.eventCatchingView.backgroundColor = newColor(1, 0, 0)
+    let eventListener = e.eventCatchingView.newEventCatchingListener()
+    e.eventCatchingView.addGestureDetector(newScrollGestureDetector(eventListener))
 
-    eventListner.tapDownDelegate = proc(evt: var Event) =
+    eventListener.tapDownDelegate = proc(evt: var Event) =
         e.onTouchDown(evt)
         e.cameraController.onTapDown(evt)
-    eventListner.scrollProgressDelegate = proc(dx, dy: float32, evt: var Event) =
+    eventListener.scrollProgressDelegate = proc(dx, dy: float32, evt: var Event) =
         e.onScroll(dx, dy, evt)
         e.cameraController.onScrollProgress(dx, dy, evt)
-    eventListner.tapUpDelegate = proc(dx, dy: float32, evt: var Event) =
+    eventListener.tapUpDelegate = proc(dx, dy: float32, evt: var Event) =
         e.onTouchUp(evt)
         e.cameraController.onTapUp(dx, dy, evt)
     e.eventCatchingView.mouseScrrollDelegate = proc(evt: var Event) =
@@ -501,7 +533,7 @@ proc createEventCatchingView(e: Editor) =
 proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Editor =
     let editor = Editor.new()
     editor.rootNode = n
-    editor.sceneView = n.sceneView # Warning!
+    editor.sceneView = n.sceneView
 
     # Create widgets and stuff
     editor.inspector = InspectorView.new(newRect(200, toolbarHeight, 340, 700))
@@ -509,27 +541,17 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.cameraController = newEditorCameraController(editor.sceneView)
     editor.createEventCatchingView()
     editor.treeView = newTreeView(editor)
-    editor.treeView.setFrameOrigin(newPoint(0, toolbarHeight))
 
-    editor.animationEditPanel = newAnimationEditView(editor)
-    editor.animationEditPanel.setFrameOrigin(newPoint(0, editor.treeView.frame.maxY))
+    editor.animationEditView = AnimationEditView.new(newRect(0, 0, 800, 300))
 
     # Toolbar buttons
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()
-    editor.createToggleAnimationEditorButton()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
     if startFromGame:
         editor.createCloseEditorButton()
 
-    # Add everything to window
-    v.window.addSubview(editor.eventCatchingView)
-    v.window.addSubview(editor.treeView)
-    v.window.addSubview(editor.inspector)
-    v.window.addSubview(editor.toolbar)
+    editor.createWorkspaceLayout()
 
     return editor
-
-proc endEditing*(e: Editor) =
-    discard

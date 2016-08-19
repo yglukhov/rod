@@ -116,15 +116,20 @@ proc worldToScreenPoint*(v: SceneView, point: Vector3): Vector3 =
     result.z = (1.0 + ndcSpacePos.z) * 0.5
 
 proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
+    let absBounds = v.convertRectToWindow(v.bounds)
+    var winSize = absBounds.size
+
+    if not v.window.isNil:
+        winSize = v.window.bounds.size
+
     let matViewProj = v.viewProjMatrix
     var matInverse: Matrix4
     if tryInverse (matViewProj, matInverse) == false:
         return
 
     var oIn: Vector4
-
-    oIn[0] = point.x / v.bounds.width * 2.0 - 1.0
-    oIn[1] = 1.0 - point.y / v.bounds.height * 2.0
+    oIn[0] = (point.x + absBounds.x) / winSize.width * 2.0 - 1.0
+    oIn[1] = 1.0 - (point.y + absBounds.y) / winSize.height * 2.0
     oIn[2] = 2.0 * point.z - 1.0
     oIn[3] = 1.0
 
@@ -186,6 +191,7 @@ proc drawGrid(v: SceneView) =
 import tables
 var drawTable*: TableRef[int, seq[Node]]
 method draw*(v: SceneView, r: Rect) =
+    procCall v.View.draw(r)
     if v.rootNode.isNil: return
 
     let c = currentContext()
@@ -210,7 +216,6 @@ method draw*(v: SceneView, r: Rect) =
 proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     if v.camera.projectionMode == cpOrtho:
         var logicalWidth = v.bounds.width / (v.bounds.height / v.camera.viewportSize.height)
-        # let viewCoords = newVector3(coords.x - v.bounds.width / 2.0, coords.y - v.bounds.height / 2.0, 0.0)
         var viewCoords:Vector3
         viewCoords.x = coords.x / v.bounds.width * logicalWidth  - logicalWidth / 2.0
         viewCoords.y = coords.y / v.bounds.height * v.camera.viewportSize.height - v.camera.viewportSize.height / 2.0
@@ -224,22 +229,8 @@ proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
         return
 
     result.origin = v.camera.node.localToWorld(newVector3())
-    let x = (2.0 * coords.x) / v.bounds.width - 1.0
-    let y = 1.0 - (2.0 * coords.y) / v.bounds.height
-    let rayClip = newVector4(x, y, -1, 1)
-
-    var proj : Transform3D
-    v.mCamera.getProjectionMatrix(v.bounds, proj)
-
-    proj.inverse()
-    var rayEye = proj * rayClip
-    rayEye[2] = -1
-    rayEye[3] = 0
-
-    var viewMat = v.mCamera.node.worldTransform
-
-    rayEye = viewMat * rayEye
-    result.direction = newVector3(rayEye[0], rayEye[1], rayEye[2])
+    let target = v.screenToWorldPoint(newVector3(coords.x, coords.y, -1))
+    result.direction = target - result.origin
     result.direction.normalize()
 
 import opengl
@@ -392,12 +383,12 @@ method viewOnExit*(v:SceneView){.base.} = discard
 
 method viewDidMoveToWindow*(v:SceneView)=
     procCall v.View.viewDidMoveToWindow()
-    if not v.window.isNil:
+    if not v.editing and not v.window.isNil:
         v.viewOnEnter()
-        v.window.addAnimationRunner(v.animationRunner)
+    v.window.addAnimationRunner(v.animationRunner)
 
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
-    if w.isNil:
+    if not v.editing and w.isNil:
         v.viewOnExit()
 
     if not v.window.isNil:

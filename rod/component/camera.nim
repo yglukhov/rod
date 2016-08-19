@@ -1,10 +1,15 @@
+import math
+
 import nimx.matrixes
 import nimx.types
 import nimx.context
 import nimx.property_visitor
+import nimx.view
 
 import rod.component
 import rod.rod_types
+import rod.viewport
+import rod.node
 
 export CameraProjection
 export Camera
@@ -13,18 +18,47 @@ method init*(c: Camera) =
     c.projectionMode = cpPerspective
     c.zNear = 1
     c.zFar = 10000
-    c.fov = 45
+    c.fov = 30
 
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
     case c.projectionMode
     of cpOrtho:
-        if c.viewportSize.height > 0:
-            let logicalWidth = viewportBounds.width / (viewportBounds.height / c.viewportSize.height)
-            mat.ortho(-logicalWidth / 2, logicalWidth / 2, c.viewportSize.height / 2, -c.viewportSize.height / 2, c.zNear, c.zFar)
-        else:
-            mat.ortho(-viewportBounds.width / 2, viewportBounds.width / 2, -viewportBounds.height / 2, viewportBounds.height / 2, c.zNear, c.zFar)
+        var logicalSize = c.viewportSize
+        let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
+        if logicalSize == zeroSize:
+            logicalSize = absBounds.size
+        let k = absBounds.height / logicalSize.height
+        let cy = absBounds.y + absBounds.height / 2
+        let cx = absBounds.x + absBounds.width / 2
+        let winSize = c.node.sceneView.window.bounds.size
+        let top = -cy / k
+        let bottom = (winSize.height - cy) / k
+        let left = -cx / k
+        let right = (winSize.width - cx) / k
+
+        mat.ortho(left, right, bottom, top, c.zNear, c.zFar)
+
     of cpPerspective:
-        mat.perspective(c.fov, viewportBounds.width / viewportBounds.height, c.zNear, c.zFar)
+        let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
+        let cy = absBounds.y + absBounds.height / 2
+        let cx = absBounds.x + absBounds.width / 2
+        let winSize = c.node.sceneView.window.bounds.size
+        let top = -cy
+        let bottom = winSize.height - cy
+        let left = -cx
+        let right = winSize.width - cx
+
+        let angle = degToRad(c.fov) / 2.0
+        let Z = absBounds.height / 2.0 / tan(angle)
+
+        # near plane space
+        let nLeft = c.zNear * left / Z
+        let nRight = c.zNear * right / Z
+        let nTop = c.zNear * top / Z
+        let nBottom = c.zNear * bottom / Z
+
+        mat.frustum(nLeft, nRight, -nBottom, -nTop, c.zNear, c.zFar)
+
     of cpManual:
         doAssert(not c.mManualGetProjectionMatrix.isNil)
         c.mManualGetProjectionMatrix(viewportBounds, mat)
@@ -36,6 +70,7 @@ proc `manualGetProjectionMatrix=`*(c: Camera, p: proc(viewportBounds: Rect, mat:
 method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("zNear", c.zNear)
     p.visitProperty("zFar", c.zFar)
+    p.visitProperty("fov", c.fov)
     p.visitProperty("projMode", c.projectionMode)
 
 registerComponent[Camera]()
