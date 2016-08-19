@@ -393,7 +393,7 @@ proc blendMode*(layer: Layer): BlendingMode =
         `bm` = `layer`.blendingMode;
     """.}
     case bm
-    of 5220:
+    of 5220, 5020:
         result = BlendingMode.ADD
     else:
         result = BlendingMode.NORMAL
