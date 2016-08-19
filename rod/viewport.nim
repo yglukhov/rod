@@ -200,7 +200,8 @@ method draw*(v: SceneView, r: Rect) =
     drawTable = newTable[int, seq[Node]]()
     v.viewProjMatrix = v.getViewProjectionMatrix()
     c.withTransform v.viewProjMatrix:
-        v.drawGrid()
+        if v.editing: v.drawGrid()
+
         v.rootNode.recursiveDraw(drawTable)
         for k, v in drawTable:
             c.gl.clearDepthStencil()

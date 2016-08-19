@@ -3,16 +3,22 @@ import math
 import random
 import json
 
+import nimx.matrixes
+import nimx.animation
+import nimx.types
+import nimx.property_visitor
+import nimx.portable_gl
+import nimx.context
+
 import rod.quaternion
 import rod.component
 import rod.rod_types
 import rod.tools.serializer
 import rod.node
-
-import nimx.matrixes
-import nimx.animation
-import nimx.types
-import nimx.property_visitor
+import rod.material.shader
+import rod.tools.debug_draw
+import rod.viewport
+import rod.component.camera
 
 type
     ParticleGenerationData* = object
@@ -82,6 +88,24 @@ method generate*(pgs: ConePSGenShape): ParticleGenerationData =
         result.position = pos
         result.direction = dir
 
+proc debugDraw(pgs: ConePSGenShape) =
+    var dist = 5.0
+    if pgs.node.sceneView.camera.projectionMode == cpOrtho:
+        dist = 50.0
+    let addRadius = sin(degToRad(pgs.angle)) * dist
+    let height = cos(degToRad(pgs.angle)) * dist
+
+    let gl = currentContext().gl
+    gl.disable(gl.DEPTH_TEST)
+    DDdrawCircle(newVector3(0.0), pgs.radius)
+    DDdrawCircle(newVector3(0.0, height, 0.0), pgs.radius + addRadius)
+    DDdrawArrow(dist)
+    gl.disable(gl.DEPTH_TEST)
+
+method draw*(pgs: ConePSGenShape) =
+    if pgs.node.sceneView.editing:
+        pgs.debugDraw()
+
 method deserialize*(pgs: ConePSGenShape, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
@@ -142,6 +166,21 @@ method generate*(pgs: SpherePSGenShape): ParticleGenerationData =
     else:
         result.generateRandDir(pgs.is2D)
 
+proc debugDraw*(pgs: SpherePSGenShape) =
+    if pgs.node.sceneView.editing:
+        pgs.debugDraw()
+    let gl = currentContext().gl
+    gl.disable(gl.DEPTH_TEST)
+    DDdrawCircle(newVector3(0.0), pgs.radius)
+    DDdrawCircleX(newVector3(0.0), pgs.radius)
+    DDdrawCircleZ(newVector3(0.0), pgs.radius)
+    gl.disable(gl.DEPTH_TEST)
+
+
+method draw*(pgs: SpherePSGenShape) =
+    if pgs.node.sceneView.editing:
+        pgs.debugDraw()
+
 method deserialize*(pgs: SpherePSGenShape, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
@@ -174,6 +213,16 @@ method generate*(pgs: BoxPSGenShape): ParticleGenerationData =
         result.position = newVector3(random(-d.x .. d.x), random(-d.y .. d.y), 0.0)
     else:
         result.position = newVector3(random(-d.x .. d.x), random(-d.y .. d.y), random(-d.z .. d.z))
+
+proc debugDraw(pgs: BoxPSGenShape) =
+    let gl = currentContext().gl
+    gl.disable(gl.DEPTH_TEST)
+    DDdrawBox(pgs.dimension)
+    gl.disable(gl.DEPTH_TEST)
+
+method draw*(pgs: BoxPSGenShape) =
+    if pgs.node.sceneView.editing:
+        pgs.debugDraw()
 
 method deserialize*(pgs: BoxPSGenShape, j: JsonNode, s: Serializer) =
     if j.isNil:

@@ -455,7 +455,10 @@ proc `+`(c1, c2: Color): Color =
     result.a = c1.a + c2.a
 
 proc rgbToFloat(c: Color): float32 =
-    float32((int(c[0]*255) + int(c[1]*255) * 256 + int(c[2]*255) * 256 * 256))
+    let c0 = clamp(c[0], 0.0, 1.0)
+    let c1 = clamp(c[1], 0.0, 1.0)
+    let c2 = clamp(c[2], 0.0, 1.0)
+    float32((int(c0 * 254.0) + int(c1 * 254.0) * 256 + int(c2 * 254.0) * 256 * 256))
 
 template setVector3ToBuffer(buff: var seq[float32], offset: int, vec: Vector3) =
     buff[offset + 0] = vec.x
