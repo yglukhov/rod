@@ -29,6 +29,9 @@ proc hash(sm: HashSet[string]): Hash =
     result = !$result
 
 proc createShader(sh: Shader) =
+    if currentContext().isNil:
+        return
+
     let gl = currentContext().gl
     if not sh.shadersCache.contains(sh.shaderMacroFlags):
         var commonShaderDefines = ""
@@ -77,6 +80,10 @@ proc removeDefine*(sh: Shader, def: string) =
 proc bindShader*(sh: Shader) =
     if sh.needUpdate:
         sh.createShader()
+
+    if sh.needUpdate == true:
+        echo "ERROR! Try to use not created shader program"
+        return
 
     let gl = currentContext().gl
     gl.useProgram(sh.program)
