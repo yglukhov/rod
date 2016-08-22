@@ -13,6 +13,7 @@ import nimx.portable_gl
 
 import rod.rod_types
 import rod.quaternion
+import rod.utils.image_serialization
 
 type Serializer* = ref object
     savePath*: string
@@ -92,9 +93,7 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Size) =
         val = newSize(jN[0].getFnum(), jN[1].getFnum())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Image) =
-    let jN = j{name}
-    if not jN.isNil:
-        val = imageWithResource(jN.getStr())
+    val = deserializeImage(j{name})
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var bool) =
     let jN = j{name}
