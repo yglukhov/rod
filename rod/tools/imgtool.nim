@@ -115,7 +115,9 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
         if im.png.isNil:
             im.png = loadPNG32(im.originalPath)
 
-        zeroColorIfZeroAlpha(im.png.data)
+        if im.png.data.len == im.png.width * im.png.height * 4:
+            zeroColorIfZeroAlpha(im.png.data)
+            colorBleed(im.png.data, im.png.width, im.png.height)
 
         if im.srcSize == im.targetSize:
             blitImage(
@@ -262,18 +264,23 @@ proc recalculateSourceBounds(im: SpriteSheetImage) =
         im.srcSize.width = im.srcBounds.width
         im.srcSize.height = im.srcBounds.height
 
-proc betterDimension(tool: ImgTool, d: int): int =
+proc betterDimension(tool: ImgTool, d, e: int): int =
     let r = int(d.float / tool.downsampleRatio)
-    result = case r
+    var changed = true
+    result = case r + e * 2
         of 257 .. 400: 256
         of 513 .. 700: 512
         of 1025 .. 1300: 1024
-        else: r
+        else:
+            changed = false
+            r
     if result > 2048: result = 2048
+    if changed:
+        result -= e * 2
 
 proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
-    im.targetSize.width = tool.betterDimension(im.srcSize.width) - im.extrusion * 2
-    im.targetSize.height = tool.betterDimension(im.srcSize.height) - im.extrusion * 2
+    im.targetSize.width = tool.betterDimension(im.srcSize.width, im.extrusion)
+    im.targetSize.height = tool.betterDimension(im.srcSize.height, im.extrusion)
 
 proc readFile(im: SpriteSheetImage) =
     im.png = loadPNG32(im.originalPath)
