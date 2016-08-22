@@ -25,6 +25,7 @@ import rod.viewport
 import rod.ray
 import rod.rod_types
 import rod.tools.serializer
+import rod.utils.image_serialization
 
 import animation.skeleton
 
@@ -412,24 +413,19 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "falloffPercent", m.material.falloffPercent)
     s.deserializeValue(j, "maskPercent", m.material.maskPercent)
 
-    proc getTexture(name: string): Image =
-        let jNode = j{name}
-        if not jNode.isNil:
-            result = imageWithResource(jNode.getStr())
-
-    m.material.matcapTextureR = getTexture("matcapTextureR")
-    m.material.matcapTextureG = getTexture("matcapTextureG")
-    m.material.matcapTextureB = getTexture("matcapTextureB")
-    m.material.matcapTextureA = getTexture("matcapTextureA")
-    m.material.matcapMaskTexture = getTexture("matcapMaskTexture")
-    m.material.albedoTexture = getTexture("albedoTexture")
-    m.material.glossTexture = getTexture("glossTexture")
-    m.material.specularTexture = getTexture("specularTexture")
-    m.material.normalTexture = getTexture("normalTexture")
-    m.material.bumpTexture = getTexture("bumpTexture")
-    m.material.reflectionTexture = getTexture("reflectionTexture")
-    m.material.falloffTexture = getTexture("falloffTexture")
-    m.material.maskTexture = getTexture("maskTexture")
+    m.material.matcapTextureR = deserializeImage(j{"matcapTextureR"})
+    m.material.matcapTextureG = deserializeImage(j{"matcapTextureG"})
+    m.material.matcapTextureB = deserializeImage(j{"matcapTextureB"})
+    m.material.matcapTextureA = deserializeImage(j{"matcapTextureA"})
+    m.material.matcapMaskTexture = deserializeImage(j{"matcapMaskTexture"})
+    m.material.albedoTexture = deserializeImage(j{"albedoTexture"})
+    m.material.glossTexture = deserializeImage(j{"glossTexture"})
+    m.material.specularTexture = deserializeImage(j{"specularTexture"})
+    m.material.normalTexture = deserializeImage(j{"normalTexture"})
+    m.material.bumpTexture = deserializeImage(j{"bumpTexture"})
+    m.material.reflectionTexture = deserializeImage(j{"reflectionTexture"})
+    m.material.falloffTexture = deserializeImage(j{"falloffTexture"})
+    m.material.maskTexture = deserializeImage(j{"maskTexture"})
 
     proc getAttribs(name: string): seq[float32] =
         result = newSeq[float32]()

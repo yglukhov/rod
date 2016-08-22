@@ -3,6 +3,7 @@ import nimx.context
 import nimx.image
 import nimx.animation
 import nimx.property_visitor
+import nimx.system_logger
 
 import json, strutils
 
@@ -11,11 +12,13 @@ import rod.node
 import rod.ray
 import rod.tools.serializer
 import rod.component
+import rod.utils.image_serialization
 
 #import image_blur
 
 type Sprite* = ref object of Component
     offset*: Point
+    frameOffsets*: seq[Point]
     images*: seq[Image]
     currentFrame*: int
     motionBlurRadius*: float
@@ -35,34 +38,16 @@ proc `image=`*(s: Sprite, i: Image) =
 
 method draw*(s: Sprite) =
     let c = currentContext()
-    var r: Rect
-    r.origin = s.offset
-
     let i = s.image
-
-    discard """
-    if s.motionBlurRadius != 0:
-        var n = s.node
-        var rootOffset = n.position
-        while not n.isNil:
-            rootOffset -= n.position
-            n = n.parent
-
-        if not i.isNil:
-            r.size = i.size
-            if s.prevRootOffset != [0.Coord, 0, 0]:
-                let blurVector = (s.prevRootOffset - rootOffset) * s.motionBlurRadius / 3
-                c.drawImageWithBlur(i, r, zeroRect, newVector2(blurVector.x, blurVector.y))
-            else:
-                c.drawImage(i, r, zeroRect, s.alpha)
-        s.prevRootOffset = rootOffset
-    el
-    """
     if not i.isNil:
+        var r: Rect
+        r.origin = s.offset
+        if s.frameOffsets.len > s.currentFrame:
+            r.origin += s.frameOffsets[s.currentFrame]
         r.size = i.size
         c.drawImage(i, r, zeroRect)
 
-proc createFrameAnimation(s: Sprite) =
+proc createFrameAnimation(s: Sprite) {.inline.} =
     let a = newAnimation()
     const fps = 1.0 / 30.0
     a.loopDuration = float(s.images.len) * fps
@@ -84,33 +69,24 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
     if not v.isNil:
         s.node.alpha = v.getFNum(1.0)
+        logi "WARNING: Alpha in sprite component deprecated"
 
-    v = j{"fileNames"}
+    v = j{"images"}
+    if v.isNil:
+        v = j{"fileNames"}
     if v.isNil:
         s.image = imageWithResource(j["name"].getStr())
+        logi "WARNING: Sprite component format deprecated: ", j["name"].getStr()
     else:
         s.images = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:
-            if v[i].kind == JString:
-                let name = v[i].getStr()
-                if name.endsWith(".sspart"):
-                    let parts1 = name.split(" - ")
-                    let parts = parts1[1].split('.')
-                    let rect = newRect(parts[^5].parseFloat(), parts[^4].parseFloat(), parts[^3].parseFloat(), parts[^2].parseFloat())
-                    let realName = parts1[0]
-                    let ss = imageWithResource(realName)
-                    s.images[i] = ss.subimageWithRect(rect)
-                else:
-                    s.images[i] = imageWithResource(name)
-            else:
-                let realName = v[i]["file"].getStr()
-                let uv = v[i]["tex"]
-                let sz = v[i]["size"]
-                let ss = imageWithResource(realName)
-                s.images[i] = ss.subimageWithTexCoords(
-                                newSize(sz[0].getFNum(), sz[1].getFNum()),
-                                [uv[0].getFNum().float32, uv[1].getFNum(), uv[2].getFNum(), uv[3].getFNum()]
-                                )
+            s.images[i] = deserializeImage(v[i])
+
+    v = j{"frameOffsets"}
+    if not v.isNil:
+        s.frameOffsets = newSeqOfCap[Point](v.len)
+        for p in v:
+            s.frameOffsets.add(newPoint(p[0].getFNum(), p[1].getFNum()))
 
     if s.images.len > 1:
         s.createFrameAnimation()
