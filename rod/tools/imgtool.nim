@@ -17,8 +17,10 @@ type
     ImageOccurence = object
         parentComposition, parentNode, parentComponent: JsonNode
         frameIndex: int
+        textureKey: string
         compPath: string
         originalTranslationInNode: tuple[x, y: float]
+        allowAlphaCrop: bool
 
     SpriteSheetImage = ref object
         spriteSheet: SpriteSheet # Index of sprite sheet in tool.images array
@@ -60,6 +62,7 @@ type ImgTool* = ref object
     resPath*: string #
     compressOutput*: bool
     compressToPVR*: bool
+    createIndex*: bool
     downsampleRatio*: float
     extrusion*: int
     images: Table[string, SpriteSheetImage]
@@ -75,14 +78,22 @@ proc newImgTool*(): ImgTool =
     result.downsampleRatio = 1.0
     result.extrusion = 1
 
-proc withSpriteNodes(n: JsonNode, p: proc(j, s: JsonNode)) =
-    let sprite = n{"components", "Sprite"}
-    if not sprite.isNil:
-        p(n, sprite)
-    let children = n{"children"}
-    if not children.isNil:
-        for c in children:
-            withSpriteNodes(c, p)
+iterator allComponentsOfType(n: JsonNode, typ: string): (JsonNode, JsonNode) =
+    var stack = @[n]
+    while stack.len > 0:
+        let nn = stack.pop()
+        let componentNode = nn{"components", typ}
+        if not componentNode.isNil:
+            yield(nn, componentNode)
+        let children = nn{"children"}
+        if not children.isNil:
+            stack.add(children.elems)
+
+iterator allSpriteNodes(n: JsonNode): (JsonNode, JsonNode) =
+    for n, c in allComponentsOfType(n, "Sprite"): yield(n, c)
+
+iterator allMeshComponentNodes(n: JsonNode): (JsonNode, JsonNode) =
+    for n, c in allComponentsOfType(n, "MeshComponent"): yield(n, c)
 
 proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
     im.pos = ss.packer.packAndGrow(im.targetSize.width.int32 + im.extrusion.int32 * 2, im.targetSize.height.int32 + im.extrusion.int32 * 2)
@@ -178,17 +189,29 @@ proc destPath(tool: ImgTool, origPath: string): string =
     let relPath = relativePathToPath(tool.originalResPath, origPath)
     result = tool.resPath / relPath
 
-proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
-    # Fixup the fileName node to contain spritesheet filename and texCoords
-    let result = newJObject()
-    o.parentComponent["fileNames"].elems[o.frameIndex] = result
-    doAssert(not im.spriteSheet.isNil)
-    result["file"] = %relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt)
+proc serializedImage(im: SpriteSheetImage, path: string): JsonNode =
+    result = newJObject()
+    result["file"] = %path
     let w = im.spriteSheet.packer.width.float
     let h = im.spriteSheet.packer.height.float
     result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float - 0.5) / w, ((im.pos.y + im.targetSize.height).float - 0.5) / h]
     result["size"] = %*[im.srcSize.width, im.srcSize.height]
 
+proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
+    # Fixup the fileName node to contain spritesheet filename and texCoords
+    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
+    doAssert(not im.spriteSheet.isNil)
+
+    if o.textureKey.isNil:
+        # We are in the sprite component
+        o.parentComponent["fileNames"].elems[o.frameIndex] = result
+    else:
+        # We are in the mesh component
+        o.parentComponent[o.textureKey]= result
+
+    if not o.textureKey.isNil: return
+
+    # TODO: The following should be removed in favor of Sprite.frameOffsets!!!!
     let jNode = o.parentNode
 
     if im.srcBounds.x > 0 or im.srcBounds.y > 0:
@@ -296,6 +319,53 @@ proc removeLeftoverFiles(tool: ImgTool) =
         removeFile(p)
         pruneEmptyDir(p.parentDir())
 
+proc imageAtPath(tool: ImgTool, compPath, imageRelPath: string): SpriteSheetImage {.inline.} =
+    var absPath = compPath.parentDir / imageRelPath
+    absPath.normalizePath()
+
+    result = tool.images.getOrDefault(absPath)
+    if result.isNil:
+        if not fileExists(absPath):
+            echo "Error: file not found: ", absPath, " (reffered from ", compPath, ")"
+        result = newSpriteSheetImage(absPath, tool.extrusion)
+        tool.updateLastModificationDateWithFile(absPath)
+        tool.images[absPath] = result
+
+proc collectImageOccurences(tool: ImgTool) {.inline.} =
+    for i, c in tool.compositions:
+        let compPath = tool.compositionPaths[i]
+
+        for n, s in c.allSpriteNodes:
+            let fileNames = s["fileNames"]
+            for ifn in 0 ..< fileNames.len:
+                var im = tool.imageAtPath(compPath, fileNames[ifn].str)
+                im.occurences.add ImageOccurence(parentComposition: c,
+                        parentNode: n, parentComponent: s, frameIndex: ifn,
+                        compPath: compPath,
+                        allowAlphaCrop: true)
+
+        for n, s in c.allMeshComponentNodes:
+            for key in ["matcapTextureR", "matcapTextureG", "matcapTextureB",
+                "matcapTextureA", "matcapMaskTexture", "albedoTexture",
+                "glossTexture", "specularTexture", "normalTexture",
+                "bumpTexture", "reflectionTexture", "falloffTexture", "maskTexture"]:
+
+                let t = s{key}
+                if not t.isNil:
+                    var im = tool.imageAtPath(compPath, t.str)
+                    im.occurences.add(ImageOccurence(parentComposition: c,
+                            parentNode: n, parentComponent: s, textureKey: key,
+                            compPath: compPath))
+
+proc writeIndex(tool: ImgTool) =
+    let root = newJObject()
+    let packedImages = newJObject()
+    root["packedImages"] = packedImages
+    for im in tool.images.values:
+        packedImages[relativePathToPath(tool.originalResPath, im.originalPath)] = im.serializedImage(tool.outPrefix & $im.spriteSheet.index & tool.outImgExt)
+    writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
+    echo root.pretty().replace(" \n", "\n")
+
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
 
@@ -304,25 +374,7 @@ proc run*(tool: ImgTool) =
         tool.updateLastModificationDateWithFile(c)
         tool.compositions[i] = parseFile(c)
 
-    # Init original images
-    for i, c in tool.compositions:
-        c.withSpriteNodes proc(n, s: JsonNode) =
-            let fileNames = s["fileNames"]
-            let compPath = tool.compositionPaths[i].parentDir
-            for ifn in 0 ..< fileNames.len:
-                let fn = fileNames[ifn]
-                var absPath = compPath / fn.str
-                absPath.normalizePath()
-                var im = tool.images.getOrDefault(absPath)
-                if im.isNil:
-                    if not fileExists(absPath):
-                        echo "Error: file not found: ", absPath, " (reffered from ", tool.compositionPaths[i], ")"
-                    im = newSpriteSheetImage(absPath, tool.extrusion)
-                    tool.updateLastModificationDateWithFile(absPath)
-                    tool.images[absPath] = im
-                im.occurences.add(ImageOccurence(parentComposition: c,
-                        parentNode: n, parentComponent: s, frameIndex: ifn,
-                        compPath: tool.compositionPaths[i]))
+    tool.collectImageOccurences()
 
     # Check if destination files are newer than original files. If yes, we
     # don't need to do anything.
@@ -354,6 +406,7 @@ proc run*(tool: ImgTool) =
         echo "Packing images..."
         for i, im in allImages:
             var done = false
+            echo im.originalPath
             for ss in tool.spriteSheets:
                 done = ss.tryPackImage(im)
                 if done: break
@@ -373,14 +426,18 @@ proc run*(tool: ImgTool) =
                 echo "    - image ", v.originalPath
             tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
 
+        # Readjust sprite nodes
         for im in tool.images.values:
             for o in im.occurences:
                 tool.adjustImageNode(im, o)
 
-        # Readjust sprite nodes
+        # Write compositions back to files
         for i, c in tool.compositions:
             let dstPath = tool.destPath(tool.compositionPaths[i])
             writeFile(dstPath, c.pretty().replace(" \n", "\n"))
+
+        if tool.createIndex:
+            tool.writeIndex()
     else:
         echo "Everyting up to date"
     tool.removeLeftoverFiles()

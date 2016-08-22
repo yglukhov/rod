@@ -5,7 +5,7 @@ import os
 
 proc rodimgtool(compressToPVR: bool = false, originalResPath: string = ".",
         resPath: string = ".", outPrefix: string = ".", nocompress: bool = false,
-        downsampleRatio: float = 1.0, extrusion: int = 1,
+        downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
         compositions: seq[string]): int =
     var tool = newImgTool()
     tool.originalResPath = originalResPath
@@ -20,6 +20,7 @@ proc rodimgtool(compressToPVR: bool = false, originalResPath: string = ".",
     tool.compressToPVR = compressToPVR
     tool.downsampleRatio = downsampleRatio
     tool.extrusion = extrusion
+    tool.createIndex = createIndex
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime
