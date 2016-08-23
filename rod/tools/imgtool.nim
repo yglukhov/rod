@@ -115,7 +115,9 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
         if im.png.isNil:
             im.png = loadPNG32(im.originalPath)
 
-        zeroColorIfZeroAlpha(im.png.data)
+        if im.png.data.len == im.png.width * im.png.height * 4:
+            zeroColorIfZeroAlpha(im.png.data)
+            colorBleed(im.png.data, im.png.width, im.png.height)
 
         if im.srcSize == im.targetSize:
             blitImage(
@@ -161,30 +163,6 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     if consumeLessMemory:
         GC_fullCollect()
 
-proc adjustTranslationValueForFrame(trans: JsonNode, im: SpriteSheetImage): JsonNode =
-    result = trans
-    if result.isNil:
-        result = %*[im.srcBounds.x, im.srcBounds.y, 0]
-    else:
-        result.elems[0] = %(result[0].getFNum() + im.srcBounds.x.float)
-        result.elems[1] = %(result[1].getFNum() + im.srcBounds.y.float)
-
-proc translationAnimFromFrameAnim(im: SpriteSheetImage, frameAnim: JsonNode, o: ImageOccurence): JsonNode =
-    result = newJObject()
-    let values = newJArray()
-    let vl = frameAnim["values"].len
-
-    for i in 0 ..< vl:
-        values.add(%*[o.originalTranslationInNode.x, o.originalTranslationInNode.y, 0])
-
-    result["values"] = values
-
-    result["duration"] = frameAnim["duration"]
-    result["frameLerp"] = %false
-    let numLoops = frameAnim{"numberOfLoops"}
-    if not numLoops.isNil:
-        result["numberOfLoops"] = numLoops
-
 proc destPath(tool: ImgTool, origPath: string): string =
     let relPath = relativePathToPath(tool.originalResPath, origPath)
     result = tool.resPath / relPath
@@ -209,37 +187,17 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
         # We are in the mesh component
         o.parentComponent[o.textureKey]= result
 
-    if not o.textureKey.isNil: return
-
-    # TODO: The following should be removed in favor of Sprite.frameOffsets!!!!
-    let jNode = o.parentNode
-
-    if im.srcBounds.x > 0 or im.srcBounds.y > 0:
-        # Node position has changed
-        if o.frameIndex == 0:
-            jNode["translation"] = adjustTranslationValueForFrame(jNode{"translation"}, im)
-
-        # Adjust translation animations
-        let allAnimations = o.parentComposition{"animations"}
-        let nodeName = jNode{"name"}.getStr(nil)
-        if not nodeName.isNil and not allAnimations.isNil:
-            let translationAnimName = nodeName & ".translation"
-            let frameAnimName = nodeName & ".curFrame"
-            for k, v in allAnimations:
-                let frameAnim = v{frameAnimName}
-                if not frameAnim.isNil:
-                    var translationAnim = v{translationAnimName}
-                    if translationAnim.isNil:
-                        translationAnim = translationAnimFromFrameAnim(im, frameAnim, o)
-                        v[translationAnimName] = translationAnim
-
-                    let frameValues = frameAnim["values"]
-                    for iVal in 0 ..< frameValues.len:
-                        if frameValues[iVal].num == o.frameIndex:
-                            let transValues = translationAnim["values"]
-                            transValues.elems[iVal] = adjustTranslationValueForFrame(transValues.elems[iVal], im)
-                else:
-                    echo "WARNING: Something is wrong..."
+    if o.textureKey.isNil:
+        # This image occurence is inside a sprite. If image alpha is cropped
+        # from top or left we have to adjust frameOffsets in the Sprite node
+        if im.srcBounds.x > 0 or im.srcBounds.y > 0:
+            var frameOffsets = o.parentComponent{"frameOffsets"}
+            if frameOffsets.isNil:
+                frameOffsets = newJArray()
+                for i in 0 ..< o.parentComponent["fileNames"].len:
+                    frameOffsets.add %*[0, 0]
+                o.parentComponent["frameOffsets"] = frameOffsets
+            frameOffsets.elems[o.frameIndex] = %*[im.srcBounds.x, im.srcBounds.y]
 
 proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: string): bool =
     let name = jNode{"name"}
@@ -252,28 +210,30 @@ proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: strin
                     if ik == animName: return true
 
 proc recalculateSourceBounds(im: SpriteSheetImage) =
-    var allowBoundsRecalc = false
     for o in im.occurences:
-        if o.parentComposition.compositionContainsAnimationForNode(o.parentNode, "curFrame"):
-            allowBoundsRecalc = true
+        if not o.allowAlphaCrop: return
 
-    if allowBoundsRecalc:
-        im.srcBounds = im.actualBounds
-        im.srcSize.width = im.srcBounds.width
-        im.srcSize.height = im.srcBounds.height
+    im.srcBounds = im.actualBounds
+    im.srcSize.width = im.srcBounds.width
+    im.srcSize.height = im.srcBounds.height
 
-proc betterDimension(tool: ImgTool, d: int): int =
+proc betterDimension(tool: ImgTool, d, e: int): int =
     let r = int(d.float / tool.downsampleRatio)
-    result = case r
+    var changed = true
+    result = case r + e * 2
         of 257 .. 400: 256
         of 513 .. 700: 512
         of 1025 .. 1300: 1024
-        else: r
+        else:
+            changed = false
+            r
     if result > 2048: result = 2048
+    if changed:
+        result -= e * 2
 
 proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
-    im.targetSize.width = tool.betterDimension(im.srcSize.width) - im.extrusion * 2
-    im.targetSize.height = tool.betterDimension(im.srcSize.height) - im.extrusion * 2
+    im.targetSize.width = tool.betterDimension(im.srcSize.width, im.extrusion)
+    im.targetSize.height = tool.betterDimension(im.srcSize.height, im.extrusion)
 
 proc readFile(im: SpriteSheetImage) =
     im.png = loadPNG32(im.originalPath)
@@ -285,8 +245,10 @@ proc readFile(im: SpriteSheetImage) =
     if consumeLessMemory:
         im.png = nil
 
-    im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
-    im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
+    im.srcBounds.width = im.png.width
+    im.srcBounds.height = im.png.height
+    # im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
+    # im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
 
     im.srcSize = (im.srcBounds.width, im.srcBounds.height)
     im.targetSize = im.srcSize
@@ -338,11 +300,12 @@ proc collectImageOccurences(tool: ImgTool) {.inline.} =
         for n, s in c.allSpriteNodes:
             let fileNames = s["fileNames"]
             for ifn in 0 ..< fileNames.len:
-                var im = tool.imageAtPath(compPath, fileNames[ifn].str)
-                im.occurences.add ImageOccurence(parentComposition: c,
-                        parentNode: n, parentComponent: s, frameIndex: ifn,
-                        compPath: compPath,
-                        allowAlphaCrop: true)
+                if fileNames[ifn].kind == JString:
+                    var im = tool.imageAtPath(compPath, fileNames[ifn].str)
+                    im.occurences.add ImageOccurence(parentComposition: c,
+                            parentNode: n, parentComponent: s, frameIndex: ifn,
+                            compPath: compPath,
+                            allowAlphaCrop: true)
 
         for n, s in c.allMeshComponentNodes:
             for key in ["matcapTextureR", "matcapTextureG", "matcapTextureB",
@@ -351,7 +314,7 @@ proc collectImageOccurences(tool: ImgTool) {.inline.} =
                 "bumpTexture", "reflectionTexture", "falloffTexture", "maskTexture"]:
 
                 let t = s{key}
-                if not t.isNil:
+                if not t.isNil and t.kind == JString:
                     var im = tool.imageAtPath(compPath, t.str)
                     im.occurences.add(ImageOccurence(parentComposition: c,
                             parentNode: n, parentComponent: s, textureKey: key,
@@ -360,7 +323,7 @@ proc collectImageOccurences(tool: ImgTool) {.inline.} =
         for n, s in c.allComponentNodesOfType("ParticleSystem"):
             for key in ["texture"]:
                 let t = s{key}
-                if not t.isNil:
+                if not t.isNil and t.kind == JString:
                     var im = tool.imageAtPath(compPath, t.str)
                     im.occurences.add(ImageOccurence(parentComposition: c,
                             parentNode: n, parentComponent: s, textureKey: key,
