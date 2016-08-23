@@ -242,13 +242,13 @@ proc readFile(im: SpriteSheetImage) =
 
     im.actualBounds = imageBounds(im.png.data, im.png.width, im.png.height)
 
-    if consumeLessMemory:
-        im.png = nil
-
     im.srcBounds.width = im.png.width
     im.srcBounds.height = im.png.height
     # im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
     # im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
+
+    if consumeLessMemory:
+        im.png = nil
 
     im.srcSize = (im.srcBounds.width, im.srcBounds.height)
     im.targetSize = im.srcSize
