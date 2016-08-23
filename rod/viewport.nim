@@ -8,6 +8,7 @@ import nimx.window
 import nimx.view_event_handling
 import nimx.view_event_handling_new
 import nimx.notification_center
+import nimx.system_logger
 
 import times
 import tables
@@ -72,11 +73,11 @@ template viewMatrix*(v: SceneView): Matrix4 = v.mCamera.node.worldTransform.inve
 
 proc prepareFramebuffer(v: SceneView, i: var SelfContainedImage, sz: Size) =
     if i.isNil:
-        echo "Creating buffer"
+        logi "Creating buffer"
         i = imageWithSize(sz)
         i.flipVertically()
     elif i.size != sz:
-        echo "Recreating buffer"
+        logi "Recreating buffer"
         i = imageWithSize(sz)
         i.flipVertically()
 
@@ -244,12 +245,12 @@ proc aquireTempFramebuffer*(v: SceneView): SelfContainedImage =
         result = v.tempFramebuffers[^1]
         v.tempFramebuffers.setLen(v.tempFramebuffers.len - 1)
         if result.size != size:
-            echo "REALLOCATING TEMP BUFFER"
+            logi "REALLOCATING TEMP BUFFER"
             result = imageWithSize(size)
             result.flipVertically()
             #swap(result.texCoords[1], result.texCoords[3])
     else:
-        echo "CREATING TEMP BUFFER"
+        logi "CREATING TEMP BUFFER"
         result = imageWithSize(size)
         result.flipVertically()
         #swap(result.texCoords[1], result.texCoords[3])
@@ -305,11 +306,11 @@ proc addLightSource*(v: SceneView, ls: LightSource) =
     if v.lightSources.len() < rod_types.maxLightsCount:
         v.lightSources[ls.node.name] = ls
     else:
-        echo "Count of light sources is limited. Current count equals " & $rod_types.maxLightsCount
+        logi "WARNING: Count of light sources is limited. Current count equals " & $rod_types.maxLightsCount
 
 proc removeLightSource*(v: SceneView, ls: LightSource) =
     if v.lightSources.isNil() or v.lightSources.len() <= 0:
-        echo "Current light sources count equals 0."
+        logi "Current light sources count equals 0."
     else:
         v.lightSources.del(ls.node.name)
 
