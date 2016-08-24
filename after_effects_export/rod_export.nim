@@ -24,12 +24,11 @@ proc getSelectedCompositions(): seq[Composition] =
 
 var logTextField: EditText
 
+proc `&=`(s: var cstring, a: cstring) = {.emit: "`s`[`s`_Idx] += `a`;".}
 proc logi(args: varargs[string, `$`]) =
-    var text = $logTextField.text
     for i in args:
-        text &= i
-    text &= "\n"
-    logTextField.text = text
+        logTextField.text &= i
+    logTextField.text &= "\n"
 
 proc shouldSerializeLayer(layer: Layer): bool = return layer.enabled
 
