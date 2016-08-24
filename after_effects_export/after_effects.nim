@@ -78,6 +78,10 @@ type
     PropertyBase* = ref PropertyBaseObj
     PropertyBaseObj {.importc.} = object of RootObj
         name*: cstring
+        enabled*: bool
+        active*: bool
+        parentProperty*: PropertyGroup
+        canSetEnabled*: bool
 
     PropertyType* = enum
         ptProperty
@@ -131,6 +135,10 @@ type
         font*: cstring
         fontSize*: int
         fillColor*: array[3, float]
+        tracking*: float
+        strokeWidth*: float
+        strokeColor*: array[3, float]
+        applyStroke*: bool
 
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted

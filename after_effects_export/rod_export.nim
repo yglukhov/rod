@@ -24,14 +24,13 @@ proc getSelectedCompositions(): seq[Composition] =
 
 var logTextField: EditText
 
+proc `&=`(s: var cstring, a: cstring) = {.emit: "`s`[`s`_Idx] += `a`;".}
 proc logi(args: varargs[string, `$`]) =
-    var text = $logTextField.text
     for i in args:
-        text &= i
-    text &= "\n"
-    logTextField.text = text
+        logTextField.text &= i
+    logTextField.text &= "\n"
 
-proc shouldSerializeLayer(layer: Layer): bool {.exportc.} = return layer.enabled
+proc shouldSerializeLayer(layer: Layer): bool = return layer.enabled
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
 
@@ -179,7 +178,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         of tjCenter: txt["justification"] = %"center"
 
         let shadow = layer.propertyGroup("Layer Styles").propertyGroup("Drop Shadow")
-        if not shadow.isNil:
+        if not shadow.isNil and shadow.canSetEnabled and shadow.enabled:
             let angle = shadow.property("Angle", float32).valueAtTime(0)
             let distance = shadow.property("Distance", float32).valueAtTime(0)
             let color = shadow.property("Color", Vector4).valueAtTime(0)
@@ -191,8 +190,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
             txt["shadowY"] = %(- distance * sin(radAngle))
 
         let stroke = layer.propertyGroup("Layer Styles").propertyGroup("Stroke")
-        if not stroke.isNil:
-            logi "Stroke  "
+        if not stroke.isNil and stroke.canSetEnabled and stroke.enabled:
             let size = stroke.property("Size", float32).valueAtTime(0)
             let color = stroke.property("Color", Vector4).valueAtTime(0)
             let alpha = stroke.property("Opacity", float32).valueAtTime(0) / 100
