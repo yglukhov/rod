@@ -300,6 +300,8 @@ method draw*(t: Text) =
     if not t.mText.isNil:
         let c = currentContext()
         var p: Point
+        let oldBaseline = t.font.baseline
+        t.font.baseline = bAlphabetic
         let hs = t.font.horizontalSpacing
         t.font.horizontalSpacing = t.trackingAmount
         if t.justification != tjLeft:
@@ -308,8 +310,6 @@ method draw*(t: Text) =
                 p.x -= textSize.width / 2
             else:
                 p.x -= textSize.width
-
-        p.y -= t.font.size
 
         if t.strokeSize > 0:
             t.drawStroke(p)
@@ -320,6 +320,7 @@ method draw*(t: Text) =
         c.fillColor = t.color
         t.drawMyText(p)
         t.font.horizontalSpacing = hs
+        t.font.baseline = oldBaseline
 
 method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("text", t.text)
