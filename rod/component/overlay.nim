@@ -51,4 +51,4 @@ method draw*(o: Overlay) =
 
 method isPosteffectComponent*(c: Overlay): bool = true
 
-registerComponent[Overlay]()
+registerComponent(Overlay)

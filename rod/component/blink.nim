@@ -106,4 +106,4 @@ method visitProperties*(b: Blink, p: var PropertyVisitor) =
     p.visitProperty("speed", b.speed)
     p.visitProperty("period", b.period)
 
-registerComponent[Blink]()
+registerComponent(Blink)

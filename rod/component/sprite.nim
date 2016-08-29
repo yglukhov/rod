@@ -104,4 +104,4 @@ method visitProperties*(t: Sprite, p: var PropertyVisitor) =
     p.visitProperty("image", t.image)
     p.visitProperty("curFrame", t.currentFrame)
 
-registerComponent[Sprite]()
+registerComponent(Sprite)

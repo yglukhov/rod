@@ -5,6 +5,7 @@ import json
 import nimx.types
 import nimx.property_visitor
 import nimx.matrixes
+import nimx.class_registry
 
 import node
 import rod_types
@@ -15,24 +16,23 @@ export Component
 
 method init*(c: Component) {.base.} = discard
 
-var componentRegistry = initTable[string, proc(): Component]()
+proc registeredComponents*(): seq[string] =
+    result = newSeq[string]()
+    for c in registeredClassesOfType(Component):
+        result.add(c)
 
-proc registeredComponents*(): seq[string] = toSeq(keys(componentRegistry))
+template registerComponent*(T: typedesc) =
+    registerClass(T)
 
-proc registerComponent*[T]() =
-    componentRegistry.add T.name, proc(): Component =
-        result = T.new()
-
-proc registerComponent*[T](creator: proc(): Component) =
-    componentRegistry.add T.name, creator
+template registerComponent*(T: typedesc, creator: (proc(): RootRef)) =
+    registerClass(T, creator)
 
 proc createComponent*(name: string): Component =
-    let p = componentRegistry.getOrDefault(name)
-    if not p.isNil:
-        result = p()
-        result.init()
-    if result.isNil:
+    if isClassRegistered(name) == false:
         raise newException(Exception, "Component " & name & " is not registered")
+
+    result = newObjectOfClass(name).Component
+    result.init()
 
 proc createComponent*[T](): T = createComponent(T.name).T
 

@@ -198,7 +198,7 @@ method visitProperties*(t: Tracer, p: var PropertyVisitor) =
     p.visitProperty("color", t.color)
     p.visitProperty("trace_step", t.traceStep)
 
-# registerComponent[Tracer]()
-registerComponent[Tracer](proc(): Component =
+proc creator(): RootRef =
     result = newTracer()
-    )
+
+registerComponent(Tracer, creator)
