@@ -4,7 +4,7 @@
   "components": [
     {
       "is2D": true,
-      "className": "ConePSGenShape",
+      "_c": "ConePSGenShape",
       "angle": -20.0,
       "radius": 2.0
     },
@@ -17,7 +17,7 @@
       "birthRate": 100.0,
       "randVelocityTo": 0.0,
       "randScaleTo": 0.0,
-      "className": "ParticleSystem",
+      "_c": "ParticleSystem",
       "randRotVelocityTo": [
         0.0,
         0.0,

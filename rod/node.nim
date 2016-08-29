@@ -483,7 +483,7 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
         if v.kind == JArray:
             for i in 0 ..< v.len:
                 var className: string
-                s.deserializeValue(v[i], "className", className)
+                s.deserializeValue(v[i], "_c", className)
                 let comp = n.addComponent(className)
                 comp.deserialize(v[i], s)
         else:
@@ -540,7 +540,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
             jcomp = value.serialize( s )
 
             if not jcomp.isNil:
-                jcomp.add("className", %value.className())
+                jcomp.add("_c", %value.className())
                 componentsNode.add(jcomp)
 
     var childsNode = newJArray()
