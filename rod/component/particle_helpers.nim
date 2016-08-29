@@ -349,11 +349,11 @@ method visitProperties*(attr: PSModifierRandWind, p: var PropertyVisitor) =
     p.visitProperty("force", attr.force)
 
 
-registerComponent[ConePSGenShape]()
-registerComponent[SpherePSGenShape]()
-registerComponent[BoxPSGenShape]()
+registerComponent(ConePSGenShape)
+registerComponent(SpherePSGenShape)
+registerComponent(BoxPSGenShape)
 
-registerComponent[PSModifierWave]()
-registerComponent[PSModifierColor]()
-registerComponent[PSModifierSpiral]()
-registerComponent[PSModifierRandWind]()
+registerComponent(PSModifierWave)
+registerComponent(PSModifierColor)
+registerComponent(PSModifierSpiral)
+registerComponent(PSModifierRandWind)

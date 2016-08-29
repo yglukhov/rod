@@ -144,4 +144,4 @@ method visitProperties*(ls: LightSource, p: var PropertyVisitor) =
 
     p.visitProperty("color", ls.lightColor)
 
-registerComponent[LightSource]()
+registerComponent(LightSource)

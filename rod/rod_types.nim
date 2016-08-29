@@ -16,7 +16,7 @@ type
         mTranslation*: Vector3
         mRotation*: Quaternion
         mScale*: Vector3
-        components*: TableRef[string, Component]
+        components*: seq[Component]
         children*: seq[Node3D]
         mParent*: Node3D
         name*: string
@@ -36,7 +36,7 @@ type
         maxPoint*: Vector3
         minPoint*: Vector3
 
-    Component* = ref object of RootObj
+    Component* = ref object of RootRef
         node*: Node3D
         bbox*: BBox
 

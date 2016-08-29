@@ -27,18 +27,18 @@ var debugDrawShader = newShader(vertexShader, fragmentShader,
 let boxIndexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
 var boxIB: BufferRef
 
+var boxPoints: seq[GLfloat]
 proc DDdrawBox*(minPoint, maxPoint: Vector3) =
-    const pointsCount = 8
-    var points = newSeq[GLfloat]()
-    points.add([minPoint.x, minPoint.y, minPoint.z])
-    points.add([maxPoint.x, minPoint.y, minPoint.z])
-    points.add([maxPoint.x, maxPoint.y, minPoint.z])
-    points.add([minPoint.x, maxPoint.y, minPoint.z])
+    boxPoints = newSeq[GLfloat]()
+    boxPoints.add([minPoint.x, minPoint.y, minPoint.z])
+    boxPoints.add([maxPoint.x, minPoint.y, minPoint.z])
+    boxPoints.add([maxPoint.x, maxPoint.y, minPoint.z])
+    boxPoints.add([minPoint.x, maxPoint.y, minPoint.z])
 
-    points.add([minPoint.x, minPoint.y, maxPoint.z])
-    points.add([maxPoint.x, minPoint.y, maxPoint.z])
-    points.add([maxPoint.x, maxPoint.y, maxPoint.z])
-    points.add([minPoint.x, maxPoint.y, maxPoint.z])
+    boxPoints.add([minPoint.x, minPoint.y, maxPoint.z])
+    boxPoints.add([maxPoint.x, minPoint.y, maxPoint.z])
+    boxPoints.add([maxPoint.x, maxPoint.y, maxPoint.z])
+    boxPoints.add([minPoint.x, maxPoint.y, maxPoint.z])
 
     let gl = currentContext().gl
     if boxIB == invalidBuffer:
@@ -48,7 +48,7 @@ proc DDdrawBox*(minPoint, maxPoint: Vector3) =
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxIB)
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, points)
+    gl.vertexAttribPointer(0, 3, false, 0, boxPoints)
 
     debugDrawShader.bindShader()
     debugDrawShader.setTransformUniform()

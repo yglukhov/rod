@@ -46,4 +46,4 @@ method serialize*(c: Solid, s: Serializer): JsonNode =
     result.add("size", s.getValue(c.size))
     result.add("color", s.getValue(c.color))
 
-registerComponent[Solid]()
+registerComponent(Solid)

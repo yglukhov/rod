@@ -124,48 +124,65 @@ proc createComponentForNode(n: Node, name: string): Component =
     if not n.mSceneView.isNil:
         result.componentNodeWasAddedToSceneView()
 
-proc component*(n: Node, name: string): Component =
+proc addComponent(n: Node, name: string): Component =
     if n.components.isNil:
-        n.components = newTable[string, Component]()
-        result = createComponentForNode(n, name)
-        n.components[name] = result
-    else:
-        result = n.components.getOrDefault(name)
-        if result.isNil:
-            result = createComponentForNode(n, name)
-            n.components[name] = result
+        n.components = newSeq[Component]()
+
+    result = createComponentForNode(n, name)
+    n.components.add(result)
+
+proc addComponent(n: Node, T: typedesc): Component =
+    result = n.addComponent(T.name)
+
+
+proc getComponent*(n: Node, name: string): Component =
+    if n.components.isNil:
+        return nil
+
+    for v in n.components:
+        if v.className == name:
+            return v
+
+    return nil
+
+proc getComponent*(n: Node, T: typedesc[Component]): T =
+    if n.components.isNil:
+        return nil
+
+    for v in n.components:
+        type TT = T
+        if v of TT:
+            return v.TT
+
+    return nil
+
+proc component*(n: Node, name: string): Component =
+    result = n.getComponent(name)
+    if result.isNil:
+        result = n.addComponent(name)
 
 proc component*(n: Node, T: typedesc[Component]): T =
     type TT = T
     result = TT(n.component(T.name))
 
 proc componentIfAvailable*(n: Node, name: string): Component =
-    if not n.components.isNil:
-        result = n.components.getOrDefault(name)
+    result = n.getComponent(name)
 
 proc componentIfAvailable*(n: Node, T: typedesc[Component]): T =
-    type TT = T
-    result = TT(n.componentIfAvailable(T.name))
+    result = n.getComponent(T)
 
 proc setComponent*(n: Node, name: string, c: Component) =
     if n.components.isNil:
-        n.components = newTable[string, Component]()
-    n.components[name] = c
+        n.components = newSeq[Component]()
+    n.components.add(c)
 
 proc removeComponent*(n: Node, name: string) =
     if not n.components.isNil:
-        let c = n.components.getOrDefault(name)
-        if not c.isNil:
-            c.componentNodeWillBeRemovedFromSceneView()
-            n.components.del(name)
-
-proc getComponent*(n: Node, T: typedesc[Component]): T =
-    for k, v in n.components:
-        type TT = T
-        if v of TT:
-            return v.TT
-
-    return nil
+        let c = n.getComponent(name)
+        for i, comp in n.components:
+            if comp == c:
+                c.componentNodeWillBeRemovedFromSceneView()
+                n.components.delete(i)
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
@@ -212,7 +229,7 @@ proc recursiveDraw*(n: Node) =
     c.withTransform tr:
         var hasPosteffectComponent = false
         if not n.components.isNil:
-            for v in values(n.components):
+            for v in n.components:
                 v.draw()
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
 
@@ -231,7 +248,7 @@ proc drawNode*(n: Node): bool =
     c.withTransform tr:
         var hasPosteffectComponent = false
         if not n.components.isNil:
-            for v in values(n.components):
+            for v in n.components:
                 v.draw()
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
 
@@ -284,7 +301,7 @@ proc checkNodeRefs(n: Node) =
 
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     if not n.components.isNil:
-        for c in n.components.values: c.componentNodeWillBeRemovedFromSceneView()
+        for c in n.components: c.componentNodeWillBeRemovedFromSceneView()
     if not n.children.isNil:
         for c in n.children: c.nodeWillBeRemovedFromSceneView()
     n.mSceneView = nil
@@ -292,7 +309,7 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
     n.mSceneView = v
     if not n.components.isNil:
-        for c in n.components.values: c.componentNodeWasAddedToSceneView()
+        for c in n.components: c.componentNodeWasAddedToSceneView()
     if not n.children.isNil:
         for c in n.children: c.nodeWasAddedToSceneView(v)
 
@@ -459,13 +476,23 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if not v.isNil:
         for i in 0 ..< v.len:
             n.addChild(newNodeFromJson(v[i], s))
+
+
     v = j{"components"}
     if not v.isNil:
-        for k, c in v:
-            if k == "NodeSelector":
-                continue
-            let comp = n.component(k)
-            comp.deserialize(c, s)
+        if v.kind == JArray:
+            for i in 0 ..< v.len:
+                var className: string
+                s.deserializeValue(v[i], "className", className)
+                let comp = n.component(className)
+                comp.deserialize(v[i], s)
+        else:
+            # Deprecated. Old save format support
+            for k, c in v:
+                if k == "NodeSelector":
+                    continue
+                let comp = n.component(k)
+                comp.deserialize(c, s)
 
     let animations = j{"animations"}
     if not animations.isNil and animations.len > 0:
@@ -502,15 +529,19 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("layer", s.getValue(n.layer))
 
     if not n.components.isNil:
-        var componentsNode = newJObject()
+        var componentsNode = newJArray()
         result.add("components", componentsNode)
 
-        for key, value in n.components:
+        for value in n.components:
+            if value.className() == "NodeSelector":
+                continue
+
             var jcomp: JsonNode
             jcomp = value.serialize( s )
 
             if not jcomp.isNil:
-                componentsNode.add(key, jcomp)
+                jcomp.add("className", %value.className())
+                componentsNode.add(jcomp)
 
     var childsNode = newJArray()
     result.add("children", childsNode)

@@ -204,4 +204,4 @@ method visitProperties*(r: FXAAPost, p: var PropertyVisitor) =
 
 method isPosteffectComponent*(r: FXAAPost): bool = true
 
-registerComponent[FXAAPost]()
+registerComponent(FXAAPost)

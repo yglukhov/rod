@@ -890,6 +890,7 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
     p.visitProperty("quads", t.quadsToDraw)
     p.visitProperty("wireframe", t.isWireframe)
 
-registerComponent[Trail](proc(): Component =
+proc creator(): RootRef =
     result = newTrail()
-    )
+
+registerComponent(Trail, creator)

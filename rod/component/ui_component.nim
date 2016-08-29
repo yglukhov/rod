@@ -101,4 +101,4 @@ method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
         if i != -1:
             sv.uiComponents.del(i)
 
-registerComponent[UIComponent]()
+registerComponent(UIComponent)

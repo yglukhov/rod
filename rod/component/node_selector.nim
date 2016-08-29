@@ -214,4 +214,4 @@ proc stopTransform*(ns: NodeSelector) =
 method visitProperties*(ns: NodeSelector, p: var PropertyVisitor) =
     p.visitProperty("color", ns.color)
 
-registerComponent[NodeSelector]()
+registerComponent(NodeSelector)

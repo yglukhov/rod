@@ -303,4 +303,4 @@ method visitProperties*(bc: BlurComponent, p: var PropertyVisitor) =
     p.visitProperty("velo_scale", bc.velocityScale)
     p.visitProperty("show_motion", bc.bShowMotionMap)
 
-registerComponent[BlurComponent]()
+registerComponent(BlurComponent)
