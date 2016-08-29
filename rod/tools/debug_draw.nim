@@ -27,18 +27,17 @@ var debugDrawShader = newShader(vertexShader, fragmentShader,
 let boxIndexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
 var boxIB: BufferRef
 
-var boxPoints: seq[GLfloat]
 proc DDdrawBox*(minPoint, maxPoint: Vector3) =
-    boxPoints = newSeq[GLfloat]()
-    boxPoints.add([minPoint.x, minPoint.y, minPoint.z])
-    boxPoints.add([maxPoint.x, minPoint.y, minPoint.z])
-    boxPoints.add([maxPoint.x, maxPoint.y, minPoint.z])
-    boxPoints.add([minPoint.x, maxPoint.y, minPoint.z])
+    const pointsCount = 8
+    let boxPoints = [minPoint.x, minPoint.y, minPoint.z,
+                maxPoint.x, minPoint.y, minPoint.z,
+                maxPoint.x, maxPoint.y, minPoint.z,
+                minPoint.x, maxPoint.y, minPoint.z,
 
-    boxPoints.add([minPoint.x, minPoint.y, maxPoint.z])
-    boxPoints.add([maxPoint.x, minPoint.y, maxPoint.z])
-    boxPoints.add([maxPoint.x, maxPoint.y, maxPoint.z])
-    boxPoints.add([minPoint.x, maxPoint.y, maxPoint.z])
+                minPoint.x, minPoint.y, maxPoint.z,
+                maxPoint.x, minPoint.y, maxPoint.z,
+                maxPoint.x, maxPoint.y, maxPoint.z,
+                minPoint.x, maxPoint.y, maxPoint.z]
 
     let gl = currentContext().gl
     if boxIB == invalidBuffer:

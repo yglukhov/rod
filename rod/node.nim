@@ -484,7 +484,7 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
             for i in 0 ..< v.len:
                 var className: string
                 s.deserializeValue(v[i], "className", className)
-                let comp = n.component(className)
+                let comp = n.addComponent(className)
                 comp.deserialize(v[i], s)
         else:
             # Deprecated. Old save format support
