@@ -18,7 +18,7 @@ proc view*(c: UIComponent): View =
     if not c.mView.isNil:
         result = c.mView.subviews[0]
 
-proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool =
+proc intersectsWithUIPlane*(uiComp: UIComponent, r: Ray, res: var Vector3): bool=
     let n = uiComp.node
     let worldPointOnPlane = n.localToWorld(newVector3())
     var worldNormal = n.localToWorld(newVector3(0, 0, 1))
@@ -26,11 +26,12 @@ proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool 
     worldNormal.normalize()
     result = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
 
-    if result and not uiComp.mView.isNil:
+proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool =
+    if uiComp.intersectsWithUIPlane(r, res) and not uiComp.mView.isNil:
         let v = uiComp.view
         if not v.isNil:
             var localres : Vector3
-            if n.tryWorldToLocal(res, localres):
+            if uiComp.node.tryWorldToLocal(res, localres):
                 result = localres.x >= v.frame.x and localres.x <= v.frame.maxX and
                     localres.y >= v.frame.y and localres.y <= v.frame.maxY
 
@@ -43,7 +44,7 @@ method convertPointFromParent*(v: UICompView, p: Point): Point =
     if not v.uiComp.node.sceneView.isNil:
         let r = v.uiComp.node.sceneView.rayWithScreenCoords(p)
         var res : Vector3
-        if v.uiComp.intersectsWithUINode(r, res):
+        if v.uiComp.intersectsWithUIPlane(r, res):
             if v.uiComp.node.tryWorldToLocal(res, res):
                 result = newPoint(res.x, res.y)
 
