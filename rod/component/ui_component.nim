@@ -18,7 +18,7 @@ proc view*(c: UIComponent): View =
     if not c.mView.isNil:
         result = c.mView.subviews[0]
 
-proc intersectsWithUIPlane*(uiComp: UIComponent, r: Ray, res: var Vector3): bool=
+proc intersectsWithUIPlane(uiComp: UIComponent, r: Ray, res: var Vector3): bool=
     let n = uiComp.node
     let worldPointOnPlane = n.localToWorld(newVector3())
     var worldNormal = n.localToWorld(newVector3(0, 0, 1))
