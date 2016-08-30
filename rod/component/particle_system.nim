@@ -995,8 +995,9 @@ method visitProperties*(h: PSHolder, p: var PropertyVisitor) =
     p.visitProperty("distance", h.distance)
     p.visitProperty("speed", h.speed)
 
-registerComponent[PSHolder]()
+registerComponent(PSHolder)
 
-registerComponent[ParticleSystem](proc(): Component =
+proc creator(): RootRef =
     result = newParticleSystem()
-    )
+
+registerComponent(ParticleSystem, creator)

@@ -73,4 +73,4 @@ method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("fov", c.fov)
     p.visitProperty("projMode", c.projectionMode)
 
-registerComponent[Camera]()
+registerComponent(Camera)

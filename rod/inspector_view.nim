@@ -58,8 +58,8 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         n.visitProperties(visitor)
 
         if not n.components.isNil:
-            for k, v in n.components:
-                propView.addSubview(newSectionTitle(i, n, k))
+            for v in n.components:
+                propView.addSubview(newSectionTitle(i, n, v.className))
                 v.visitProperties(visitor)
 
         propView.addSubview(createNewComponentButton(i, n))

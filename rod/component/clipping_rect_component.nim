@@ -76,4 +76,4 @@ method draw*(cl: ClippingRectComponent) =
 
 method isPosteffectComponent*(c: ClippingRectComponent): bool = true
 
-registerComponent[ClippingRectComponent]()
+registerComponent(ClippingRectComponent)

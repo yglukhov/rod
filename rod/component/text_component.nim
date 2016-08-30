@@ -340,4 +340,4 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("strokeColorFrom", t.strokeColorFrom)
     p.visitProperty("strokeColorTo", t.strokeColorTo)
 
-registerComponent[Text]()
+registerComponent(Text)

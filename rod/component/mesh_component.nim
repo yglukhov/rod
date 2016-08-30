@@ -619,4 +619,4 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
         p.visitProperty("animType", m.skeleton.animType)
         p.visitProperty("debugSkeleton", m.debugSkeleton)
 
-registerComponent[MeshComponent]()
+registerComponent(MeshComponent)
