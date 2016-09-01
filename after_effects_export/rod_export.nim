@@ -24,7 +24,9 @@ proc getSelectedCompositions(): seq[Composition] =
 
 var logTextField: EditText
 
-proc `&=`(s: var cstring, a: cstring) = {.emit: "`s`[`s`_Idx] += `a`;".}
+proc appendToJSStringAux(s: cstring, a: cstring) {.importcpp: "# += #".}
+template `&=`(s: var cstring, a: cstring) = appendToJSStringAux(s, a)
+
 proc logi(args: varargs[string, `$`]) =
     for i in args:
         logTextField.text &= i
@@ -172,6 +174,10 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
+        if textDoc.boxText:
+            let r = layer.sourceRectAtTime(0, false)
+            txt["bounds"] = % [r.left, r.top, r.width, r.height]
+
         case textDoc.justification
         of tjLeft: txt["justification"] = %"left"
         of tjRight: txt["justification"] = %"right"
