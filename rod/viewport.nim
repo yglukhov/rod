@@ -291,7 +291,9 @@ proc swapCompositingBuffers*(v: SceneView) =
             # Swap active buffer to backup buffer
             gl.bindFramebuffer(v.mBackupFrameBuffer, false)
             gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
-        glBlitFramebuffer(0, 0, vp[2], vp[3], 0, 0, vp[2], vp[3], GL_COLOR_BUFFER_BIT, GLenum(GL_NEAREST))
+        let bounds = v.convertRectToWindow(v.bounds)
+        glBlitFramebuffer(bounds.x.GLint, bounds.y.GLint, bounds.width.GLint, bounds.height.GLint,
+                            bounds.x.GLint, bounds.y.GLint, bounds.width.GLint, bounds.height.GLint, GL_COLOR_BUFFER_BIT, GLenum(GL_NEAREST))
 
     swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 

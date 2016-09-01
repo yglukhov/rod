@@ -139,6 +139,9 @@ type
         strokeWidth*: float
         strokeColor*: array[3, float]
         applyStroke*: bool
+        pointText*: bool
+        boxText*: bool
+        boxTextSize*: array[2, int]
 
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
@@ -155,6 +158,10 @@ type
         ## Value in the range [0.1..100.0]
         influence*: float
 
+    Rect* = ref RectObj
+    RectObj {.importc.} = object of RootObj
+        top*, left*, width*, height*: float
+
 template `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
 template len*[T](c: Collection[T]): int = cast[seq[type(c.fieldToCheckType)]](c).len
 
@@ -163,6 +170,8 @@ proc remove*(i: Item) {.importcpp.}
 proc layers*(c: Composition): Collection[Layer] = {.emit:"`result` = `c`.layers;".}
 proc selectedLayers*(c: Composition): seq[Layer] = {.emit:"`result` = `c`.selectedLayers; if (`result`.length === undefined) { `result` = [`result`]; }".}
 proc layer*(c: Composition, name: cstring): Layer {.importcpp.}
+
+proc sourceRectAtTime*(layer: Layer, time: float, extents: bool): Rect {.importcpp.}
 
 proc activeItem*(p: Project, T: typedesc): T = {.emit: "`result` = `p`.activeItem;".}
 
