@@ -167,8 +167,6 @@ method generate*(pgs: SpherePSGenShape): ParticleGenerationData =
         result.generateRandDir(pgs.is2D)
 
 proc debugDraw*(pgs: SpherePSGenShape) =
-    if pgs.node.sceneView.editing:
-        pgs.debugDraw()
     let gl = currentContext().gl
     gl.disable(gl.DEPTH_TEST)
     DDdrawCircle(newVector3(0.0), pgs.radius)
