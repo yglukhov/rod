@@ -124,14 +124,14 @@ proc createComponentForNode(n: Node, name: string): Component =
     if not n.mSceneView.isNil:
         result.componentNodeWasAddedToSceneView()
 
-proc addComponent(n: Node, name: string): Component =
+proc addComponent*(n: Node, name: string): Component =
     if n.components.isNil:
         n.components = newSeq[Component]()
 
     result = createComponentForNode(n, name)
     n.components.add(result)
 
-proc addComponent(n: Node, T: typedesc): Component =
+proc addComponent*(n: Node, T: typedesc): Component =
     result = n.addComponent(T.name)
 
 
@@ -240,29 +240,31 @@ proc recursiveDraw*(n: Node) =
 
 proc drawNode*(n: Node): bool =
     if n.alpha < 0.0000001: return
-    let c = currentContext()
     var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-    let oldAlpha = c.alpha
-    c.alpha *= n.alpha
 
-    c.withTransform tr:
+    currentContext().withTransform tr:
         var hasPosteffectComponent = false
         if not n.components.isNil:
             for v in n.components:
                 v.draw()
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
 
-    c.alpha = oldAlpha
     result = hasPosteffectComponent
 
 proc recursiveDraw*(n: Node, drawTable: var TableRef[int, seq[Node]]) =
     if n.layer == 0:
         if n.alpha < 0.0000001: return
+
+        let c = currentContext()
+        let oldAlpha = c.alpha
+        c.alpha *= n.alpha
         var hasPosteffectComponent = n.drawNode()
 
         if not hasPosteffectComponent:
             for c in n.children:
                 c.recursiveDraw(drawTable)
+
+        c.alpha = oldAlpha
 
     else:
         var drawNodes = drawTable.getOrDefault(n.layer)
@@ -307,11 +309,18 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
     n.mSceneView = nil
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
-    n.mSceneView = v
-    if not n.components.isNil:
-        for c in n.components: c.componentNodeWasAddedToSceneView()
-    if not n.children.isNil:
-        for c in n.children: c.nodeWasAddedToSceneView(v)
+    if n.mSceneView.isNil:
+        n.mSceneView = v
+        if not n.components.isNil:
+            for c in n.components: c.componentNodeWasAddedToSceneView()
+        if not n.children.isNil:
+            for c in n.children: c.nodeWasAddedToSceneView(v)
+    else:
+        # There may be cases where this proc has already been called.
+        # E.g. component adds child node to its node in
+        # `componentNodeWasAddedToSceneView`.
+        # In such case we don't have to do anything
+        assert(n.mSceneView == v)
 
 proc removeChild(n, child: Node) =
     for i, c in n.children:
@@ -556,6 +565,12 @@ proc getDepth*(n: Node): int =
         inc result
         p = p.parent
 
+proc printParents(n: Node, indent: var string) =
+    echo "" & indent & " name ", n.name
+    indent = indent & "+"
+    if not n.parent.isNil:
+        n.parent.printParents(indent)
+
 proc getTreeDistance*(x, y: Node): int =
     var xLevel = x.getDepth()
     var yLevel = y.getDepth()
@@ -568,6 +583,12 @@ proc getTreeDistance*(x, y: Node): int =
     while yLevel > xLevel:
         dec yLevel
         py = py.parent
+
+    if px == py:
+        var indent = ""
+        px.printParents(indent)
+        indent = ""
+        py.printParents(indent)
 
     assert(px != py)
     var cx, cy : Node
