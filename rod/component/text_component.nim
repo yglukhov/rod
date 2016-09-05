@@ -91,7 +91,7 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 
         t.mText.horizontalAlignment = horAlign
 
-        v = j{"justification_vertical"}
+        v = j{"verticalAlignment"}
         var vertAlign = vaTop
         if not v.isNil:
             case v.getStr()
@@ -261,7 +261,7 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     of vaCenter: vertAlign = "center"
     of vaBottom: vertAlign = "bottom"
     else: discard
-    result.add("justification_vertical", s.getValue(vertAlign))
+    result.add("verticalAlignment", s.getValue(vertAlign))
 
 proc shadowMultiplier(t: Text): Size =
     let sv = newVector3(1, 1)
