@@ -417,4 +417,8 @@ method init*(v: SceneView, frame: Rect) =
 
     gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
 
+method resizeSubviews*(v: SceneView, oldSize: Size) =
+    procCall v.View.resizeSubviews(oldSize)
+    v.viewProjMatrix = v.getViewProjectionMatrix()
+
 import component.all_components
