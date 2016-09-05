@@ -12,6 +12,7 @@ import rod.component
 import rod.component.camera
 import rod.viewport
 import rod.tools.serializer
+import rod.tools.debug_draw
 
 type TextJustification* = enum
     tjLeft
@@ -90,6 +91,17 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 
         t.mText.horizontalAlignment = horAlign
 
+        v = j{"verticalAlignment"}
+        var vertAlign = vaTop
+        if not v.isNil:
+            case v.getStr()
+            of "top": vertAlign = vaTop
+            of "center": vertAlign = vaCenter
+            of "bottom": vertAlign = vaBottom
+            else: discard
+
+        t.mText.verticalAlignment = vertAlign
+
         var strokeSize: float
         s.deserializeValue(j, "strokeSize", strokeSize)
         if strokeSize != 0:
@@ -118,7 +130,7 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
         v = j{"bounds"}
         if not v.isNil:
             t.mBoundingOffset = newPoint(v[0].getFNum(), v[1].getFNum())
-            t.mText.boundingSize = newSize(v[2].getFNum(), v[2].getFNum())
+            t.mText.boundingSize = newSize(v[2].getFNum(), v[3].getFNum())
 
 ################################################################################
 # Old compatibility api
@@ -233,6 +245,24 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     result.add("strokeColorFrom", s.getValue(c.strokeColorFrom))
     result.add("strokeColorTo", s.getValue(c.strokeColorTo))
 
+    result.add("bounds", s.getValue([c.mBoundingOffset.x, c.mBoundingOffset.y, c.mText.boundingSize.width, c.mText.boundingSize.height]))
+
+    var horAlign = "left"
+    case c.mText.horizontalAlignment
+    of haLeft: horAlign = "left"
+    of haCenter: horAlign = "center"
+    of haRight: horAlign = "right"
+    else: discard
+    result.add("justification", s.getValue(horAlign))
+
+    var vertAlign = "top"
+    case c.mText.verticalAlignment
+    of vaTop: vertAlign = "top"
+    of vaCenter: vertAlign = "center"
+    of vaBottom: vertAlign = "bottom"
+    else: discard
+    result.add("verticalAlignment", s.getValue(vertAlign))
+
 proc shadowMultiplier(t: Text): Size =
     let sv = newVector3(1, 1)
     var wsv = t.node.localToWorld(sv)
@@ -251,6 +281,10 @@ proc shadowMultiplier(t: Text): Size =
     let y_direction = abs(projMatrix[5]) / projMatrix[5]
 
     result = newSize(wsv.x / abs(worldScale.x), - y_direction * wsv.y / abs(worldScale.y))
+
+proc debugDraw(t: Text) =
+    let rect = newRect(newPoint(0.0, 0.0), t.mText.boundingSize)
+    DDdrawRect(rect)
 
 method draw*(t: Text) =
     if not t.mText.isNil:
@@ -271,6 +305,9 @@ method draw*(t: Text) =
         c.drawText(p, t.mText)
         t.mText.horizontalAlignment = ha
 
+        if t.node.sceneView.editing:
+            t.debugDraw()
+
 method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("text", t.text)
     p.visitProperty("color", t.color)
@@ -288,5 +325,9 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("isStrokeGradient", t.isStrokeGradient)
     p.visitProperty("strokeColorFrom", t.strokeColorFrom)
     p.visitProperty("strokeColorTo", t.strokeColorTo)
+
+    p.visitProperty("boundingSize", t.mText.boundingSize)
+    p.visitProperty("horAlignment", t.mText.horizontalAlignment)
+    p.visitProperty("vertAlignment", t.mText.verticalAlignment)
 
 registerComponent(Text)

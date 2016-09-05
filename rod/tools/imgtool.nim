@@ -64,6 +64,7 @@ type ImgTool* = ref object
     compressToPVR*: bool
     createIndex*: bool
     downsampleRatio*: float
+    disablePotAdjustment*: bool # If true, do not resize images to power of 2
     extrusion*: int
     images: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
@@ -219,6 +220,8 @@ proc recalculateSourceBounds(im: SpriteSheetImage) =
 
 proc betterDimension(tool: ImgTool, d, e: int): int =
     let r = int(d.float / tool.downsampleRatio)
+    if tool.disablePotAdjustment:
+        return r
     var changed = true
     result = case r + e * 2
         of 257 .. 400: 256

@@ -138,3 +138,9 @@ proc DDdrawArrow*(dist: float32) =
     DDdrawLine( newVector3(0.0, dist, 0.0), newVector3(-dist / 8.0, dist * 3.0 / 4.0, dist / 8.0) )
     DDdrawLine( newVector3(0.0, dist, 0.0), newVector3(-dist / 8.0, dist * 3.0 / 4.0, -dist / 8.0) )
     DDdrawLine( newVector3(0.0, dist, 0.0), newVector3(dist / 8.0, dist * 3.0 / 4.0, -dist / 8.0) )
+
+proc DDdrawRect*(rect: Rect) =
+    DDdrawLine( newVector3(rect.x, rect.y, 0.0), newVector3(rect.x + rect.width, rect.y, 0.0) )
+    DDdrawLine( newVector3(rect.x, rect.y, 0.0), newVector3(rect.x, rect.y + rect.height, 0.0) )
+    DDdrawLine( newVector3(rect.x + rect.width, rect.y, 0.0), newVector3(rect.x + rect.width, rect.y + rect.height, 0.0) )
+    DDdrawLine( newVector3(rect.x, rect.y + rect.height, 0.0), newVector3(rect.x + rect.width, rect.y + rect.height, 0.0) )
