@@ -291,8 +291,7 @@ proc shadowMultiplier(t: Text): Size =
     result = newSize(wsv.x / abs(worldScale.x), - y_direction * wsv.y / abs(worldScale.y))
 
 proc debugDraw(t: Text) =
-    let rect = newRect(newPoint(0.0, 0.0), t.mText.boundingSize)
-    DDdrawRect(rect)
+    DDdrawRect(newRect(t.mBoundingOffset, t.mText.boundingSize))
 
 method draw*(t: Text) =
     if not t.mText.isNil:
