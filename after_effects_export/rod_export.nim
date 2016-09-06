@@ -170,7 +170,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
     if not text.isNil:
         var textDoc = text.property("Source Text", TextDocument).value
         var txt = newJObject()
-        txt["text"] = % $textDoc.text
+        txt["text"] = % ($textDoc.text).replace('\r', '\l')
         txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
