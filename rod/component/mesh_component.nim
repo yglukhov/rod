@@ -303,7 +303,6 @@ method draw*(m: MeshComponent) =
 
 
 method getBBox*(c: MeshComponent): BBox =
-    result = newBBox()
     result.maxPoint = c.vboData.maxCoord
     result.minPoint = c.vboData.minCoord
 
