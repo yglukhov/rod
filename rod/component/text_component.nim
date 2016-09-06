@@ -118,6 +118,10 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
                 s.deserializeValue(j, "strokeColor", color)
                 t.mText.setStrokeInRange(0, -1, color, strokeSize)
 
+        var ls : float32
+        s.deserializeValue(j, "lineSpacing", ls)
+        t.mText.lineSpacing = ls
+
         var isColorGradient: bool
         s.deserializeValue(j, "isColorGradient", isColorGradient)
         if isColorGradient:
@@ -223,6 +227,9 @@ proc `colorTo=`*(c: Text, v: Color) =
     s.color2 = v
     c.mText.setTextColorInRange(0, -1, s.color1, s.color2)
 
+proc lineSpacing*(c: Text): Coord = c.mText.lineSpacing
+proc `lineSpacing=`*(c: Text, s: float32) = c.mText.lineSpacing = s
+
 method serialize*(c: Text, s: Serializer): JsonNode =
     result = newJObject()
     result.add("text", s.getValue(c.text))
@@ -231,6 +238,7 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     result.add("shadowY", s.getValue(c.shadowY))
     result.add("shadowColor", s.getValue(c.shadowColor))
     result.add("Tracking Amount", s.getValue(c.trackingAmount))
+    result.add("lineSpacing", s.getValue(c.lineSpacing))
     result.add("fontSize", s.getValue(c.font.size))
 
     if not c.fontFace.isNil:
@@ -315,6 +323,7 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("shadowY", t.shadowY)
     p.visitProperty("shadowColor", t.shadowColor)
     p.visitProperty("Tracking Amount", t.trackingAmount)
+    p.visitProperty("lineSpacing", t.lineSpacing)
 
     p.visitProperty("isColorGradient", t.isColorGradient)
     p.visitProperty("colorFrom", t.colorFrom)
