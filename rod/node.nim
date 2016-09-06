@@ -572,8 +572,12 @@ proc printParents(n: Node, indent: var string) =
         n.parent.printParents(indent)
 
 proc getTreeDistance*(x, y: Node): int =
-    var xLevel = x.getDepth()
-    var yLevel = y.getDepth()
+    assert(x != y)
+
+    let xxLevel = x.getDepth()
+    let yyLevel = y.getDepth()
+    var xLevel = xxLevel
+    var yLevel = yyLevel
     var px = x
     var py = y
 
@@ -585,12 +589,13 @@ proc getTreeDistance*(x, y: Node): int =
         py = py.parent
 
     if px == py:
-        var indent = ""
-        px.printParents(indent)
-        indent = ""
-        py.printParents(indent)
+        # One node is child of another
+        if xxLevel > yyLevel:
+            return -1
+        else:
+            return 1
 
-    assert(px != py)
+    #assert(px != py)
     var cx, cy : Node
     while px != py:
         cx = px
