@@ -34,6 +34,12 @@ proc `text=`*(t: Text, text: string) =
     if not t.node.isNil and not t.node.sceneView.isNil:
         t.node.sceneView.setNeedsDisplay()
 
+proc `boundingSize=`*(t: Text, boundingSize: Size) =
+    t.mText.boundingSize = boundingSize
+
+proc `horizontalAlignment=`*(t: Text, horizontalAlignment: HorizontalTextAlignment) =
+    t.mText.horizontalAlignment = horizontalAlignment
+
 proc text*(t: Text) : string =
     result = t.mText.text
 
@@ -291,8 +297,7 @@ proc shadowMultiplier(t: Text): Size =
     result = newSize(wsv.x / abs(worldScale.x), - y_direction * wsv.y / abs(worldScale.y))
 
 proc debugDraw(t: Text) =
-    let rect = newRect(newPoint(0.0, 0.0), t.mText.boundingSize)
-    DDdrawRect(rect)
+    DDdrawRect(newRect(t.mBoundingOffset, t.mText.boundingSize))
 
 method draw*(t: Text) =
     if not t.mText.isNil:

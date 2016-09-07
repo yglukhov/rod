@@ -101,7 +101,7 @@ method init*(ns: NodeSelector) =
 proc createBoxes(ns: NodeSelector) =
     for k, v in ns.node.components:
         let bbox = v.getBBox()
-        if not bbox.isNil:
+        if not bbox.isEmpty:
             # echo "node ", ns.node.name, "  min  ", bbox.minPoint, "  max  ", bbox.maxPoint
             ns.vertexData = newSeq[GLfloat]()
             ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.minPoint.z])

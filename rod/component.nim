@@ -53,13 +53,7 @@ type UpdateProcComponent = ref object of Component
 type DrawProcComponent = ref object of Component
     drawProc: proc()
 
-proc newBBox*(): BBox =
-    result.new()
-
-proc newBBox*(min, max: Vector3): BBox =
-    result.new()
-    result.minPoint = min
-    result.maxPoint = max
+template isEmpty*(b: BBox): bool = (b.maxPoint - b.minPoint == newVector3())
 
 proc newComponentWithUpdateProc*(p: proc()): Component =
     var r : UpdateProcComponent
@@ -89,7 +83,7 @@ method componentNodeWillBeRemovedFromSceneView*(c: OverlayComponent) =
 
 method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
     let bbox = c.getBBox()
-    if bbox.isNil:
+    if bbox.isEmpty:
         return false
 
     var inv_mat: Matrix4

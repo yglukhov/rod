@@ -779,7 +779,8 @@ method draw*(ps: ParticleSystem) =
     gl.depthMask(true)
 
 method getBBox*(ps: ParticleSystem): BBox =
-    result = newBBox(newVector3(-3, -3, -3), newVector3(3, 3, 3))
+    result.minPoint = newVector3(-3, -3, -3)
+    result.maxPoint = newVector3(3, 3, 3)
 
 method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     if j.isNil:
