@@ -341,6 +341,45 @@ proc writeIndex(tool: ImgTool) =
     writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
     echo root.pretty().replace(" \n", "\n")
 
+proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet]) =
+    for i, im in images:
+        var done = false
+        for ss in spritesheets:
+            done = ss.tryPackImage(im)
+            if done: break
+        if not done:
+            let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
+            done = newSS.tryPackImage(im)
+            if done:
+                newSS.index = spritesheets.len
+                spritesheets.add(newSS)
+            else:
+                echo "Could not pack image: ", im.originalPath
+
+proc assignImagesToSpriteSheets(tool: ImgTool) =
+    var allImages = toSeq(values(tool.images))
+    # Allocate spritesheets for images
+    # Here we try two approaches of packing. The first is to sort images
+    # by max(w, h). The second is to sort by area.
+    var try1 = newSeq[SpriteSheet]()
+    var try2 = newSeq[SpriteSheet]()
+
+    # First approach
+    allImages.sort do(x, y: SpriteSheetImage) -> int:
+        max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+    tool.packImagesToSpritesheets(allImages, try1)
+
+    # Second approach
+    allImages.sort do(x, y: SpriteSheetImage) -> int:
+        y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
+    tool.packImagesToSpritesheets(allImages, try2)
+
+    # Choose better approach
+    if try1.len < try2.len:
+        shallowCopy(tool.spriteSheets, try1)
+    else:
+        shallowCopy(tool.spriteSheets, try2)
+
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
 
@@ -371,28 +410,7 @@ proc run*(tool: ImgTool) =
         if consumeLessMemory:
             GC_fullCollect()
 
-        # Sort images by area
-        var allImages = toSeq(values(tool.images))
-        allImages.sort(proc(x, y: SpriteSheetImage): int =
-            y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
-            )
-
-        # Allocate spritesheets for images
-        echo "Packing images..."
-        for i, im in allImages:
-            var done = false
-            echo im.originalPath
-            for ss in tool.spriteSheets:
-                done = ss.tryPackImage(im)
-                if done: break
-            if not done:
-                let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
-                done = newSS.tryPackImage(im)
-                if done:
-                    newSS.index = tool.spriteSheets.len
-                    tool.spriteSheets.add(newSS)
-                else:
-                    echo "Could not pack image: ", im.originalPath
+        tool.assignImagesToSpriteSheets()
 
         # Blit images to spriteSheets and save them
         for i, ss in tool.spriteSheets:
