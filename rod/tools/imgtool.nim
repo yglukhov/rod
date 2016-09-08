@@ -376,6 +376,11 @@ proc assignImagesToSpriteSheets(tool: ImgTool) =
 
     # Choose better approach
     if try1.len < try2.len:
+        # Redo try1 again
+        allImages.sort do(x, y: SpriteSheetImage) -> int:
+            max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+        try1.setLen(0)
+        tool.packImagesToSpritesheets(allImages, try1)
         shallowCopy(tool.spriteSheets, try1)
     else:
         shallowCopy(tool.spriteSheets, try2)
