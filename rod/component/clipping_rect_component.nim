@@ -4,8 +4,7 @@ import nimx.composition
 import nimx.portable_gl
 import nimx.view
 
-import rod.node
-import rod.component
+import rod.node, rod.viewport, rod.component
 
 import opengl
 
@@ -32,31 +31,27 @@ when not clippingRectWithScissors:
     }
     """, "clipRect")
 
-proc project(p: Vector3, mat: Matrix4, vp: Size): Point =
-    let point3D = mat * p
-    result.x = (( point3D.x + 1 ) / 2.0) * vp.width
-    result.y = (( 1 - point3D.y ) / 2.0) * vp.height
-
 method draw*(cl: ClippingRectComponent) =
-    let c = currentContext()
     let tl = cl.clippingRect.minCorner()
     let br = cl.clippingRect.maxCorner()
     let tlv = newVector3(tl.x, tl.y)
     let brv = newVector3(br.x, br.y)
 
-    let vpbounds = c.gl.getViewport()
-    let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
+    let sv = cl.node.sceneView
+    let tlvw = sv.worldToScreenPoint(cl.node.localToWorld(tlv))
+    let brvw = sv.worldToScreenPoint(cl.node.localToWorld(brv))
 
-    let tl2 = project(tlv, c.transform, vpSize)
-    let br2 = project(brv, c.transform, vpSize)
+    let tlp = sv.convertPointToWindow(newPoint(tlvw.x, tlvw.y))
+    let brp = sv.convertPointToWindow(newPoint(brvw.x, brvw.y))
 
     when clippingRectWithScissors:
-        let gl = c.gl
+        let gl = currentContext().gl
         gl.enable(gl.SCISSOR_TEST)
-        var x = GLint(tl2.x)
-        var y = GLint(vpSize.height - br2.y)
-        var w = GLsizei(br2.x - tl2.x)
-        var h = GLSizei(br2.y - tl2.y)
+        let pr = sv.window.pixelRatio
+        var x = GLint(tlp.x * pr)
+        var y = GLint((sv.window.bounds.height - brp.y) * pr)
+        var w = GLsizei((brp.x - tlp.x) * pr)
+        var h = GLSizei((brp.y - tlp.y) * pr)
 
         try:
             gl.scissor(x, y, w, h)

@@ -59,6 +59,7 @@ proc `view=`*(c: UIComponent, v: View) =
     cv.uiComp = c
     cv.superview = c.node.sceneView
     c.mView = cv
+    c.enabled = true
     cv.addSubview(v)
 
 proc moveToWindow(v: View, w: Window) =
