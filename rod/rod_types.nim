@@ -78,6 +78,7 @@ type
 
     UIComponent* = ref object of Component
         mView*: View
+        enabled*: bool
 
     LightSource* = ref object of Component
         mLightAmbient*: float32

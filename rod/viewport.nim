@@ -334,7 +334,7 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
             var intersections = newSeq[Inter]()
             for c in v.uiComponents:
                 var inter : Vector3
-                if c.intersectsWithUINode(r, inter):
+                if c.enabled and c.intersectsWithUINode(r, inter):
                     intersections.add((inter, c))
 
             template dist(a, b): expr = (a - b).length
