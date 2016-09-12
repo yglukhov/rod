@@ -147,7 +147,7 @@ type
 
 var shadersCache = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
 
-template getUniformLocation(gl: GL, m: Material, name: cstring): UniformLocation =
+template getUniformLocation*(gl: GL, m: Material, name: cstring): UniformLocation =
     inc m.iUniform
     if m.uniformLocationCache.len - 1 < m.iUniform:
         m.uniformLocationCache.add(gl.getUniformLocation(m.shader, name))
@@ -391,6 +391,8 @@ template `isRIM=`*(m: Material, val: bool) =
         m.bShaderNeedUpdate = true
 
 template setupRIMLightTechnique*(m: Material) =
+    let c = currentContext()
+    let gl = c.gl
     if m.shader == invalidProgram:
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
     else:
@@ -912,7 +914,7 @@ method updateSetup*(m: Material, n: Node) {.base.} =
     if m.isRIM:
         m.setupRIMLightTechnique()
 
-    if n.alpha < 1.0 or m.blendEnable:
+    if c.alpha < 1.0 or m.blendEnable:
         gl.enable(gl.BLEND)
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     else:

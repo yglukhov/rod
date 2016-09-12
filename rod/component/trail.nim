@@ -286,6 +286,7 @@ type
 
         bDepth*: bool
         bStretch*: bool
+        bCollapsible*: bool
         isWireframe: bool
 
         uniformLocationCache*: seq[UniformLocation]
@@ -467,9 +468,6 @@ proc reset*(t: Trail) =
     t.directRotation = newQuaternion(0,0,0,1)
     t.gravityDirection = newVector3(0,0,0)
 
-    t.imagePercent = 1.0
-    t.matcapPercent = 1.0
-
     t.currPos = t.node.worldPos() - t.gravityDirection
     t.prevPos = t.currPos
     t.prevRotation = t.node.rotation
@@ -536,6 +534,8 @@ method init*(t: Trail) =
 
     t.widthOffset = 100.0
     t.heightOffset = 10.0
+    t.imagePercent = 1.0
+    t.matcapPercent = 1.0
 
     t.angleThreshold = 0.01
     t.quadsToDraw = 150
@@ -763,6 +763,12 @@ method draw*(t: Trail) =
         if t.totalLen > t.widthOffset and not t.bStretch:
             t.cropOffset += t.currLength
 
+        if t.bCollapsible and t.cropOffset < t.widthOffset:
+            t.cropOffset += t.currLength
+
+        # if t.currLength > t.widthOffset:
+        #     t.reset()
+
         t.getVertexData(t.prevVertexData)
 
         gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
@@ -840,6 +846,7 @@ method deserialize*(t: Trail, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "angleThreshold", t.angleThreshold)
     s.deserializeValue(j, "bDepth", t.bDepth)
     s.deserializeValue(j, "bStretch", t.bStretch)
+    s.deserializeValue(j, "bCollapsible", t.bCollapsible)
     s.deserializeValue(j, "isWireframe", t.isWireframe)
     s.deserializeValue(j, "imagePercent", t.imagePercent)
     s.deserializeValue(j, "matcapPercent", t.matcapPercent)
@@ -864,13 +871,15 @@ method serialize*(t: Trail, s: Serializer): JsonNode =
     result.add("angleThreshold", s.getValue(t.angleThreshold))
     result.add("bDepth", s.getValue(t.bDepth))
     result.add("bStretch", s.getValue(t.bStretch))
+    result.add("bCollapsible", s.getValue(t.bCollapsible))
     result.add("isWireframe", s.getValue(t.isWireframe))
-    result.add("imagePercent", s.getValue(t.imagePercent))
-    result.add("matcapPercent", s.getValue(t.matcapPercent))
-
+    if not t.image.isNil:
+        result.add("imagePercent", s.getValue(t.imagePercent))
+    if not t.trailMatcap.isNil:
+        result.add("matcapPercent", s.getValue(t.matcapPercent))
     if not t.image.isNil:
         result.add("trailImage", s.getValue(s.getRelativeResourcePath(t.trailImage.filePath())))
-    if not t.image.isNil:
+    if not t.trailMatcap.isNil:
         result.add("trailMatcap", s.getValue(s.getRelativeResourcePath(t.trailMatcap.filePath())))
 
 method visitProperties*(t: Trail, p: var PropertyVisitor) =
@@ -884,6 +893,7 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
     p.visitProperty("rotation", t.directRotation)
     p.visitProperty("depth", t.bDepth)
     p.visitProperty("stretch", t.bStretch)
+    p.visitProperty("collapsible", t.bCollapsible)
 
     # dev props
     p.visitProperty("threshold", t.angleThreshold)
