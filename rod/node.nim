@@ -297,8 +297,10 @@ template addNodeRef*(refNode: var Node, name: string) =
     if name in nodeLoadRefTable:
         nodeLoadRefTable[name].add(refProc)
     else:
-        nodeLoadRefTable[name] = @[]
-        nodeLoadRefTable[name].add refProc
+        # Hacky workaround for closure compiler
+        var s = nodeLoadRefTable[name]
+        s.add(refProc)
+        nodeLoadRefTable[name] = s
 
 proc checkNodeRefs(n: Node) =
     for k, v in nodeLoadRefTable:
