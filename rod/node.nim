@@ -290,16 +290,22 @@ proc findNode*(n: Node, name: string): Node =
         n.name == name
 
 
-let nodeLoadRefTable = newTable[string, proc(nodeValue: Node)]()
+let nodeLoadRefTable = newTable[string, seq[proc(nodeValue: Node)]]()
+
 template addNodeRef*(refNode: var Node, name: string) =
     let refProc = proc(nodeValue: Node) = refNode = nodeValue
-    nodeLoadRefTable[name] = refProc
+    if name in nodeLoadRefTable:
+        nodeLoadRefTable[name].add(refProc)
+    else:
+        nodeLoadRefTable[name] = @[]
+        nodeLoadRefTable[name].add refProc
 
 proc checkNodeRefs(n: Node) =
     for k, v in nodeLoadRefTable:
         let foundNode = n.findNode(k)
         if not foundNode.isNil:
-            v(foundNode)
+            for s in v:
+                s(foundNode)
 
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     if not n.components.isNil:

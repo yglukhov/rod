@@ -81,14 +81,25 @@ proc newImgTool*(): ImgTool =
 
 iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode) =
     var stack = @[n]
+    var comps = newSeq[JsonNode]()
     while stack.len > 0:
         let nn = stack.pop()
-        let componentNode = nn{"components", typ}
-        if not componentNode.isNil:
-            yield(nn, componentNode)
-        let children = nn{"children"}
-        if not children.isNil:
-            stack.add(children.elems)
+        let components = nn{"components"}
+        if not components.isNil:
+            comps.setLen(0)
+            if components.kind == JObject:
+                let c = components{typ}
+                if not c.isNil:
+                    comps.add(c)
+            elif components.kind == JArray:
+                for c in components.elems:
+                    if c["_c"].str == typ:
+                        comps.add(c)
+            for componentNode in comps:
+                yield(nn, componentNode)
+            let children = nn{"children"}
+            if not children.isNil:
+                stack.add(children.elems)
 
 iterator allSpriteNodes(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
