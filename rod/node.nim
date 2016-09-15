@@ -293,14 +293,15 @@ proc findNode*(n: Node, name: string): Node =
 let nodeLoadRefTable = newTable[string, seq[proc(nodeValue: Node)]]()
 
 template addNodeRef*(refNode: var Node, name: string) =
-    let refProc = proc(nodeValue: Node) = refNode = nodeValue
+    let refProc = proc(nodeValue: Node) {.closure.} = refNode = nodeValue
     if name in nodeLoadRefTable:
-        nodeLoadRefTable[name].add(refProc)
-    else:
         # Hacky workaround for closure compiler
         var s = nodeLoadRefTable[name]
         s.add(refProc)
         nodeLoadRefTable[name] = s
+    else:
+        # Hacky workaround for closure compiler
+        nodeLoadRefTable[name] = @[refProc]
 
 proc checkNodeRefs(n: Node) =
     for k, v in nodeLoadRefTable:
