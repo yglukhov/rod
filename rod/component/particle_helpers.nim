@@ -305,7 +305,7 @@ method updateParticle*(attr: PSModifierSpiral, part: Particle) =
     distance_vec.y = 0.0
     let distance = distance_vec.length()
     distance_vec.normalize()
-    let force = distance_vec * (attr.force / 60.0) / (distance * distance)
+    let force = distance_vec * (attr.force * getDeltaTime()) / (distance * distance)
     part.velocity -= force
 
 
