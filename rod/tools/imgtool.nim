@@ -83,8 +83,8 @@ iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode)
     var stack = @[n]
     var comps = newSeq[JsonNode]()
     while stack.len > 0:
-        let nn = stack.pop()
-        let components = nn{"components"}
+        let n = stack.pop()
+        let components = n{"components"}
         if not components.isNil:
             comps.setLen(0)
             if components.kind == JObject:
@@ -96,10 +96,10 @@ iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode)
                     if c["_c"].str == typ:
                         comps.add(c)
             for componentNode in comps:
-                yield(nn, componentNode)
-            let children = nn{"children"}
-            if not children.isNil:
-                stack.add(children.elems)
+                yield(n, componentNode)
+        let children = n{"children"}
+        if not children.isNil:
+            stack.add(children.elems)
 
 iterator allSpriteNodes(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
