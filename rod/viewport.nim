@@ -326,6 +326,34 @@ import component.ui_component, algorithm
 method name*(v: SceneView): string =
     result = "SceneView"
 
+
+method onScroll*(v: SceneView, e: var Event): bool =
+    if v.uiComponents.len > 0:
+        let r = v.rayWithScreenCoords(e.localPosition)
+        type Inter = tuple[i: Vector3, c: UIComponent]
+        var intersections = newSeq[Inter]()
+        for c in v.uiComponents:
+            var inter : Vector3
+            if c.enabled and c.intersectsWithUINode(r, inter):
+                intersections.add((inter, c))
+
+            template dist(a, b): expr = (a - b).length
+            if intersections.len > 0:
+                intersections.sort(proc (x, y: Inter): int =
+                    result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
+                    if result == 0:
+                        result = getTreeDistance(x.c.node, y.c.node)
+                )
+
+                for i in intersections:
+                    result = i.c.handleScrollEv(r, e, i.i)
+                    if result:
+                        v.touchTarget = i.c.mView
+                        break
+
+    if not result:
+        result = procCall v.View.onScroll(e)
+
 method onTouchEv*(v: SceneView, e: var Event): bool =
     if v.uiComponents.len > 0:
         if e.buttonState == bsDown:
