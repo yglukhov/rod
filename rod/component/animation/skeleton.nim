@@ -96,7 +96,8 @@ proc newBone*(): Bone =
     result.invMatrix.loadIdentity()
 
 proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
-    let gl = currentContext().gl
+    let c = currentContext()
+    let gl = c.gl
     var mat: Matrix4
     if not parent.isNil:
         if not b.currFrame.isNil:
@@ -118,13 +119,12 @@ proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
     parentMatrix.multiply(p1, p1)
     mat.multiply(p2, p2)
 
-    var points: array[6, float32]
-    points[0] = p1.x
-    points[1] = p1.y
-    points[2] = p1.z
-    points[3] = p2.x
-    points[4] = p2.y
-    points[5] = p2.z
+    c.vertexes[0] = p1.x
+    c.vertexes[1] = p1.y
+    c.vertexes[2] = p1.z
+    c.vertexes[3] = p2.x
+    c.vertexes[4] = p2.y
+    c.vertexes[5] = p2.z
 
     b.shader.bindShader()
     b.shader.setTransformUniform()
@@ -132,7 +132,8 @@ proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
     b.shader.setUniform("uColor", col)
 
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, points)
+    c.bindVertexData(6)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
     gl.depthMask(false)
     gl.disable(gl.DEPTH_TEST)
