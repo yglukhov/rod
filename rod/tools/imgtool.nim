@@ -1,5 +1,5 @@
 import nimPNG
-import os, osproc, json, strutils, times, sequtils, tables, algorithm, math
+import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, threadpool
 
 import nimx.rect_packer
 import nimx.types except Point, Size, Rect
@@ -13,13 +13,14 @@ type Size = tuple[width, height: int]
 
 let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
 
+const isMultithreaded = true
+
 type
     ImageOccurence = object
         parentComposition, parentNode, parentComponent: JsonNode
         frameIndex: int
         textureKey: string
         compPath: string
-        originalTranslationInNode: tuple[x, y: float]
         allowAlphaCrop: bool
 
     SpriteSheetImage = ref object
@@ -124,8 +125,10 @@ proc outImgExt(tool: ImgTool): string =
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
     for im in ss.images:
+        var nullifyWhenDone = false
         if im.png.isNil:
             im.png = loadPNG32(im.originalPath)
+            nullifyWhenDone = true
 
         if im.png.data.len == im.png.width * im.png.height * 4:
             zeroColorIfZeroAlpha(im.png.data)
@@ -160,7 +163,8 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
             im.extrusion
         )
 
-        im.png = nil # We no longer need the data in memory
+        if nullifyWhenDone or not isMultithreaded:
+            im.png = nil # We no longer need the data in memory
 
     if tool.compressToPVR:
         let tmpPath = path & ".png"
@@ -261,16 +265,11 @@ proc readFile(im: SpriteSheetImage) =
     # im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
     # im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
 
-    if consumeLessMemory:
+    if consumeLessMemory or isMultithreaded:
         im.png = nil
 
     im.srcSize = (im.srcBounds.width, im.srcBounds.height)
     im.targetSize = im.srcSize
-
-    for o in im.occurences.mitems:
-        let tr = o.parentNode["translation"]
-        o.originalTranslationInNode.x = tr[0].getFNum()
-        o.originalTranslationInNode.y = tr[1].getFNum()
 
 proc updateLastModificationDateWithFile(tool: ImgTool, path: string) =
     let modDate = getLastModificationTime(path)
@@ -396,6 +395,19 @@ proc assignImagesToSpriteSheets(tool: ImgTool) =
     else:
         shallowCopy(tool.spriteSheets, try2)
 
+when isMultithreaded:
+    proc composeAndWriteAux(tool, ss: pointer, path: string) =
+        let tool = cast[ImgTool](tool)
+        let ss = cast[SpriteSheet](ss)
+        tool.composeAndWrite(ss, path)
+
+proc readImageFileAux(tool, im: pointer) {.inline.} =
+    let i = cast[SpriteSheetImage](im)
+    let tool = cast[ImgTool](tool)
+    i.readFile()
+    i.recalculateSourceBounds()
+    tool.recalculateTargetSize(i)
+
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
 
@@ -419,9 +431,16 @@ proc run*(tool: ImgTool) =
     if needsUpdate:
         for i in tool.images.values:
             echo "Reading file: ", i.originalPath
-            i.readFile()
-            i.recalculateSourceBounds()
-            tool.recalculateTargetSize(i)
+            when isMultithreaded:
+                if consumeLessMemory:
+                    echo "spawn"
+                    spawn readImageFileAux(cast[pointer](tool), cast[pointer](i))
+                else:
+                    readImageFileAux(cast[pointer](tool), cast[pointer](i))
+            else:
+                readImageFileAux(cast[pointer](tool), cast[pointer](i))
+
+        when isMultithreaded: sync() # Wait for all spawned tasks
 
         if consumeLessMemory:
             GC_fullCollect()
@@ -433,7 +452,12 @@ proc run*(tool: ImgTool) =
             echo "Saving ", i + 1, " of ", tool.spriteSheets.len
             for v in ss.images:
                 echo "    - image ", v.originalPath
-            tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
+            when isMultithreaded:
+                spawn composeAndWriteAux(cast[pointer](tool), cast[pointer](ss), tool.resPath / tool.outPrefix & $i & tool.outImgExt)
+            else:
+                tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
+
+        when isMultithreaded: sync() # Wait for all spawned tasks
 
         # Readjust sprite nodes
         for im in tool.images.values:
