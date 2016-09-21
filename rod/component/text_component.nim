@@ -78,6 +78,10 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
             shadowX = v[0].getFnum()
             shadowY = v[1].getFnum()
 
+        elif "shadowX" in j and "shadowY" in j:
+            shadowY = j["shadowY"].getFnum()
+            shadowX = j["shadowX"].getFnum()
+
         v = j{"shadowColor"}
         var shadowColor: Color
         if not v.isNil:
