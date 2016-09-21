@@ -174,7 +174,13 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     else:
         discard savePNG32(path, data, ss.packer.width, ss.packer.height)
         if tool.compressOutput:
-            discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
+            var res = 1
+            try:
+                res = execCmd("pngquant --force --speed 1 -o " & path & " " & path)
+            except:
+                discard
+            if res != 0:
+                echo "WARNING: pngquant failed"
 
     if consumeLessMemory:
         GC_fullCollect()
@@ -433,7 +439,6 @@ proc run*(tool: ImgTool) =
             echo "Reading file: ", i.originalPath
             when isMultithreaded:
                 if consumeLessMemory:
-                    echo "spawn"
                     spawn readImageFileAux(cast[pointer](tool), cast[pointer](i))
                 else:
                     readImageFileAux(cast[pointer](tool), cast[pointer](i))
