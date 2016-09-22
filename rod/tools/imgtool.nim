@@ -260,19 +260,19 @@ proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
     im.targetSize.height = tool.betterDimension(im.srcSize.height, im.extrusion)
 
 proc readFile(im: SpriteSheetImage) =
-    im.png = loadPNG32(im.originalPath)
-    if im.png.isNil:
+    let png = loadPNG32(im.originalPath)
+    if png.isNil:
         echo "PNG NOT LOADED: ", im.originalPath
 
-    im.actualBounds = imageBounds(im.png.data, im.png.width, im.png.height)
+    im.actualBounds = imageBounds(png.data, png.width, png.height)
 
-    im.srcBounds.width = im.png.width
-    im.srcBounds.height = im.png.height
+    im.srcBounds.width = png.width
+    im.srcBounds.height = png.height
     # im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
     # im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
 
-    if consumeLessMemory or isMultithreaded:
-        im.png = nil
+    if not (consumeLessMemory or isMultithreaded):
+        im.png = png
 
     im.srcSize = (im.srcBounds.width, im.srcBounds.height)
     im.targetSize = im.srcSize
@@ -411,6 +411,8 @@ proc readImageFileAux(tool, im: pointer) {.inline.} =
     let i = cast[SpriteSheetImage](im)
     let tool = cast[ImgTool](tool)
     i.readFile()
+    if consumeLessMemory:
+        GC_fullCollect()
     i.recalculateSourceBounds()
     tool.recalculateTargetSize(i)
 
