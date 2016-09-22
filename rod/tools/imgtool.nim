@@ -13,7 +13,7 @@ type Size = tuple[width, height: int]
 
 let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
 
-const isMultithreaded = not defined(windows)
+const isMultithreaded = false # ... not defined(windows)
 
 type
     ImageOccurence = object
