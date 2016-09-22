@@ -36,14 +36,18 @@ proc `image=`*(s: Sprite, i: Image) =
     s.images[0] = i
     s.currentFrame = 0
 
+proc getOffset*(s: Sprite): Point =
+    result = s.offset
+    if s.frameOffsets.len > s.currentFrame:
+        result += s.frameOffsets[s.currentFrame]
+
 method draw*(s: Sprite) =
     let c = currentContext()
+
     let i = s.image
     if not i.isNil:
         var r: Rect
-        r.origin = s.offset
-        if s.frameOffsets.len > s.currentFrame:
-            r.origin += s.frameOffsets[s.currentFrame]
+        r.origin = s.getOffset()
         r.size = i.size
         c.drawImage(i, r, zeroRect)
 
