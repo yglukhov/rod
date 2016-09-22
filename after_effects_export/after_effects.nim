@@ -18,6 +18,7 @@ type
     ProjectObj {.importc.} = object of RootObj
         selection*: seq[Item]
         rootFolder*: FolderItem
+        file*: File
 
     ColorLabel* = range[0 .. 16]
 
