@@ -4,6 +4,7 @@ import times
 import json
 import algorithm
 import strutils
+import sequtils
 import nimx.matrixes, nimx.pathutils
 import rod.quaternion
 
@@ -72,6 +73,9 @@ let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Ran
 var gCompExportPath = ""
 var gExportFolderPath = ""
 
+var layerNames = initTable[int, string]()
+var resourcePaths: seq[string] = @[]
+
 proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string =
     var path = $footageSource.projectPath
     if path[^1] != '/': path &= "/"
@@ -113,12 +117,14 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                     # Copy the file to the resources
                     if app.settings.getSetting("rodExport", "copyResources") == "true":
                         let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
-                        logi "Copying: ", resourcePath
-                        let targetFile = newFile(resourcePath)
-                        if not targetFile.parent.create():
-                            logi "ERROR: Could not create folder for ", resourcePath
-                        if not f.copy(targetFile):
-                            logi "ERROR: Could not copy ", resourcePath
+                        if not resourcePaths.contains(resourcePath):
+                            logi "Copying: ", resourcePath
+                            resourcePaths.add(resourcePath)
+                            let targetFile = newFile(resourcePath)
+                            if not targetFile.parent.create():
+                                logi "ERROR: Could not create folder for ", resourcePath
+                            if not f.copy(targetFile):
+                                logi "ERROR: Could not copy ", resourcePath
 
                 var sprite = newJObject()
                 sprite["fileNames"] = imageFileRelativeExportPaths
@@ -214,8 +220,6 @@ proc requiresAuxParent(layer: Layer): bool =
         result = true
     if layer.blendMode != BlendingMode.NORMAL:
         result = true
-
-var layerNames = initTable[int, string]()
 
 proc mangledName(layer: Layer): string =
     result = layerNames.getOrDefault(layer.index)
@@ -627,6 +631,7 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
 
 proc serializeComposition(composition: Composition): JsonNode =
     layerNames = initTable[int, string]()
+    resourcePaths = @[]
 
     let rootLayer = composition.layer("root")
     if not rootLayer.isNil:
@@ -649,6 +654,7 @@ proc serializeComposition(composition: Composition): JsonNode =
 
     if animations.len > 0:
         result["animations"] = animations
+    result["aep_name"] = % $app.project.file.name
 
 proc replacer(n: JsonNode): ref RootObj {.exportc.} =
     case n.kind
