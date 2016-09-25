@@ -73,18 +73,36 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
                 t.node.alpha = v[3].getFnum()
 
         v = j{"shadowOff"}
-        var shadowX, shadowY: float
+        var shadowX, shadowY: float  # TODO do only one format
         if not v.isNil:
             shadowX = v[0].getFnum()
             shadowY = v[1].getFnum()
+        else:
+            s.deserializeValue(j, "shadowX", shadowX)
+            s.deserializeValue(j, "shadowY", shadowY)
+
+        var isShadowExist = false
+        if shadowX > 0.0 or shadowY > 0.0: isShadowExist = true
+
+        elif "shadowX" in j and "shadowY" in j:
+            shadowY = j["shadowY"].getFnum()
+            shadowX = j["shadowX"].getFnum()
 
         v = j{"shadowColor"}
         var shadowColor: Color
-        if not v.isNil:
-            shadowColor = newColor(v[0].getFnum(), v[1].getFnum(), v[2].getFnum(), v[3].getFnum())
+        s.deserializeValue(j, "shadowColor", shadowColor)
+        if shadowColor.a > 0.0: isShadowExist = true
 
-        if shadowColor.a != 0:
-            t.mText.setShadowInRange(0, -1, shadowColor, newSize(shadowX, shadowY))
+        var shadowSpread: float32
+        s.deserializeValue(j, "shadowSpread", shadowSpread)
+        if shadowSpread > 0.0: isShadowExist = true
+
+        var shadowRadius: float32
+        s.deserializeValue(j, "shadowRadius", shadowRadius)
+        if shadowRadius > 0.0: isShadowExist = true
+
+        if isShadowExist:
+            t.mText.setShadowInRange(0, -1, shadowColor, newSize(shadowX, shadowY), shadowRadius, shadowSpread)
 
         v = j{"justification"}
         var horAlign = haLeft
@@ -153,18 +171,30 @@ proc shadowY*(c: Text): float32 = c.mText.shadowOfRuneAtPos(0).offset.height
 proc `shadowX=`*(c: Text, v: float32) =
     var s = c.mText.shadowOfRuneAtPos(0)
     s.offset.width = v
-    c.mText.setShadowInRange(0, -1, s.color, s.offset)
+    c.mText.setShadowInRange(0, -1, s.color, s.offset, s.radius, s.spread)
 
 proc `shadowY=`*(c: Text, v: float32) =
     var s = c.mText.shadowOfRuneAtPos(0)
     s.offset.height = v
-    c.mText.setShadowInRange(0, -1, s.color, s.offset)
+    c.mText.setShadowInRange(0, -1, s.color, s.offset, s.radius, s.spread)
 
 proc shadowColor*(c: Text): Color = c.mText.shadowOfRuneAtPos(0).color
 proc `shadowColor=`*(c: Text, v: Color) =
     var s = c.mText.shadowOfRuneAtPos(0)
     s.color = v
-    c.mText.setShadowInRange(0, -1, s.color, s.offset)
+    c.mText.setShadowInRange(0, -1, s.color, s.offset, s.radius, s.spread)
+
+proc shadowRadius*(c: Text): float32 = c.mText.shadowOfRuneAtPos(0).radius
+proc `shadowRadius=`*(c: Text, r: float32) =
+    var s = c.mText.shadowOfRuneAtPos(0)
+    s.radius = r
+    c.mText.setShadowInRange(0, -1, s.color, s.offset, s.radius, s.spread)
+
+proc shadowSpread*(c: Text): float32 = c.mText.shadowOfRuneAtPos(0).spread
+proc `shadowSpread=`*(c: Text, spread: float32) =
+    var s = c.mText.shadowOfRuneAtPos(0)
+    s.spread = spread
+    c.mText.setShadowInRange(0, -1, s.color, s.offset, s.radius, s.spread)
 
 proc font*(c: Text): Font = c.mText.fontOfRuneAtPos(0)
 proc `font=`*(c: Text, v: Font) = c.mText.setFontInRange(0, -1, v)
@@ -242,6 +272,8 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     result.add("color", s.getValue(c.color))
     result.add("shadowX", s.getValue(c.shadowX))
     result.add("shadowY", s.getValue(c.shadowY))
+    result.add("shadowRadius", s.getValue(c.shadowRadius))
+    result.add("shadowSpread", s.getValue(c.shadowSpread))
     result.add("shadowColor", s.getValue(c.shadowColor))
     result.add("Tracking Amount", s.getValue(c.trackingAmount))
     result.add("lineSpacing", s.getValue(c.lineSpacing))
@@ -326,6 +358,8 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("color", t.color)
     p.visitProperty("shadowX", t.shadowX)
     p.visitProperty("shadowY", t.shadowY)
+    p.visitProperty("shadowRadius", t.shadowRadius)
+    p.visitProperty("shadowSpread", t.shadowSpread)
     p.visitProperty("shadowColor", t.shadowColor)
     p.visitProperty("Tracking Amount", t.trackingAmount)
     p.visitProperty("lineSpacing", t.lineSpacing)

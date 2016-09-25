@@ -125,7 +125,7 @@ proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
 
     let matViewProj = v.viewProjMatrix
     var matInverse: Matrix4
-    if tryInverse (matViewProj, matInverse) == false:
+    if tryInverse(matViewProj, matInverse) == false:
         return
 
     var oIn: Vector4
@@ -147,21 +147,21 @@ template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProject
 proc swapCompositingBuffers*(v: SceneView)
 
 const gridLineCount = 10
-var gridPoints: array[6 * gridLineCount * 2, float32]
 proc drawGrid(v: SceneView) =
-    let gl = currentContext().gl
+    let c = currentContext()
+    let gl = c.gl
 
     for i in 0 .. gridLineCount-1:
         var p1 = newVector3(10.0 * i.float, 0.0, 45.0)
         var p2 = newVector3(10.0 * i.float, 0.0, -45.0)
         p1.x -= gridLineCount / 2.0 * 10.0 - 5
         p2.x -= gridLineCount / 2.0 * 10.0 - 5
-        gridPoints[6 * i + 0] = p1.x
-        gridPoints[6 * i + 1] = p1.y
-        gridPoints[6 * i + 2] = p1.z
-        gridPoints[6 * i + 3] = p2.x
-        gridPoints[6 * i + 4] = p2.y
-        gridPoints[6 * i + 5] = p2.z
+        c.vertexes[6 * i + 0] = p1.x
+        c.vertexes[6 * i + 1] = p1.y
+        c.vertexes[6 * i + 2] = p1.z
+        c.vertexes[6 * i + 3] = p2.x
+        c.vertexes[6 * i + 4] = p2.y
+        c.vertexes[6 * i + 5] = p2.z
 
     for i in 0 .. gridLineCount-1:
         var p1 = newVector3(45.0, 0.0, 10.0 * i.float)
@@ -169,18 +169,19 @@ proc drawGrid(v: SceneView) =
         p1.z -= gridLineCount / 2.0 * 10.0 - 5
         p2.z -= gridLineCount / 2.0 * 10.0 - 5
         let index = 6 * i + (gridLineCount) * 6
-        gridPoints[index + 0] = p1.x
-        gridPoints[index + 1] = p1.y
-        gridPoints[index + 2] = p1.z
-        gridPoints[index + 3] = p2.x
-        gridPoints[index + 4] = p2.y
-        gridPoints[index + 5] = p2.z
+        c.vertexes[index + 0] = p1.x
+        c.vertexes[index + 1] = p1.y
+        c.vertexes[index + 2] = p1.z
+        c.vertexes[index + 3] = p2.x
+        c.vertexes[index + 4] = p2.y
+        c.vertexes[index + 5] = p2.z
 
     gridShader.bindShader()
     gridShader.setTransformUniform()
 
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, gridPoints)
+    c.bindVertexData(6 * gridLineCount * 2)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
     gl.depthMask(true)
     gl.enable(gl.DEPTH_TEST)
@@ -263,11 +264,10 @@ proc releaseTempFramebuffer*(v: SceneView, fb: SelfContainedImage) =
 proc swapCompositingBuffers*(v: SceneView) =
     assert(v.numberOfNodesWithBackCompositionInCurrentFrame > 0)
     dec v.numberOfNodesWithBackCompositionInCurrentFrame
-    let boundsSize = v.bounds.size
     let c = currentContext()
     let gl = c.gl
-    let vp = gl.getViewport()
     when defined(js) or defined(emscripten) or defined(gles2only):
+        let vp = gl.getViewport()
         #proc ortho*(dest: var Matrix4, left, right, bottom, top, near, far: Coord) =
         var mat = ortho(0, Coord(vp[2]), Coord(vp[3]), 0, -1, 1)
 
@@ -337,7 +337,7 @@ method onScroll*(v: SceneView, e: var Event): bool =
             if c.enabled and c.intersectsWithUINode(r, inter):
                 intersections.add((inter, c))
 
-            template dist(a, b): expr = (a - b).length
+            template dist(a, b): auto = (a - b).length
             if intersections.len > 0:
                 intersections.sort(proc (x, y: Inter): int =
                     result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
@@ -365,7 +365,7 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
                 if c.enabled and c.intersectsWithUINode(r, inter):
                     intersections.add((inter, c))
 
-            template dist(a, b): expr = (a - b).length
+            template dist(a, b): auto = (a - b).length
             if intersections.len > 0:
                 intersections.sort(proc (x, y: Inter): int =
                     result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
@@ -402,7 +402,7 @@ method handleMouseEvent*(v: SceneView, e: var Event): bool =
             if c.intersectsWithUINode(r, inter):
                 intersections.add((inter, c))
 
-        template dist(a, b): expr = (b - a).length
+        template dist(a, b): auto = (b - a).length
 
         if intersections.len > 0:
             intersections.sort(proc (x, y: Inter): int =

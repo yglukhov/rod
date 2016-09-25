@@ -28,18 +28,24 @@ let boxIndexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 
 var boxIB: BufferRef
 
 proc DDdrawBox*(minPoint, maxPoint: Vector3) =
-    const pointsCount = 8
-    let boxPoints = [minPoint.x, minPoint.y, minPoint.z,
-                maxPoint.x, minPoint.y, minPoint.z,
-                maxPoint.x, maxPoint.y, minPoint.z,
-                minPoint.x, maxPoint.y, minPoint.z,
+    let c = currentContext()
+    let gl = c.gl
 
-                minPoint.x, minPoint.y, maxPoint.z,
-                maxPoint.x, minPoint.y, maxPoint.z,
-                maxPoint.x, maxPoint.y, maxPoint.z,
-                minPoint.x, maxPoint.y, maxPoint.z]
+    var i: uint = 0
+    template v(f: GLfloat) =
+        c.vertexes[i] = f
+        inc i
 
-    let gl = currentContext().gl
+    v minPoint.x; v minPoint.y; v minPoint.z
+    v maxPoint.x; v minPoint.y; v minPoint.z
+    v maxPoint.x; v maxPoint.y; v minPoint.z
+    v minPoint.x; v maxPoint.y; v minPoint.z
+
+    v minPoint.x; v minPoint.y; v maxPoint.z
+    v maxPoint.x; v minPoint.y; v maxPoint.z
+    v maxPoint.x; v maxPoint.y; v maxPoint.z
+    v minPoint.x; v maxPoint.y; v maxPoint.z
+
     if boxIB == invalidBuffer:
         boxIB = gl.createBuffer()
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxIB)
@@ -47,7 +53,8 @@ proc DDdrawBox*(minPoint, maxPoint: Vector3) =
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, boxIB)
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, boxPoints)
+    c.bindVertexData(24)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
     debugDrawShader.bindShader()
     debugDrawShader.setTransformUniform()
@@ -62,17 +69,18 @@ proc DDdrawBox*(size: Vector3) =
 
 proc DDdrawCircle*(pos: Vector3, radius: float32) =
     const pointsCount = 36
-    var points : array[pointsCount * 3, float32]
+    let c = currentContext()
 
-    for i in 0..pointsCount - 1:
+    for i in 0 ..< pointsCount:
         let angle = degToRad(i * 360 / pointsCount)
-        points[3*i + 0] = cos(angle) * radius + pos.x
-        points[3*i + 1] = 0.0 + pos.y
-        points[3*i + 2] = sin(angle) * radius + pos.z
+        c.vertexes[3*i + 0] = cos(angle) * radius + pos.x
+        c.vertexes[3*i + 1] = 0.0 + pos.y
+        c.vertexes[3*i + 2] = sin(angle) * radius + pos.z
 
-    let gl = currentContext().gl
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, points)
+    let gl = c.gl
+    gl.enableVertexAttribArray(0)
+    c.bindVertexData(pointsCount * 3)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
     debugDrawShader.bindShader()
     debugDrawShader.setTransformUniform()
@@ -80,17 +88,18 @@ proc DDdrawCircle*(pos: Vector3, radius: float32) =
 
 proc DDdrawCircleX*(pos: Vector3, radius: float32) =
     const pointsCount = 36
-    var points : array[pointsCount * 3, float32]
+    let c = currentContext()
 
-    for i in 0..pointsCount - 1:
+    for i in 0 ..< pointsCount:
         let angle = degToRad(i * 360 / pointsCount)
-        points[3*i + 0] = pos.x
-        points[3*i + 1] = cos(angle) * radius + + pos.y
-        points[3*i + 2] = sin(angle) * radius + pos.z
+        c.vertexes[3*i + 0] = pos.x
+        c.vertexes[3*i + 1] = cos(angle) * radius + + pos.y
+        c.vertexes[3*i + 2] = sin(angle) * radius + pos.z
 
-    let gl = currentContext().gl
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, points)
+    let gl = c.gl
+    gl.enableVertexAttribArray(0)
+    c.bindVertexData(pointsCount * 3)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
     debugDrawShader.bindShader()
     debugDrawShader.setTransformUniform()
@@ -98,34 +107,36 @@ proc DDdrawCircleX*(pos: Vector3, radius: float32) =
 
 proc DDdrawCircleZ*(pos: Vector3, radius: float32) =
     const pointsCount = 36
-    var points : array[pointsCount * 3, float32]
+    let c = currentContext()
 
-    for i in 0..pointsCount - 1:
+    for i in 0 ..< pointsCount:
         let angle = degToRad(i * 360 / pointsCount)
-        points[3*i + 0] = cos(angle) * radius + pos.x
-        points[3*i + 1] = sin(angle) * radius + pos.y
-        points[3*i + 2] = pos.z
+        c.vertexes[3*i + 0] = cos(angle) * radius + pos.x
+        c.vertexes[3*i + 1] = sin(angle) * radius + pos.y
+        c.vertexes[3*i + 2] = pos.z
 
-    let gl = currentContext().gl
+    let gl = c.gl
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, points)
+    c.bindVertexData(pointsCount * 3)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
     debugDrawShader.bindShader()
     debugDrawShader.setTransformUniform()
     gl.drawArrays(gl.LINE_LOOP, 0, pointsCount)
 
 proc DDdrawLine*(p1, p2: Vector3) =
-    var points : array[2 * 3, float32]
-    points[0] = p1.x
-    points[1] = p1.y
-    points[2] = p1.z
-    points[3] = p2.x
-    points[4] = p2.y
-    points[5] = p2.z
+    let c = currentContext()
+    c.vertexes[0] = p1.x
+    c.vertexes[1] = p1.y
+    c.vertexes[2] = p1.z
+    c.vertexes[3] = p2.x
+    c.vertexes[4] = p2.y
+    c.vertexes[5] = p2.z
 
-    let gl = currentContext().gl
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, false, 0, points)
+    let gl = c.gl
+    gl.enableVertexAttribArray(0)
+    c.bindVertexData(2 * 3)
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
     debugDrawShader.bindShader()
     debugDrawShader.setTransformUniform()
