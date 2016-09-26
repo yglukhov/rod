@@ -26,9 +26,9 @@ proc registerComponentGroup(group, component: string) =
     var g = componentGroupsTable.getOrDefault(validatedGroup)
     if g.isNil:
         g = newSeq[string]()
-        componentGroupsTable[validatedGroup] = g
 
-    componentGroupsTable[validatedGroup].add(component)
+    g.add(component)
+    componentGroupsTable[validatedGroup] = g
 
 proc registeredComponents*(): seq[string] =
     result = newSeq[string]()
