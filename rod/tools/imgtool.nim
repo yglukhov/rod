@@ -175,12 +175,26 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
         discard savePNG32(path, data, ss.packer.width, ss.packer.height)
         if tool.compressOutput:
             var res = 1
+            var normalizePath: string
             try:
-                res = execCmd("pngquant --force --speed 1 -o " & path & " " & path)
+                normalizePath = quoteShell(path)
+                res = execCmd("pngquant --force --speed 1 --quality 90-100 -o " & normalizePath & " " & normalizePath)
             except:
                 discard
             if res != 0:
-                echo "WARNING: pngquant failed"
+                echo "WARNING: pngquant failed ", normalizePath
+                try:
+                    let tmp = normalizePath & "__tmp"
+                    moveFile(normalizePath, tmp)
+                    res = execCmd("posterizer -Q 90 -b " & tmp & " " & normalizePath)
+                    if res != 0:
+                        echo "WARNING: posterizer failed or not found ", normalizePath
+                        removeFile(normalizePath)
+                        moveFile(tmp, normalizePath)
+                    else:
+                        removeFile(tmp)
+                except:
+                    discard
 
     if consumeLessMemory:
         GC_fullCollect()
