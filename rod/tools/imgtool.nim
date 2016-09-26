@@ -188,6 +188,7 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
                     moveFile(normalizePath, tmp)
                     res = execCmd("posterizer -Q 90 -b " & tmp & " " & normalizePath)
                     if res != 0:
+                        echo "WARNING: pasterizer failed or not found ", normalizePath
                         removeFile(normalizePath)
                         moveFile(tmp, normalizePath)
                     else:
