@@ -146,4 +146,4 @@ method visitProperties*(c: ChannelLevels, p: var PropertyVisitor) =
     p.visitProperty("greenOutBlack", c.outBlackV[1], {pfAnimatable})
     p.visitProperty("blueOutBlack", c.outBlackV[2], {pfAnimatable})
 
-registerComponent(ChannelLevels)
+registerComponent(ChannelLevels, "Effects")

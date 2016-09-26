@@ -16,16 +16,32 @@ export Component
 
 method init*(c: Component) {.base.} = discard
 
+var componentGroupsTable* = initTable[string, seq[string]]()
+
+proc registerComponentGroup(group, component: string) =
+    var validatedGroup = group
+    if validatedGroup.isNil:
+        validatedGroup = "Other"
+
+    var g = componentGroupsTable.getOrDefault(validatedGroup)
+    if g.isNil:
+        g = newSeq[string]()
+
+    g.add(component)
+    componentGroupsTable[validatedGroup] = g
+
 proc registeredComponents*(): seq[string] =
     result = newSeq[string]()
     for c in registeredClassesOfType(Component):
         result.add(c)
 
-template registerComponent*(T: typedesc) =
+template registerComponent*(T: typedesc, group: string = nil ) =
     registerClass(T)
+    registerComponentGroup(group, typetraits.name(T))
 
-template registerComponent*(T: typedesc, creator: (proc(): RootRef)) =
+template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: string = nil ) =
     registerClass(T, creator)
+    registerComponentGroup(group, typetraits.name(T))
 
 proc createComponent*(name: string): Component =
     if isClassRegistered(name) == false:
