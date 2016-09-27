@@ -66,6 +66,7 @@ type ImgTool* = ref object
     createIndex*: bool
     downsampleRatio*: float
     disablePotAdjustment*: bool # If true, do not resize images to power of 2
+    removeOriginals*: bool
     extrusion*: int
     images: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
@@ -122,26 +123,51 @@ proc outImgExt(tool: ImgTool): string =
     else:
         result = ".png"
 
+proc compressPng(tool: ImgTool, path: string) =
+    var res = 1
+    var qPath = quoteShell(path)
+    try:
+        res = execCmd("pngquant --force --speed 1 --quality 90-100 -o " & qPath & " " & qPath)
+    except:
+        discard
+    if res != 0:
+        echo "WARNING: pngquant failed ", path
+        let tmp = path & "__tmp"
+        moveFile(path, tmp)
+        try:
+            res = execCmd("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: posterize failed or not found ", path
+            removeFile(path)
+            moveFile(tmp, path)
+        else:
+            removeFile(tmp)
+
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
     for im in ss.images:
         var nullifyWhenDone = false
+        var png: PNGResult
         if im.png.isNil:
-            im.png = loadPNG32(im.originalPath)
+            png = loadPNG32(im.originalPath)
+        else:
+            png = im.png
             nullifyWhenDone = true
 
-        if im.png.data.len == im.png.width * im.png.height * 4:
-            zeroColorIfZeroAlpha(im.png.data)
-            colorBleed(im.png.data, im.png.width, im.png.height)
+        if png.data.len == png.width * png.height * 4:
+            zeroColorIfZeroAlpha(png.data)
+            colorBleed(png.data, png.width, png.height)
 
         if im.srcSize == im.targetSize:
             blitImage(
                 data, ss.packer.width, ss.packer.height, # Target image
                 im.pos.x, im.pos.y, # Position in target image
-                im.png.data, im.png.width, im.png.height,
+                png.data, png.width, png.height,
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height)
         else:
-            resizeImage(im.png.data, im.png.width, im.png.height,
+            resizeImage(png.data, png.width, png.height,
                 data, ss.packer.width, ss.packer.height,
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height,
                 im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
@@ -174,27 +200,7 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     else:
         discard savePNG32(path, data, ss.packer.width, ss.packer.height)
         if tool.compressOutput:
-            var res = 1
-            var normalizePath: string
-            try:
-                normalizePath = quoteShell(path)
-                res = execCmd("pngquant --force --speed 1 --quality 90-100 -o " & normalizePath & " " & normalizePath)
-            except:
-                discard
-            if res != 0:
-                echo "WARNING: pngquant failed ", normalizePath
-                try:
-                    let tmp = normalizePath & "__tmp"
-                    moveFile(normalizePath, tmp)
-                    res = execCmd("posterizer -Q 90 -b " & tmp & " " & normalizePath)
-                    if res != 0:
-                        echo "WARNING: posterizer failed or not found ", normalizePath
-                        removeFile(normalizePath)
-                        moveFile(tmp, normalizePath)
-                    else:
-                        removeFile(tmp)
-                except:
-                    discard
+            tool.compressPNG(path)
 
     if consumeLessMemory:
         GC_fullCollect()
@@ -488,13 +494,15 @@ proc run*(tool: ImgTool) =
         # Write compositions back to files
         for i, c in tool.compositions:
             let dstPath = tool.destPath(tool.compositionPaths[i])
+            createDir(dstPath.parentDir())
             writeFile(dstPath, c.pretty().replace(" \n", "\n"))
 
         if tool.createIndex:
             tool.writeIndex()
     else:
         echo "Everyting up to date"
-    tool.removeLeftoverFiles()
+    if tool.removeOriginals:
+        tool.removeLeftoverFiles()
 
 proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =
     var tool = newImgTool()
@@ -507,6 +515,7 @@ proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefi
     tool.compositionPaths = compositions
     tool.outPrefix = outPrefix
     tool.compressOutput = compressOutput
+    tool.removeOriginals = true
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime
