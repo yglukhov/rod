@@ -1,5 +1,6 @@
 import nimPNG
-import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, threadpool
+import os, osproc, json, strutils, times, sequtils, tables, algorithm, math,
+    threadpool, sets
 
 import nimx.rect_packer
 import nimx.types except Point, Size, Rect
@@ -68,7 +69,7 @@ type ImgTool* = ref object
     disablePotAdjustment*: bool # If true, do not resize images to power of 2
     removeOriginals*: bool
     extrusion*: int
-    images: Table[string, SpriteSheetImage]
+    images*: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
 
     latestOriginalModificationDate: Time
@@ -77,9 +78,10 @@ type ImgTool* = ref object
 proc newImgTool*(): ImgTool =
     result.new()
     result.images = initTable[string, SpriteSheetImage]()
-    result.spriteSheets = newSeq[SpriteSheet]()
+    result.spriteSheets = @[]
     result.downsampleRatio = 1.0
     result.extrusion = 1
+    result.compositionPaths = @[]
 
 iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode) =
     var stack = @[n]
@@ -219,7 +221,7 @@ proc serializedImage(im: SpriteSheetImage, path: string): JsonNode =
 
 proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
     # Fixup the fileName node to contain spritesheet filename and texCoords
-    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
+    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath).parentDir(), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
     doAssert(not im.spriteSheet.isNil)
 
     if o.textureKey.isNil:
@@ -507,12 +509,10 @@ proc run*(tool: ImgTool) =
 proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =
     var tool = newImgTool()
 
-    var compositions = newSeq[string]()
     for p in compositionPatterns:
         for c in walkFiles(p):
-            compositions.add(c)
+            tool.compositionPaths.add(c)
 
-    tool.compositionPaths = compositions
     tool.outPrefix = outPrefix
     tool.compressOutput = compressOutput
     tool.removeOriginals = true

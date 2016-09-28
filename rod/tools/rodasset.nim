@@ -1,0 +1,95 @@
+import os, strutils, times, tables, osproc
+import imgtool, asset_cache
+
+proc hash(path: string) = echo dirHash(path)
+
+var gAudioConvTool = ""
+
+proc audioConvTool(): string =
+    if gAudioConvTool.len == 0:
+        gAudioConvTool = findExe("ffmpeg")
+        if gAudioConvTool.len == 0:
+            gAudioConvTool = findExe("avconv")
+    result = gAudioConvTool
+
+proc convertWavToOgg(fromFile, toFile: string) =
+    echo audioConvTool().execProcess(
+        ["-i", fromFile, "-acodec", "libvorbis", "-y", toFile], options={poStdErrToStdOut})
+
+proc convertWavToMP3(fromFile, toFile: string) =
+    var args = @["-i", fromFile, "-acodec", "libmp3lame", "-y"]
+    when defined(macosx):
+        args.add(["-write_xing", "0"])
+    args.add(toFile)
+    echo audioConvTool().execProcess(args, options={poStdErrToStdOut})
+
+proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
+    let isMp3 = audioFmt == "mp3"
+    for r in walkDirRec(src):
+        let sf = r.splitFile()
+        if not sf.name.startsWith('.'):
+            let d = dst / substr(r, src.len)
+            var doCopy = false
+            case sf.ext
+            of ".png":
+                if r notin tool.images:
+                    doCopy = true
+            of ".wav":
+                createDir(d.parentDir())
+                let ssf = d.splitFile()
+                if isMp3:
+                    convertWavToMP3(r, ssf.dir / ssf.name & ".mp3")
+                else:
+                    convertWavToOgg(r, ssf.dir / ssf.name & ".ogg")
+            of ".json":
+                discard
+            else:
+                doCopy = true
+
+            if doCopy:
+                echo "copying remaining asset: ", r, " to ", d
+                createDir(d.parentDir())
+                copyFile(r, d)
+
+proc pack(cache: string = "", compressToPVR: bool = false, nocompress: bool = false,
+        downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
+        disablePotAdjustment: bool = false, audio: string = "ogg",
+        src, dst: string) =
+    let src = expandTilde(src)
+    let dst = expandTilde(dst)
+    let cache = getCache(cache)
+    let h = dirHash(src)
+    let c = cache / h
+    echo "rodasset Cache: ", c
+    if not dirExists(c):
+        var tool = newImgTool()
+        for f in walkDirRec(src):
+            if f.endsWith(".json"):
+                tool.compositionPaths.add(f)
+
+        tool.originalResPath = src
+        tool.resPath = c
+        createDir(c)
+        tool.outPrefix = "p"
+        tool.compressOutput = true
+        tool.compressToPVR = compressToPVR
+        tool.downsampleRatio = downsampleRatio
+        tool.extrusion = extrusion
+        tool.disablePotAdjustment = disablePotAdjustment
+        let startTime = epochTime()
+        tool.run()
+        echo "Done. Time: ", epochTime() - startTime
+
+        copyRemainingAssets(tool, src, c, audio)
+
+    copyResourcesFromCache(c, h, dst)
+
+proc cacheAvailbale(cache: string = "", src: string) =
+    let cache = getCache(cache)
+    if not dirExists(cache):
+        quit 1
+    echo cache
+
+when isMainModule:
+    import cligen
+    dispatchMulti([hash], [pack], [cacheAvailbale])
