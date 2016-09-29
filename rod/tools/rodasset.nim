@@ -1,7 +1,7 @@
 import os, strutils, times, tables, osproc
 import imgtool, asset_cache
 
-proc hash(path: string) = echo dirHash(path)
+proc hash(audio: string = "ogg", path: string) = echo dirHash(path, audio)
 
 var gAudioConvTool = ""
 
@@ -54,22 +54,24 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
 proc pack(cache: string = "", compressToPVR: bool = false, nocompress: bool = false,
         downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
         disablePotAdjustment: bool = false, audio: string = "ogg",
+        onlyCache: bool = false,
         src, dst: string) =
     let src = expandTilde(src)
     let dst = expandTilde(dst)
     let cache = getCache(cache)
-    let h = dirHash(src)
+    let h = dirHash(src, audio)
     let c = cache / h
     echo "rodasset Cache: ", c
     if not dirExists(c):
+        let tmpCacheDir = c & ".tmp"
         var tool = newImgTool()
         for f in walkDirRec(src):
             if f.endsWith(".json"):
                 tool.compositionPaths.add(f)
 
         tool.originalResPath = src
-        tool.resPath = c
-        createDir(c)
+        tool.resPath = tmpCacheDir
+        createDir(tmpCacheDir)
         tool.outPrefix = "p"
         tool.compressOutput = true
         tool.compressToPVR = compressToPVR
@@ -80,16 +82,12 @@ proc pack(cache: string = "", compressToPVR: bool = false, nocompress: bool = fa
         tool.run()
         echo "Done. Time: ", epochTime() - startTime
 
-        copyRemainingAssets(tool, src, c, audio)
+        copyRemainingAssets(tool, src, tmpCacheDir, audio)
+        moveFile(tmpCacheDir, c)
 
-    copyResourcesFromCache(c, h, dst)
-
-proc cacheAvailbale(cache: string = "", src: string) =
-    let cache = getCache(cache)
-    if not dirExists(cache):
-        quit 1
-    echo cache
+    if not onlyCache:
+        copyResourcesFromCache(c, h, dst)
 
 when isMainModule:
     import cligen
-    dispatchMulti([hash], [pack], [cacheAvailbale])
+    dispatchMulti([hash], [pack])

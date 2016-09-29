@@ -1,11 +1,14 @@
 import securehash, os, algorithm, strutils
 
-proc dirHash*(path: string): string =
+proc dirHash*(path: string, profile: string = ""): string =
     var allFiles = newSeq[string]()
     for f in walkDirRec(path):
         let sf = f.splitFile()
         if not sf.name.startsWith('.'):
-            allFiles.add(f)
+            if sf.ext == ".wav":
+                allFiles.add(f & "." & profile)
+            else:
+                allFiles.add(f)
     allFiles.sort(system.cmp[string])
     var hashStr = allFiles.join(":")
     for f in allFiles:
