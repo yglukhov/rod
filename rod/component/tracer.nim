@@ -51,9 +51,7 @@ proc newTracer(): Tracer =
     new(result, proc(t: Tracer) =
         let c = currentContext()
         let gl = c.gl
-        gl.bindBuffer(gl.ARRAY_BUFFER, t.indexBuffer)
         gl.deleteBuffer(t.indexBuffer)
-        gl.bindBuffer(gl.ARRAY_BUFFER, t.vertexBuffer)
         gl.deleteBuffer(t.vertexBuffer)
         t.indexBuffer = invalidBuffer
         t.vertexBuffer = invalidBuffer
