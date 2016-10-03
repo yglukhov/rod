@@ -32,7 +32,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
             var doCopy = false
             case sf.ext
             of ".png":
-                if r notin tool.images:
+                if unixToNativePath(r) notin tool.images:
                     doCopy = true
             of ".wav":
                 createDir(d.parentDir())
