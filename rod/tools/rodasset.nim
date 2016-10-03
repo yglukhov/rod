@@ -51,7 +51,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
                 createDir(d.parentDir())
                 copyFile(r, d)
 
-proc pack(cache: string = "", compressToPVR: bool = false, nocompress: bool = false,
+proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = false, nocompress: bool = false,
         downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
         disablePotAdjustment: bool = false, audio: string = "ogg",
         onlyCache: bool = false,
@@ -65,10 +65,13 @@ proc pack(cache: string = "", compressToPVR: bool = false, nocompress: bool = fa
     if not dirExists(c):
         let tmpCacheDir = c & ".tmp"
         var tool = newImgTool()
+
+        tool.exceptions = @[]
         for f in walkDirRec(src):
             if f.endsWith(".json"):
                 tool.compositionPaths.add(f)
-
+        for e in split(exceptions, ","):
+            tool.exceptions.add(e)
         tool.originalResPath = src
         tool.resPath = tmpCacheDir
         createDir(tmpCacheDir)

@@ -40,6 +40,7 @@ type
         index: int # Index of sprite sheet in tool.images array
         images: seq[SpriteSheetImage]
         packer: RectPacker
+        noquant: bool
 
 proc newSpriteSheetImage(path: string, extrusion: int = 1): SpriteSheetImage =
     result.new()
@@ -71,7 +72,7 @@ type ImgTool* = ref object
     extrusion*: int
     images*: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
-
+    exceptions*: seq[string]
     latestOriginalModificationDate: Time
 
 
@@ -125,15 +126,11 @@ proc outImgExt(tool: ImgTool): string =
     else:
         result = ".png"
 
-proc compressPng(tool: ImgTool, path: string) =
+proc compressPng(tool: ImgTool, path: string, noquant: bool = false) =
     var res = 1
     var qPath = quoteShell(path)
-    try:
-        res = execCmd("pngquant --force --speed 1 --quality 90-100 -o " & qPath & " " & qPath)
-    except:
-        discard
-    if res != 0:
-        echo "WARNING: pngquant failed ", path
+
+    if noquant:
         let tmp = path & "__tmp"
         moveFile(path, tmp)
         try:
@@ -146,6 +143,19 @@ proc compressPng(tool: ImgTool, path: string) =
             moveFile(tmp, path)
         else:
             removeFile(tmp)
+    else:
+        try:
+            res = execCmd("pngquant --force --speed 1  -o " & qPath & " " & qPath)
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: pngquant failed ", path
+    try:
+        res = execCmd("pngcrush -ow -rem allb -reduce " & qPath)
+    except:
+        discard
+    if res != 0:
+        echo "WARNING: removing sRGB failed ", path
 
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
@@ -202,7 +212,7 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     else:
         discard savePNG32(path, data, ss.packer.width, ss.packer.height)
         if tool.compressOutput:
-            tool.compressPNG(path)
+            tool.compressPNG(path, ss.noquant)
 
     if consumeLessMemory:
         GC_fullCollect()
@@ -379,7 +389,7 @@ proc writeIndex(tool: ImgTool) =
     writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
     echo root.pretty().replace(" \n", "\n")
 
-proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet]) =
+proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], noquant: bool = false) =
     for i, im in images:
         var done = false
         for ss in spritesheets:
@@ -390,38 +400,59 @@ proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage]
             done = newSS.tryPackImage(im)
             if done:
                 newSS.index = spritesheets.len
+                newSS.noquant = noquant
                 spritesheets.add(newSS)
             else:
                 echo "Could not pack image: ", im.originalPath
 
 proc assignImagesToSpriteSheets(tool: ImgTool) =
-    var allImages = toSeq(values(tool.images))
     # Allocate spritesheets for images
     # Here we try two approaches of packing. The first is to sort images
     # by max(w, h). The second is to sort by area.
-    var try1 = newSeq[SpriteSheet]()
-    var try2 = newSeq[SpriteSheet]()
 
-    # First approach
-    allImages.sort do(x, y: SpriteSheetImage) -> int:
-        max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
-    tool.packImagesToSpritesheets(allImages, try1)
+    var allImages: seq[SpriteSheetImage] = @[]
+    var exceptionImages: seq[SpriteSheetImage] = @[]
 
-    # Second approach
-    allImages.sort do(x, y: SpriteSheetImage) -> int:
-        y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
-    tool.packImagesToSpritesheets(allImages, try2)
-
-    # Choose better approach
-    if try1.len < try2.len:
-        # Redo try1 again
-        allImages.sort do(x, y: SpriteSheetImage) -> int:
-            max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
-        try1.setLen(0)
-        tool.packImagesToSpritesheets(allImages, try1)
-        shallowCopy(tool.spriteSheets, try1)
+    if tool.exceptions.len > 0:
+        for k, v in tool.images:
+            var name = splitFile(k).name
+            if tool.exceptions.contains(name):
+                exceptionImages.add(v)
+            else:
+                allImages.add(v)
     else:
-        shallowCopy(tool.spriteSheets, try2)
+        allImages = toSeq(values(tool.images))
+
+    proc assign(imgs: var seq[SpriteSheetImage]) =
+        var try1 = newSeq[SpriteSheet]()
+        var try2 = newSeq[SpriteSheet]()
+
+        # First approach
+        imgs.sort do(x, y: SpriteSheetImage) -> int:
+            max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+        tool.packImagesToSpritesheets(imgs, try1)
+
+        # Second approach
+        imgs.sort do(x, y: SpriteSheetImage) -> int:
+            y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
+        tool.packImagesToSpritesheets(imgs, try2)
+
+        # Choose better approach
+        if try1.len < try2.len:
+            # Redo try1 again
+            imgs.sort do(x, y: SpriteSheetImage) -> int:
+                max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+            try1.setLen(0)
+            tool.packImagesToSpritesheets(imgs, try1)
+            shallowCopy(tool.spriteSheets, try1)
+        else:
+            shallowCopy(tool.spriteSheets, try2)
+
+    assign(allImages)
+    if tool.exceptions.len > 0:
+        var try3 = newSeq[SpriteSheet]()
+        tool.packImagesToSpritesheets(exceptionImages, try3, true)
+        tool.spriteSheets.add(try3)
 
 when isMultithreaded:
     proc composeAndWriteAux(tool, ss: pointer, path: string) =
