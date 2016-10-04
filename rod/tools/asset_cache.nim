@@ -34,16 +34,19 @@ proc dirHash*(path: string, profile: string = ""): string =
                 if sf.ext == ".wav":
                     hasSound = true
                 allFiles.add(f)
-        if path.len > 0:
-            for f in allFiles.mitems:
-                f = f.substr(path.len + 1)
+
         allFiles.sort(system.cmp[string])
-        var hashStr = allFiles.join(':')
+
+        var hashStr = ""
+        for f in allFiles:
+            if path.len > 0:
+                hashStr &= f.substr(path.len + 1) & ":"
+            else:
+                hashStr &= f & ":"
+            hashStr &= $hash(readFile(f)) & ";"
         if hasSound:
             hashStr &= profile
-        for f in allFiles:
-            let fdata = readFile(f)
-            hashStr &= $hash(fdata)
+
         result = ($secureHash(hashStr)).toLowerAscii()
 
 proc copyResourcesFromCache*(cache, cacheHash, dst: string) =
