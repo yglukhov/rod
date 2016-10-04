@@ -34,12 +34,11 @@ proc dirHash*(path: string, profile: string = ""): string =
                 if sf.ext == ".wav":
                     hasSound = true
                 allFiles.add(f)
+        if path.len > 0:
+            for f in allFiles.mitems:
+                f = f.substr(path.len + 1)
         allFiles.sort(system.cmp[string])
-        var hashStr = ""
-        for f in allFiles:
-            let ptp = if path.len > 0: f.substr(path.len + 1) & ":"
-                                 else: f & ":"
-            hashStr &= ptp
+        var hashStr = allFiles.join(':')
         if hasSound:
             hashStr &= profile
         for f in allFiles:
