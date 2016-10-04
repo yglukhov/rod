@@ -389,7 +389,7 @@ proc writeIndex(tool: ImgTool) =
     writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
     echo root.pretty().replace(" \n", "\n")
 
-proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], noquant: bool = false) =
+proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], offset: int = 0, noquant: bool = false) =
     for i, im in images:
         var done = false
         for ss in spritesheets:
@@ -399,7 +399,7 @@ proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage]
             let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
             done = newSS.tryPackImage(im)
             if done:
-                newSS.index = spritesheets.len
+                newSS.index = spritesheets.len + offset
                 newSS.noquant = noquant
                 spritesheets.add(newSS)
             else:
@@ -447,11 +447,10 @@ proc assignImagesToSpriteSheets(tool: ImgTool) =
             shallowCopy(tool.spriteSheets, try1)
         else:
             shallowCopy(tool.spriteSheets, try2)
-
     assign(allImages)
     if tool.exceptions.len > 0:
         var try3 = newSeq[SpriteSheet]()
-        tool.packImagesToSpritesheets(exceptionImages, try3, true)
+        tool.packImagesToSpritesheets(exceptionImages, try3, tool.spriteSheets.len, true)
         tool.spriteSheets.add(try3)
 
 when isMultithreaded:
