@@ -1,7 +1,7 @@
 import nimPNG
 import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, sets
 
-when defined(threads):
+when compileOption("threads"):
     import threadpool
 
 import nimx.rect_packer
@@ -16,7 +16,7 @@ type Size = tuple[width, height: int]
 
 let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
 
-const isMultithreaded = false and defined(threads) # ... not defined(windows)
+const isMultithreaded = false and compileOption("threads") # ... not defined(windows)
 
 type
     ImageOccurence = object
