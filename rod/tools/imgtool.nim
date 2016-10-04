@@ -1,6 +1,8 @@
 import nimPNG
-import os, osproc, json, strutils, times, sequtils, tables, algorithm, math,
-    threadpool, sets
+import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, sets
+
+when defined(threads):
+    import threadpool
 
 import nimx.rect_packer
 import nimx.types except Point, Size, Rect
@@ -14,7 +16,7 @@ type Size = tuple[width, height: int]
 
 let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
 
-const isMultithreaded = false # ... not defined(windows)
+const isMultithreaded = false and defined(threads) # ... not defined(windows)
 
 type
     ImageOccurence = object
