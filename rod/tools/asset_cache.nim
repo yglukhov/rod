@@ -1,5 +1,9 @@
 import securehash, os, osproc, algorithm, strutils, times, hashes
 
+# When asset packing algorithm changes, we should increase `hashVersion`
+# to invalidate old caches.
+const hashVersion = 1
+
 const useExperimentalOptimization = false
 
 proc dirHash*(path: string, profile: string = ""): string =
@@ -46,6 +50,7 @@ proc dirHash*(path: string, profile: string = ""): string =
             hashStr &= $hash(readFile(f)) & ";"
         if hasSound:
             hashStr &= profile
+        hashStr &= $hashVersion
 
         result = ($secureHash(hashStr)).toLowerAscii()
 
