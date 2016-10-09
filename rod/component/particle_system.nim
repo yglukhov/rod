@@ -778,6 +778,9 @@ method draw*(ps: ParticleSystem) =
     gl.enable(gl.BLEND)
     gl.depthMask(true)
 
+    for i in 1 .. 6:
+        gl.disableVertexAttribArray(GLuint(i))
+
 method getBBox*(ps: ParticleSystem): BBox =
     result.minPoint = newVector3(-3, -3, -3)
     result.maxPoint = newVector3(3, 3, 3)
