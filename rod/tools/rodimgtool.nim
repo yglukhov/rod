@@ -23,6 +23,7 @@ proc rodimgtool(compressToPVR: bool = false, originalResPath: string = ".",
     tool.extrusion = extrusion
     tool.createIndex = createIndex
     tool.disablePotAdjustment = disablePotAdjustment
+    tool.removeOriginals = true
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime

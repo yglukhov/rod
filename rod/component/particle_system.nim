@@ -778,6 +778,9 @@ method draw*(ps: ParticleSystem) =
     gl.enable(gl.BLEND)
     gl.depthMask(true)
 
+    for i in 1 .. 6:
+        gl.disableVertexAttribArray(GLuint(i))
+
 method getBBox*(ps: ParticleSystem): BBox =
     result.minPoint = newVector3(-3, -3, -3)
     result.maxPoint = newVector3(3, 3, 3)
@@ -996,9 +999,9 @@ method visitProperties*(h: PSHolder, p: var PropertyVisitor) =
     p.visitProperty("distance", h.distance)
     p.visitProperty("speed", h.speed)
 
-registerComponent(PSHolder)
+registerComponent(PSHolder, "ParticleSystem")
 
 proc creator(): RootRef =
     result = newParticleSystem()
 
-registerComponent(ParticleSystem, creator)
+registerComponent(ParticleSystem, creator, "ParticleSystem")

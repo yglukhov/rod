@@ -1,5 +1,8 @@
 import nimPNG
-import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, threadpool
+import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, sets
+
+when compileOption("threads"):
+    import threadpool
 
 import nimx.rect_packer
 import nimx.types except Point, Size, Rect
@@ -13,7 +16,7 @@ type Size = tuple[width, height: int]
 
 let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
 
-const isMultithreaded = false # ... not defined(windows)
+const isMultithreaded = false and compileOption("threads") # ... not defined(windows)
 
 type
     ImageOccurence = object
@@ -39,6 +42,7 @@ type
         index: int # Index of sprite sheet in tool.images array
         images: seq[SpriteSheetImage]
         packer: RectPacker
+        noquant: bool
 
 proc newSpriteSheetImage(path: string, extrusion: int = 1): SpriteSheetImage =
     result.new()
@@ -66,19 +70,21 @@ type ImgTool* = ref object
     createIndex*: bool
     downsampleRatio*: float
     disablePotAdjustment*: bool # If true, do not resize images to power of 2
+    removeOriginals*: bool
     extrusion*: int
-    images: Table[string, SpriteSheetImage]
+    images*: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
-
+    exceptions*: seq[string]
     latestOriginalModificationDate: Time
 
 
 proc newImgTool*(): ImgTool =
     result.new()
     result.images = initTable[string, SpriteSheetImage]()
-    result.spriteSheets = newSeq[SpriteSheet]()
+    result.spriteSheets = @[]
     result.downsampleRatio = 1.0
     result.extrusion = 1
+    result.compositionPaths = @[]
 
 iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode) =
     var stack = @[n]
@@ -122,26 +128,64 @@ proc outImgExt(tool: ImgTool): string =
     else:
         result = ".png"
 
+proc compressPng(tool: ImgTool, path: string, noquant: bool = false) =
+    var res = 1
+    var qPath = quoteShell(path)
+
+    if noquant:
+        let tmp = path & "__tmp"
+        moveFile(path, tmp)
+        try:
+            res = execCmd("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: posterize failed or not found ", path
+            removeFile(path)
+            moveFile(tmp, path)
+        else:
+            removeFile(tmp)
+    else:
+        try:
+            res = execCmd("pngquant --force --speed 1  -o " & qPath & " " & qPath)
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: pngquant failed ", path
+    try:
+        # Temp file path is set explicitly to reside near the target file.
+        # Otherwise pngcrush will create temp file in current dir and that may
+        # cause problems. Originally this bug was observed in docker build image.
+        let tmp = quoteShell(path & ".tmp.png")
+        res = execCmd("pngcrush -ow -rem allb -reduce " & qPath & " " & tmp)
+    except:
+        discard
+    if res != 0:
+        echo "WARNING: removing sRGB failed ", path
+
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
     for im in ss.images:
         var nullifyWhenDone = false
+        var png: PNGResult
         if im.png.isNil:
-            im.png = loadPNG32(im.originalPath)
+            png = loadPNG32(im.originalPath)
+        else:
+            png = im.png
             nullifyWhenDone = true
 
-        if im.png.data.len == im.png.width * im.png.height * 4:
-            zeroColorIfZeroAlpha(im.png.data)
-            colorBleed(im.png.data, im.png.width, im.png.height)
+        if png.data.len == png.width * png.height * 4:
+            zeroColorIfZeroAlpha(png.data)
+            colorBleed(png.data, png.width, png.height)
 
         if im.srcSize == im.targetSize:
             blitImage(
                 data, ss.packer.width, ss.packer.height, # Target image
                 im.pos.x, im.pos.y, # Position in target image
-                im.png.data, im.png.width, im.png.height,
+                png.data, png.width, png.height,
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height)
         else:
-            resizeImage(im.png.data, im.png.width, im.png.height,
+            resizeImage(png.data, png.width, png.height,
                 data, ss.packer.width, ss.packer.height,
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height,
                 im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
@@ -174,13 +218,7 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     else:
         discard savePNG32(path, data, ss.packer.width, ss.packer.height)
         if tool.compressOutput:
-            var res = 1
-            try:
-                res = execCmd("pngquant --force --speed 1 -o " & path & " " & path)
-            except:
-                discard
-            if res != 0:
-                echo "WARNING: pngquant failed"
+            tool.compressPNG(path, ss.noquant)
 
     if consumeLessMemory:
         GC_fullCollect()
@@ -199,7 +237,7 @@ proc serializedImage(im: SpriteSheetImage, path: string): JsonNode =
 
 proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
     # Fixup the fileName node to contain spritesheet filename and texCoords
-    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
+    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath).parentDir(), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
     doAssert(not im.spriteSheet.isNil)
 
     if o.textureKey.isNil:
@@ -357,7 +395,7 @@ proc writeIndex(tool: ImgTool) =
     writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
     echo root.pretty().replace(" \n", "\n")
 
-proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet]) =
+proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], offset: int = 0, noquant: bool = false) =
     for i, im in images:
         var done = false
         for ss in spritesheets:
@@ -367,39 +405,59 @@ proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage]
             let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
             done = newSS.tryPackImage(im)
             if done:
-                newSS.index = spritesheets.len
+                newSS.index = spritesheets.len + offset
+                newSS.noquant = noquant
                 spritesheets.add(newSS)
             else:
                 echo "Could not pack image: ", im.originalPath
 
 proc assignImagesToSpriteSheets(tool: ImgTool) =
-    var allImages = toSeq(values(tool.images))
     # Allocate spritesheets for images
     # Here we try two approaches of packing. The first is to sort images
     # by max(w, h). The second is to sort by area.
-    var try1 = newSeq[SpriteSheet]()
-    var try2 = newSeq[SpriteSheet]()
 
-    # First approach
-    allImages.sort do(x, y: SpriteSheetImage) -> int:
-        max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
-    tool.packImagesToSpritesheets(allImages, try1)
+    var allImages: seq[SpriteSheetImage] = @[]
+    var exceptionImages: seq[SpriteSheetImage] = @[]
 
-    # Second approach
-    allImages.sort do(x, y: SpriteSheetImage) -> int:
-        y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
-    tool.packImagesToSpritesheets(allImages, try2)
-
-    # Choose better approach
-    if try1.len < try2.len:
-        # Redo try1 again
-        allImages.sort do(x, y: SpriteSheetImage) -> int:
-            max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
-        try1.setLen(0)
-        tool.packImagesToSpritesheets(allImages, try1)
-        shallowCopy(tool.spriteSheets, try1)
+    if tool.exceptions.len > 0:
+        for k, v in tool.images:
+            var name = splitFile(k).name
+            if tool.exceptions.contains(name):
+                exceptionImages.add(v)
+            else:
+                allImages.add(v)
     else:
-        shallowCopy(tool.spriteSheets, try2)
+        allImages = toSeq(values(tool.images))
+
+    proc assign(imgs: var seq[SpriteSheetImage]) =
+        var try1 = newSeq[SpriteSheet]()
+        var try2 = newSeq[SpriteSheet]()
+
+        # First approach
+        imgs.sort do(x, y: SpriteSheetImage) -> int:
+            max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+        tool.packImagesToSpritesheets(imgs, try1)
+
+        # Second approach
+        imgs.sort do(x, y: SpriteSheetImage) -> int:
+            y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
+        tool.packImagesToSpritesheets(imgs, try2)
+
+        # Choose better approach
+        if try1.len < try2.len:
+            # Redo try1 again
+            imgs.sort do(x, y: SpriteSheetImage) -> int:
+                max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+            try1.setLen(0)
+            tool.packImagesToSpritesheets(imgs, try1)
+            shallowCopy(tool.spriteSheets, try1)
+        else:
+            shallowCopy(tool.spriteSheets, try2)
+    assign(allImages)
+    if tool.exceptions.len > 0:
+        var try3 = newSeq[SpriteSheet]()
+        tool.packImagesToSpritesheets(exceptionImages, try3, tool.spriteSheets.len, true)
+        tool.spriteSheets.add(try3)
 
 when isMultithreaded:
     proc composeAndWriteAux(tool, ss: pointer, path: string) =
@@ -474,25 +532,26 @@ proc run*(tool: ImgTool) =
         # Write compositions back to files
         for i, c in tool.compositions:
             let dstPath = tool.destPath(tool.compositionPaths[i])
+            createDir(dstPath.parentDir())
             writeFile(dstPath, c.pretty().replace(" \n", "\n"))
 
         if tool.createIndex:
             tool.writeIndex()
     else:
         echo "Everyting up to date"
-    tool.removeLeftoverFiles()
+    if tool.removeOriginals:
+        tool.removeLeftoverFiles()
 
 proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =
     var tool = newImgTool()
 
-    var compositions = newSeq[string]()
     for p in compositionPatterns:
         for c in walkFiles(p):
-            compositions.add(c)
+            tool.compositionPaths.add(c)
 
-    tool.compositionPaths = compositions
     tool.outPrefix = outPrefix
     tool.compressOutput = compressOutput
+    tool.removeOriginals = true
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime
