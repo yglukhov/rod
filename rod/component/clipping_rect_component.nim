@@ -3,6 +3,7 @@ import nimx.context
 import nimx.composition
 import nimx.portable_gl
 import nimx.view
+import nimx.property_visitor
 
 import rod.node, rod.viewport, rod.component
 
@@ -52,11 +53,8 @@ method draw*(cl: ClippingRectComponent) =
         var y = GLint((sv.window.bounds.height - brp.y) * pr)
         var w = GLsizei((brp.x - tlp.x) * pr)
         var h = GLSizei((brp.y - tlp.y) * pr)
+        gl.scissor(x, y, w, h)
 
-        try:
-            gl.scissor(x, y, w, h)
-        except:
-            discard
         for c in cl.node.children: c.recursiveDraw()
         gl.disable(gl.SCISSOR_TEST)
     else:
@@ -70,5 +68,8 @@ method draw*(cl: ClippingRectComponent) =
         popPostEffect()
 
 method isPosteffectComponent*(c: ClippingRectComponent): bool = true
+
+method visitProperties*(cl: ClippingRectComponent, p: var PropertyVisitor) =
+    p.visitProperty("rect", cl.clippingRect)
 
 registerComponent(ClippingRectComponent)
