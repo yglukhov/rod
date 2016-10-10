@@ -1,4 +1,7 @@
 import json
+import strutils
+import unicode
+import tables
 import nimx.types
 import nimx.font
 import nimx.context
@@ -13,6 +16,7 @@ import rod.component.camera
 import rod.viewport
 import rod.tools.serializer
 import rod.tools.debug_draw
+import rod.utils.attributed_text
 
 type TextJustification* = enum
     tjLeft
@@ -160,6 +164,7 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
             t.mBoundingOffset = newPoint(v[0].getFNum(), v[1].getFNum())
             t.mText.boundingSize = newSize(v[2].getFNum(), v[3].getFNum())
 
+        t.mText.processAttributedText()
 ################################################################################
 # Old compatibility api
 proc color*(c: Text): Color = c.mText.colorOfRuneAtPos(0).color1

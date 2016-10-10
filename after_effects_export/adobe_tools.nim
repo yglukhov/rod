@@ -5,6 +5,7 @@ type
     FileObj {.importc.} = object of RootObj
         name*: cstring
         path*: cstring
+        encoding*: cstring
         lineFeed*: cstring # lfWindows, lfUnix or lfMacintosh
         parent*: Folder
 
