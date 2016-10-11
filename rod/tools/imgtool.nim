@@ -190,11 +190,6 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height,
                 im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
 
-        # if image has only alpha 0
-        if im.targetSize.width < 1:
-            im.targetSize.width = 1
-        if im.targetSize.height < 1:
-            im.targetSize.height = 1
 
         extrudeBorderPixels(
             data,
