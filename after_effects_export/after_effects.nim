@@ -32,6 +32,10 @@ type
         color*: ColorLabel
         parentFolder*: FolderItem
 
+    MarkerValue* = ref MarkerValueObj
+    MarkerValueObj {.importc.} = object of RootObj
+        comment*: cstring
+
     AVItem* = ref AVItemObj
     AVItemObj {.importc.} = object of ItemObj
         duration*: float
@@ -214,6 +218,7 @@ template valueTypeFromType(t: typedesc[float32]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[float]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[cstring]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[TextDocument]): untyped = [pvtTextDocument]
+template valueTypeFromType(t: typedesc[MarkerValue]): untyped = [pvtMarker]
 
 template isPropertyGroup*(p: PropertyBase): bool = p.propertyType != ptProperty
 
