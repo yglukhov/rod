@@ -1,7 +1,4 @@
 import json
-import strutils
-import unicode
-import tables
 import nimx.types
 import nimx.font
 import nimx.context

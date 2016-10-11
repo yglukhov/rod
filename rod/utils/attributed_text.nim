@@ -59,7 +59,6 @@ proc removeTextAttributes*(text: string): string =
             tagOpened = false
 
 proc parseAttributedStr(str: var string): seq[TextAttributes] =
-    var br = 0
     result = @[]
 
     proc getTextAttributes(text: var string): TextAttributes =
@@ -69,23 +68,32 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
         var middle: int
         var i: int
 
-        for rune in text.runes:
-            let letter = $rune
-            let offset = text.runeOffset(i)
+        var middleOffset: int
+        var startOffset: int
+        var rune: Rune
+        var offset = 0
 
-            if letter == "\"" and text.continuesWith(">", offset + 1):
+        while offset < text.len:
+            fastRuneAt(text, offset, rune)
+            let letter = $rune
+            let ordRune = rune.int32
+
+            if ordRune == ord('\"') and text.continuesWith(">", offset):
                 middle = i + 1
-            if  tagOpened and letter == "\"" and text.continuesWith(">", offset + 1):
+                middleOffset = offset
+            if  tagOpened and ordRune == ord('\"') and text.continuesWith(">", offset):
                 tagOpened = false
-            elif letter == "<" and text.continuesWith("/span>", offset + 1):
+            elif ordRune == ord('<') and text.continuesWith("/span>", offset):
                 currentAttr.to = i - 1
-                text.uniDelete(i, i + 6) # /span> len
-                text.uniDelete(currentAttr.start, middle)
+                text.delete(offset - 1, offset + 5) # /span> len
+                text.delete(startOffset - 1, middleOffset)
                 break
             elif  tagOpened:
-                strWithAttr &= letter
-            elif letter == "<" and text.continuesWith("span style=", offset + 1):
+                var pos = strWithAttr.len
+                fastToUTF8Copy(rune, strWithAttr, pos)
+            elif ordRune == ord('<') and text.continuesWith("span style=", offset):
                 currentAttr.start = i
+                startOffset = offset
                 tagOpened = true
             i.inc()
 
@@ -93,8 +101,9 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
         currentAttr.attributes = @[]
 
         for attrType in TextAttributeType.low..TextAttributeType.high:
-            if strWithAttr.find($attrType & ":") > -1:
-                var index = strWithAttr.find($attrType & ":") + ($attrType).len
+            let findAttr = strWithAttr.find($attrType & ":")
+            if findAttr > -1:
+                var index = findAttr + ($attrType).len
                 if index > -1:
                     var attr: Attribute
                     var letter = ""
@@ -205,5 +214,47 @@ proc processAttributedText*(fText: FormattedText) =
                     var s = fText.colorOfRuneAtPos(ta.start)
                     s.color2 = fromHexColor(a.value)
                     fText.setTextColorInRange(ta.start, ta.to, s.color1, s.color2)
+
+
+when isMainModule:
+    block: # Test latin symbols string
+        var toParse = "It's a small\n<span style=\"strokeColor:FF0000FF;strokeSize:3.5;isColorGradient:true;colorFrom:00FF00FF;colorTo:0000FFFF\">string</span> example - <span style=\"color:FFFF00FF\">duh</span>!"
+        let original = "It's a small\nstring example - duh!"
+        let textAttributesSet = parseAttributedStr(toParse)
+        let first = textAttributesSet[0]
+        let second = textAttributesSet[1]
+
+        doAssert(toParse == original)
+        doAssert(first.start == 13)
+        doAssert(first.to == 19)
+        doAssert(second.start == 30)
+        doAssert(second.to == 33)
+        doAssert((first.attributes[0]).typ == TextAttributeType.strokeSize)
+        doAssert((first.attributes[1]).typ == TextAttributeType.strokeColor)
+        doAssert((first.attributes[2]).value == "true")
+        doAssert((first.attributes[3]).value == "00FF00FF")
+        doAssert((second.attributes[0]).typ == TextAttributeType.color and (second.attributes[0]).value == "FFFF00FF")
+
+    block: # Test cyrillic symbols string
+        var toParse = "<span style=\"shadowX:-3.67;shadowY:2.0;shadowColor:000000FF\">Хороший</span> <span style=\"fontSize:100\">БОРЩ</span> - с капусточкой, но не <span style=\"color:FF0000FF\">красный</span>..."
+        let original = "Хороший БОРЩ - с капусточкой, но не красный..."
+        let textAttributesSet = parseAttributedStr(toParse)
+        let first = textAttributesSet[0]
+        let second = textAttributesSet[1]
+        let third = textAttributesSet[2]
+        let clr = newColor(1.0, 0, 0)
+
+        doAssert(toParse == original)
+        doAssert(first.start == 0)
+        doAssert(first.to == 7)
+        doAssert(second.start == 8)
+        doAssert(second.to == 12)
+        doAssert(third.start == 36)
+        doAssert(third.to == 43)
+        doAssert((parseFloat(first.attributes[0].value)) == -3.67)
+        doAssert((parseFloat(first.attributes[1].value)) == 2.0)
+        doAssert((first.attributes[2]).typ == TextAttributeType.shadowColor)
+        doAssert((second.attributes[0]).typ == TextAttributeType.fontSize)
+        doAssert((fromHexColor(third.attributes[0].value)) == clr)
 
 
