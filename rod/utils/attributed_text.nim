@@ -1,6 +1,5 @@
 import strutils
 import unicode
-import os
 
 import nimx.unistring
 import nimx.types
