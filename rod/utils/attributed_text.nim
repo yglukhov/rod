@@ -75,7 +75,6 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
 
         while offset < text.len:
             fastRuneAt(text, offset, rune)
-            let letter = $rune
             let ordRune = rune.int32
 
             if ordRune == ord('\"') and text.continuesWith(">", offset):
@@ -106,14 +105,15 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
                 var index = findAttr + ($attrType).len
                 if index > -1:
                     var attr: Attribute
-                    var letter = ""
+                    var letter: char
 
                     attr.value = ""
                     attr.typ = attrType
                     index.inc()
-                    while letter != "\"" and letter != ";" and index <= strWithAttr.len:
-                        attr.value &= letter
-                        letter = $strWithAttr[index]
+                    while letter != '\"' and letter != ';' and index <= strWithAttr.len:
+                        if letter != '\0':
+                            attr.value &= letter
+                        letter = strWithAttr[index]
                         index.inc()
 
                     currentAttr.attributes.add(attr)
