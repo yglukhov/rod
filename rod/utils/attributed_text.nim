@@ -24,6 +24,7 @@ type TextAttributeType* {.pure.} = enum
     isColorGradient
     colorFrom
     colorTo
+    lineSpacing
 
 type Attribute* = tuple[typ: TextAttributeType, value: string]
 
@@ -213,7 +214,8 @@ proc processAttributedText*(fText: FormattedText) =
                     var s = fText.colorOfRuneAtPos(ta.start)
                     s.color2 = fromHexColor(a.value)
                     fText.setTextColorInRange(ta.start, ta.to, s.color1, s.color2)
-
+                elif a.typ == TextAttributeType.lineSpacing:
+                    fText.lineSpacing = parseFloat(a.value)
 
 when isMainModule:
     block: # Test latin symbols string
