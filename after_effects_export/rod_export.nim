@@ -7,7 +7,7 @@ import strutils
 import sequtils
 import nimx.matrixes, nimx.pathutils
 import rod.quaternion
-import rod.utils.attributed_text
+import rod.utils.text_helpers
 
 type File = after_effects.File
 
