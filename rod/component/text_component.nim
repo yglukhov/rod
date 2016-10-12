@@ -337,20 +337,13 @@ method draw*(t: Text) =
     if not t.mText.isNil:
         let c = currentContext()
         var p = t.mBoundingOffset
-        let ha = t.mText.horizontalAlignment
         if t.mText.boundingSize.width == 0:
             # This is an unbound point text. Origin is at the baseline of the
-            # first (and only) line.
+            # first line.
             p.y -= t.mText.lineBaseline(0)
-            case ha
-            of haRight: p.x -= t.mText.lineWidth(0)
-            of haCenter: p.x -= t.mText.lineWidth(0) / 2
-            else: discard
-            t.mText.horizontalAlignment = haLeft
         if t.mText.hasShadow:
             t.mText.shadowMultiplier = t.shadowMultiplier
         c.drawText(p, t.mText)
-        t.mText.horizontalAlignment = ha
 
         if t.node.sceneView.editing:
             t.debugDraw()
