@@ -76,7 +76,7 @@ proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = fal
         tool.resPath = tmpCacheDir
         createDir(tmpCacheDir)
         tool.outPrefix = "p"
-        tool.compressOutput = true
+        tool.compressOutput = not nocompress
         tool.compressToPVR = compressToPVR
         tool.downsampleRatio = downsampleRatio
         tool.extrusion = extrusion

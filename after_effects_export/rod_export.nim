@@ -7,6 +7,7 @@ import strutils
 import sequtils
 import nimx.matrixes, nimx.pathutils
 import rod.quaternion
+import rod.utils.text_helpers
 
 type File = after_effects.File
 
@@ -95,6 +96,26 @@ proc isSolidLayer(layer: Layer): bool =
         not layer.nullLayer and not source.mainSource.isNil and
             source.mainSource.jsObjectType == "SolidSource"
 
+proc isTextMarkerValid(layer: Layer): bool =
+    let textMarker = layer.property("Marker", MarkerValue).valueAtTime(0.0, false).comment
+    let textLayer = layer.propertyGroup("Text").property("Source Text", TextDocument).value.text
+
+    if textMarker == textLayer or removeTextAttributes($textMarker) == textLayer:
+        return true
+
+proc getText(layer: Layer): string =
+    let markerText = layer.property("Marker", MarkerValue).valueAtTime(0.0, false).comment
+    let text = layer.propertyGroup("Text")
+    let str = text.property("Source Text", TextDocument).value.text
+
+    if not text.isNil:
+        if markerText == "":
+            return $str
+    if layer.isTextMarkerValid():
+        result = $markerText
+    else:
+        raise newException(Exception, "Marker is not valid for text: " & $str)
+
 proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJObject()
     var source = layer.source
@@ -176,7 +197,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
     if not text.isNil:
         var textDoc = text.property("Source Text", TextDocument).value
         var txt = newJObject()
-        txt["text"] = % ($textDoc.text).replace('\r', '\l')
+        txt["text"] = % (layer.getText()).replace('\r', '\l')
         txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
@@ -247,7 +268,6 @@ proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
 
     logi("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
-
     result["name"] = % layer.mangledName
     result["translation"] = % layer.property("Position", Vector3).valueAtTime(0)
     var scale = layer.property("Scale", Vector3).valueAtTime(0)
@@ -697,6 +717,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
         let filePath = fullExportPath & "/" & $c.name & ".json"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
+        file.encoding = "UTF-8"
         file.openForWriting()
         file.lineFeed = lfUnix
         try:
