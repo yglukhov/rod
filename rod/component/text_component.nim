@@ -61,7 +61,7 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
             t.fontFace = v.getStr()
             font = newFontWithFace(t.fontFace, fontSize)
             if font.isNil:
-                echo "font = ", t.fontFace, "  doesn't load, use system font"
+                echo "font = ", t.fontFace, "  doesn't load, system font will be used"
                 font = systemFontOfSize(fontSize)
         elif font_size > 0:
             font = systemFontOfSize(fontSize)
