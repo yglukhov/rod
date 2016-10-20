@@ -1,4 +1,4 @@
-import math, algorithm, strutils, tables, json
+import math, algorithm, strutils, tables, json, logging
 
 import nimx.view
 import nimx.types, nimx.matrixes
@@ -158,29 +158,32 @@ when loadingAndSavingAvailable:
             var s = Serializer.new()
             var sData = selectedNode.serialize(s)
             s.save(sData, path)
-            # s.save(selectedNode, path)
 
     proc loadNode(editor: Editor) =
         let path = callDialogFileOpen("Load Json or DAE")
         if not path.isNil:
-            if path.endsWith(".dae"):
-                var sip = editor.outlineView.selectedIndexPath
-                var p = editor.rootNode
-                if sip.len == 0:
-                    sip.add(0)
-                else:
-                    p = editor.outlineView.itemAtIndexPath(sip).get(Node3D)
+            try:
+                if path.endsWith(".dae"):
+                    var sip = editor.outlineView.selectedIndexPath
+                    var p = editor.rootNode
+                    if sip.len == 0:
+                        sip.add(0)
+                    else:
+                        p = editor.outlineView.itemAtIndexPath(sip).get(Node3D)
 
-                editor.outlineView.expandRow(sip)
-                loadSceneAsync path, proc(n: Node) =
-                    p.addChild(n)
-            elif path.endsWith(".json"):
-                let ln = newNodeWithResource(path)
-                if not editor.selectedNode.isNil:
-                    editor.selectedNode.addChild(ln)
-                else:
-                    editor.rootNode.addChild(ln)
-            editor.sceneTreeDidChange()
+                    editor.outlineView.expandRow(sip)
+                    loadSceneAsync path, proc(n: Node) =
+                        p.addChild(n)
+                elif path.endsWith(".json"):
+                    let ln = newNodeWithResource(path)
+                    if not editor.selectedNode.isNil:
+                        editor.selectedNode.addChild(ln)
+                    else:
+                        editor.rootNode.addChild(ln)
+                editor.sceneTreeDidChange()
+            except:
+                error "ERROR:: Resource at path doesn't load ", path
+                error "Exception caught: ", getCurrentExceptionMsg()
 
 proc newTreeView(e: Editor): View =
     result = View.new(newRect(0, 0, 200, 500)) #700

@@ -61,7 +61,8 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
             t.fontFace = v.getStr()
             font = newFontWithFace(t.fontFace, fontSize)
             if font.isNil:
-                echo "font = ", t.fontFace, "  doesn't load"
+                echo "font = ", t.fontFace, "  doesn't load, use system font"
+                font = systemFontOfSize(fontSize)
         elif font_size > 0:
             font = systemFontOfSize(fontSize)
         t.mText.setFontInRange(0, -1, font)
@@ -199,13 +200,18 @@ proc `shadowSpread=`*(c: Text, spread: float32) =
     c.mText.setShadowInRange(0, -1, s.color, s.offset, s.radius, s.spread)
 
 proc font*(c: Text): Font = c.mText.fontOfRuneAtPos(0)
-proc `font=`*(c: Text, v: Font) = c.mText.setFontInRange(0, -1, v)
+proc `font=`*(c: Text, v: Font) =
+    c.fontFace = v.face
+    c.mText.setFontInRange(0, -1, v)
 
 proc fontSize*(c: Text): float32 = c.mText.fontOfRuneAtPos(0).size
 proc `fontSize=`*(c: Text, v: float32) =
-    let f = c.mText.fontOfRuneAtPos(0)
-    f.size = v
-    c.mText.setFontInRange(0, -1, f)
+    var font: Font
+    if c.fontFace.isNil:
+        font = systemFontOfSize(v)
+    else:
+        font = newFontWithFace(c.fontFace, v)
+    c.mText.setFontInRange(0, -1, font)
 
 proc trackingAmount*(c: Text): float32 = c.mText.trackingOfRuneAtPos(0)
 proc `trackingAmount=`*(c: Text, v: float32) = c.mText.setTrackingInRange(0, -1, v)
@@ -350,6 +356,8 @@ method draw*(t: Text) =
 
 method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("text", t.text)
+    p.visitProperty("fontSize", t.fontSize)
+    p.visitProperty("font", t.font)
     p.visitProperty("color", t.color)
     p.visitProperty("shadowX", t.shadowX)
     p.visitProperty("shadowY", t.shadowY)
