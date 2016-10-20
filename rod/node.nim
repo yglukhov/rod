@@ -290,7 +290,7 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
                     return ch
                 else:
                     nChildren.add(ch.children)
-            children = nChildren
+            swap(children, nChildren)
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
