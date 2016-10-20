@@ -283,18 +283,14 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     else:
         var children = n.children
         var nChildren = newSeq[Node]()
-
-        block blockBFS:
-            while children.len > 0:
-                nChildren.setLen(0)
-                for ch in children:
-                    if p(ch):
-                        result = ch
-                        break blockBFS
-                    else:
-                        nChildren.add(ch.children)
-
-                children = nChildren
+        while children.len > 0:
+            nChildren.setLen(0)
+            for ch in children:
+                if p(ch):
+                    return ch
+                else:
+                    nChildren.add(ch.children)
+            children = nChildren
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
