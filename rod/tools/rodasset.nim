@@ -34,13 +34,15 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
             of ".png":
                 if unixToNativePath(r) notin tool.images:
                     doCopy = true
-            of ".wav":
+            of ".wav", ".mp3", ".ogg":
                 createDir(d.parentDir())
                 let ssf = d.splitFile()
-                if isMp3:
+                if isMp3 and sf.ext != ".mp3":
                     convertWavToMP3(r, ssf.dir / ssf.name & ".mp3")
-                else:
+                elif sf.ext != ".ogg":
                     convertWavToOgg(r, ssf.dir / ssf.name & ".ogg")
+                else:
+                    doCopy = true
             of ".json":
                 discard
             else:
