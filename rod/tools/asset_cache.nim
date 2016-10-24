@@ -2,7 +2,7 @@ import securehash, os, osproc, algorithm, strutils, times, hashes
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
-const hashVersion = 1
+const hashVersion = 2
 
 const useExperimentalOptimization = false
 
