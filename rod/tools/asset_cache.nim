@@ -24,7 +24,7 @@ proc dirHash*(path: string, profile: string = ""): string =
             gitStageArgs[0] = "reset"
             discard execProcess("git", gitStageArgs, options = {poUsePath})
         for ln in splitLines(all):
-            if ln.endsWith(".wav"):
+            if ln.endsWith(".wav") or ln.endsWith(".mp3") or ln.endsWith(".ogg"):
                 hasSound = true
                 break
         if hasSound:
@@ -35,7 +35,7 @@ proc dirHash*(path: string, profile: string = ""): string =
         for f in walkDirRec(path):
             let sf = f.splitFile()
             if not sf.name.startsWith('.'):
-                if sf.ext == ".wav":
+                if sf.ext == ".wav" or sf.ext == ".mp3" or sf.ext == ".ogg":
                     hasSound = true
                 allFiles.add(f)
 
