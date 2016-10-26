@@ -67,15 +67,17 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
 
         if not n.components.isNil:
             for v in n.components:
-                expView = newExpandingView(newRect(0, 0, 328, 20.0))
-                expView.title = v.className
-                expView.expand()
+                closureScope:
+                    expView = newExpandingView(newRect(0, 0, 328, 20.0))
+                    expView.title = v.className
+                    let class_name = v.className
+                    expView.expand()
 
-                let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
-                removeButton.autoresizingMask = {afFlexibleMinX}
-                removeButton.onAction do():
-                    n.removeComponent(v.className)
-                    i.inspectedNode = n
+                    let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
+                    removeButton.autoresizingMask = {afFlexibleMinX}
+                    removeButton.onAction do():
+                        n.removeComponent(class_name)
+                        i.inspectedNode = n
 
                 v.visitProperties(visitor)
                 propView.addSubview(expView)
