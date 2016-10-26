@@ -63,8 +63,8 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
 method getBBox*(s: Sprite): BBox =
     let img = s.image
     if not img.isNil:
-        result.maxPoint = newVector3(-s.offset.x, -s.offset.y, 0.0)
-        result.minPoint = newVector3(img.size.width - s.offset.x, img.size.height - s.offset.y, 0.01)
+        result.maxPoint = newVector3(s.offset.x, s.offset.y, 0.0)
+        result.minPoint = newVector3(img.size.width + s.offset.x, img.size.height + s.offset.y, 0.01)
 
 method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
@@ -92,9 +92,12 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     if s.images.len > 1:
         s.createFrameAnimation()
 
+    serealizer.deserializeValue(j, "offset", s.offset)
+
 method serialize*(c: Sprite, s: Serializer): JsonNode =
     result = newJObject()
     result.add("currentFrame", s.getValue(c.currentFrame))
+    result.add("offset", s.getValue(c.offset))
 
     var imagesNode = newJArray()
     result.add("fileNames", s.getValue(imagesNode))
@@ -104,5 +107,6 @@ method serialize*(c: Sprite, s: Serializer): JsonNode =
 method visitProperties*(t: Sprite, p: var PropertyVisitor) =
     p.visitProperty("image", t.image)
     p.visitProperty("curFrame", t.currentFrame)
+    p.visitProperty("offset", t.offset)
 
 registerComponent(Sprite)

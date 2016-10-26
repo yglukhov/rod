@@ -38,6 +38,9 @@ proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
 proc `%`*(v: Size): JsonNode =
     result = vectorToJNode(newVector2(v.width, v.height))
 
+proc `%`*(v: Point): JsonNode =
+    result = vectorToJNode(newVector2(v.x, v.y))
+
 proc `%`*(v: Color): JsonNode =
     result = newJArray()
     for k, val in v.fieldPairs:
@@ -91,6 +94,11 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Size) =
     let jN = j{name}
     if not jN.isNil:
         val = newSize(jN[0].getFnum(), jN[1].getFnum())
+
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Point) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newPoint(jN[0].getFnum(), jN[1].getFnum())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Image) =
     val = deserializeImage(j{name})
