@@ -43,7 +43,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
                     convertWavToOgg(r, ssf.dir / ssf.name & ".ogg")
                 else:
                     doCopy = true
-            of ".json":
+            of ".json", ".rab":
                 discard
             else:
                 doCopy = true
