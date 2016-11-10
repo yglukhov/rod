@@ -860,7 +860,10 @@ method draw*(t: Trail) =
             gl.drawElements(gl.TRIANGLE_STRIP, drawVertices.GLsizei, gl.UNSIGNED_SHORT, (offset*sizeof(GLushort)).int )
 
     template multiplyBuffersDraw(currBuff, nextBuff: DataInBuffer) =
-        var indicesCount =  t.buffers[currBuff.int].indices.curr - t.buffers[nextBuff.int].indices.curr
+        var indicesCount = t.buffers[currBuff.int].indices.curr
+
+        if (t.buffers[currBuff.int].indices.curr + t.buffers[nextBuff.int].indices.curr) > drawVertices:
+            indicesCount -= t.buffers[nextBuff.int].indices.curr
 
         if indicesCount <= 0:
             t.buffers[currBuff.int].bValidData = false
@@ -982,7 +985,7 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
     p.visitProperty("cutSpeed", t.cutSpeed)
     p.visitProperty("alphaCut", t.alphaCut)
     p.visitProperty("tiled", t.tiled)
-    p.visitProperty("tiled", t.tiles)
+    p.visitProperty("tiles", t.tiles)
 
     # dev props
     p.visitProperty("threshold", t.angleThreshold)
