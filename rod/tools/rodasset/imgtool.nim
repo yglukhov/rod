@@ -254,16 +254,6 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
                 o.parentComponent["frameOffsets"] = frameOffsets
             frameOffsets.elems[o.frameIndex] = %*[im.srcBounds.x, im.srcBounds.y]
 
-proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: string): bool =
-    let name = jNode{"name"}
-    if not name.isNil:
-        let animations = jComp{"animations"}
-        if not animations.isNil:
-            let animName = name.str & "." & propName
-            for k, v in animations:
-                for ik, iv in v:
-                    if ik == animName: return true
-
 proc recalculateSourceBounds(im: SpriteSheetImage) =
     for o in im.occurences:
         if not o.allowAlphaCrop: return
@@ -524,11 +514,27 @@ proc run*(tool: ImgTool) =
             for o in im.occurences:
                 tool.adjustImageNode(im, o)
 
-        # Write compositions back to files
-        for i, c in tool.compositions:
-            let dstPath = tool.destPath(tool.compositionPaths[i])
-            createDir(dstPath.parentDir())
-            writeFile(dstPath, c.pretty().replace(" \n", "\n"))
+        let packCompositions = false
+
+        # Write all composisions to single file
+        if packCompositions:
+            let allComps = newJObject()
+            for i, c in tool.compositions:
+                if "aep_name" in c: c.delete("aep_name")
+                var resName = tool.compositionPaths[i]
+                if not resName.startsWith("res/"):
+                    raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
+                resName = resName.substr("res/".len)
+                allComps[resName] = c
+            var str = ""
+            toUgly(str, allComps)
+            writeFile(tool.resPath / "comps.jsonpack", str)
+        else:
+            # Write compositions back to files
+            for i, c in tool.compositions:
+                let dstPath = tool.destPath(tool.compositionPaths[i])
+                createDir(dstPath.parentDir())
+                writeFile(dstPath, c.pretty().replace(" \n", "\n"))
 
         if tool.createIndex:
             tool.writeIndex()
