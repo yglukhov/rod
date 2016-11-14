@@ -1,7 +1,23 @@
 import os, strutils, times, tables, osproc
-import imgtool, asset_cache
+import imgtool, asset_cache, settings
 
-proc hash(audio: string = "ogg", path: string) = echo dirHash(path, audio)
+template settingsWithCmdLine(): Settings =
+    let s = newSettings()
+    s.audio.extension = audio
+    s.graphics.downsampleRatio = downsampleRatio
+    s.graphics.compressOutput = not nocompress
+    s.graphics.extrusion = extrusion
+    s.graphics.disablePotAdjustment = disablePotAdjustment
+    s.graphics.compressToPVR = compressToPVR
+    s.graphics.compressionExceptions = exceptions
+    s
+
+proc hash(audio: string = "ogg", downsampleRatio: float = 1.0, nocompress: bool = false,
+    compressToPVR: bool = false, extrusion: int = 1, disablePotAdjustment: bool = false,
+    exceptions: string = "",
+    path: string) =
+    let s = settingsWithCmdLine()
+    echo dirHash(path, s)
 
 var gAudioConvTool = ""
 
@@ -61,7 +77,8 @@ proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = fal
     let src = expandTilde(src)
     let dst = expandTilde(dst)
     let cache = getCache(cache)
-    let h = dirHash(src, audio)
+    let s = settingsWithCmdLine()
+    let h = dirHash(src, s)
     let c = cache / h
     echo "rodasset Cache: ", c
     if not dirExists(c):
