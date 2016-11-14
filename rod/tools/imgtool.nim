@@ -524,11 +524,27 @@ proc run*(tool: ImgTool) =
             for o in im.occurences:
                 tool.adjustImageNode(im, o)
 
-        # Write compositions back to files
-        for i, c in tool.compositions:
-            let dstPath = tool.destPath(tool.compositionPaths[i])
-            createDir(dstPath.parentDir())
-            writeFile(dstPath, c.pretty().replace(" \n", "\n"))
+        let packCompositions = false
+
+        # Write all composisions to single file
+        if packCompositions:
+            let allComps = newJObject()
+            for i, c in tool.compositions:
+                if "aep_name" in c: c.delete("aep_name")
+                var resName = tool.compositionPaths[i]
+                if not resName.startsWith("res/"):
+                    raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
+                resName = resName.substr("res/".len)
+                allComps[resName] = c
+            var str = ""
+            toUgly(str, allComps)
+            writeFile(tool.resPath / "comps.jsonpack", str)
+        else:
+            # Write compositions back to files
+            for i, c in tool.compositions:
+                let dstPath = tool.destPath(tool.compositionPaths[i])
+                createDir(dstPath.parentDir())
+                writeFile(dstPath, c.pretty().replace(" \n", "\n"))
 
         if tool.createIndex:
             tool.writeIndex()
