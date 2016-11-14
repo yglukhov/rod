@@ -254,16 +254,6 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
                 o.parentComponent["frameOffsets"] = frameOffsets
             frameOffsets.elems[o.frameIndex] = %*[im.srcBounds.x, im.srcBounds.y]
 
-proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: string): bool =
-    let name = jNode{"name"}
-    if not name.isNil:
-        let animations = jComp{"animations"}
-        if not animations.isNil:
-            let animName = name.str & "." & propName
-            for k, v in animations:
-                for ik, iv in v:
-                    if ik == animName: return true
-
 proc recalculateSourceBounds(im: SpriteSheetImage) =
     for o in im.occurences:
         if not o.allowAlphaCrop: return
