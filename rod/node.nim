@@ -34,6 +34,7 @@ proc newNode*(name: string = nil): Node =
     result.name = name
     result.alpha = 1.0
     result.isDirty = true
+    result.isEnabled = true
 
 proc setDirty(n: Node) =
     if n.isDirty == false:
@@ -44,6 +45,11 @@ proc setDirty(n: Node) =
 template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
 proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
     n.mTranslation = p
+    n.setDirty()
+
+template enabled*(n: Node): bool = n.isEnabled
+proc `enabled=`*(n: Node, v: bool) =
+    n.isEnabled = v
     n.setDirty()
 
 proc `translate=`*(n: Node, p: Vector3) =
@@ -239,7 +245,7 @@ proc recursiveDraw*(n: Node) =
 
 
 proc drawNode*(n: Node): bool =
-    if n.alpha < 0.0000001: return
+    if n.alpha < 0.0000001 or not n.enabled: return
     var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
 
     currentContext().withTransform tr:
@@ -253,7 +259,7 @@ proc drawNode*(n: Node): bool =
 
 proc recursiveDraw*(n: Node, drawTable: var TableRef[int, seq[Node]]) =
     if n.layer == 0:
-        if n.alpha < 0.0000001: return
+        if n.alpha < 0.0000001 or not n.enabled: return
 
         let c = currentContext()
         let oldAlpha = c.alpha
@@ -426,6 +432,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
 
     p.visitProperty("layer", n.layer)
+    p.visitProperty("enabled", n.enabled)
 
 proc reparentTo*(n, newParent: Node) =
     # Change parent of a node preserving its world transform
@@ -489,6 +496,7 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "rotation", n.mRotation)
     s.deserializeValue(j, "alpha", n.alpha)
     s.deserializeValue(j, "layer", n.layer)
+    s.deserializeValue(j, "enabled", n.enabled)
 
     var v = j{"children"}
     if not v.isNil:
@@ -545,6 +553,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("rotation", s.getValue(n.rotation))
     result.add("alpha", s.getValue(n.alpha))
     result.add("layer", s.getValue(n.layer))
+    result.add("enabled", s.getValue(n.enabled))
 
     if not n.components.isNil:
         var componentsNode = newJArray()

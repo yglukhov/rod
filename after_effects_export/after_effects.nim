@@ -85,6 +85,7 @@ type
         name*: cstring
         enabled*: bool
         active*: bool
+        isEffect*: bool
         parentProperty*: PropertyGroup
         canSetEnabled*: bool
 

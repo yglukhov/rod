@@ -27,6 +27,7 @@ type
         worldMatrix*: Matrix4
         isDirty*: bool
         layer*: int
+        isEnabled*: bool
 
     Node2D* = Node3D
 
