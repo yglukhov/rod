@@ -226,7 +226,7 @@ proc transform*(n: Node): Matrix4 =
     return n.mMatrix
 
 proc recursiveDraw*(n: Node) =
-    if n.alpha < 0.0000001: return
+    if n.alpha < 0.0000001 or not n.enabled: return
     let c = currentContext()
     var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
     let oldAlpha = c.alpha
