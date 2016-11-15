@@ -547,7 +547,7 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
         let p = fromObj.property(i)
         let fullyQualifiedPropName = name & "." & $p.name
         if p.isPropertyGroup:
-            if p.name != "Layer Styles":
+            if p.name != "Layer Styles" and ((p.isEffect and p.canSetEnabled and p.enabled) or not p.isEffect):
                 getAnimatableProperties(p.toPropertyGroup(), res, fullyQualifiedPropName)
         else:
             let pr = p.toAbstractProperty()
