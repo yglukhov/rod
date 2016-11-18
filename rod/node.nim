@@ -227,7 +227,6 @@ proc transform*(n: Node): Matrix4 =
 
 proc drawNode*(n: Node): bool =
     if n.alpha < 0.0000001 or not n.enabled: return
-
     var hasPosteffectComponent = false
     if not n.components.isNil:
         var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
@@ -241,22 +240,14 @@ proc drawNode*(n: Node): bool =
 proc recursiveDraw*(n: Node) =
     if n.alpha < 0.0000001 or not n.enabled: return
     let c = currentContext()
-    var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
-
-    c.withTransform tr:
-        var hasPosteffectComponent = false
-        if not n.components.isNil:
-            for v in n.components:
-                v.draw()
-                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
-
+    let hasPosteffectComponent = n.drawNode()
     if not hasPosteffectComponent:
         for c in n.children: c.recursiveDraw()
     c.alpha = oldAlpha
 
-proc recursiveDraw*(n: Node, drawTable: var TableRef[int, seq[Node]]) =
+proc recursiveDraw*(n: Node, drawTable: TableRef[int, seq[Node]]) =
     if n.layer == 0:
         if n.alpha < 0.0000001 or not n.enabled: return
 
