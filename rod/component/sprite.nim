@@ -63,8 +63,8 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
 method getBBox*(s: Sprite): BBox =
     let img = s.image
     if not img.isNil:
-        result.maxPoint = newVector3(s.offset.x, s.offset.y, 0.0)
-        result.minPoint = newVector3(img.size.width + s.offset.x, img.size.height + s.offset.y, 0.01)
+        result.maxPoint = newVector3(img.size.width + s.offset.x, img.size.height + s.offset.y, 0.01)
+        result.minPoint = newVector3(s.offset.x, s.offset.y, 0.0)
 
 method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
