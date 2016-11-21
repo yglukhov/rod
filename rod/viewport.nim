@@ -199,7 +199,10 @@ method draw*(v: SceneView, r: Rect) =
     let c = currentContext()
     v.prepareFramebuffers()
 
-    drawTable = newTable[int, seq[Node]]()
+    if drawTable.isNil:
+        drawTable = newTable[int, seq[Node]]()
+    elif drawTable.len > 0:
+        drawTable.clear()
     v.viewProjMatrix = v.getViewProjectionMatrix()
     c.withTransform v.viewProjMatrix:
         if v.editing: v.drawGrid()
