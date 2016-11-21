@@ -34,6 +34,7 @@ proc newNode*(name: string = nil): Node =
     result.name = name
     result.alpha = 1.0
     result.isDirty = true
+    result.isEnabled = true
 
 proc setDirty(n: Node) =
     if n.isDirty == false:
@@ -44,6 +45,11 @@ proc setDirty(n: Node) =
 template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
 proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
     n.mTranslation = p
+    n.setDirty()
+
+template enabled*(n: Node): bool = n.isEnabled
+proc `enabled=`*(n: Node, v: bool) =
+    n.isEnabled = v
     n.setDirty()
 
 proc `translate=`*(n: Node, p: Vector3) =
@@ -219,41 +225,31 @@ proc transform*(n: Node): Matrix4 =
 
     return n.mMatrix
 
-proc recursiveDraw*(n: Node) =
-    if n.alpha < 0.0000001: return
-    let c = currentContext()
-    var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-    let oldAlpha = c.alpha
-    c.alpha *= n.alpha
-
-    c.withTransform tr:
-        var hasPosteffectComponent = false
-        if not n.components.isNil:
-            for v in n.components:
-                v.draw()
-                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
-
-    if not hasPosteffectComponent:
-        for c in n.children: c.recursiveDraw()
-    c.alpha = oldAlpha
-
-
 proc drawNode*(n: Node): bool =
-    if n.alpha < 0.0000001: return
-    var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-
-    currentContext().withTransform tr:
-        var hasPosteffectComponent = false
-        if not n.components.isNil:
+    if n.alpha < 0.0000001 or not n.enabled: return
+    var hasPosteffectComponent = false
+    if not n.components.isNil:
+        var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+        currentContext().withTransform tr:
             for v in n.components:
                 v.draw()
                 hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
 
     result = hasPosteffectComponent
 
-proc recursiveDraw*(n: Node, drawTable: var TableRef[int, seq[Node]]) =
+proc recursiveDraw*(n: Node) =
+    if n.alpha < 0.0000001 or not n.enabled: return
+    let c = currentContext()
+    let oldAlpha = c.alpha
+    c.alpha *= n.alpha
+    let hasPosteffectComponent = n.drawNode()
+    if not hasPosteffectComponent:
+        for c in n.children: c.recursiveDraw()
+    c.alpha = oldAlpha
+
+proc recursiveDraw*(n: Node, drawTable: TableRef[int, seq[Node]]) =
     if n.layer == 0:
-        if n.alpha < 0.0000001: return
+        if n.alpha < 0.0000001 or not n.enabled: return
 
         let c = currentContext()
         let oldAlpha = c.alpha
@@ -426,6 +422,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
 
     p.visitProperty("layer", n.layer)
+    p.visitProperty("enabled", n.enabled)
 
 proc reparentTo*(n, newParent: Node) =
     # Change parent of a node preserving its world transform
@@ -489,6 +486,7 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "rotation", n.mRotation)
     s.deserializeValue(j, "alpha", n.alpha)
     s.deserializeValue(j, "layer", n.layer)
+    s.deserializeValue(j, "enabled", n.enabled)
 
     var v = j{"children"}
     if not v.isNil:
@@ -545,6 +543,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("rotation", s.getValue(n.rotation))
     result.add("alpha", s.getValue(n.alpha))
     result.add("layer", s.getValue(n.layer))
+    result.add("enabled", s.getValue(n.enabled))
 
     if not n.components.isNil:
         var componentsNode = newJArray()

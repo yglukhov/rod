@@ -1,58 +1,50 @@
 import securehash, os, osproc, algorithm, strutils, times, hashes
 
+import settings
+
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
 const hashVersion = 2
 
-const useExperimentalOptimization = false
+const audioFileExtensions = [".wav", ".ogg", "mp3"]
 
-proc dirHash*(path: string, profile: string = ""): string =
+proc isAudio(path: string): bool {.inline.} =
+    for e in audioFileExtensions:
+        if path.endsWith(e): return true
+
+proc isGraphics(path: string): bool {.inline.} = path.endsWith(".png")
+
+proc dirHash*(path: string, s: Settings): string =
     var hasSound = false
+    var hasGraphics = false
 
-    when useExperimentalOptimization:
-        # Use git
-        var lsFilesArgs = ["ls-files", "-o", "--exclude-standard", path]
-        let untracked = execProcess("git", lsFilesArgs, options = {poUsePath})
-        var gitStageArgs = @["add"]
-        for i in untracked.splitLines():
-            gitStageArgs.add(i)
-        if gitStageArgs.len > 1:
-            discard execProcess("git", gitStageArgs, options = {poUsePath})
-        lsFilesArgs[1] = "-smd"
-        var all = execProcess("git", lsFilesArgs, options = {poUsePath})
-        if gitStageArgs.len > 1:
-            gitStageArgs[0] = "reset"
-            discard execProcess("git", gitStageArgs, options = {poUsePath})
-        for ln in splitLines(all):
-            if ln.endsWith(".wav") or ln.endsWith(".mp3") or ln.endsWith(".ogg"):
+    var allFiles = newSeq[string]()
+    for f in walkDirRec(path):
+        let sf = f.splitFile()
+        if not sf.name.startsWith('.'):
+            if not hasSound and f.isAudio():
                 hasSound = true
-                break
-        if hasSound:
-            all &= profile
-        result = ($secureHash(all)).toLowerAscii()
-    else:
-        var allFiles = newSeq[string]()
-        for f in walkDirRec(path):
-            let sf = f.splitFile()
-            if not sf.name.startsWith('.'):
-                if sf.ext == ".wav" or sf.ext == ".mp3" or sf.ext == ".ogg":
-                    hasSound = true
-                allFiles.add(f)
+            elif not hasGraphics and f.isGraphics():
+                hasGraphics = true
+            allFiles.add(f)
 
-        allFiles.sort(system.cmp[string])
+    allFiles.sort(system.cmp[string])
 
-        var hashStr = ""
-        for f in allFiles:
-            if path.len > 0:
-                hashStr &= f.substr(path.len + 1) & ":"
-            else:
-                hashStr &= f & ":"
-            hashStr &= $hash(readFile(f)) & ";"
-        if hasSound:
-            hashStr &= profile
-        hashStr &= $hashVersion
+    var hashStr = ""
+    for f in allFiles:
+        if path.len > 0:
+            hashStr &= f.substr(path.len + 1) & ":"
+        else:
+            hashStr &= f & ":"
+        hashStr &= $hash(readFile(f)) & ";"
+    if hasSound:
+        hashStr &= $hash(s.audio) & ";"
+    if hasGraphics:
+        hashStr &= $hash(s.graphics) & ";"
 
-        result = ($secureHash(hashStr)).toLowerAscii()
+    hashStr &= $hashVersion
+
+    result = ($secureHash(hashStr)).toLowerAscii()
 
 proc copyResourcesFromCache*(cache, cacheHash, dst: string) =
     let hashFile = dst / ".hash"
