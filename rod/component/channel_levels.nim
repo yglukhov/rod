@@ -17,18 +17,6 @@ type ChannelLevels* = ref object of Component
     inWhiteV*, inBlackV*, inGammaV*, outWhiteV*, outBlackV*: Vector3
 
 var levelsPostEffect = newPostEffect("""
-uniform vec3 inWhiteV;
-uniform vec3 inBlackV;
-uniform vec3 inGammaV;
-uniform vec3 outWhiteV;
-uniform vec3 outBlackV;
-
-uniform float inWhite;
-uniform float inBlack;
-uniform float inGamma;
-uniform float outWhite;
-uniform float outBlack;
-
 vec3 colorPow(vec3 i, vec3 p) {
     return vec3(pow(i.r, p.r), pow(i.g, p.g), pow(i.b, p.b));
 }
@@ -37,13 +25,14 @@ vec3 colorPow(vec3 i, float p) {
     return vec3(pow(i.r, p), pow(i.g, p), pow(i.b, p));
 }
 
-void channelLevels() {
+void channelLevels(vec3 inWhiteV, vec3 inBlackV, vec3 inGammaV, vec3 outWhiteV,
+        vec3 outBlackV, float inWhite, float inBlack, float inGamma, float outWhite, float outBlack) {
     vec3 inPixel = gl_FragColor.rgb;
     inPixel = colorPow((inPixel - inBlackV) / (inWhiteV - inBlackV), inGammaV) * (outWhiteV - outBlackV) + outBlackV;
     inPixel = colorPow((inPixel - inBlack) / (inWhite - inBlack), inGamma) * (outWhite - outBlack) + outBlack;
     gl_FragColor.rgb = inPixel;
 }
-""", "channelLevels")
+""", "channelLevels", ["vec3", "vec3", "vec3", "vec3", "vec3", "float", "float", "float", "float", "float"])
 
 # Dirty hack to optimize out extra drawing:
 template `~==`(f1, f2: float): bool = (f1 > f2 - 0.2 and f1 < f2 + 0.2)
@@ -97,17 +86,7 @@ method deserialize*(c: ChannelLevels, j: JsonNode, s: Serializer) =
 
 method draw*(cl: ChannelLevels) =
     if not cl.areValuesNormal():
-        pushPostEffect levelsPostEffect:
-            setUniform("inWhiteV", cl.inWhiteV)
-            setUniform("inBlackV", cl.inBlackV)
-            setUniform("inGammaV", cl.inGammaV)
-            setUniform("outWhiteV", cl.outWhiteV)
-            setUniform("outBlackV", cl.outBlackV)
-            setUniform("inWhite", cl.inWhite)
-            setUniform("inBlack", cl.inBlack)
-            setUniform("inGamma", cl.inGamma)
-            setUniform("outWhite", cl.outWhite)
-            setUniform("outBlack", cl.outBlack)
+        pushPostEffect(levelsPostEffect, cl.inWhiteV, cl.inBlackV, cl.inGammaV, cl.outWhiteV, cl.outBlackV, cl.inWhite, cl.inBlack, cl.inGamma, cl.outWhite, cl.outBlack)
         for c in cl.node.children: c.recursiveDraw()
         popPostEffect()
 
