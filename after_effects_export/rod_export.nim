@@ -26,8 +26,7 @@ proc getSelectedCompositions(): seq[Composition] =
 
 var logTextField: EditText
 
-proc appendToJSStringAux(s: cstring, a: cstring) {.importcpp: "# += #".}
-template `&=`(s: var cstring, a: cstring) = appendToJSStringAux(s, a)
+proc `&=`(s, a: cstring) {.importcpp: "# += #".}
 
 proc logi(args: varargs[string, `$`]) =
     for i in args:
@@ -38,53 +37,110 @@ proc shouldSerializeLayer(layer: Layer): bool = return layer.enabled
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
 
-var propertyNameMap = {
-    "Rotation" : "rotation",
-    "Position" : "translation",
-    "X Position": "tX",
-    "Y Position": "tY",
-    "Scale": "scale",
-    "Opacity": "alpha",
-    "Input White": "inWhite",
-    "Input Black": "inBlack",
-    "Gamma": "inGamma",
-    "Output White": "outWhite",
-    "Output Black": "outBlack",
-
-    "Red Input White": "redInWhite",
-    "Red Input Black": "redInBlack",
-    "Red Gamma": "redInGamma",
-    "Red Output White": "redOutWhite",
-    "Red Output Black": "redOutBlack",
-    "Green Input White": "greenInWhite",
-    "Green Input Black": "greenInBlack",
-    "Green Gamma": "greenInGamma",
-    "Green Output White": "greenOutWhite",
-    "Green Output Black": "greenOutBlack",
-    "Blue Input White": "blueInWhite",
-    "Blue Input Black": "blueInBlack",
-    "Blue Gamma": "blueInGamma",
-    "Blue Output White": "blueOutWhite",
-    "Blue Output Black": "blueOutBlack",
-
-}.toTable()
-
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
+
+type PropertyDescription = ref object
+    name: string
+    fullyQualifiedName: string
+    property: AbstractProperty
+    valueAtTime: proc(time: float): JsonNode
+    keyValue: proc(k: int): JsonNode
+    initialValue: proc(): JsonNode
 
 var gCompExportPath = ""
 var gExportFolderPath = ""
+var gAnimatedProperties = newSeq[PropertyDescription]()
 
 var layerNames = initTable[int, string]()
 var resourcePaths: seq[string] = @[]
+
+proc requiresAuxParent(layer: Layer): bool =
+    let ap = layer.property("Anchor Point", Vector3)
+    if ap.value != newVector3(0, 0, 0):
+        result = true
+    if layer.blendMode != BlendingMode.NORMAL:
+        result = true
+
+proc mangledName(layer: Layer): string =
+    result = layerNames.getOrDefault(layer.index)
+    if result.len == 0:
+        result = $layer.name
+        if result == $layer.containingComp.name:
+            result &= "$" & $layer.index
+        else:
+            for v in values(layerNames):
+                if result == v:
+                    result &= "$" & $layer.index
+                    break
+        layerNames[layer.index] = result
+
+proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
+
+proc belongsToAux(p: PropertyBase): bool =
+    for i in ["Scale".cstring, "Rotation", "Position", "X Position", "Y Position"]:
+        if p.name == i: return true
+
+proc fullyQualifiedPropName(layer: Layer, componentIndex: int, name: string, p: AbstractProperty): string =
+    let layerName = if p.belongsToAux and layer.requiresAuxParent:
+            layer.auxLayerName
+        else:
+            layer.mangledName
+
+    if componentIndex == -1:
+        result = layerName & "." & name
+    else:
+        result = layerName & "." & $componentIndex & "." & name
+
+proc isAnimated(p: AbstractProperty): bool =
+    p.isTimeVarying and (not p.isSeparationLeader or not p.dimensionsSeparated)
+
+proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription =
+    if p.isNil:
+        return
+
+    result.new()
+    result.name = name
+
+    result.property = p
+    if mapper.isNil:
+        result.valueAtTime = proc(t: float): JsonNode =
+            % p.valueAtTime(t)
+        result.keyValue = proc(k: int): JsonNode =
+            % p.keyValue(k)
+    else:
+        result.valueAtTime = proc(t: float): JsonNode =
+            mapper(p.valueAtTime(t))
+        result.keyValue = proc(k: int): JsonNode =
+            mapper(p.keyValue(k))
+
+    let vat = result.valueAtTime
+    result.initialValue = proc(): JsonNode =
+        vat(0)
+
+    result.fullyQualifiedName = fullyQualifiedPropName(layer, componentIndex, name, p)
+
+proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
+    result = newPropDesc(layer, componentIndex, name, p, mapper)
+    if not result.isNil and p.isAnimated:
+        gAnimatedProperties.add(result)
+
+proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
+    result = addPropDesc(layer, componentIndex, name, p, mapper)
+    let vat = result.valueAtTime
+    result.initialValue = proc(): JsonNode =
+        let v = p.valueAtTime(0)
+        if v != defaultValue:
+            result = vat(0)
+
+proc setInitialValueToResult(pd: PropertyDescription, res: JsonNode) =
+    let v = pd.initialValue()
+    if not v.isNil:
+        res[pd.name] = v
 
 proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string =
     var path = $footageSource.projectPath
     if path[^1] != '/': path &= "/"
     result = relativePathToPath("/" & gCompExportPath, path & $decodeURIComponent(file.name))
-
-proc `%`[T: string | SomeNumber](s: openarray[T]): JsonNode =
-    result = newJArray()
-    for c in s: result.add(%c)
 
 proc isSolidLayer(layer: Layer): bool =
     let source = FootageItem(layer.source)
@@ -97,14 +153,14 @@ proc isSolidLayer(layer: Layer): bool =
             source.mainSource.jsObjectType == "SolidSource"
 
 proc isTextMarkerValid(layer: Layer): bool =
-    let textMarker = layer.property("Marker", MarkerValue).valueAtTime(0.0, false).comment
+    let textMarker = layer.property("Marker", MarkerValue).valueAtTime(0).comment
     let textLayer = layer.propertyGroup("Text").property("Source Text", TextDocument).value.text
 
     if textMarker == textLayer or removeTextAttributes($textMarker) == textLayer:
         return true
 
 proc getText(layer: Layer): string =
-    let markerText = layer.property("Marker", MarkerValue).valueAtTime(0.0, false).comment
+    let markerText = layer.property("Marker", MarkerValue).valueAtTime(0).comment
     let text = layer.propertyGroup("Text")
     let str = text.property("Source Text", TextDocument).value.text
 
@@ -116,8 +172,151 @@ proc getText(layer: Layer): string =
     else:
         raise newException(Exception, "Marker is not valid for text: " & $str)
 
+proc dumpPropertyTree(p: PropertyBase | Layer, indentLevel = 0) =
+    ## This may come in handy to research After Effects property structure.
+    var ln = ""
+    for i in 0 ..< indentLevel: ln &= "    "
+
+    when p is Layer:
+        ln &= "+ layer: " & $p.name
+    else:
+        if p.isPropertyGroup:
+            ln &= "+ group: "
+        else:
+            ln &= "- prop: "
+        ln &= $p.name & ": " & $p.matchName
+        if not p.isPropertyGroup:
+            ln &= ": " & $p.toAbstractProperty().propertyValueType
+
+    logi ln
+
+    template dumpChildren(p: PropertyOwner) =
+        for i in 0 ..< p.numProperties:
+            dumpPropertyTree(p.property(i), indentLevel + 1)
+
+    when p is Layer:
+        dumpChildren(p)
+    else:
+        if p.isPropertyGroup:
+            let p = p.toPropertyGroup()
+            dumpChildren(p)
+
+proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableComponent: var bool): JsonNode =
+    case $p.matchName
+    of "ADBE Color Balance (HLS)":
+        result = newJObject()
+        let hue = addPropDesc(layer, compIndex, "hue", p.property("Hue", float)) do(v: float) -> JsonNode:
+            %(v / 360)
+        hue.setInitialValueToResult(result)
+        let saturation = addPropDesc(layer, compIndex, "saturation", p.property("Saturation", float)) do(v: float) -> JsonNode:
+            %(v / 100)
+        saturation.setInitialValueToResult(result)
+        let lightness = addPropDesc(layer, compIndex, "lightness", p.property("Lightness", float)) do(v: float) -> JsonNode:
+            %(v / 100)
+        lightness.setInitialValueToResult(result)
+        result["_c"] = %"ColorBalanceHLS"
+
+    of "ADBE Pro Levels2": # Channel levels (individual controls)
+        proc separatedLevelValueAtTime(lvl: PropertyGroup, propName: string, t: float): Vector3 =
+            result[0] = lvl.property("Red " & propName, float).valueAtTime(t, false)
+            result[1] = lvl.property("Green " & propName, float).valueAtTime(t, false)
+            result[2] = lvl.property("Blue " & propName, float).valueAtTime(t, false)
+
+        proc levelsValueAtTime(lvl: PropertyGroup, t: float): JsonNode =
+            result = newJObject()
+            result["inWhite"] = % lvl.property("Input White", float).valueAtTime(t, false)
+            result["inBlack"] = % lvl.property("Input Black", float).valueAtTime(t, false)
+            result["inGamma"] = % lvl.property("Gamma", float).valueAtTime(t, false)
+            result["outWhite"] = % lvl.property("Output White", float).valueAtTime(t, false)
+            result["outBlack"] = % lvl.property("Output Black", float).valueAtTime(t, false)
+            result["inWhiteV"] = %separatedLevelValueAtTime(lvl, "Input White", t)
+            result["inBlackV"] = %separatedLevelValueAtTime(lvl, "Input Black", t)
+            result["inGammaV"] = %separatedLevelValueAtTime(lvl, "Gamma", t)
+            result["outWhiteV"] = %separatedLevelValueAtTime(lvl, "Output White", t)
+            result["outBlackV"] = %separatedLevelValueAtTime(lvl, "Output Black", t)
+
+        result = levelsValueAtTime(p, 0)
+        result["_c"] = %"ChannelLevels"
+
+        var propertyNameMap = {
+            "Input White": "inWhite",
+            "Input Black": "inBlack",
+            "Gamma": "inGamma",
+            "Output White": "outWhite",
+            "Output Black": "outBlack",
+
+            "Red Input White": "redInWhite",
+            "Red Input Black": "redInBlack",
+            "Red Gamma": "redInGamma",
+            "Red Output White": "redOutWhite",
+            "Red Output Black": "redOutBlack",
+            "Green Input White": "greenInWhite",
+            "Green Input Black": "greenInBlack",
+            "Green Gamma": "greenInGamma",
+            "Green Output White": "greenOutWhite",
+            "Green Output Black": "greenOutBlack",
+            "Blue Input White": "blueInWhite",
+            "Blue Input Black": "blueInBlack",
+            "Blue Gamma": "blueInGamma",
+            "Blue Output White": "blueOutWhite",
+            "Blue Output Black": "blueOutBlack",
+
+        }.toTable()
+
+        for n in ["Input White", "Input Black", "Gamma", "Output White", "Output Black"]:
+            addPropDesc(layer, compIndex, propertyNameMap[n], p.property(n, float))
+            addPropDesc(layer, compIndex, propertyNameMap["Red " & n], p.property("Red " & n, float))
+            addPropDesc(layer, compIndex, propertyNameMap["Green " & n], p.property("Green " & n, float))
+            addPropDesc(layer, compIndex, propertyNameMap["Blue " & n], p.property("Blue " & n, float))
+
+    of "ADBE Numbers2": # Numbers
+        renderableComponent = true
+        result = newJObject()
+        var color = p.property("Fill Color", Vector4).valueAtTime(0)
+        result["color"] = %color
+        result["fontSize"] = % p.property("Size", float).valueAtTime(0)
+        result["_c"] = %"Text"
+
+    of "ADBE Ramp": # Ramp
+        result = newJObject()
+        let startPoint = addPropDesc(layer, compIndex, "startPoint", p.property("Start of Ramp", Vector2))
+        startPoint.setInitialValueToResult(result)
+
+        let endPoint = addPropDesc(layer, compIndex, "endPoint", p.property("End of Ramp", Vector2))
+        endPoint.setInitialValueToResult(result)
+
+        let startColor = addPropDesc(layer, compIndex, "startColor", p.property("Start Color", Vector4))
+        startColor.setInitialValueToResult(result)
+
+        let endColor = addPropDesc(layer, compIndex, "endColor", p.property("End Color", Vector4))
+        endColor.setInitialValueToResult(result)
+
+        result["_c"] = %"GradientFill"
+
+    of "ADBE Fill": # Fill
+        result = newJObject()
+        let startColor = addPropDesc(layer, compIndex, "color", p.property("Color", Vector4))
+        startColor.setInitialValueToResult(result)
+        result["_c"] = %"ColorFill"
+    else:
+        logi "WARNING: Effect not supported. Layer: ", layer.name
+        dumpPropertyTree(p)
+
 proc serializeLayerComponents(layer: Layer): JsonNode =
-    result = newJObject()
+    result = newJArray()
+
+    var layerHasRenderableComponents = false
+    let effects = layer.propertyGroup("Effects")
+    if not effects.isNil:
+        for i in 0 ..< effects.numProperties:
+            let p = effects.property(i)
+            if p.isPropertyGroup and p.canSetEnabled and p.enabled:
+                let p = p.toPropertyGroup()
+                var renderableComponent = false
+                let c = serializeEffect(layer, result.len, p, renderableComponent)
+                layerHasRenderableComponents = layerHasRenderableComponents or renderableComponent
+                if not c.isNil: result.add(c)
+
     var source = layer.source
     if not source.isNil:
         if source.jsObjectType == "FootageItem":
@@ -149,49 +348,16 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
 
                 var sprite = newJObject()
                 sprite["fileNames"] = imageFileRelativeExportPaths
-                result["Sprite"] = sprite
-            elif layer.isSolidLayer:
+                sprite["_c"] = %"Sprite"
+                result.add(sprite)
+
+            elif layer.isSolidLayer and not layerHasRenderableComponents:
                 var solid = newJObject()
                 let solidSource = SolidSource(footageSource.mainSource)
                 solid["color"] = %* solidSource.color
                 solid["size"] = % [source.width, source.height]
-                result["Solid"] = solid
-
-
-    proc separatedLevelValueAtTime(lvl: PropertyGroup, propName: string, t: float): Vector3 =
-        result[0] = lvl.property("Red " & propName, float).valueAtTime(t, false)
-        result[1] = lvl.property("Green " & propName, float).valueAtTime(t, false)
-        result[2] = lvl.property("Blue " & propName, float).valueAtTime(t, false)
-
-    proc levelsValueAtTime(lvl: PropertyGroup, t: float): JsonNode =
-        result = newJObject()
-        result["inWhite"] = % lvl.property("Input White", float).valueAtTime(t, false)
-        result["inBlack"] = % lvl.property("Input Black", float).valueAtTime(t, false)
-        result["inGamma"] = % lvl.property("Gamma", float).valueAtTime(t, false)
-        result["outWhite"] = % lvl.property("Output White", float).valueAtTime(t, false)
-        result["outBlack"] = % lvl.property("Output Black", float).valueAtTime(t, false)
-        result["inWhiteV"] = %separatedLevelValueAtTime(lvl, "Input White", t)
-        result["inBlackV"] = %separatedLevelValueAtTime(lvl, "Input Black", t)
-        result["inGammaV"] = %separatedLevelValueAtTime(lvl, "Gamma", t)
-        result["outWhiteV"] = %separatedLevelValueAtTime(lvl, "Output White", t)
-        result["outBlackV"] = %separatedLevelValueAtTime(lvl, "Output Black", t)
-
-
-    let effects = layer.propertyGroup("Effects")
-    if not effects.isNil:
-        let levels = effects.propertyGroup("Levels (Individual Controls)")
-        if not levels.isNil:
-            var lvl = levelsValueAtTime(levels, 0)
-            result["ChannelLevels"] = lvl
-
-        let numbers = effects.propertyGroup("Numbers")
-        if not numbers.isNil:
-            var txt = newJObject()
-            var color = numbers.property("Fill Color", Vector4).valueAtTime(0)
-            txt["color"] = %color
-            txt["fontSize"] = % numbers.property("Size", float).valueAtTime(0)
-            result["Text"] = txt
-            result.delete("Solid")
+                solid["_c"] = % "Solid"
+                result.add(solid)
 
     var text = layer.propertyGroup("Text")
     if not text.isNil:
@@ -210,7 +376,8 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         of tjRight: txt["justification"] = %"right"
         of tjCenter: txt["justification"] = %"center"
 
-        let shadow = layer.propertyGroup("Layer Styles").propertyGroup("Drop Shadow")
+        let layerStyles = layer.propertyGroup("Layer Styles")
+        let shadow = layerStyles.propertyGroup("Drop Shadow")
         if not shadow.isNil and shadow.canSetEnabled and shadow.enabled:
             let angle = shadow.property("Angle", float32).valueAtTime(0)
             let distance = shadow.property("Distance", float32).valueAtTime(0)
@@ -222,7 +389,7 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
             txt["shadowX"] = %(distance * cos(radAngle))
             txt["shadowY"] = %(- distance * sin(radAngle))
 
-        let stroke = layer.propertyGroup("Layer Styles").propertyGroup("Stroke")
+        let stroke = layerStyles.propertyGroup("Stroke")
         if not stroke.isNil and stroke.canSetEnabled and stroke.enabled:
             let size = stroke.property("Size", float32).valueAtTime(0)
             let color = stroke.property("Color", Vector4).valueAtTime(0)
@@ -230,32 +397,11 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
             txt["strokeColor"] = %[color.x, color.y, color.z, alpha]
             txt["strokeSize"] = %size
 
-        result["Text"] = txt
+        txt["_c"] = %"Text"
+        result.add(txt)
 
 proc layerIsCompositionRef(layer: Layer): bool =
     not layer.source.isNil and layer.source.jsObjectType == "CompItem"
-
-proc requiresAuxParent(layer: Layer): bool =
-    let ap = layer.property("Anchor Point", Vector3)
-    if ap.value != newVector3(0, 0, 0):
-        result = true
-    if layer.blendMode != BlendingMode.NORMAL:
-        result = true
-
-proc mangledName(layer: Layer): string =
-    result = layerNames.getOrDefault(layer.index)
-    if result.len == 0:
-        result = $layer.name
-        if result == $layer.containingComp.name:
-            result &= "$" & $layer.index
-        else:
-            for v in values(layerNames):
-                if result == v:
-                    result &= "$" & $layer.index
-                    break
-        layerNames[layer.index] = result
-
-proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
 
 proc exportPath(c: Item): string =
     result = c.projectPath
@@ -269,18 +415,24 @@ proc serializeLayer(layer: Layer): JsonNode =
 
     logi("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
     result["name"] = % layer.mangledName
-    result["translation"] = % layer.property("Position", Vector3).valueAtTime(0)
-    var scale = layer.property("Scale", Vector3).valueAtTime(0)
-    if scale != newVector3(100, 100, 100):
-        scale /= 100
-        result["scale"] = %scale
-    var rotation = layer.property("Rotation", float32).valueAtTime(0, false);
-    if (rotation != 0):
-        result["rotation"] = % quaternionWithZRotation(rotation)
 
-    let opacity = layer.property("Opacity", float).valueAtTime(0)
-    if opacity != 100:
-        result["alpha"] = % (opacity / 100.0)
+    let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3())
+    position.setInitialValueToResult(result)
+
+    addPropDesc(layer, -1, "tX", layer.property("X Position", float))
+    addPropDesc(layer, -1, "tY", layer.property("Y Position", float))
+
+    let scale = addPropDesc(layer, -1, "scale", layer.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
+        %(v / 100)
+    scale.setInitialValueToResult(result)
+
+    let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
+        % quaternionWithZRotation(v)
+    rotation.setInitialValueToResult(result)
+
+    let alpha = addPropDesc(layer, -1, "alpha", layer.property("Opacity", float), 100) do(v: float) -> JsonNode:
+        %(v / 100.0)
+    alpha.setInitialValueToResult(result)
 
     var children = layer.children
     if children.len > 0:
@@ -318,7 +470,7 @@ proc serializeLayer(layer: Layer): JsonNode =
 
         let blendMode = layer.blendMode
         if blendMode != BlendingMode.NORMAL:
-            auxNode["components"] = %*{"VisualModifier": {"blendMode": % $blendMode}}
+            auxNode["components"] = %*[{"_c": "VisualModifier", "blendMode": % $blendMode}]
 
         result = auxNode
 
@@ -396,73 +548,6 @@ proc getAnimationMarkers(comp: Composition): seq[Marker] =
                 doAssert(em.time > result[i].time)
                 result[i].duration = em.time - result[i].time
 
-proc jsonPropertyKeyValueAccessor(p: AbstractProperty): proc(k: int): JsonNode =
-    case $p.name
-    of "Rotation":
-        let cp = p.toPropertyOfType(float)
-        result = proc(k: int): JsonNode =
-            % quaternionWithZRotation(cp.keyValue(k))
-    of "Scale":
-        let cp = p.toPropertyOfType(Vector3)
-        result = proc(k: int): JsonNode =
-            % (cp.keyValue(k) / 100)
-    of "Opacity":
-        let cp = p.toPropertyOfType(float)
-        result = proc(k: int): JsonNode =
-            % (cp.keyValue(k) / 100)
-    else:
-        case p.propertyValueType
-        of pvt2d, pvt2dSpatial:
-            let cp = p.toPropertyOfType(Vector2)
-            result = proc(k: int): JsonNode =
-                % (cp.keyValue(k))
-
-        of pvt3d, pvt3dSpatial:
-            let cp = p.toPropertyOfType(Vector3)
-            result = proc(k: int): JsonNode =
-                % (cp.keyValue(k))
-
-        of pvt1d:
-            let cp = p.toPropertyOfType(float)
-            result = proc(k: int): JsonNode =
-                % (cp.keyValue(k))
-        else:
-            raise newException(Exception, "Unknown property type to convert: " & $p.propertyValueType)
-
-proc jsonPropertyAccessor(p: AbstractProperty): proc(t: float): JsonNode =
-    case $p.name
-    of "Rotation":
-        let cp = p.toPropertyOfType(float)
-        result = proc(t: float): JsonNode =
-            % quaternionWithZRotation(cp.valueAtTime(t))
-    of "Scale":
-        let cp = p.toPropertyOfType(Vector3)
-        result = proc(t: float): JsonNode =
-            % (cp.valueAtTime(t) / 100)
-    of "Opacity":
-        let cp = p.toPropertyOfType(float)
-        result = proc(t: float): JsonNode =
-            % (cp.valueAtTime(t) / 100)
-    else:
-        case p.propertyValueType
-        of pvt2d, pvt2dSpatial:
-            let cp = p.toPropertyOfType(Vector2)
-            result = proc(t: float): JsonNode =
-                % (cp.valueAtTime(t))
-
-        of pvt3d, pvt3dSpatial:
-            let cp = p.toPropertyOfType(Vector3)
-            result = proc(t: float): JsonNode =
-                % (cp.valueAtTime(t))
-
-        of pvt1d:
-            let cp = p.toPropertyOfType(float)
-            result = proc(t: float): JsonNode =
-                % (cp.valueAtTime(t))
-
-        else:
-            raise newException(Exception, "Unknown property type to convert: " & $p.propertyValueType)
-
 proc `%`(e: KeyframeEase): JsonNode =
     const c = 0.66
     let y = e.speed * (e.influence / 100) * c
@@ -471,12 +556,12 @@ proc `%`(e: KeyframeEase): JsonNode =
         y
     ]
 
-proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
+proc getPropertyAnimation(pd: PropertyDescription, marker: Marker): JsonNode =
     var animationStartTime = marker.time
     var animationEndTime = marker.time + marker.duration;
-    #if (prop.numKeys > 0) {
-    #  animationStartTime = Math.max(animationStartTime, prop.keyTime(1));
-    #  animationEndTime = Math.min(animationEndTime, prop.keyTime(prop.numKeys));
+    #if (pd.property.numKeys > 0) {
+    #  animationStartTime = Math.max(animationStartTime, pd.property.keyTime(1));
+    #  animationEndTime = Math.min(animationEndTime, pd.property.keyTime(pd.property.numKeys));
     #}
 
     #if (animationStartTime >= animationEndTime - 0.0001) {
@@ -486,14 +571,12 @@ proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
     result = newJObject()
 
     when exportKeyframeAnimations:
-        let nk = prop.numKeys
-        logi "prop: ", prop.name
+        let nk = pd.property.numKeys
+        logi "prop: ", pd.fullyQualifiedName
         logi "nk: ", nk
         var keys = newJArray()
 
-        let lastKeyTime = prop.keyTime(prop.numKeys)
-
-        let keyValueAccessor = jsonPropertyKeyValueAccessor(prop)
+        let lastKeyTime = pd.property.keyTime(pd.property.numKeys)
 
         for i in 1 .. nk:
     #        const c = 0.66
@@ -501,15 +584,15 @@ proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
             # let outY = oe.speed * (oe.influence / 100) * c
             # let ie = prop.keyInTemporalEase(i)[0]
             # let inY = - ie.speed * (ie.influence / 100) * c
-            let inEase = prop.keyInTemporalEase(i)
-            let outEase = prop.keyOutTemporalEase(i)
+            let inEase = pd.property.keyInTemporalEase(i)
+            let outEase = pd.property.keyOutTemporalEase(i)
             if inEase.len != 1 or outEase.len != 1:
                 logi "ERROR: Too many eases. Exported file might not be valid."
             let key = %*{
                 "ie": inEase[0],
                 "oe": outEase[0],
-                "p": prop.keyTime(i) / lastKeyTime,
-                "v": keyValueAccessor(i)
+                "p": pd.property.keyTime(i) / lastKeyTime,
+                "v": pd.keyValue(i)
             }
             keys.add(key)
 
@@ -521,14 +604,13 @@ proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
         var fps = 30.0;
         var timeStep = 1.0 / fps;
         var sampledPropertyValues = newJArray()
-        var accessor = jsonPropertyAccessor(prop)
 
         var dEndTime = animationEndTime - 0.0001; # Due to floating point errors, we
         # may hit end time, so prevent that.
 
         var s = animationStartTime
         while s < dEndTime:
-            sampledPropertyValues.add(accessor(s))
+            sampledPropertyValues.add(pd.valueAtTime(s))
             s += timeStep
         #  logi(JSON.stringify(sampledPropertyValues));
         #  sampledPropertyValues.push(converter(prop.valueAtTime(animationEndTime, false)));
@@ -536,11 +618,6 @@ proc getPropertyAnimation(prop: AbstractProperty, marker: Marker): JsonNode =
 
     result["duration"] = %(animationEndTime - animationStartTime)
     if marker.loops != 0: result["numberOfLoops"] = %marker.loops
-
-proc mapPropertyName(name: string): string =
-    result = propertyNameMap.getOrDefault(name)
-    if result.len == 0:
-        result = name
 
 proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProperty], name: string = "") =
     for i in 0 ..< fromObj.numProperties:
@@ -555,20 +632,6 @@ proc getAnimatableProperties(fromObj: PropertyOwner, res: var seq[AbstractProper
                 if not pr.isSeparationLeader or not pr.dimensionsSeparated:
                     logi "Animatable prop: ", fullyQualifiedPropName
                     res.add(pr)
-
-proc belongsToAux(p: AbstractProperty): bool =
-    for i in ["Scale".cstring, "Rotation", "Position", "X Position", "Y Position"]:
-        if p.name == i: return true
-
-proc getLayerAnimationForMarker(layer: Layer, marker: Marker, props: openarray[AbstractProperty], result: JsonNode) =
-    for pr in props:
-        var anim = getPropertyAnimation(pr, marker)
-        let layerName = if pr.belongsToAux and layer.requiresAuxParent:
-                layer.auxLayerName
-            else:
-                layer.mangledName
-        var fullyQualifiedPropName = layerName & "." & mapPropertyName($pr.name)
-        result[fullyQualifiedPropName] = anim
 
 proc layerFootage(layer: Layer): FootageItem =
     var source = layer.source
@@ -628,24 +691,17 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
     var animationMarkers = getAnimationMarkers(composition)
     result = newJObject()
 
-    var layerAnimatebleProps = newSeq[seq[AbstractProperty]]()
-
     for m in animationMarkers:
         var animations = newJObject()
         logi("Exporting animation: ", m.animation, ": ", epochTime())
-        var i = 0
+
+        for pd in gAnimatedProperties:
+            animations[pd.fullyQualifiedName] = getPropertyAnimation(pd, m)
+
         for layer in composition.layers:
-            if shouldSerializeLayer(layer):
-                if layerAnimatebleProps.len <= i:
-                    var props = newSeq[AbstractProperty]()
-                    getAnimatableProperties(layer, props)
-                    layerAnimatebleProps.add(props)
-                getLayerAnimationForMarker(layer, m, layerAnimatebleProps[i], animations)
+            if shouldSerializeLayer(layer) and layer.isSequenceLayer():
+                getSequenceLayerAnimationForMarker(layer, m, animations)
 
-                if layer.isSequenceLayer():
-                    getSequenceLayerAnimationForMarker(layer, m, animations)
-
-                inc i
         if animations.len > 0:
             result[m.animation] = animations
 
@@ -674,7 +730,9 @@ proc serializeComposition(composition: Composition): JsonNode =
 
     if animations.len > 0:
         result["animations"] = animations
-    result["aep_name"] = % $app.project.file.name
+    let f = app.project.file
+    if not f.isNil:
+        result["aep_name"] = % $f.name
 
 proc replacer(n: JsonNode): ref RootObj {.exportc.} =
     case n.kind
@@ -709,6 +767,7 @@ proc fastJsonStringify(n: JsonNode): cstring =
 proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     let compositions = getSelectedCompositions()
     gExportFolderPath = $exportFolderPath
+    gAnimatedProperties.setLen(0)
     for c in compositions:
         gCompExportPath = c.exportPath
         let fullExportPath = gExportFolderPath & "/" & gCompExportPath
@@ -724,7 +783,9 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
             var serializedComp = serializeComposition(c)
             file.write(fastJsonStringify(serializedComp))
         except:
-            logi("Exception caught: ", getCurrentExceptionMsg())
+            logi "Exception caught: ", getCurrentExceptionMsg()
+            let s = getCurrentException().getStackTrace()
+            if not s.isNil: logi s
         file.close()
 
     logi("Done. ", epochTime())

@@ -16,19 +16,19 @@ var overlayPostEffect = newPostEffect("""
 uniform Image uBackground;
 uniform vec2 viewportSize;
 
-vec2 fbUv(vec4 imgTexCoords) {
+vec2 overlay_effect_fbUv(vec4 imgTexCoords) {
     vec2 pos = gl_FragCoord.xy;
     pos.y = viewportSize.y - pos.y;
     return imgTexCoords.xy + (imgTexCoords.zw - imgTexCoords.xy) * (pos / viewportSize);
 }
 
-void overlay() {
-    vec2 bgUv = fbUv(uBackground.texCoords);
+void overlay_effect() {
+    vec2 bgUv = overlay_effect_fbUv(uBackground.texCoords);
     vec4 burnColor = texture2D(uBackground.tex, bgUv);
     vec4 maskColor = gl_FragColor;
     gl_FragColor.rgb = burnColor.rgb * (1.0 + maskColor.a * 2.0);
 }
-""", "overlay")
+""", "overlay_effect")
 
 method draw*(o: Overlay) =
     let vp = o.node.sceneView

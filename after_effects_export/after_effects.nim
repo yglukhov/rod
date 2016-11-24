@@ -83,6 +83,7 @@ type
     PropertyBase* = ref PropertyBaseObj
     PropertyBaseObj {.importc.} = object of RootObj
         name*: cstring
+        matchName*: cstring
         enabled*: bool
         active*: bool
         isEffect*: bool
