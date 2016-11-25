@@ -48,9 +48,9 @@ varying float vAlpha;
     varying vec2 texCoords;
 #endif
 #ifdef GL_ES
-    varying highp float vColor;
+    varying highp vec3 vColor;
 #else
-    varying float vColor;
+    varying vec3 vColor;
 #endif
 
 #ifdef ANIMATED_TEXTURE
@@ -100,11 +100,20 @@ varying float vAlpha;
     }
 #endif
 
+vec3 encodeRgbFromFloat( float f )
+{
+    vec3 color;
+    color.b = floor(f / (256.0 * 256.0));
+    color.g = floor((f - color.b * 256.0 * 256.0) / 256.0);
+    color.r = floor(f - color.b * 256.0 * 256.0 - color.g * 256.0);
+    return color / 256.0;
+}
+
 void main()
 {
     vAlpha = aAlpha;
-    vColor = aColor;
-    vec3 vertexOffset;
+    vec3 vertexOffset = vec3(0.0,0.0,0.0);
+    vColor = encodeRgbFromFloat(aColor);
 
 #ifdef ANIMATED_TEXTURE
     // calculate anim frame
@@ -152,9 +161,9 @@ const ParticleFragmentShader = """
 #ifdef GL_ES
     #extension GL_OES_standard_derivatives : enable
     precision highp float;
-    varying highp float vColor;
+    varying highp vec3 vColor;
 #else
-    varying float vColor;
+    varying vec3 vColor;
 #endif
 
 #ifdef TEXTURED
@@ -166,24 +175,13 @@ const ParticleFragmentShader = """
 
 varying float vAlpha;
 
-vec3 encodeRgbFromFloat( float f )
-{
-    vec3 color;
-    color.b = floor(f / (256.0 * 256.0));
-    color.g = floor((f - color.b * 256.0 * 256.0) / 256.0);
-    color.r = floor(f - color.b * 256.0 * 256.0 - color.g * 256.0);
-    return color / 256.0;
-}
-
 void main()
 {
 #ifdef TEXTURED
     vec4 tex_color = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * texCoords);
-    vec3 color = encodeRgbFromFloat(vColor);
-    gl_FragColor = tex_color * vec4(color.xyz, vAlpha);
+    gl_FragColor = tex_color * vec4(vColor.xyz, vAlpha);
 #else
-    vec3 color = encodeRgbFromFloat(vColor);
-    gl_FragColor = vec4(color.xyz, vAlpha);
+    gl_FragColor = vec4(vColor.xyz, vAlpha);
 #endif
 }
 """
