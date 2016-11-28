@@ -36,6 +36,7 @@ proc logi(args: varargs[string, `$`]) =
 proc shouldSerializeLayer(layer: Layer): bool = return layer.enabled
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
+template quaternionWithEulerRotation(euler: Vector3): Quaternion = newQuaternionFromEulerXYZ(euler.x, euler.y, euler.z)
 
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
 
@@ -46,6 +47,7 @@ type PropertyDescription = ref object
     valueAtTime: proc(time: float): JsonNode
     keyValue: proc(k: int): JsonNode
     initialValue: proc(): JsonNode
+    separatedProperties: seq[AbstractProperty]
 
 var gCompExportPath = ""
 var gExportFolderPath = ""
@@ -119,10 +121,51 @@ proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Pro
 
     result.fullyQualifiedName = fullyQualifiedPropName(layer, componentIndex, name, p)
 
+
+proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: string, p: seq[Property[T]], mapper: proc(val: seq[T]): JsonNode = nil): PropertyDescription =
+    if p.isNil:
+        return
+
+    result.new()
+    result.name = name
+
+    result.property = p[0]
+    result.separatedProperties = @[]
+    for i in 0 ..< p.len:
+        result.separatedProperties.add(p[i])
+    let r = result
+    if mapper.isNil:
+        result.valueAtTime = proc(t: float): JsonNode =
+            result = newJArray()
+            for sp in r.separatedProperties:
+                result.add(%sp.toPropertyOfType(T).valueAtTime(t))
+        result.keyValue = proc(k: int): JsonNode =
+            result = newJArray()
+            for sp in r.separatedProperties:
+                result.add(%sp.toPropertyOfType(T).keyValue(k))
+    else:
+        result.valueAtTime = proc(t: float): JsonNode =
+            var args = newSeq[T]()
+            for sp in r.separatedProperties:
+                args.add(sp.toPropertyOfType(T).valueAtTime(t))
+            mapper(args)
+        result.keyValue = proc(k: int): JsonNode =
+            var args = newSeq[T]()
+            for sp in r.separatedProperties:
+                args.add(sp.toPropertyOfType(T).keyValue(k))
+            mapper(args)
+
+    let vat = result.valueAtTime
+    result.initialValue = proc(): JsonNode =
+        vat(0)
+
+    result.fullyQualifiedName = fullyQualifiedPropName(layer, componentIndex, name, p[0])
+
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
     result = newPropDesc(layer, componentIndex, name, p, mapper)
     if not result.isNil and p.isAnimated:
         gAnimatedProperties.add(result)
+
 
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
     result = addPropDesc(layer, componentIndex, name, p, mapper)
@@ -426,9 +469,20 @@ proc serializeLayer(layer: Layer): JsonNode =
         %(v / 100)
     scale.setInitialValueToResult(result)
 
-    let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
-        % quaternionWithZRotation(v)
-    rotation.setInitialValueToResult(result)
+    try:
+        let xprop = layer.property("X Rotation", float)
+        let yprop = layer.property("Y Rotation", float)
+        let zprop = layer.property("Z Rotation", float)
+
+        let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
+            % quaternionWithEulerRotation(newVector3(v[0], v[1], v[2]))
+        if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
+            gAnimatedProperties.add(rotationEuler)
+        rotationEuler.setInitialValueToResult(result)
+    except:
+        let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
+            % quaternionWithZRotation(v)
+        rotation.setInitialValueToResult(result)
 
     let alpha = addPropDesc(layer, -1, "alpha", layer.property("Opacity", float), 100) do(v: float) -> JsonNode:
         %(v / 100.0)
