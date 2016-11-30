@@ -208,7 +208,7 @@ proc recursiveUpdate*(n: Node) =
     n.update()
     for c in n.children: c.recursiveUpdate()
 
-proc anchorMatrix*(n: Node): Matrix4=
+proc anchorMatrix(n: Node): Matrix4=
     result[0] = 1; result[1] = 0; result[2] = 0;
     result[4] = 0; result[5] = 1; result[6] = 0;
     result[8] = 0; result[9] = 0; result[10] = 1;
@@ -494,7 +494,6 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "translation", n.position)
     s.deserializeValue(j, "scale", n.mScale)
     s.deserializeValue(j, "rotation", n.mRotation)
-    s.deserializeValue(j, "translation", n.position)
     s.deserializeValue(j, "anchor", n.anchor)
     s.deserializeValue(j, "alpha", n.alpha)
     s.deserializeValue(j, "layer", n.layer)
