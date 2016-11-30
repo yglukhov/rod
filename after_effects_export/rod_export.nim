@@ -459,7 +459,8 @@ proc serializeLayer(layer: Layer): JsonNode =
     logi("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
     result["name"] = % layer.mangledName
 
-    let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3())
+    let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+        %(newVector3(v.x, v.y, v.z * -1.0))
     position.setInitialValueToResult(result)
 
     addPropDesc(layer, -1, "tX", layer.property("X Position", float))
