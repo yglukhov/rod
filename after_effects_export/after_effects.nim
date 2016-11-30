@@ -72,7 +72,7 @@ type
         hasTrackMatte*: bool
         timeRemapEnabled*: bool
         nullLayer*: bool
-
+        threeDLayer*: bool
         ## The start time of the layer, expressed in composition time (seconds).
         ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.
         startTime*: float

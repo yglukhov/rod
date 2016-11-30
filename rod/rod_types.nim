@@ -28,6 +28,7 @@ type
         isDirty*: bool
         layer*: int
         isEnabled*: bool
+        mAnchorPoint*: Vector3
 
     Node2D* = Node3D
 

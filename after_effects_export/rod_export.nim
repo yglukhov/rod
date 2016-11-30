@@ -57,9 +57,9 @@ var layerNames = initTable[int, string]()
 var resourcePaths: seq[string] = @[]
 
 proc requiresAuxParent(layer: Layer): bool =
-    let ap = layer.property("Anchor Point", Vector3)
-    if ap.value != newVector3(0, 0, 0):
-        result = true
+    # let ap = layer.property("Anchor Point", Vector3)
+    # if ap.value != newVector3(0, 0, 0):
+    #     result = true
     if layer.blendMode != BlendingMode.NORMAL:
         result = true
 
@@ -469,7 +469,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         %(v / 100)
     scale.setInitialValueToResult(result)
 
-    try:
+    if layer.threeDLayer:
         let xprop = layer.property("X Rotation", float)
         let yprop = layer.property("Y Rotation", float)
         let zprop = layer.property("Z Rotation", float)
@@ -479,10 +479,14 @@ proc serializeLayer(layer: Layer): JsonNode =
         if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
             gAnimatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
-    except:
+    else:
         let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
             % quaternionWithZRotation(v)
         rotation.setInitialValueToResult(result)
+
+    let anchor = addPropDesc(layer, -1, "anchor", layer.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+        %v
+    anchor.setInitialValueToResult(result)
 
     let alpha = addPropDesc(layer, -1, "alpha", layer.property("Opacity", float), 100) do(v: float) -> JsonNode:
         %(v / 100.0)
@@ -509,17 +513,17 @@ proc serializeLayer(layer: Layer): JsonNode =
         logi "Creating aux parent for: ", layer.mangledName
         var auxNode = newJObject()
         auxNode["name"] = % layer.auxLayerName
-        let pos = layer.property("Position", Vector3).valueAtTime(0)
-        auxNode["translation"] = % pos
-        if not result{"scale"}.isNil:
-            auxNode["scale"] = result["scale"]
-            result.delete("scale")
+        # let pos = layer.property("Position", Vector3).valueAtTime(0)
+        # auxNode["translation"] = % pos
+        # if not result{"scale"}.isNil:
+        #     auxNode["scale"] = result["scale"]
+        #     result.delete("scale")
 
-        if not result{"rotation"}.isNil:
-            auxNode["rotation"] = result["rotation"]
-            result.delete("rotation")
+        # if not result{"rotation"}.isNil:
+        #     auxNode["rotation"] = result["rotation"]
+        #     result.delete("rotation")
 
-        result["translation"] = % (- layer.property("Anchor Point", Vector3).valueAtTime(0))
+        # result["translation"] = % (- layer.property("Anchor Point", Vector3).valueAtTime(0))
         auxNode["children"] = % [result]
 
         let blendMode = layer.blendMode

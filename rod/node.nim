@@ -118,6 +118,13 @@ proc `scaleZ=`*(n: Node, value: Coord) =
     n.mScale.z = value
     n.setDirty()
 
+proc `anchor=`*(n: Node, v: Vector3) =
+    n.mAnchorPoint = v
+    n.isDirty = true
+
+proc anchor*(n: Node): Vector3 =
+    result = n.mAnchorPoint
+
 proc parent*(n: Node): Node = n.mParent
 proc `parent=`*(n: Node, p: Node) =
     n.mParent = p
@@ -201,6 +208,13 @@ proc recursiveUpdate*(n: Node) =
     n.update()
     for c in n.children: c.recursiveUpdate()
 
+proc anchorMatrix*(n: Node): Matrix4=
+    result[0] = 1; result[1] = 0; result[2] = 0;
+    result[4] = 0; result[5] = 1; result[6] = 0;
+    result[8] = 0; result[9] = 0; result[10] = 1;
+    result[12] = -n.mAnchorPoint.x;  result[13] = -n.mAnchorPoint.y; result[14] = -n.mAnchorPoint.z;
+    result[15] = 1;
+
 proc makeTransform(n: Node): Matrix4 =
     var rot = n.mRotation.toMatrix4()
 
@@ -213,16 +227,12 @@ proc makeTransform(n: Node): Matrix4 =
     # // No projection term
     result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
 
-
 proc getTransform*(n: Node, mat: var Matrix4) =
     mat.multiply(n.makeTransform(), mat)
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
-    # if n.isDirty:
-    n.mMatrix = n.makeTransform()
-        # n.isDirty = false
-
+    n.mMatrix = n.makeTransform() * n.anchorMatrix()
     return n.mMatrix
 
 proc drawNode*(n: Node): bool =
@@ -284,7 +294,6 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
         n.name == name
-
 
 let nodeLoadRefTable = newTable[string, seq[proc(nodeValue: Node)]]()
 
@@ -398,7 +407,7 @@ proc tryWorldToLocal*(n: Node, p: Vector3, res: var Vector3): bool =
         result = true
 
 proc worldPos*(n: Node): Vector3 =
-    result = n.localToWorld(newVector3())
+    result = n.localToWorld(n.mAnchorPoint)
 
 proc `worldPos=`*(n: Node, p: Vector3) =
     if n.parent.isNil:
@@ -412,6 +421,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("worldPos", n.worldPos)
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
+    p.visitProperty("anchor", n.anchor)
     p.visitProperty("alpha", n.alpha)
 
     p.visitProperty("tX", n.positionX, { pfAnimatable })
@@ -484,6 +494,8 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "translation", n.position)
     s.deserializeValue(j, "scale", n.mScale)
     s.deserializeValue(j, "rotation", n.mRotation)
+    s.deserializeValue(j, "translation", n.position)
+    s.deserializeValue(j, "anchor", n.anchor)
     s.deserializeValue(j, "alpha", n.alpha)
     s.deserializeValue(j, "layer", n.layer)
     s.deserializeValue(j, "enabled", n.enabled)
