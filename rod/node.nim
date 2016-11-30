@@ -120,7 +120,7 @@ proc `scaleZ=`*(n: Node, value: Coord) =
 
 proc `anchor=`*(n: Node, v: Vector3) =
     n.mAnchorPoint = v
-    n.isDirty = true
+    n.setDirty()
 
 proc anchor*(n: Node): Vector3 =
     result = n.mAnchorPoint
@@ -552,6 +552,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("translation", s.getValue(n.position))
     result.add("scale", s.getValue(n.scale))
     result.add("rotation", s.getValue(n.rotation))
+    result.add("anchor", s.getValue(n.anchor))
     result.add("alpha", s.getValue(n.alpha))
     result.add("layer", s.getValue(n.layer))
     result.add("enabled", s.getValue(n.enabled))
