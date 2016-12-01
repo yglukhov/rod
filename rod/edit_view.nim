@@ -50,6 +50,7 @@ type EventCatchingView* = ref object of View
     keyDownDelegate*: proc(event: var Event): bool
     keyUpDelegate*: proc(event: var Event): bool
     mouseScrrollDelegate*: proc(event: var Event)
+    allowGameInput: bool
 
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
@@ -323,7 +324,6 @@ proc onTouchDown*(editor: Editor, e: var Event) =
 
         if indexPath.len > 1:
             editor.outlineView.selectItemAtIndexPath(indexPath)
-            editor.outlineView.expandBranch(indexPath)
 
 
 proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
@@ -366,6 +366,13 @@ proc createZoomSelectionButton(e: Editor) =
             let cam = e.rootNode.findNode("camera")
             if not cam.isNil:
                 e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
+
+proc createGameInputToggle(e: Editor) =
+    let toggle = e.newToolbarButton("Game Input")
+    toggle.behavior = bbToggle
+    toggle.onAction do():
+        e.eventCatchingView.allowGameInput = (toggle.value == 1)
+    toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
 
 proc createCameraSelector(e: Editor) =
     e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
@@ -510,6 +517,10 @@ proc createWorkspaceLayout(e: Editor) =
     sceneClipView.addSubview(e.sceneView)
     sceneClipView.addSubview(e.eventCatchingView)
 
+method onTouchEv*(v: EventCatchingView, e: var Event): bool =
+    if not v.allowGameInput:
+        result = procCall v.View.onTouchEv(e)
+
 proc createEventCatchingView(e: Editor) =
     e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
     e.eventCatchingView.resizingMask = "wh"
@@ -550,6 +561,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     # Toolbar buttons
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()
+    editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
     if startFromGame:
