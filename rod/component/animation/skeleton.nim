@@ -11,6 +11,7 @@ import nimx.property_visitor
 
 import rod.component
 import rod.rod_types
+import rod.node
 import rod.material.shader
 import rod.tools.serializer
 
@@ -61,6 +62,8 @@ type
         currFrame: AnimationFrame
         invMatrix*: Matrix4
         animTrack*: AnimationTrack
+
+        atachedNodes*: seq[Node]
         shader: Shader
 
     Skeleton* = ref object
@@ -94,6 +97,7 @@ proc newBone*(): Bone =
     result.children = newSeq[Bone]()
     result.shader = newShader(BoneVertexShader, BoneFragmentShader, @[(0.GLuint, "aPosition")])
     result.invMatrix.loadIdentity()
+    result.atachedNodes = newSeq[Node]()
 
 proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
     let c = currentContext()
@@ -163,6 +167,9 @@ proc update(b: Bone, time: float, mat: Matrix4) =
     else:
         newMat = b.startMatrix
         b.matrix = newMat * b.invMatrix
+
+    for node in b.atachedNodes:
+        node.setBoneMatrix(newMat)
 
     for k, v in b.children:
         v.update(time, newMat)

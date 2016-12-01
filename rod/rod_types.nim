@@ -28,6 +28,8 @@ type
         isDirty*: bool
         layer*: int
         isEnabled*: bool
+        boneMatrix*: Matrix4
+        isBoneTransform*: bool
 
     Node2D* = Node3D
 

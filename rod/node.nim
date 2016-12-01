@@ -182,13 +182,36 @@ proc setComponent*(n: Node, name: string, c: Component) =
         n.components = newSeq[Component]()
     n.components.add(c)
 
+proc componentPosition*(n: Node, c: Component): int =
+    if not n.components.isNil:
+        for i, comp in n.components:
+            if comp == c:
+                return i
+
+    return -1
+
+proc insertComponent*(n: Node, c: Component, index: int) =
+    if n.components.isNil:
+        n.components = newSeq[Component]()
+
+    var i = index
+    if index < 0:
+        i = 0
+    if index > n.components.len():
+        i = n.components.len()
+
+    n.components.insert(c, i)
+
+proc removeComponent*(n: Node, c: Component) =
+    let compPos = n.componentPosition(c)
+    if compPos > -1:
+        c.componentNodeWillBeRemovedFromSceneView()
+        n.components.delete(compPos)
+
 proc removeComponent*(n: Node, name: string) =
     if not n.components.isNil:
         let c = n.getComponent(name)
-        for i, comp in n.components:
-            if comp == c:
-                c.componentNodeWillBeRemovedFromSceneView()
-                n.components.delete(i)
+        n.removeComponent(c)
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
@@ -283,6 +306,7 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
+        # echo "find in node ": n.name
         n.name == name
 
 
@@ -372,12 +396,20 @@ proc childNamed*(n: Node, name: string): Node =
     for c in n.children:
         if c.name == name: return c
 
+proc setBoneMatrix*(n: Node, mat: Matrix4) =
+    n.setDirty()
+    n.isBoneTransform = true
+    n.boneMatrix = mat
+
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 
 proc worldTransform*(n: Node): Matrix4 =
     if n.isDirty:
         n.isDirty = false
-        if n.parent.isNil:
+        if n.isBoneTransform:
+            let w = n.boneMatrix
+            w.multiply(n.transform, n.worldMatrix)
+        elif n.parent.isNil:
             n.worldMatrix = n.transform
         else:
             let w = n.parent.worldTransform

@@ -195,8 +195,8 @@ proc startTransform*(ns: NodeSelector, selectedGizmo: Node, position: Point) =
     offset = ns.gizmo.worldPos - ns.node.sceneView.screenToWorldPoint(newVector3(position.x, position.y, screenPoint.z))
 
 proc proccesTransform*(ns: NodeSelector, position: Point) =
-    let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
-    let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
+    # let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
+    # let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
 
     let curScreenPoint = newVector3(position.x, position.y, screenPoint.z)
     var curPosition: Vector3
