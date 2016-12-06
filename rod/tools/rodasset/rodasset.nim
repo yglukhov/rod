@@ -1,5 +1,5 @@
 import os, strutils, times, tables, osproc
-import imgtool, asset_cache, settings
+import imgtool, asset_cache, settings, migrator
 
 template settingsWithCmdLine(): Settings =
     let s = newSettings()
@@ -112,4 +112,4 @@ proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = fal
 
 when isMainModule:
     import cligen
-    dispatchMulti([hash], [pack])
+    dispatchMulti([hash], [pack], [upgradeAssetBundle])

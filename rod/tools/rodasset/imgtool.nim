@@ -9,6 +9,7 @@ import nimx.types except Point, Size, Rect
 import nimx.pathutils
 
 import imgtools.imgtools, imgtools.texcompress
+import tree_traversal
 
 type Rect = imgtools.Rect
 type Point = tuple[x, y: int32]
@@ -85,34 +86,6 @@ proc newImgTool*(): ImgTool =
     result.downsampleRatio = 1.0
     result.extrusion = 1
     result.compositionPaths = @[]
-
-iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode) =
-    var stack = @[n]
-    var comps = newSeq[JsonNode]()
-    while stack.len > 0:
-        let n = stack.pop()
-        let components = n{"components"}
-        if not components.isNil:
-            comps.setLen(0)
-            if components.kind == JObject:
-                let c = components{typ}
-                if not c.isNil:
-                    comps.add(c)
-            elif components.kind == JArray:
-                for c in components.elems:
-                    if c["_c"].str == typ:
-                        comps.add(c)
-            for componentNode in comps:
-                yield(n, componentNode)
-        let children = n{"children"}
-        if not children.isNil:
-            stack.add(children.elems)
-
-iterator allSpriteNodes(n: JsonNode): (JsonNode, JsonNode) =
-    for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
-
-iterator allMeshComponentNodes(n: JsonNode): (JsonNode, JsonNode) =
-    for n, c in allComponentNodesOfType(n, "MeshComponent"): yield(n, c)
 
 proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
     im.pos = ss.packer.packAndGrow(im.targetSize.width.int32 + im.extrusion.int32 * 2, im.targetSize.height.int32 + im.extrusion.int32 * 2)
