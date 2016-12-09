@@ -500,20 +500,6 @@ proc loadComposition*(n: Node, j: JsonNode) =
 
 import rod.animation.property_animation
 
-# proc deserialize*(n: Node, s: Serializer) =
-#     proc toValue(j: JsonNode, s: var string) =
-#         s = j.str
-
-#     proc jsonNameForPropName(s: string): string =
-#         case s
-#         of "bEnableBackfaceCulling": "culling"
-#         else: s
-
-#     for k, v in n[].fieldPairs:
-#         echo "deserialize mesh = ", k
-#         jNode{jsonNameForPropName(k)}.toValue(v)
-
-
 proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if n.name.isNil:
         s.deserializeValue(j, "name", n.name)
@@ -524,12 +510,12 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "alpha", n.alpha)
     s.deserializeValue(j, "layer", n.layer)
     s.deserializeValue(j, "enabled", n.enabled)
+    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
 
     var v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
             n.addChild(newNodeFromJson(v[i], s))
-
 
     v = j{"components"}
     if not v.isNil:
