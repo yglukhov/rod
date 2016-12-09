@@ -507,7 +507,9 @@ proc run*(tool: ImgTool) =
             for i, c in tool.compositions:
                 let dstPath = tool.destPath(tool.compositionPaths[i])
                 createDir(dstPath.parentDir())
-                writeFile(dstPath, c.pretty().replace(" \n", "\n"))
+                var str = ""
+                toUgly(str, c)
+                writeFile(dstPath, str)
 
         if tool.createIndex:
             tool.writeIndex()
