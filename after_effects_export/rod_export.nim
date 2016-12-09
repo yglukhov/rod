@@ -54,16 +54,10 @@ type PropertyDescription = ref object
 var gCompExportPath = ""
 var gExportFolderPath = ""
 var gAnimatedProperties = newSeq[PropertyDescription]()
+var transitiveEffects = false
 
 var layerNames = initTable[int, string]()
 var resourcePaths: seq[string] = @[]
-
-proc requiresAuxParent(layer: Layer): bool =
-    # let ap = layer.property("Anchor Point", Vector3)
-    # if ap.value != newVector3(0, 0, 0):
-    #     result = true
-    if layer.blendMode != BlendingMode.NORMAL:
-        result = true
 
 proc mangledName(layer: Layer): string =
     result = layerNames.getOrDefault(layer.index)
@@ -78,17 +72,8 @@ proc mangledName(layer: Layer): string =
                     break
         layerNames[layer.index] = result
 
-proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
-
-proc belongsToAux(p: PropertyBase): bool =
-    for i in ["Scale".cstring, "Rotation", "Position", "X Position", "Y Position"]:
-        if p.name == i: return true
-
 proc fullyQualifiedPropName(layer: Layer, componentIndex: int, name: string, p: AbstractProperty): string =
-    let layerName = if p.belongsToAux and layer.requiresAuxParent:
-            layer.auxLayerName
-        else:
-            layer.mangledName
+    let layerName = layer.mangledName
 
     if componentIndex == -1:
         result = layerName & "." & name
@@ -167,7 +152,6 @@ proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Pro
     result = newPropDesc(layer, componentIndex, name, p, mapper)
     if not result.isNil and p.isAnimated:
         gAnimatedProperties.add(result)
-
 
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
     result = addPropDesc(layer, componentIndex, name, p, mapper)
@@ -350,6 +334,10 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
 proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJArray()
 
+    let blendMode = layer.blendMode
+    if blendMode != BlendingMode.NORMAL:
+        result.add(%*{"_c": "VisualModifier", "blendMode": % $blendMode})
+
     var layerHasRenderableComponents = false
     let effects = layer.propertyGroup("Effects")
     if not effects.isNil:
@@ -509,31 +497,10 @@ proc serializeLayer(layer: Layer): JsonNode =
     if layer.layerIsCompositionRef():
         result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
 
+    if not transitiveEffects: result["affectsChildren"] = %false
+
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
-
-    if layer.requiresAuxParent:
-        logi "Creating aux parent for: ", layer.mangledName
-        var auxNode = newJObject()
-        auxNode["name"] = % layer.auxLayerName
-        # let pos = layer.property("Position", Vector3).valueAtTime(0)
-        # auxNode["translation"] = % pos
-        # if not result{"scale"}.isNil:
-        #     auxNode["scale"] = result["scale"]
-        #     result.delete("scale")
-
-        # if not result{"rotation"}.isNil:
-        #     auxNode["rotation"] = result["rotation"]
-        #     result.delete("rotation")
-
-        # result["translation"] = % (- layer.property("Anchor Point", Vector3).valueAtTime(0))
-        auxNode["children"] = % [result]
-
-        let blendMode = layer.blendMode
-        if blendMode != BlendingMode.NORMAL:
-            auxNode["components"] = %*[{"_c": "VisualModifier", "blendMode": % $blendMode}]
-
-        result = auxNode
 
 type Marker = object
     time*, duration*: float
@@ -826,6 +793,8 @@ proc fastJsonStringify(n: JsonNode): cstring =
     {.emit: "`result` = JSON.stringify(`replacer`(`n`), null, 2);".}
 
 proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
+    logTextField.text = ""
+
     let compositions = getSelectedCompositions()
     gExportFolderPath = $exportFolderPath
     gAnimatedProperties.setLen(0)
@@ -875,14 +844,25 @@ function buildUI(contextObj) {
   var filePath = topGroup.add("statictext");
   filePath.alignment = ["fill", "fill"];
 
-  var isCopyResources = topGroup.add("checkbox", undefined, "Copy resources");
-  isCopyResources.alignment = ["right", "center"];
-  isCopyResources.value = true
-  app.settings.saveSetting("rodExport", "copyResources", "true")
+  var copyResourcesCheckBox = topGroup.add("checkbox", undefined, "Copy resources");
+  copyResourcesCheckBox.alignment = ["right", "center"];
+  copyResourcesCheckBox.value = true;
+  app.settings.saveSetting("rodExport", "copyResources", "true");
 
-  isCopyResources.onClick = function(e) {
-    app.settings.saveSetting("rodExport", "copyResources", isCopyResources.value + "");
-  }
+  copyResourcesCheckBox.onClick = function(e) {
+    app.settings.saveSetting("rodExport", "copyResources", copyResourcesCheckBox.value + "");
+  };
+
+  var transitiveEffectsCheckBox = topGroup.add("checkbox", undefined, "Transitive effects");
+  transitiveEffectsCheckBox.alignment = ["right", "center"];
+  `transitiveEffects`[0] = app.settings.haveSetting("rodExport", "transitiveEffects") &&
+    app.settings.getSetting("rodExport", "transitiveEffects") == "true";
+  transitiveEffectsCheckBox.value = `transitiveEffects`[0];
+
+  transitiveEffectsCheckBox.onClick = function(e) {
+    `transitiveEffects`[0] = affectsChildrenCheckBox.value;
+    app.settings.saveSetting("rodExport", "transitiveEffects", affectsChildrenCheckBox.value + "");
+  };
 
   var exportButton = topGroup.add("button", undefined,
     "Export selected compositions");
@@ -912,7 +892,6 @@ function buildUI(contextObj) {
   };
 
   exportButton.onClick = function(e) {
-    `logTextField`[0].text = "";
     exportSelectedCompositions(filePath.text);
   };
 
