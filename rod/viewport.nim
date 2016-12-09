@@ -207,11 +207,11 @@ method draw*(v: SceneView, r: Rect) =
     c.withTransform v.viewProjMatrix:
         if v.editing: v.drawGrid()
 
-        v.rootNode.recursiveDraw(drawTable)
+        v.rootNode.drawNode(true, drawTable)
         for k, v in drawTable:
             c.gl.clearDepthStencil()
             for node in v:
-                discard node.drawNode()
+                node.drawNode(false, nil)
 
     if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
         # When some compositing nodes are optimized away, we have

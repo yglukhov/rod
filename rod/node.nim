@@ -35,6 +35,7 @@ proc newNode*(name: string = nil): Node =
     result.alpha = 1.0
     result.isDirty = true
     result.isEnabled = true
+    result.affectsChildren = true
 
 proc setDirty(n: Node) =
     if n.isDirty == false:
@@ -147,7 +148,6 @@ proc addComponent*(n: Node, name: string): Component =
 proc addComponent*(n: Node, T: typedesc): Component =
     result = n.addComponent(T.name)
 
-
 proc getComponent*(n: Node, name: string): Component =
     if n.components.isNil:
         return nil
@@ -235,53 +235,73 @@ proc transform*(n: Node): Matrix4 =
     n.mMatrix = n.makeTransform() * n.anchorMatrix()
     return n.mMatrix
 
-proc drawNode*(n: Node): bool =
-    if n.alpha < 0.0000001 or not n.enabled: return
-    var hasPosteffectComponent = false
-    if not n.components.isNil:
-        var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-        currentContext().withTransform tr:
-            for v in n.components:
-                v.draw()
-                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
+proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
 
-    result = hasPosteffectComponent
-
-proc recursiveDraw*(n: Node) =
+proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
     if n.alpha < 0.0000001 or not n.enabled: return
+
+    var tr: Transform3d
     let c = currentContext()
+
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
-    let hasPosteffectComponent = n.drawNode()
-    if not hasPosteffectComponent:
-        for c in n.children: c.recursiveDraw()
+
+    var lastDrawComp = -1
+    var hasPosteffectComponent = false
+
+    var compLen = n.components.len
+
+    if compLen > 0:
+        tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+        c.withTransform tr:
+            for c in n.components:
+                inc lastDrawComp
+                if c.beforeDraw(lastDrawComp): break
+
+            # Legacy api support. Will be removed soon.
+            for c in n.components:
+                c.draw()
+                hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
+
+    let shouldDrawChildren = recursive and not hasPosteffectComponent
+
+    if shouldDrawChildren and n.affectsChildren:
+        for c in n.children:
+            c.drawNode(recursive, drawTable)
+
+    assert(compLen == n.components.len, "Components changed during drawing.")
+    if compLen > 0:
+        c.withTransform tr:
+            while lastDrawComp >= 0:
+                n.components[lastDrawComp].afterDraw(lastDrawComp)
+                dec lastDrawComp
+
+    if shouldDrawChildren and not n.affectsChildren:
+        for c in n.children:
+            c.drawNode(recursive, drawTable)
+
     c.alpha = oldAlpha
 
-proc recursiveDraw*(n: Node, drawTable: TableRef[int, seq[Node]]) =
+proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
     if n.layer == 0:
-        if n.alpha < 0.0000001 or not n.enabled: return
-
-        let c = currentContext()
-        let oldAlpha = c.alpha
-        c.alpha *= n.alpha
-        var hasPosteffectComponent = n.drawNode()
-
-        if not hasPosteffectComponent:
-            for c in n.children:
-                c.recursiveDraw(drawTable)
-
-        c.alpha = oldAlpha
-
-    else:
+        drawNodeAux(n, recursive, drawTable)
+    elif not drawTable.isNil:
         var drawNodes = drawTable.getOrDefault(n.layer)
         if drawNodes.isNil:
             drawNodes = newSeq[Node]()
+            shallow(drawNodes)
 
         drawNodes.add(n)
         drawTable[n.layer] = drawNodes
 
-        for c in n.children:
-            c .recursiveDraw(drawTable)
+        if recursive:
+            for c in n.children:
+                c.drawNode(recursive, drawTable)
+    else:
+        drawNodeAux(n, recursive, drawTable)
+
+template recursiveDraw*(n: Node) =
+    n.drawNode(true, nil)
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
@@ -465,8 +485,14 @@ proc loadComposition*(n: Node, resourceName: string) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(fullPath)
         let serializer = Serializer.new()
-        n.deserialize(j, serializer)
-        popParentResource()
+        try:
+            n.deserialize(j, serializer)
+        except:
+            echo "Could not deserialize ", resourceName, ": ", getCurrentExceptionMsg()
+            echo getCurrentException().getStackTrace()
+            raise
+        finally:
+            popParentResource()
 
 proc loadComposition*(n: Node, j: JsonNode) =
     let serializer = Serializer.new()
