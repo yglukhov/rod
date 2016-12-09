@@ -14,6 +14,8 @@ type File = after_effects.File
 const exportSampledAnimations = true
 const exportKeyframeAnimations = false
 
+const exportedVersion = 1
+
 const useObsoleteNullLayerCheck = false # Flip this if you have problems with exporting null layers
 
 proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item], typeName: string): seq[t] =
@@ -793,7 +795,7 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not f.isNil:
         result["aep_name"] = % $f.name
 
-proc replacer(n: JsonNode): ref RootObj {.exportc.} =
+proc replacer(n: JsonNode): ref RootObj =
     case n.kind
     of JNull: result = nil
     of JBool:
@@ -839,7 +841,8 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
         file.openForWriting()
         file.lineFeed = lfUnix
         try:
-            var serializedComp = serializeComposition(c)
+            let serializedComp = serializeComposition(c)
+            serializedComp["version"] = %exportedVersion
             file.write(fastJsonStringify(serializedComp))
         except:
             logi "Exception caught: ", getCurrentExceptionMsg()

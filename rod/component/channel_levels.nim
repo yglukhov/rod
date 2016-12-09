@@ -15,6 +15,7 @@ import rod.tools.serializer
 type ChannelLevels* = ref object of Component
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: Coord
     inWhiteV*, inBlackV*, inGammaV*, outWhiteV*, outBlackV*: Vector3
+    active: bool
 
 var levelsPostEffect = newPostEffect("""
 vec3 colorPow(vec3 i, vec3 p) {
@@ -84,13 +85,14 @@ method deserialize*(c: ChannelLevels, j: JsonNode, s: Serializer) =
         c.outBlackV = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
     c.outBlack = j["outBlack"].getFNum()
 
-method draw*(cl: ChannelLevels) =
-    if not cl.areValuesNormal():
-        pushPostEffect(levelsPostEffect, cl.inWhiteV, cl.inBlackV, cl.inGammaV, cl.outWhiteV, cl.outBlackV, cl.inWhite, cl.inBlack, cl.inGamma, cl.outWhite, cl.outBlack)
-        for c in cl.node.children: c.recursiveDraw()
-        popPostEffect()
+method beforeDraw*(c: ChannelLevels, index: int): bool =
+    c.active = not c.areValuesNormal()
+    if c.active:
+        pushPostEffect(levelsPostEffect, c.inWhiteV, c.inBlackV, c.inGammaV, c.outWhiteV, c.outBlackV, c.inWhite, c.inBlack, c.inGamma, c.outWhite, c.outBlack)
 
-method isPosteffectComponent*(c: ChannelLevels): bool = not c.areValuesNormal()
+method afterDraw*(c: ChannelLevels, index: int) =
+    if c.active:
+        popPostEffect()
 
 method visitProperties*(c: ChannelLevels, p: var PropertyVisitor) =
     p.visitProperty("inWhiteV", c.inWhiteV)
