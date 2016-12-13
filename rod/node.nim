@@ -35,6 +35,7 @@ proc newNode*(name: string = nil): Node =
     result.alpha = 1.0
     result.isDirty = true
     result.isEnabled = true
+    result.affectsChildren = true
 
 proc setDirty(n: Node) =
     if n.isDirty == false:
@@ -118,6 +119,13 @@ proc `scaleZ=`*(n: Node, value: Coord) =
     n.mScale.z = value
     n.setDirty()
 
+proc `anchor=`*(n: Node, v: Vector3) =
+    n.mAnchorPoint = v
+    n.setDirty()
+
+proc anchor*(n: Node): Vector3 =
+    result = n.mAnchorPoint
+
 proc parent*(n: Node): Node = n.mParent
 proc `parent=`*(n: Node, p: Node) =
     n.mParent = p
@@ -139,7 +147,6 @@ proc addComponent*(n: Node, name: string): Component =
 
 proc addComponent*(n: Node, T: typedesc): Component =
     result = n.addComponent(T.name)
-
 
 proc getComponent*(n: Node, name: string): Component =
     if n.components.isNil:
@@ -224,6 +231,13 @@ proc recursiveUpdate*(n: Node) =
     n.update()
     for c in n.children: c.recursiveUpdate()
 
+proc anchorMatrix(n: Node): Matrix4=
+    result[0] = 1; result[1] = 0; result[2] = 0;
+    result[4] = 0; result[5] = 1; result[6] = 0;
+    result[8] = 0; result[9] = 0; result[10] = 1;
+    result[12] = -n.mAnchorPoint.x;  result[13] = -n.mAnchorPoint.y; result[14] = -n.mAnchorPoint.z;
+    result[15] = 1;
+
 proc makeTransform(n: Node): Matrix4 =
     var rot = n.mRotation.toMatrix4()
 
@@ -236,65 +250,81 @@ proc makeTransform(n: Node): Matrix4 =
     # // No projection term
     result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
 
-
 proc getTransform*(n: Node, mat: var Matrix4) =
     mat.multiply(n.makeTransform(), mat)
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
-    # if n.isDirty:
-    n.mMatrix = n.makeTransform()
-        # n.isDirty = false
-
+    n.mMatrix = n.makeTransform() * n.anchorMatrix()
     return n.mMatrix
 
-proc drawNode*(n: Node): bool =
-    if n.alpha < 0.0000001 or not n.enabled: return
-    var hasPosteffectComponent = false
-    if not n.components.isNil:
-        var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-        currentContext().withTransform tr:
-            for v in n.components:
-                v.draw()
-                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
+proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
 
-    result = hasPosteffectComponent
-
-proc recursiveDraw*(n: Node) =
+proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
     if n.alpha < 0.0000001 or not n.enabled: return
+
+    var tr: Transform3d
     let c = currentContext()
+
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
-    let hasPosteffectComponent = n.drawNode()
-    if not hasPosteffectComponent:
-        for c in n.children: c.recursiveDraw()
+
+    var lastDrawComp = -1
+    var hasPosteffectComponent = false
+
+    var compLen = n.components.len
+
+    if compLen > 0:
+        tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+        c.withTransform tr:
+            for c in n.components:
+                inc lastDrawComp
+                if c.beforeDraw(lastDrawComp): break
+
+            # Legacy api support. Will be removed soon.
+            for c in n.components:
+                c.draw()
+                hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
+
+    let shouldDrawChildren = recursive and not hasPosteffectComponent
+
+    if shouldDrawChildren and n.affectsChildren:
+        for c in n.children:
+            c.drawNode(recursive, drawTable)
+
+    assert(compLen == n.components.len, "Components changed during drawing.")
+    if compLen > 0:
+        c.withTransform tr:
+            while lastDrawComp >= 0:
+                n.components[lastDrawComp].afterDraw(lastDrawComp)
+                dec lastDrawComp
+
+    if shouldDrawChildren and not n.affectsChildren:
+        for c in n.children:
+            c.drawNode(recursive, drawTable)
+
     c.alpha = oldAlpha
 
-proc recursiveDraw*(n: Node, drawTable: TableRef[int, seq[Node]]) =
+proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
     if n.layer == 0:
-        if n.alpha < 0.0000001 or not n.enabled: return
-
-        let c = currentContext()
-        let oldAlpha = c.alpha
-        c.alpha *= n.alpha
-        var hasPosteffectComponent = n.drawNode()
-
-        if not hasPosteffectComponent:
-            for c in n.children:
-                c.recursiveDraw(drawTable)
-
-        c.alpha = oldAlpha
-
-    else:
+        drawNodeAux(n, recursive, drawTable)
+    elif not drawTable.isNil:
         var drawNodes = drawTable.getOrDefault(n.layer)
         if drawNodes.isNil:
             drawNodes = newSeq[Node]()
+            shallow(drawNodes)
 
         drawNodes.add(n)
         drawTable[n.layer] = drawNodes
 
-        for c in n.children:
-            c .recursiveDraw(drawTable)
+        if recursive:
+            for c in n.children:
+                c.drawNode(recursive, drawTable)
+    else:
+        drawNodeAux(n, recursive, drawTable)
+
+template recursiveDraw*(n: Node) =
+    n.drawNode(true, nil)
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
@@ -308,7 +338,6 @@ proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
         # echo "find in node ": n.name
         n.name == name
-
 
 let nodeLoadRefTable = newTable[string, seq[proc(nodeValue: Node)]]()
 
@@ -430,7 +459,7 @@ proc tryWorldToLocal*(n: Node, p: Vector3, res: var Vector3): bool =
         result = true
 
 proc worldPos*(n: Node): Vector3 =
-    result = n.localToWorld(newVector3())
+    result = n.localToWorld(n.mAnchorPoint)
 
 proc `worldPos=`*(n: Node, p: Vector3) =
     if n.parent.isNil:
@@ -444,6 +473,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("worldPos", n.worldPos)
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
+    p.visitProperty("anchor", n.anchor)
     p.visitProperty("alpha", n.alpha)
 
     p.visitProperty("tX", n.positionX, { pfAnimatable })
@@ -487,8 +517,14 @@ proc loadComposition*(n: Node, resourceName: string) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(fullPath)
         let serializer = Serializer.new()
-        n.deserialize(j, serializer)
-        popParentResource()
+        try:
+            n.deserialize(j, serializer)
+        except:
+            echo "Could not deserialize ", resourceName, ": ", getCurrentExceptionMsg()
+            echo getCurrentException().getStackTrace()
+            raise
+        finally:
+            popParentResource()
 
 proc loadComposition*(n: Node, j: JsonNode) =
     let serializer = Serializer.new()
@@ -496,35 +532,22 @@ proc loadComposition*(n: Node, j: JsonNode) =
 
 import rod.animation.property_animation
 
-# proc deserialize*(n: Node, s: Serializer) =
-#     proc toValue(j: JsonNode, s: var string) =
-#         s = j.str
-
-#     proc jsonNameForPropName(s: string): string =
-#         case s
-#         of "bEnableBackfaceCulling": "culling"
-#         else: s
-
-#     for k, v in n[].fieldPairs:
-#         echo "deserialize mesh = ", k
-#         jNode{jsonNameForPropName(k)}.toValue(v)
-
-
 proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if n.name.isNil:
         s.deserializeValue(j, "name", n.name)
     s.deserializeValue(j, "translation", n.position)
     s.deserializeValue(j, "scale", n.mScale)
     s.deserializeValue(j, "rotation", n.mRotation)
+    s.deserializeValue(j, "anchor", n.anchor)
     s.deserializeValue(j, "alpha", n.alpha)
     s.deserializeValue(j, "layer", n.layer)
     s.deserializeValue(j, "enabled", n.enabled)
+    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
 
     var v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
             n.addChild(newNodeFromJson(v[i], s))
-
 
     v = j{"components"}
     if not v.isNil:
@@ -573,6 +596,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("translation", s.getValue(n.position))
     result.add("scale", s.getValue(n.scale))
     result.add("rotation", s.getValue(n.rotation))
+    result.add("anchor", s.getValue(n.anchor))
     result.add("alpha", s.getValue(n.alpha))
     result.add("layer", s.getValue(n.layer))
     result.add("enabled", s.getValue(n.enabled))

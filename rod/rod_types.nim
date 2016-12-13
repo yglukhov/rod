@@ -30,6 +30,8 @@ type
         isEnabled*: bool
         boneMatrix*: Matrix4
         isBoneTransform*: bool
+        mAnchorPoint*: Vector3
+        affectsChildren*: bool # Should posteffects affect only this node or its children as well
 
     Node2D* = Node3D
 

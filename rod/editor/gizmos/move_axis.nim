@@ -4,7 +4,7 @@ let move_axis_node = """{
   "layer": 1,
   "name": "gizmo_axis",
   "components":
-  {},
+  [],
   "alpha": 1.0,
   "translation": [
     0.0,
@@ -21,9 +21,9 @@ let move_axis_node = """{
       "layer": 1,
       "name": "gizmo_axis_y",
       "components":
-      {
-        "MeshComponent":
+      [
         {
+          "_c": "MeshComponent",
           "shininess": 1.0,
           "normals": [
             0.0,
@@ -1203,7 +1203,7 @@ let move_axis_node = """{
             0.0
           ]
         }
-      },
+      ],
       "alpha": 1.0,
       "translation": [
         0.0,
@@ -1227,9 +1227,9 @@ let move_axis_node = """{
       "layer": 1,
       "name": "gizmo_axis_x",
       "components":
-      {
-        "MeshComponent":
+      [
         {
+          "_c": "MeshComponent",
           "shininess": 1.0,
           "normals": [
             0.0,
@@ -2409,7 +2409,7 @@ let move_axis_node = """{
             0.0
           ]
         }
-      },
+      ],
       "alpha": 1.0,
       "translation": [
         0.0,
@@ -2433,9 +2433,9 @@ let move_axis_node = """{
       "layer": 1,
       "name": "gizmo_axis_z",
       "components":
-      {
-        "MeshComponent":
+      [
         {
+          "_c": "MeshComponent",
           "shininess": 1.0,
           "normals": [
             0.0,
@@ -3615,7 +3615,7 @@ let move_axis_node = """{
             0.0
           ]
         }
-      },
+      ],
       "alpha": 1.0,
       "translation": [
         0.0,

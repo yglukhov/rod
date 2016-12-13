@@ -50,9 +50,12 @@ proc copyResourcesFromCache*(cache, cacheHash, dst: string) =
     let hashFile = dst / ".hash"
     if fileExists(hashFile) and readFile(hashFile) == cacheHash: return
     removeDir(dst)
-    createDir(dst)
-    copyDir(cache, dst)
-    writeFile(hashFile, cacheHash)
+    let tmp = dst & ".tmp"
+    removeDir(tmp)
+    createDir(tmp)
+    copyDir(cache, tmp)
+    writeFile(tmp / ".hash", cacheHash)
+    moveFile(tmp, dst)
 
 proc getCache*(cacheOverride: string = nil): string =
     if cacheOverride.len > 0: return expandTilde(cacheOverride)

@@ -50,6 +50,7 @@ type EventCatchingView* = ref object of View
     keyDownDelegate*: proc(event: var Event): bool
     keyUpDelegate*: proc(event: var Event): bool
     mouseScrrollDelegate*: proc(event: var Event)
+    allowGameInput: bool
 
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
@@ -57,12 +58,10 @@ type EventCatchingListener = ref object of BaseScrollListener
 method acceptsFirstResponder(v: EventCatchingView): bool = true
 
 method onKeyUp(v: EventCatchingView, e : var Event): bool =
-    echo "editor onKeyUp ", e.keyCode
     if not v.keyUpDelegate.isNil:
         result = v.keyUpDelegate(e)
 
 method onKeyDown(v: EventCatchingView, e : var Event): bool =
-    echo "editor onKeyUp ", e.keyCode
     if not v.keyDownDelegate.isNil:
         result = v.keyDownDelegate(e)
 
@@ -184,6 +183,7 @@ when loadingAndSavingAvailable:
             except:
                 error "ERROR:: Resource at path doesn't load ", path
                 error "Exception caught: ", getCurrentExceptionMsg()
+                error "stack trace: ", getCurrentException().getStackTrace()
 
 proc newTreeView(e: Editor): View =
     result = View.new(newRect(0, 0, 200, 500)) #700
@@ -323,7 +323,6 @@ proc onTouchDown*(editor: Editor, e: var Event) =
 
         if indexPath.len > 1:
             editor.outlineView.selectItemAtIndexPath(indexPath)
-            editor.outlineView.expandBranch(indexPath)
 
 
 proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
@@ -367,6 +366,13 @@ proc createZoomSelectionButton(e: Editor) =
             if not cam.isNil:
                 e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
 
+proc createGameInputToggle(e: Editor) =
+    let toggle = e.newToolbarButton("Game Input")
+    toggle.behavior = bbToggle
+    toggle.onAction do():
+        e.eventCatchingView.allowGameInput = (toggle.value == 1)
+    toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
+
 proc createCameraSelector(e: Editor) =
     e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
     e.updateCameraSelector()
@@ -380,6 +386,12 @@ proc createCameraSelector(e: Editor) =
                 if not cam.isNil:
                     e.rootNode.sceneView.camera = cam
                     e.cameraController.setCamera(cam.node)
+
+proc createSimulatePhysicButton(e: Editor) =
+    var cPicker: ColorPickerView
+    let b = e.newToolbarButton("Simulate Physic")
+    # b.onAction do():
+    #     e.sceneView.simulatePhysic = not e.sceneView.simulatePhysic
 
 proc createChangeBackgroundColorButton(e: Editor) =
     var cPicker: ColorPickerView
@@ -510,6 +522,10 @@ proc createWorkspaceLayout(e: Editor) =
     sceneClipView.addSubview(e.sceneView)
     sceneClipView.addSubview(e.eventCatchingView)
 
+method onTouchEv*(v: EventCatchingView, e: var Event): bool =
+    if not v.allowGameInput:
+        result = procCall v.View.onTouchEv(e)
+
 proc createEventCatchingView(e: Editor) =
     e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
     e.eventCatchingView.resizingMask = "wh"
@@ -550,8 +566,10 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     # Toolbar buttons
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()
+    editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
+    editor.createSimulatePhysicButton()
     if startFromGame:
         editor.createCloseEditorButton()
 

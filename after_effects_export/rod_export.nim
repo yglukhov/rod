@@ -14,6 +14,8 @@ type File = after_effects.File
 const exportSampledAnimations = true
 const exportKeyframeAnimations = false
 
+const exportedVersion = 1
+
 const useObsoleteNullLayerCheck = false # Flip this if you have problems with exporting null layers
 
 proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item], typeName: string): seq[t] =
@@ -36,6 +38,7 @@ proc logi(args: varargs[string, `$`]) =
 proc shouldSerializeLayer(layer: Layer): bool = return layer.enabled
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
+template quaternionWithEulerRotation(euler: Vector3): Quaternion = newQuaternionFromEulerXYZ(euler.x, euler.y, euler.z)
 
 let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
 
@@ -46,20 +49,15 @@ type PropertyDescription = ref object
     valueAtTime: proc(time: float): JsonNode
     keyValue: proc(k: int): JsonNode
     initialValue: proc(): JsonNode
+    separatedProperties: seq[AbstractProperty]
 
 var gCompExportPath = ""
 var gExportFolderPath = ""
 var gAnimatedProperties = newSeq[PropertyDescription]()
+var transitiveEffects = false
 
 var layerNames = initTable[int, string]()
 var resourcePaths: seq[string] = @[]
-
-proc requiresAuxParent(layer: Layer): bool =
-    let ap = layer.property("Anchor Point", Vector3)
-    if ap.value != newVector3(0, 0, 0):
-        result = true
-    if layer.blendMode != BlendingMode.NORMAL:
-        result = true
 
 proc mangledName(layer: Layer): string =
     result = layerNames.getOrDefault(layer.index)
@@ -74,17 +72,8 @@ proc mangledName(layer: Layer): string =
                     break
         layerNames[layer.index] = result
 
-proc auxLayerName(layer: Layer): string = layer.mangledName & "$AUX"
-
-proc belongsToAux(p: PropertyBase): bool =
-    for i in ["Scale".cstring, "Rotation", "Position", "X Position", "Y Position"]:
-        if p.name == i: return true
-
 proc fullyQualifiedPropName(layer: Layer, componentIndex: int, name: string, p: AbstractProperty): string =
-    let layerName = if p.belongsToAux and layer.requiresAuxParent:
-            layer.auxLayerName
-        else:
-            layer.mangledName
+    let layerName = layer.mangledName
 
     if componentIndex == -1:
         result = layerName & "." & name
@@ -119,10 +108,51 @@ proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Pro
 
     result.fullyQualifiedName = fullyQualifiedPropName(layer, componentIndex, name, p)
 
+
+proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: string, p: seq[Property[T]], mapper: proc(val: seq[T]): JsonNode = nil): PropertyDescription =
+    if p.isNil:
+        return
+
+    result.new()
+    result.name = name
+
+    result.property = p[0]
+    result.separatedProperties = @[]
+    for i in 0 ..< p.len:
+        result.separatedProperties.add(p[i])
+    let r = result
+    if mapper.isNil:
+        result.valueAtTime = proc(t: float): JsonNode =
+            result = newJArray()
+            for sp in r.separatedProperties:
+                result.add(%sp.toPropertyOfType(T).valueAtTime(t))
+        result.keyValue = proc(k: int): JsonNode =
+            result = newJArray()
+            for sp in r.separatedProperties:
+                result.add(%sp.toPropertyOfType(T).keyValue(k))
+    else:
+        result.valueAtTime = proc(t: float): JsonNode =
+            var args = newSeq[T]()
+            for sp in r.separatedProperties:
+                args.add(sp.toPropertyOfType(T).valueAtTime(t))
+            mapper(args)
+        result.keyValue = proc(k: int): JsonNode =
+            var args = newSeq[T]()
+            for sp in r.separatedProperties:
+                args.add(sp.toPropertyOfType(T).keyValue(k))
+            mapper(args)
+
+    let vat = result.valueAtTime
+    result.initialValue = proc(): JsonNode =
+        vat(0)
+
+    result.fullyQualifiedName = fullyQualifiedPropName(layer, componentIndex, name, p[0])
+
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
     result = newPropDesc(layer, componentIndex, name, p, mapper)
     if not result.isNil and p.isAnimated:
         gAnimatedProperties.add(result)
+
 
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
     result = addPropDesc(layer, componentIndex, name, p, mapper)
@@ -305,6 +335,10 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
 proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJArray()
 
+    let blendMode = layer.blendMode
+    if blendMode != BlendingMode.NORMAL:
+        result.add(%*{"_c": "VisualModifier", "blendMode": % $blendMode})
+
     var layerHasRenderableComponents = false
     let effects = layer.propertyGroup("Effects")
     if not effects.isNil:
@@ -416,7 +450,8 @@ proc serializeLayer(layer: Layer): JsonNode =
     logi("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
     result["name"] = % layer.mangledName
 
-    let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3())
+    let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+        %(newVector3(v.x, v.y, v.z * -1.0))
     position.setInitialValueToResult(result)
 
     addPropDesc(layer, -1, "tX", layer.property("X Position", float))
@@ -426,9 +461,24 @@ proc serializeLayer(layer: Layer): JsonNode =
         %(v / 100)
     scale.setInitialValueToResult(result)
 
-    let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
-        % quaternionWithZRotation(v)
-    rotation.setInitialValueToResult(result)
+    if layer.threeDLayer:
+        let xprop = layer.property("X Rotation", float)
+        let yprop = layer.property("Y Rotation", float)
+        let zprop = layer.property("Z Rotation", float)
+
+        let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
+            % quaternionWithEulerRotation(newVector3(v[0], v[1], v[2]))
+        if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
+            gAnimatedProperties.add(rotationEuler)
+        rotationEuler.setInitialValueToResult(result)
+    else:
+        let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
+            % quaternionWithZRotation(v)
+        rotation.setInitialValueToResult(result)
+
+    let anchor = addPropDesc(layer, -1, "anchor", layer.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+        %v
+    anchor.setInitialValueToResult(result)
 
     let alpha = addPropDesc(layer, -1, "alpha", layer.property("Opacity", float), 100) do(v: float) -> JsonNode:
         %(v / 100.0)
@@ -448,31 +498,10 @@ proc serializeLayer(layer: Layer): JsonNode =
     if layer.layerIsCompositionRef():
         result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
 
+    if not transitiveEffects: result["affectsChildren"] = %false
+
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
-
-    if layer.requiresAuxParent:
-        logi "Creating aux parent for: ", layer.mangledName
-        var auxNode = newJObject()
-        auxNode["name"] = % layer.auxLayerName
-        let pos = layer.property("Position", Vector3).valueAtTime(0)
-        auxNode["translation"] = % pos
-        if not result{"scale"}.isNil:
-            auxNode["scale"] = result["scale"]
-            result.delete("scale")
-
-        if not result{"rotation"}.isNil:
-            auxNode["rotation"] = result["rotation"]
-            result.delete("rotation")
-
-        result["translation"] = % (- layer.property("Anchor Point", Vector3).valueAtTime(0))
-        auxNode["children"] = % [result]
-
-        let blendMode = layer.blendMode
-        if blendMode != BlendingMode.NORMAL:
-            auxNode["components"] = %*[{"_c": "VisualModifier", "blendMode": % $blendMode}]
-
-        result = auxNode
 
 type Marker = object
     time*, duration*: float
@@ -734,7 +763,7 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not f.isNil:
         result["aep_name"] = % $f.name
 
-proc replacer(n: JsonNode): ref RootObj {.exportc.} =
+proc replacer(n: JsonNode): ref RootObj =
     case n.kind
     of JNull: result = nil
     of JBool:
@@ -765,6 +794,8 @@ proc fastJsonStringify(n: JsonNode): cstring =
     {.emit: "`result` = JSON.stringify(`replacer`(`n`), null, 2);".}
 
 proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
+    logTextField.text = ""
+
     let compositions = getSelectedCompositions()
     gExportFolderPath = $exportFolderPath
     gAnimatedProperties.setLen(0)
@@ -780,7 +811,8 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
         file.openForWriting()
         file.lineFeed = lfUnix
         try:
-            var serializedComp = serializeComposition(c)
+            let serializedComp = serializeComposition(c)
+            serializedComp["version"] = %exportedVersion
             file.write(fastJsonStringify(serializedComp))
         except:
             logi "Exception caught: ", getCurrentExceptionMsg()
@@ -813,14 +845,25 @@ function buildUI(contextObj) {
   var filePath = topGroup.add("statictext");
   filePath.alignment = ["fill", "fill"];
 
-  var isCopyResources = topGroup.add("checkbox", undefined, "Copy resources");
-  isCopyResources.alignment = ["right", "center"];
-  isCopyResources.value = true
-  app.settings.saveSetting("rodExport", "copyResources", "true")
+  var copyResourcesCheckBox = topGroup.add("checkbox", undefined, "Copy resources");
+  copyResourcesCheckBox.alignment = ["right", "center"];
+  copyResourcesCheckBox.value = true;
+  app.settings.saveSetting("rodExport", "copyResources", "true");
 
-  isCopyResources.onClick = function(e) {
-    app.settings.saveSetting("rodExport", "copyResources", isCopyResources.value + "");
-  }
+  copyResourcesCheckBox.onClick = function(e) {
+    app.settings.saveSetting("rodExport", "copyResources", copyResourcesCheckBox.value + "");
+  };
+
+  var transitiveEffectsCheckBox = topGroup.add("checkbox", undefined, "Transitive effects");
+  transitiveEffectsCheckBox.alignment = ["right", "center"];
+  `transitiveEffects`[0] = app.settings.haveSetting("rodExport", "transitiveEffects") &&
+    app.settings.getSetting("rodExport", "transitiveEffects") == "true";
+  transitiveEffectsCheckBox.value = `transitiveEffects`[0];
+
+  transitiveEffectsCheckBox.onClick = function(e) {
+    `transitiveEffects`[0] = affectsChildrenCheckBox.value;
+    app.settings.saveSetting("rodExport", "transitiveEffects", affectsChildrenCheckBox.value + "");
+  };
 
   var exportButton = topGroup.add("button", undefined,
     "Export selected compositions");
@@ -850,7 +893,6 @@ function buildUI(contextObj) {
   };
 
   exportButton.onClick = function(e) {
-    `logTextField`[0].text = "";
     exportSelectedCompositions(filePath.text);
   };
 
