@@ -8,6 +8,8 @@ const hashVersion = 2
 
 const audioFileExtensions = [".wav", ".ogg", "mp3"]
 
+const max_copy_attempts = 5
+
 proc isAudio(path: string): bool {.inline.} =
     for e in audioFileExtensions:
         if path.endsWith(e): return true
@@ -55,7 +57,21 @@ proc copyResourcesFromCache*(cache, cacheHash, dst: string) =
     createDir(tmp)
     copyDir(cache, tmp)
     writeFile(tmp / ".hash", cacheHash)
-    moveFile(tmp, dst)
+
+    var attemptCounter = 0
+    var fileMoved = false
+    while(not fileMoved):
+        try:
+            moveFile(tmp, dst)
+            fileMoved = true
+        except:
+            # On Windows file could be inaccessible some time for some reasons,
+            # So we try few times and raise exeption after that.
+            if attemptCounter < max_copy_attempts:
+                attemptCounter += 1
+                sleep(1000)
+            else:
+                raise newException(Exception, "Couldn't rename $# to $#. Message:\n $#".format(tmp, dst, getCurrentExceptionMsg()))
 
 proc getCache*(cacheOverride: string = nil): string =
     if cacheOverride.len > 0: return expandTilde(cacheOverride)
