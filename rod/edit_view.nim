@@ -387,12 +387,6 @@ proc createCameraSelector(e: Editor) =
                     e.rootNode.sceneView.camera = cam
                     e.cameraController.setCamera(cam.node)
 
-proc createSimulatePhysicButton(e: Editor) =
-    var cPicker: ColorPickerView
-    let b = e.newToolbarButton("Simulate Physic")
-    # b.onAction do():
-    #     e.sceneView.simulatePhysic = not e.sceneView.simulatePhysic
-
 proc createChangeBackgroundColorButton(e: Editor) =
     var cPicker: ColorPickerView
     let b = e.newToolbarButton("Background Color")
@@ -569,7 +563,6 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
-    editor.createSimulatePhysicButton()
     if startFromGame:
         editor.createCloseEditorButton()
 
