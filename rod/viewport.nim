@@ -112,8 +112,8 @@ proc worldToScreenPoint*(v: SceneView, point: Vector3): Vector3 =
     else:
         ndcSpacePos = newVector3(clipSpacePos[0], clipSpacePos[1], clipSpacePos[2])
 
-    result.x = ((ndcSpacePos.x + 1.0) / 2.0) * v.bounds.width
-    result.y = ((1.0 - ndcSpacePos.y) / 2.0) * v.bounds.height
+    result.x = ((ndcSpacePos.x + 1.0) / 2.0) * v.window.bounds.width
+    result.y = ((1.0 - ndcSpacePos.y) / 2.0) * v.window.bounds.height
     result.z = (1.0 + ndcSpacePos.z) * 0.5
 
 proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =

@@ -32,6 +32,14 @@ when not clippingRectWithScissors:
     }
     """, "clipRect")
 
+import rod.tools.debug_draw
+
+proc debugDraw(cl: ClippingRectComponent, rect: Rect) =
+    let gl = currentContext().gl
+    gl.disable(gl.DEPTH_TEST)
+    DDdrawRect(rect, newColor(1.0, 0.2, 0.2, 1.0))
+    gl.disable(gl.DEPTH_TEST)
+
 method draw*(cl: ClippingRectComponent) =
     let tl = cl.clippingRect.minCorner()
     let br = cl.clippingRect.maxCorner()
@@ -42,21 +50,19 @@ method draw*(cl: ClippingRectComponent) =
     let tlvw = sv.worldToScreenPoint(cl.node.localToWorld(tlv))
     let brvw = sv.worldToScreenPoint(cl.node.localToWorld(brv))
 
-    let tlp = sv.convertPointToWindow(newPoint(tlvw.x, tlvw.y))
-    let brp = sv.convertPointToWindow(newPoint(brvw.x, brvw.y))
-
     when clippingRectWithScissors:
         let gl = currentContext().gl
         gl.enable(gl.SCISSOR_TEST)
         let pr = sv.window.pixelRatio
-        var x = GLint(tlp.x * pr)
-        var y = GLint((sv.window.bounds.height - brp.y) * pr)
-        var w = GLsizei((brp.x - tlp.x) * pr)
-        var h = GLSizei((brp.y - tlp.y) * pr)
+        var x = GLint(tlvw.x * pr)
+        var y = GLint((sv.window.bounds.height - brvw.y) * pr)
+        var w = GLsizei((brvw.x - tlvw.x) * pr)
+        var h = GLSizei((brvw.y - tlvw.y) * pr)
         gl.scissor(x, y, w, h)
 
         for c in cl.node.children: c.recursiveDraw()
         gl.disable(gl.SCISSOR_TEST)
+
     else:
         pushPostEffect clippingRectPostEffect:
            setUniform("uTopLeft", tl2)
@@ -66,6 +72,9 @@ method draw*(cl: ClippingRectComponent) =
         for c in cl.node.children: c.recursiveDraw()
 
         popPostEffect()
+
+    if cl.node.sceneView.editing:
+        cl.debugDraw(cl.clippingRect)
 
 method isPosteffectComponent*(c: ClippingRectComponent): bool = true
 
