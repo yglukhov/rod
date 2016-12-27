@@ -14,8 +14,6 @@ import rod.rod_types
 import rod.node
 export UIComponent
 
-import typetraits
-
 type UICompView = ref object of View
     uiComp: UIComponent
 
