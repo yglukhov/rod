@@ -255,7 +255,9 @@ proc getNodeByName(cnode: ColladaNode, name: string): ColladaNode =
     for child in cnode.children:
         return child.getNodeByName(name)
 
-proc loadBones(bone: var Bone, animDuration: var float, cn: ColladaNode, colladaScene: ColladaScene, skinController: ColladaSkinController, boneID: var int) =
+proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node
+proc loadBones(bone: var Bone, animDuration: var float, node: var Node,
+                cn: ColladaNode, colladaScene: ColladaScene, skinController: ColladaSkinController, boneID: var int) =
     bone = newBone()
     bone.name = cn.name
     bone.startMatrix = parseMatrix4(cn.matrix)
@@ -308,10 +310,13 @@ proc loadBones(bone: var Bone, animDuration: var float, cn: ColladaNode, collada
 
     for joint in cn.children:
         if joint.kind != NodeKind.Joint:
+            let newNode = setupFromColladaNode(joint, colladaScene)
+            node.addChild(newNode)
+            bone.atachedNodes.add(newNode)
             continue
 
         var b: Bone
-        b.loadBones(animDuration, joint, colladaScene, skinController, boneID)
+        b.loadBones(animDuration, node, joint, colladaScene, skinController, boneID)
         if not b.isNil:
             bone.children.add(b)
 
@@ -361,7 +366,7 @@ proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: Collada
         var bones: Bone
         var animDuration = 0.0
         var boneID = 0
-        bones.loadBones(animDuration, rootBoneColladaNode, colladaScene, skinController, boneID)
+        bones.loadBones(animDuration, node, rootBoneColladaNode, colladaScene, skinController, boneID)
 
         if not bones.isNil:
             let nodeMesh = node.getComponent(MeshComponent)

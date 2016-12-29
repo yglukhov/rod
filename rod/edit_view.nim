@@ -58,12 +58,10 @@ type EventCatchingListener = ref object of BaseScrollListener
 method acceptsFirstResponder(v: EventCatchingView): bool = true
 
 method onKeyUp(v: EventCatchingView, e : var Event): bool =
-    echo "editor onKeyUp ", e.keyCode
     if not v.keyUpDelegate.isNil:
         result = v.keyUpDelegate(e)
 
 method onKeyDown(v: EventCatchingView, e : var Event): bool =
-    echo "editor onKeyUp ", e.keyCode
     if not v.keyDownDelegate.isNil:
         result = v.keyDownDelegate(e)
 
@@ -185,6 +183,7 @@ when loadingAndSavingAvailable:
             except:
                 error "ERROR:: Resource at path doesn't load ", path
                 error "Exception caught: ", getCurrentExceptionMsg()
+                error "stack trace: ", getCurrentException().getStackTrace()
 
 proc newTreeView(e: Editor): View =
     result = View.new(newRect(0, 0, 200, 500)) #700

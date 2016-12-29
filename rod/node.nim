@@ -189,13 +189,24 @@ proc setComponent*(n: Node, name: string, c: Component) =
         n.components = newSeq[Component]()
     n.components.add(c)
 
+proc insertComponent*(n: Node, c: Component, index: int) =
+    if n.components.isNil:
+        n.components = newSeq[Component]()
+
+    let i = clamp(index, 0, n.components.len)
+    c.componentNodeWasAddedToSceneView()
+    n.components.insert(c, i)
+
+proc removeComponent*(n: Node, c: Component) =
+    let compPos = n.components.find(c)
+    if compPos > -1:
+        c.componentNodeWillBeRemovedFromSceneView()
+        n.components.delete(compPos)
+
 proc removeComponent*(n: Node, name: string) =
     if not n.components.isNil:
         let c = n.getComponent(name)
-        for i, comp in n.components:
-            if comp == c:
-                c.componentNodeWillBeRemovedFromSceneView()
-                n.components.delete(i)
+        n.removeComponent(c)
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
@@ -313,6 +324,7 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
+        # echo "find in node ": n.name
         n.name == name
 
 let nodeLoadRefTable = newTable[string, seq[proc(nodeValue: Node)]]()
@@ -400,6 +412,10 @@ proc insertChild*(n, c: Node, index: int) =
 proc childNamed*(n: Node, name: string): Node =
     for c in n.children:
         if c.name == name: return c
+
+proc setBoneMatrix*(n: Node, mat: Matrix4) =
+    n.isDirty = false
+    mat.multiply(n.transform, n.worldMatrix)
 
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 

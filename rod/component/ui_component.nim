@@ -4,6 +4,8 @@ import nimx.event
 import nimx.view_event_handling
 import nimx.view_event_handling_new
 import nimx.system_logger
+import nimx.property_visitor
+
 import rod.component
 import rod.ray
 import rod.viewport
@@ -111,5 +113,9 @@ method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
         let i = sv.uiComponents.find(ui)
         if i != -1:
             sv.uiComponents.del(i)
+
+method visitProperties*(ui: UIComponent, p: var PropertyVisitor) =
+    p.visitProperty("enabled", ui.enabled)
+    ui.view.visitProperties(p)
 
 registerComponent(UIComponent)
