@@ -4,7 +4,6 @@ import nimx.event
 import nimx.view_event_handling
 import nimx.view_event_handling_new
 import nimx.system_logger
-import nimx.button
 import nimx.property_visitor
 
 import rod.component

@@ -124,6 +124,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         i.propView.addSubview(newComponentButtn)
 
         scrollBar.value = oldPos
+        scrollBar.sendAction()
     else:
         discard
 

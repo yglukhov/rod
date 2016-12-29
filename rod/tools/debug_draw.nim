@@ -22,13 +22,14 @@ uniform vec4 uColor;
 void main() { gl_FragColor = uColor; }
 """
 
+const greenColor = newColor(0.2, 1.0, 0.2, 1.0)
 var debugDrawShader = newShader(vertexShader, fragmentShader,
             @[(0.GLuint, "aPosition")])
 
 let boxIndexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
 var boxIB: BufferRef
 
-proc DDdrawBox*(minPoint, maxPoint: Vector3, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
+proc DDdrawBox*(minPoint, maxPoint: Vector3, color: Color = greenColor) =
     let c = currentContext()
     let gl = c.gl
 
@@ -69,7 +70,7 @@ proc DDdrawBox*(size: Vector3) =
     let maxPoint = size / 2.0
     DDdrawBox(minPoint, maxPoint)
 
-proc DDdrawCircle*(pos: Vector3, radius: float32, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
+proc DDdrawCircle*(pos: Vector3, radius: float32, color: Color = greenColor) =
     const pointsCount = 36
     let c = currentContext()
 
@@ -89,7 +90,7 @@ proc DDdrawCircle*(pos: Vector3, radius: float32, color: Color = newColor(0.2, 1
     debugDrawShader.setTransformUniform()
     gl.drawArrays(gl.LINE_LOOP, 0, pointsCount)
 
-proc DDdrawCircleX*(pos: Vector3, radius: float32, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
+proc DDdrawCircleX*(pos: Vector3, radius: float32, color: Color = greenColor) =
     const pointsCount = 36
     let c = currentContext()
 
@@ -109,7 +110,7 @@ proc DDdrawCircleX*(pos: Vector3, radius: float32, color: Color = newColor(0.2, 
     debugDrawShader.setTransformUniform()
     gl.drawArrays(gl.LINE_LOOP, 0, pointsCount)
 
-proc DDdrawCircleZ*(pos: Vector3, radius: float32, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
+proc DDdrawCircleZ*(pos: Vector3, radius: float32, color: Color = greenColor) =
     const pointsCount = 36
     let c = currentContext()
 
@@ -129,7 +130,7 @@ proc DDdrawCircleZ*(pos: Vector3, radius: float32, color: Color = newColor(0.2, 
     debugDrawShader.setTransformUniform()
     gl.drawArrays(gl.LINE_LOOP, 0, pointsCount)
 
-proc DDdrawLine*(p1, p2: Vector3, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
+proc DDdrawLine*(p1, p2: Vector3, color: Color = greenColor) =
     let c = currentContext()
     c.vertexes[0] = p1.x
     c.vertexes[1] = p1.y
@@ -148,7 +149,7 @@ proc DDdrawLine*(p1, p2: Vector3, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
     debugDrawShader.setTransformUniform()
     gl.drawArrays(gl.LINES, 0, 2)
 
-proc DDdrawArrow*(dist: float32, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
+proc DDdrawArrow*(dist: float32, color: Color = greenColor) =
     DDdrawLine( newVector3(0.0), newVector3(0.0, dist, 0.0), color )
 
     DDdrawLine( newVector3(0.0, dist, 0.0), newVector3(dist / 8.0, dist * 3.0 / 4.0, dist / 8.0), color )
@@ -156,7 +157,7 @@ proc DDdrawArrow*(dist: float32, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
     DDdrawLine( newVector3(0.0, dist, 0.0), newVector3(-dist / 8.0, dist * 3.0 / 4.0, -dist / 8.0), color )
     DDdrawLine( newVector3(0.0, dist, 0.0), newVector3(dist / 8.0, dist * 3.0 / 4.0, -dist / 8.0), color )
 
-proc DDdrawRect*(rect: Rect, color: Color = newColor(0.2, 1.0, 0.2, 1.0)) =
+proc DDdrawRect*(rect: Rect, color: Color = greenColor) =
     DDdrawLine( newVector3(rect.x, rect.y, 0.0), newVector3(rect.x + rect.width, rect.y, 0.0), color )
     DDdrawLine( newVector3(rect.x, rect.y, 0.0), newVector3(rect.x, rect.y + rect.height, 0.0), color )
     DDdrawLine( newVector3(rect.x + rect.width, rect.y, 0.0), newVector3(rect.x + rect.width, rect.y + rect.height, 0.0), color )

@@ -189,28 +189,16 @@ proc setComponent*(n: Node, name: string, c: Component) =
         n.components = newSeq[Component]()
     n.components.add(c)
 
-proc componentPosition*(n: Node, c: Component): int =
-    if not n.components.isNil:
-        for i, comp in n.components:
-            if comp == c:
-                return i
-
-    return -1
-
 proc insertComponent*(n: Node, c: Component, index: int) =
     if n.components.isNil:
         n.components = newSeq[Component]()
 
-    var i = index
-    if index < 0:
-        i = 0
-    if index > n.components.len():
-        i = n.components.len()
-
+    let i = clamp(index, 0, n.components.len)
+    c.componentNodeWasAddedToSceneView()
     n.components.insert(c, i)
 
 proc removeComponent*(n: Node, c: Component) =
-    let compPos = n.componentPosition(c)
+    let compPos = n.components.find(c)
     if compPos > -1:
         c.componentNodeWillBeRemovedFromSceneView()
         n.components.delete(compPos)
@@ -426,19 +414,15 @@ proc childNamed*(n: Node, name: string): Node =
         if c.name == name: return c
 
 proc setBoneMatrix*(n: Node, mat: Matrix4) =
-    n.setDirty()
-    n.isBoneTransform = true
-    n.boneMatrix = mat
+    n.isDirty = false
+    mat.multiply(n.transform, n.worldMatrix)
 
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 
 proc worldTransform*(n: Node): Matrix4 =
     if n.isDirty:
         n.isDirty = false
-        if n.isBoneTransform:
-            let w = n.boneMatrix
-            w.multiply(n.transform, n.worldMatrix)
-        elif n.parent.isNil:
+        if n.parent.isNil:
             n.worldMatrix = n.transform
         else:
             let w = n.parent.worldTransform

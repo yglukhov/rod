@@ -153,7 +153,6 @@ proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Pro
     if not result.isNil and p.isAnimated:
         gAnimatedProperties.add(result)
 
-
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
     result = addPropDesc(layer, componentIndex, name, p, mapper)
     let vat = result.valueAtTime
