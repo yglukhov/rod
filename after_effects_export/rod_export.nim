@@ -801,8 +801,12 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     for c in compositions:
         gCompExportPath = c.exportPath
         let fullExportPath = gExportFolderPath & "/" & gCompExportPath
-        if not newFolder(fullExportPath).create():
-            logi "ERROR: Could not create folder ", fullExportPath
+
+        try:
+            if not newFolder(fullExportPath).create():
+                logi "ERROR: Could not create folder ", fullExportPath
+        except:
+            discard
         let filePath = fullExportPath & "/" & $c.name & ".json"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
