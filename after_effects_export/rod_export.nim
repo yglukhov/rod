@@ -762,7 +762,7 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not f.isNil:
         result["aep_name"] = % $f.name
 
-proc replacer(n: JsonNode): ref RootObj =
+proc replacer(n: JsonNode): ref RootObj {.exportc.} =
     case n.kind
     of JNull: result = nil
     of JBool:
