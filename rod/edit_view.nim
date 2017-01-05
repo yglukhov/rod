@@ -289,6 +289,13 @@ proc newTreeView(e: Editor): View =
         e.sceneTreeDidChange()
     result.addSubview(refreshButton)
 
+proc selectNode*(editor: Editor, node: Node) =
+    var indexPath = newSeq[int]()
+    editor.getTreeViewIndexPathForNode(node, indexPath)
+
+    if indexPath.len > 1:
+        editor.outlineView.selectItemAtIndexPath(indexPath)
+
 #import tables
 proc onTouchDown*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
@@ -318,11 +325,7 @@ proc onTouchDown*(editor: Editor, e: var Event) =
             return
 
         # make node select
-        var indexPath = newSeq[int]()
-        editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
-
-        if indexPath.len > 1:
-            editor.outlineView.selectItemAtIndexPath(indexPath)
+        editor.selectNode(castResult[0].node)
 
 
 proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
