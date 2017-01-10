@@ -327,6 +327,15 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
         let startColor = addPropDesc(layer, compIndex, "color", p.property("Color", Vector4))
         startColor.setInitialValueToResult(result)
         result["_c"] = %"ColorFill"
+
+    of "ADBE Tint": # Tint
+        result = newJObject()
+        let blackColor = addPropDesc(layer, compIndex, "black", p.property("Map Black To", Vector4))
+        blackColor.setInitialValueToResult(result)
+        let whiteColor = addPropDesc(layer, compIndex, "white", p.property("Map White To", Vector4))
+        whiteColor.setInitialValueToResult(result)
+        result["_c"] = %"Tint"
+
     else:
         logi "WARNING: Effect not supported. Layer: ", layer.name
         dumpPropertyTree(p)
