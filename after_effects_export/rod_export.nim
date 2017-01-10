@@ -492,7 +492,7 @@ proc serializeLayer(layer: Layer): JsonNode =
 
         if chres.len > 0:
             chres.elems.reverse()
-        result["children"] = chres
+            result["children"] = chres
 
     if layer.layerIsCompositionRef():
         result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
@@ -762,7 +762,7 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not f.isNil:
         result["aep_name"] = % $f.name
 
-proc replacer(n: JsonNode): ref RootObj {.exportc.} =
+proc replacer(n: JsonNode): ref RootObj =
     case n.kind
     of JNull: result = nil
     of JBool:
@@ -790,7 +790,8 @@ proc replacer(n: JsonNode): ref RootObj {.exportc.} =
             {.emit: "`result`[`ck`] = `val`;".}
 
 proc fastJsonStringify(n: JsonNode): cstring =
-    {.emit: "`result` = JSON.stringify(`replacer`(`n`), null, 2);".}
+    let r = replacer(n)
+    {.emit: "`result` = JSON.stringify(`r`, null, 2);".}
 
 proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     logTextField.text = ""
