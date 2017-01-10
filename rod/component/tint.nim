@@ -30,9 +30,10 @@ method deserialize*(c: Tint, j: JsonNode, s: Serializer) =
     v = j["white"]
     c.white = newColor(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
 
-method draw*(c: Tint) =
+method beforeDraw*(c: Tint, index: int): bool =
     pushPostEffect(effect, c.black, c.white)
-    for c in c.node.children: c.recursiveDraw()
+
+method afterDraw*(c: Tint, index: int) =
     popPostEffect()
 
 method isPosteffectComponent*(c: Tint): bool = true
