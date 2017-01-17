@@ -21,7 +21,7 @@ template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.get
 template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
 template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
 template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
-# template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum(1))
+template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum(1))
 template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
 
 proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) =
@@ -90,6 +90,7 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): t
     of clause(Vector2): action(Vector2)
     of clause(Vector3): action(Vector3)
     of clause(Vector4): action(Vector4)
+    of clause(Color): action(Color)
     of clause(int): action(int)
     else:
         raise newException(Exception, "Unknown type id")

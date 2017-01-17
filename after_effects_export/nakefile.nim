@@ -9,6 +9,7 @@ proc aeScriptsFolder(): string =
     else:
         const searchPaths = [
             "/Applications/Adobe After Effects CC 2015/Scripts",
+            "/Applications/Adobe After Effects CC 2015.3/Scripts",
             "/Applications/Adobe After Effects CC 2017/Scripts"
         ]
     for p in searchPaths:
