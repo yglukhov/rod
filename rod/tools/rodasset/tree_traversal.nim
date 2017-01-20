@@ -22,15 +22,31 @@ iterator componentNodes*(n: JsonNode): tuple[typ: string, node: JsonNode] =
         for c in comps:
             yield c
 
+iterator componentNodesOfType*(n: JsonNode, typ: string): JsonNode =
+    for c in n.componentNodes:
+        if c.typ == typ: yield c.node
+
 iterator allComponentNodesOfType*(n: JsonNode, typ: string): (JsonNode, JsonNode) =
-    var comps = newSeq[JsonNode]()
     for n in n.allNodes:
-        for c in n.componentNodes:
-            if c.typ == typ:
-                yield(n, c.node)
+        for c in n.componentNodesOfType(typ):
+            yield(n, c)
 
 iterator allSpriteNodes*(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
 
 iterator allMeshComponentNodes*(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "MeshComponent"): yield(n, c)
+
+iterator compositionAnimationsForNodeProperty*(compositionNode: JsonNode, nodeName, propertyName: string): (string, JsonNode) =
+    let animName = nodeName & "." & propertyName
+    for k, v in compositionNode["animations"]:
+        let a = v{animName}
+        if not a.isNil:
+            yield(k, a)
+
+proc findNode*(n: JsonNode, name: string): JsonNode =
+    for c in n.allNodes:
+        if c{"name"}.getStr() == name: return c
+
+proc firstComponentOfType*(n: JsonNode, typ: string): JsonNode =
+    for c in n.componentNodesOfType(typ): return c
