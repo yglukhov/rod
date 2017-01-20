@@ -24,7 +24,7 @@ method numberOfDimensions*[T](c: AnimationCurve[T]): int =
         2
     elif T is Vector3:
         3
-    elif T is Vector4:
+    elif T is Vector4 | Color:
         4
     else:
         {.error: "Unknown type".}
@@ -51,11 +51,27 @@ method setKeyOutTangent*[T](c: AnimationCurve[T], i: int, p: Point) =
     c.sampler.keys[i].outX = p.x
     c.sampler.keys[i].outY = p.y
 
+proc `[]`(c: Color, i: int): Coord =
+    case i
+    of 0: c.r
+    of 1: c.g
+    of 2: c.b
+    of 3: c.a
+    else: 0
+
+proc `[]=`(c: var Color, i: int, v: Coord) =
+    case i
+    of 0: c.r = v
+    of 1: c.g = v
+    of 2: c.b = v
+    of 3: c.a = v
+    else: discard
+
 method keyValue*(c: AbstractAnimationCurve, iKey, iDimension: int): Coord {.base.} = 0
 method keyValue*[T](c: AnimationCurve[T], iKey, iDimension: int): Coord =
     when T is Coord | int:
         Coord(c.sampler.keys[iKey].v)
-    elif T is Vector2 | Vector3 | Vector4:
+    elif T is Vector2 | Vector3 | Vector4 | Color:
         Coord(c.sampler.keys[iKey].v[iDimension])
     else:
         {.error: "Unknown type".}
@@ -64,7 +80,7 @@ method setKeyValue*(c: AbstractAnimationCurve, iKey, iDimension: int, v: Coord) 
 method setKeyValue*[T](c: AnimationCurve[T], iKey, iDimension: int, v: Coord) =
     when T is Coord | int:
         c.sampler.keys[iKey].v = T(v)
-    elif T is Vector2 | Vector3 | Vector4:
+    elif T is Vector2 | Vector3 | Vector4 | Color:
         c.sampler.keys[iKey].v[iDimension] = v
     else:
         {.error: "Unknown type".}

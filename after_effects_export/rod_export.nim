@@ -334,6 +334,9 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
         blackColor.setInitialValueToResult(result)
         let whiteColor = addPropDesc(layer, compIndex, "white", p.property("Map White To", Vector4))
         whiteColor.setInitialValueToResult(result)
+        let amount = addPropDesc(layer, compIndex, "amount", p.property("Amount to Tint", float)) do(v: float) -> JsonNode:
+            %(v / 100)
+        amount.setInitialValueToResult(result)
         result["_c"] = %"Tint"
 
     else:

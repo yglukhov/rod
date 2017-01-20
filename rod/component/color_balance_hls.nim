@@ -15,6 +15,7 @@ type ColorBalanceHLS* = ref object of Component
     hue*: float32
     saturation*: float32
     lightness*: float32
+    enabled: bool
 
 var effect = newPostEffect("""
 vec3 cbhls_effect_rgb2hsv(vec3 c) {
@@ -51,13 +52,14 @@ method deserialize*(c: ColorBalanceHLS, j: JsonNode, s: Serializer) =
     c.saturation = j["saturation"].getFNum()
     c.lightness = j["lightness"].getFNum()
 
-method draw*(c: ColorBalanceHLS) =
-    if not c.areValuesNormal():
+method beforeDraw*(c: ColorBalanceHLS, index: int): bool =
+    c.enabled = not c.areValuesNormal()
+    if c.enabled:
         pushPostEffect(effect, c.hue, c.saturation, c.lightness)
-        for c in c.node.children: c.recursiveDraw()
-        popPostEffect()
 
-method isPosteffectComponent*(c: ColorBalanceHLS): bool = not c.areValuesNormal()
+method afterDraw*(c: ColorBalanceHLS, index: int) =
+    if c.enabled:
+        popPostEffect()
 
 method visitProperties*(c: ColorBalanceHLS, p: var PropertyVisitor) =
     p.visitProperty("hue", c.hue)
