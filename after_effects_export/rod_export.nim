@@ -330,9 +330,13 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
 
     of "ADBE Tint": # Tint
         result = newJObject()
-        let blackColor = addPropDesc(layer, compIndex, "black", p.property("Map Black To", Vector4))
+        let blackColor = addPropDesc(layer, compIndex, "black", p.property("Map Black To", Vector4))do(v: Vector4) -> JsonNode:
+            %[v[0], v[1], v[2], 1.0]
         blackColor.setInitialValueToResult(result)
-        let whiteColor = addPropDesc(layer, compIndex, "white", p.property("Map White To", Vector4))
+
+        let whiteColor = addPropDesc(layer, compIndex, "white", p.property("Map White To", Vector4))do(v: Vector4) -> JsonNode:
+            %[v[0], v[1], v[2], 1.0]
+
         whiteColor.setInitialValueToResult(result)
         let amount = addPropDesc(layer, compIndex, "amount", p.property("Amount to Tint", float)) do(v: float) -> JsonNode:
             %(v / 100)
