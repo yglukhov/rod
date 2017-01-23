@@ -1,11 +1,18 @@
 # rod [![Build Status](https://travis-ci.org/yglukhov/rod.svg?branch=master)](https://travis-ci.org/yglukhov/rod)
 
-rod is a cross-platform 2d and 3d game engine.
+Rod is a cross-platform 2d and 3d game engine for Nim.
 
-Instalation:
+Installation:
+```
     $ git clone https://github.com/yglukhov/rod
     $ cd rod
     $ nimble install -y
+```
+
+Update all dependencies:
+```
+    $ nimble install -y -d
+```
 
 Supported platforms:
     * iOS
