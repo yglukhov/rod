@@ -167,8 +167,6 @@ method generate*(pgs: SpherePSGenShape): ParticleGenerationData =
         result.generateRandDir(pgs.is2D)
 
 proc debugDraw*(pgs: SpherePSGenShape) =
-    if pgs.node.sceneView.editing:
-        pgs.debugDraw()
     let gl = currentContext().gl
     gl.disable(gl.DEPTH_TEST)
     DDdrawCircle(newVector3(0.0), pgs.radius)
@@ -307,7 +305,7 @@ method updateParticle*(attr: PSModifierSpiral, part: Particle) =
     distance_vec.y = 0.0
     let distance = distance_vec.length()
     distance_vec.normalize()
-    let force = distance_vec * (attr.force / 60.0) / (distance * distance)
+    let force = distance_vec * (attr.force * getDeltaTime()) / (distance * distance)
     part.velocity -= force
 
 
@@ -349,11 +347,11 @@ method visitProperties*(attr: PSModifierRandWind, p: var PropertyVisitor) =
     p.visitProperty("force", attr.force)
 
 
-registerComponent[ConePSGenShape]()
-registerComponent[SpherePSGenShape]()
-registerComponent[BoxPSGenShape]()
+registerComponent(ConePSGenShape, "ParticleSystem")
+registerComponent(SpherePSGenShape, "ParticleSystem")
+registerComponent(BoxPSGenShape, "ParticleSystem")
 
-registerComponent[PSModifierWave]()
-registerComponent[PSModifierColor]()
-registerComponent[PSModifierSpiral]()
-registerComponent[PSModifierRandWind]()
+registerComponent(PSModifierWave, "ParticleSystem")
+registerComponent(PSModifierColor, "ParticleSystem")
+registerComponent(PSModifierSpiral, "ParticleSystem")
+registerComponent(PSModifierRandWind, "ParticleSystem")

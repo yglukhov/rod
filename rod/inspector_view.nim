@@ -6,7 +6,10 @@ import nimx.button
 import nimx.menu
 import nimx.scroll_view
 import nimx.linear_layout
+import nimx.slider
 import nimx.property_visitor
+import nimx.expanding_view
+import nimx.stack_view
 
 import variant
 
@@ -20,32 +23,53 @@ import rod.property_editors.propedit_registry
 import rod.property_editors.standard_editors
 
 
+const componentsViewSize = newSize(200, 300)
+
 type InspectorView* = ref object of View
+    propView: LinearLayout
+    scView: ScrollView
+    currNode: Node
 
 method init*(i: InspectorView, r: Rect) =
     procCall i.View.init(r)
     i.resizingMask = "wh"
 
-proc newSectionTitle(inspector: InspectorView, n: Node3D, name: string): View
-proc createNewComponentButton(inspector: InspectorView, n: Node3D): View
+    i.propView = newVerticalLayout(newRect(0, 0, i.bounds.width, 20))
+    i.propView.resizingMask = "wb"
+    i.propView.topMargin = 5
+    i.propView.bottomMargin = 5
+    i.propView.leftMargin = 5
+    i.propView.rightMargin = 5
+
+    i.scView = newScrollView(i.propView)
+    i.scView.horizontalScrollBar = nil
+    i.scView.resizingMask = "wh"
+    i.scView.setFrame(i.bounds)
+    i.addSubview(i.scView)
+
+proc createComponentsView(inspector: InspectorView, n: Node)
 
 proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
     # TODO: This is a hacky hardcode! Here we assume that inspector can have either
     # 2 subviews (no node edited) or 3 subviews, first of which is the scrollview
     # with property editors. We want to remove the scrollview.
-    if i.subviews.len > 0:
-        i.subviews[0].removeFromSuperview()
+    # if i.propView.subviews.len > 0:
+    #     i.propView.subviews[0].removeFromSuperview()
+
+    let scrollBar = i.scView.verticalScrollBar()
+    let oldPos = scrollBar.value()
+
+    while i.propView.subviews.len() > 0:
+        i.propView.subviews[0].removeFromSuperview()
 
     if not n.isNil:
-        let propView = newVerticalLayout(newRect(0, 0, i.bounds.width, 20))
-        propView.resizingMask = "wb"
-        propView.topMargin = 5
-        propView.bottomMargin = 5
-        propView.leftMargin = 5
-        propView.rightMargin = 5
-
+        i.currNode = n
         proc changeInspectorView() =
             i.inspectedNode = n
+
+        var expView= newExpandingView(newRect(0, 0, 328, 20.0))
+        expView.title = "Node"
+        expView.expand()
 
         var visitor : PropertyVisitor
         visitor.requireName = true
@@ -53,57 +77,89 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            propView.addSubview(propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView))
+            expView.addContent(propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView))
 
         n.visitProperties(visitor)
+        i.propView.addSubview(expView)
 
         if not n.components.isNil:
-            for k, v in n.components:
-                propView.addSubview(newSectionTitle(i, n, k))
+            for v in n.components:
+                closureScope:
+                    expView = newExpandingView(newRect(0, 0, 328, 20.0))
+                    expView.title = v.className
+                    let class_name = v.className
+                    let component = v
+                    expView.expand()
+
+                    let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
+                    removeButton.autoresizingMask = {afFlexibleMinX}
+                    removeButton.onAction do():
+                        n.removeComponent(component)
+                        i.inspectedNode = n
+
+                    # let downCompButton = newButton(expView, newPoint(328 - 45, 0), newSize(18.0, 18), "↓")
+                    # downCompButton.autoresizingMask = {afFlexibleMinX}
+                    # downCompButton.onAction do():
+                    #     let compPos = n.componentPosition(component)
+                    #     n.components.delete(compPos)
+                    #     n.insertComponent(component, compPos + 1)
+                    #     i.inspectedNode = n
+
+                    # let upCompButton = newButton(expView, newPoint(328 - 65, 0), newSize(18.0, 18), "↑")
+                    # upCompButton.autoresizingMask = {afFlexibleMinX}
+                    # upCompButton.onAction do():
+                    #     let compPos = n.componentPosition(component)
+                    #     n.insertComponent(component, compPos - 1)
+                    #     n.components.delete(compPos + 1)
+                    #     i.inspectedNode = n
+
                 v.visitProperties(visitor)
+                i.propView.addSubview(expView)
 
-        propView.addSubview(createNewComponentButton(i, n))
+        let newComponentButtn = Button.new(newRect(0, 30, 0, 20))
+        newComponentButtn.title = "New component"
+        newComponentButtn.onAction do():
+            createComponentsView(i, n)
 
-        let scView = newScrollView(propView)
-        scView.horizontalScrollBar = nil
-        scView.resizingMask = "wh"
-        scView.setFrame(i.bounds)
-        i.addSubview(scView)
+        i.propView.addSubview(newComponentButtn)
+
+        scrollBar.value = oldPos
+        scrollBar.sendAction()
     else:
         discard
 
-proc newSectionTitle(inspector: InspectorView, n: Node3D, name: string): View =
-    result = View.new(newRect(0, 0, 324, 18))
-    let v = newLabel(newRect(100, 0, 100, 15))
-    v.text = name
-    v.textColor = newColor(1.0, 1.0, 0.5)
-    result.addSubview(v)
 
-    let removeButton = newButton(newRect(result.bounds.width - 18, 0, 18, 18))
-    removeButton.autoresizingMask = {afFlexibleMinX, afFlexibleMinY}
-    removeButton.title = "-"
-    removeButton.onAction do():
-        n.removeComponent(name)
-        inspector.inspectedNode = n
-    result.addSubview(removeButton)
-
-proc createNewComponentButton(inspector: InspectorView, n: Node3D): View =
-    let b = Button.new(newRect(0, 30, 0, 20))
-    b.title = "New component"
-    b.onAction do():
-        var menu : Menu
-        menu.new()
-        var items = newSeq[MenuItem]()
-        var components = registeredComponents()
+proc createComponentButtons(inspector: InspectorView, components_list: seq[string]): StackView =
+        var menu = newStackView(newRect(0, 0, componentsViewSize.width, 100))
+        var components = components_list
         sort(components, system.cmp)
         for i, c in components:
             closureScope:
-                let menuItem = newMenuItem(c)
-                menuItem.action = proc() =
-                    discard n.component(menuItem.title)
-                    inspector.inspectedNode = n
-                items.add(menuItem)
+                let compName = c
+                let createButton = newButton(menu, newPoint(0, 0), newSize(componentsViewSize.width - 20.0, 16), compName)
+                createButton.onAction do():
+                    discard inspector.currNode.addComponent(compName)
+                    inspector.inspectedNode = inspector.currNode
 
-        menu.items = items
-        menu.popupAtPoint(inspector, newPoint(0, 27))
-    result = b
+        result = menu
+
+proc createComponentsView(inspector: InspectorView, n: Node) =
+    let stackView = newStackView(newRect(0, 0, componentsViewSize.width, 400))
+    var isFirst = true
+    for key, value in componentGroupsTable:
+        let expView = newExpandingView(newRect(0, 0, componentsViewSize.width, 20.0), true)
+        expView.title = key
+        stackView.addSubview(expView)
+        expView.addContent(inspector.createComponentButtons(value))
+
+        if isFirst:
+            isFirst = false
+            let createButton = newButton(expView, newPoint(componentsViewSize.width - 20, 0), newSize(16.0, 16), "X")
+            createButton.onAction do():
+                stackView.removeFromSuperview()
+
+    var origin = inspector.convertPointToWindow(newPoint(-205, 0))
+    stackView.setFrameOrigin(origin)
+    inspector.window.addSubview(stackView)
+
+

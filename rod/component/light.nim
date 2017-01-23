@@ -77,7 +77,8 @@ method componentNodeWillBeRemovedFromSceneView(ls: LightSource) =
     ls.node.sceneView.removeLightSource(ls)
 
 method getBBox*(ls: LightSource): BBox =
-    result = newBBox(newVector3(-3, -3, -3), newVector3(3, 3, 3))
+    result.minPoint = newVector3(-3, -3, -3)
+    result.maxPoint = newVector3(3, 3, 3)
 
 method deserialize*(ls: LightSource, j: JsonNode, s: Serializer) =
     var v = j{"ambient"}
@@ -144,4 +145,4 @@ method visitProperties*(ls: LightSource, p: var PropertyVisitor) =
 
     p.visitProperty("color", ls.lightColor)
 
-registerComponent[LightSource]()
+registerComponent(LightSource)

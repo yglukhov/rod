@@ -83,13 +83,16 @@ uniform vec4 uColor;
 uniform float uLength;
 uniform float uCropOffset;
 uniform float uAlpha;
+uniform float uAlphaCut;
 
 void main() {
     vec2 uv = vec2(vTexCoord.x-uCropOffset , vTexCoord.y);
     if (uv.x < 0.0) {
         discard;
     }
-    gl_FragColor = uColor * uAlpha;
+    vec4 color = uColor * uAlpha;
+    gl_FragColor.rgb = color.rgb;
+    gl_FragColor.a = color.a * (uv.x/(1.0+uAlphaCut));
 }
 """
 const fragmentShaderTexture = """
@@ -109,6 +112,7 @@ uniform vec4 uColor;
 uniform float uLength;
 uniform float uCropOffset;
 uniform float uAlpha;
+uniform float uAlphaCut;
 
 void main() {
     vec2 uv = vec2(vTexCoord.x-uCropOffset , vTexCoord.y);
@@ -123,7 +127,42 @@ void main() {
     if (col.a < 0.01) {
         discard;
     }
+
     gl_FragColor = col * uColor * uAlpha;
+}
+"""
+
+const fragmentShaderTextureTiled = """
+#ifdef GL_ES
+#extension GL_OES_standard_derivatives : enable
+precision mediump float;
+#endif
+
+varying vec3 vPosition;
+varying vec2 vTexCoord;
+
+uniform sampler2D texUnit;
+uniform vec4 uTexUnitCoords;
+uniform float uImagePercent;
+
+uniform vec4 uColor;
+uniform float uLength;
+uniform float uCropOffset;
+uniform float uAlpha;
+uniform float uAlphaCut;
+uniform float uTiles;
+
+void main() {
+    vec2 uv = vec2(vTexCoord.x-uCropOffset , vTexCoord.y);
+    if (uv.x < 0.0) {
+        discard;
+    }
+
+    uv.x = fract(uv.x / uTiles);
+
+    uv = uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * uv;
+
+    gl_FragColor = texture2D(texUnit, uv, -1000.0) * uImagePercent * uColor * uAlpha;
 }
 """
 
@@ -145,6 +184,7 @@ uniform vec4 uColor;
 uniform float uLength;
 uniform float uCropOffset;
 uniform float uAlpha;
+uniform float uAlphaCut;
 
 void main() {
     vec2 uv = vec2(vTexCoord.x-uCropOffset , vTexCoord.y);
@@ -159,7 +199,10 @@ void main() {
     vec2 matcapUV = matcapReflected.xy / mtcp + 0.5;
     matcapUV = vec2(matcapUV.x, 1.0 - matcapUV.y);
     vec4 matcap = texture2D(matcapUnit, uMatcapUnitCoords.xy + (uMatcapUnitCoords.zw - uMatcapUnitCoords.xy) * matcapUV) * uMatcapPercent;
-    gl_FragColor = matcap * uColor * uAlpha;
+
+    vec4 color = matcap * uColor * uAlpha;
+    gl_FragColor.rgb = color.rgb;
+    gl_FragColor.a = color.a * (uv.x/(1.0+uAlphaCut));
 }
 """
 
@@ -214,6 +257,7 @@ var TrailShader: ProgramRef
 var TrailTextureShader: ProgramRef
 var TrailMatcapShader: ProgramRef
 var TrailMatcapShaderMask: ProgramRef
+var TrailTextureShaderTiled: ProgramRef
 
 const initialIndicesCount = 500
 const initialVerticesCount = 5 * initialIndicesCount
@@ -286,10 +330,17 @@ type
 
         bDepth*: bool
         bStretch*: bool
+        bCollapsible*: bool
         isWireframe: bool
 
         uniformLocationCache*: seq[UniformLocation]
         iUniform: int
+
+        cutSpeed*: float32
+        alphaCut: float32
+
+        bIsTiled: bool
+        tiles: float32
 
 template getUniformLocation(gl: GL, t: Trail, name: cstring): UniformLocation =
     inc t.iUniform
@@ -386,7 +437,10 @@ proc newTrail(): Trail =
 
 template checkShader(t: Trail) =
     if not t.image.isNil:
-        t.shader = TrailTextureShader
+        if t.bIsTiled:
+            t.shader = TrailTextureShaderTiled
+        else:
+            t.shader = TrailTextureShader
     else:
         t.shader = TrailShader
     if not t.matcap.isNil:
@@ -467,9 +521,6 @@ proc reset*(t: Trail) =
     t.directRotation = newQuaternion(0,0,0,1)
     t.gravityDirection = newVector3(0,0,0)
 
-    t.imagePercent = 1.0
-    t.matcapPercent = 1.0
-
     t.currPos = t.node.worldPos() - t.gravityDirection
     t.prevPos = t.currPos
     t.prevRotation = t.node.rotation
@@ -536,6 +587,8 @@ method init*(t: Trail) =
 
     t.widthOffset = 100.0
     t.heightOffset = 10.0
+    t.imagePercent = 1.0
+    t.matcapPercent = 1.0
 
     t.angleThreshold = 0.01
     t.quadsToDraw = 150
@@ -588,6 +641,7 @@ proc emitQuad(t: Trail) =
     let gl = c.gl
 
     t.currLength = distance(t.currPos, t.prevPos)
+
     t.totalLen += t.currLength
     if t.currLength > t.widthOffset:
         t.reset()
@@ -643,9 +697,10 @@ method draw*(t: Trail) =
     if TrailShader == invalidProgram:
         TrailShader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
         TrailTextureShader = gl.newShaderProgram(vertexShader, fragmentShaderTexture, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
+        TrailTextureShaderTiled = gl.newShaderProgram(vertexShader, fragmentShaderTextureTiled, [(aPosition.GLuint, $aPosition), (aTexCoord.GLuint, $aTexCoord)])
         TrailMatcapShader = gl.newShaderProgram(vertexShaderWithNormal, fragmentShaderMatcap, [(aPosition.GLuint, $aPosition), (aNormal.GLuint, $aNormal), (aTexCoord.GLuint, $aTexCoord)])
         TrailMatcapShaderMask = gl.newShaderProgram(vertexShaderWithNormal, fragmentShaderMatcapMask, [(aPosition.GLuint, $aPosition), (aNormal.GLuint, $aNormal), (aTexCoord.GLuint, $aTexCoord)])
-        if TrailShader == invalidProgram or TrailTextureShader == invalidProgram or TrailMatcapShader == invalidProgram or TrailMatcapShaderMask == invalidProgram:
+        if TrailShader == invalidProgram or TrailTextureShader == invalidProgram or TrailMatcapShader == invalidProgram or TrailMatcapShaderMask == invalidProgram or TrailTextureShaderTiled == invalidProgram:
             return
         t.checkShader()
 
@@ -705,6 +760,9 @@ method draw*(t: Trail) =
         gl.uniform1i(gl.getUniformLocation(t, "matcapUnit"), 1.GLint)
         gl.uniform1f(gl.getUniformLocation(t, "uMatcapPercent"), t.matcapPercent)
 
+    if t.bIsTiled:
+        gl.uniform1f(gl.getUniformLocation(t, "uTiles"), t.tiles)
+
 
     var modelMatrix = t.directRotation.toMatrix4
     modelMatrix[12] = t.gravityDirection[0]
@@ -758,10 +816,22 @@ method draw*(t: Trail) =
 
     template updateLastVertex(currBuff: DataInBuffer) =
         t.currLength = distance(t.currPos, t.prevPos)
+
         t.totalLen += t.currLength
 
         if t.totalLen > t.widthOffset and not t.bStretch:
             t.cropOffset += t.currLength
+
+        # if t.bCollapsible and t.cropOffset < t.widthOffset:
+        #     t.cropOffset += t.currLength
+
+        # if t.bCollapsible and t.currLength == 0:
+        if t.bCollapsible:
+            if t.cutSpeed > 0:
+                t.cropOffset += t.cutSpeed * getDeltaTime()
+
+        # if t.currLength > t.widthOffset:
+        #     t.reset()
 
         t.getVertexData(t.prevVertexData)
 
@@ -774,6 +844,7 @@ method draw*(t: Trail) =
     template setupUniforms() =
         gl.uniform1f(gl.getUniformLocation(t, "uCropOffset"), t.cropOffset)
         gl.uniform1f(gl.getUniformLocation(t, "uLength"), t.totalLen)
+        gl.uniform1f(gl.getUniformLocation(t, "uAlphaCut"), t.alphaCut)
 
     template singleBufferDraw(currBuff: DataInBuffer) =
         gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
@@ -789,7 +860,10 @@ method draw*(t: Trail) =
             gl.drawElements(gl.TRIANGLE_STRIP, drawVertices.GLsizei, gl.UNSIGNED_SHORT, (offset*sizeof(GLushort)).int )
 
     template multiplyBuffersDraw(currBuff, nextBuff: DataInBuffer) =
-        var indicesCount =  t.buffers[currBuff.int].indices.curr - t.buffers[nextBuff.int].indices.curr
+        var indicesCount = t.buffers[currBuff.int].indices.curr
+
+        if (t.buffers[currBuff.int].indices.curr + t.buffers[nextBuff.int].indices.curr) > drawVertices:
+            indicesCount -= t.buffers[nextBuff.int].indices.curr
 
         if indicesCount <= 0:
             t.buffers[currBuff.int].bValidData = false
@@ -840,9 +914,12 @@ method deserialize*(t: Trail, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "angleThreshold", t.angleThreshold)
     s.deserializeValue(j, "bDepth", t.bDepth)
     s.deserializeValue(j, "bStretch", t.bStretch)
+    s.deserializeValue(j, "bCollapsible", t.bCollapsible)
     s.deserializeValue(j, "isWireframe", t.isWireframe)
     s.deserializeValue(j, "imagePercent", t.imagePercent)
     s.deserializeValue(j, "matcapPercent", t.matcapPercent)
+    s.deserializeValue(j, "bIsTiled", t.bIsTiled)
+    s.deserializeValue(j, "tiles", t.tiles)
 
     proc getTexture(name: string): Image =
         let jNode = j{name}
@@ -864,14 +941,34 @@ method serialize*(t: Trail, s: Serializer): JsonNode =
     result.add("angleThreshold", s.getValue(t.angleThreshold))
     result.add("bDepth", s.getValue(t.bDepth))
     result.add("bStretch", s.getValue(t.bStretch))
+    result.add("bCollapsible", s.getValue(t.bCollapsible))
     result.add("isWireframe", s.getValue(t.isWireframe))
-    result.add("imagePercent", s.getValue(t.imagePercent))
-    result.add("matcapPercent", s.getValue(t.matcapPercent))
-
+    result.add("bIsTiled", s.getValue(t.bIsTiled))
+    result.add("tiles", s.getValue(t.tiles))
+    if not t.image.isNil:
+        result.add("imagePercent", s.getValue(t.imagePercent))
+    if not t.trailMatcap.isNil:
+        result.add("matcapPercent", s.getValue(t.matcapPercent))
     if not t.image.isNil:
         result.add("trailImage", s.getValue(s.getRelativeResourcePath(t.trailImage.filePath())))
-    if not t.image.isNil:
+    if not t.trailMatcap.isNil:
         result.add("trailMatcap", s.getValue(s.getRelativeResourcePath(t.trailMatcap.filePath())))
+
+proc collapse*(t: Trail): bool =
+    result = t.bCollapsible
+
+proc `collapse=`*(t: Trail, v: bool) =
+    if t.bCollapsible and not v:
+        t.reset()
+
+    t.bCollapsible = v
+
+proc tiled*(t: Trail): bool =
+    result = t.bIsTiled
+
+proc `tiled=`*(t: Trail, v: bool) =
+    t.bIsTiled = v
+    t.checkShader()
 
 method visitProperties*(t: Trail, p: var PropertyVisitor) =
     # art props
@@ -884,12 +981,18 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
     p.visitProperty("rotation", t.directRotation)
     p.visitProperty("depth", t.bDepth)
     p.visitProperty("stretch", t.bStretch)
+    p.visitProperty("collapsible", t.collapse)
+    p.visitProperty("cutSpeed", t.cutSpeed)
+    p.visitProperty("alphaCut", t.alphaCut)
+    p.visitProperty("tiled", t.tiled)
+    p.visitProperty("tiles", t.tiles)
 
     # dev props
     p.visitProperty("threshold", t.angleThreshold)
     p.visitProperty("quads", t.quadsToDraw)
     p.visitProperty("wireframe", t.isWireframe)
 
-registerComponent[Trail](proc(): Component =
+proc creator(): RootRef =
     result = newTrail()
-    )
+
+registerComponent(Trail, creator)

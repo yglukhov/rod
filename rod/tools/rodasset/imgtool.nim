@@ -1,11 +1,15 @@
 import nimPNG
-import os, osproc, json, strutils, times, sequtils, tables, algorithm, math
+import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, sets
+
+when compileOption("threads"):
+    import threadpool
 
 import nimx.rect_packer
 import nimx.types except Point, Size, Rect
 import nimx.pathutils
 
 import imgtools.imgtools, imgtools.texcompress
+import tree_traversal
 
 type Rect = imgtools.Rect
 type Point = tuple[x, y: int32]
@@ -13,13 +17,14 @@ type Size = tuple[width, height: int]
 
 let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
 
+const isMultithreaded = false and compileOption("threads") # ... not defined(windows)
+
 type
     ImageOccurence = object
         parentComposition, parentNode, parentComponent: JsonNode
         frameIndex: int
         textureKey: string
         compPath: string
-        originalTranslationInNode: tuple[x, y: float]
         allowAlphaCrop: bool
 
     SpriteSheetImage = ref object
@@ -38,6 +43,7 @@ type
         index: int # Index of sprite sheet in tool.images array
         images: seq[SpriteSheetImage]
         packer: RectPacker
+        noquant: bool
 
 proc newSpriteSheetImage(path: string, extrusion: int = 1): SpriteSheetImage =
     result.new()
@@ -64,36 +70,22 @@ type ImgTool* = ref object
     compressToPVR*: bool
     createIndex*: bool
     downsampleRatio*: float
+    disablePotAdjustment*: bool # If true, do not resize images to power of 2
+    removeOriginals*: bool
     extrusion*: int
-    images: Table[string, SpriteSheetImage]
+    images*: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
-
+    exceptions*: seq[string]
     latestOriginalModificationDate: Time
 
 
 proc newImgTool*(): ImgTool =
     result.new()
     result.images = initTable[string, SpriteSheetImage]()
-    result.spriteSheets = newSeq[SpriteSheet]()
+    result.spriteSheets = @[]
     result.downsampleRatio = 1.0
     result.extrusion = 1
-
-iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode) =
-    var stack = @[n]
-    while stack.len > 0:
-        let nn = stack.pop()
-        let componentNode = nn{"components", typ}
-        if not componentNode.isNil:
-            yield(nn, componentNode)
-        let children = nn{"children"}
-        if not children.isNil:
-            stack.add(children.elems)
-
-iterator allSpriteNodes(n: JsonNode): (JsonNode, JsonNode) =
-    for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
-
-iterator allMeshComponentNodes(n: JsonNode): (JsonNode, JsonNode) =
-    for n, c in allComponentNodesOfType(n, "MeshComponent"): yield(n, c)
+    result.compositionPaths = @[]
 
 proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
     im.pos = ss.packer.packAndGrow(im.targetSize.width.int32 + im.extrusion.int32 * 2, im.targetSize.height.int32 + im.extrusion.int32 * 2)
@@ -109,33 +101,68 @@ proc outImgExt(tool: ImgTool): string =
     else:
         result = ".png"
 
+proc compressPng(tool: ImgTool, path: string, noquant: bool = false) =
+    var res = 1
+    var qPath = quoteShell(path)
+
+    if noquant:
+        let tmp = path & "__tmp"
+        moveFile(path, tmp)
+        try:
+            res = execCmd("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: posterize failed or not found ", path
+            removeFile(path)
+            moveFile(tmp, path)
+        else:
+            removeFile(tmp)
+    else:
+        try:
+            res = execCmd("pngquant --force --speed 1  -o " & qPath & " " & qPath)
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: pngquant failed ", path
+    try:
+        # Temp file path is set explicitly to reside near the target file.
+        # Otherwise pngcrush will create temp file in current dir and that may
+        # cause problems. Originally this bug was observed in docker build image.
+        let tmp = quoteShell(path & ".tmp.png")
+        res = execCmd("pngcrush -ow -rem allb -reduce " & qPath & " " & tmp)
+    except:
+        discard
+    if res != 0:
+        echo "WARNING: removing sRGB failed ", path
+
 proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     var data = newString(ss.packer.width * ss.packer.height * 4)
     for im in ss.images:
+        var nullifyWhenDone = false
+        var png: PNGResult
         if im.png.isNil:
-            im.png = loadPNG32(im.originalPath)
+            png = loadPNG32(im.originalPath)
+        else:
+            png = im.png
+            nullifyWhenDone = true
 
-        if im.png.data.len == im.png.width * im.png.height * 4:
-            zeroColorIfZeroAlpha(im.png.data)
-            colorBleed(im.png.data, im.png.width, im.png.height)
+        if png.data.len == png.width * png.height * 4:
+            zeroColorIfZeroAlpha(png.data)
+            colorBleed(png.data, png.width, png.height)
 
         if im.srcSize == im.targetSize:
             blitImage(
                 data, ss.packer.width, ss.packer.height, # Target image
                 im.pos.x, im.pos.y, # Position in target image
-                im.png.data, im.png.width, im.png.height,
+                png.data, png.width, png.height,
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height)
         else:
-            resizeImage(im.png.data, im.png.width, im.png.height,
+            resizeImage(png.data, png.width, png.height,
                 data, ss.packer.width, ss.packer.height,
                 im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height,
                 im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
 
-        # if image has only alpha 0
-        if im.targetSize.width < 1:
-            im.targetSize.width = 1
-        if im.targetSize.height < 1:
-            im.targetSize.height = 1
 
         extrudeBorderPixels(
             data,
@@ -148,7 +175,8 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
             im.extrusion
         )
 
-        im.png = nil # We no longer need the data in memory
+        if nullifyWhenDone or not isMultithreaded:
+            im.png = nil # We no longer need the data in memory
 
     if tool.compressToPVR:
         let tmpPath = path & ".png"
@@ -158,7 +186,7 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     else:
         discard savePNG32(path, data, ss.packer.width, ss.packer.height)
         if tool.compressOutput:
-            discard execCmd("pngquant --force --speed 1 -o " & path & " " & path)
+            tool.compressPNG(path, ss.noquant)
 
     if consumeLessMemory:
         GC_fullCollect()
@@ -177,7 +205,7 @@ proc serializedImage(im: SpriteSheetImage, path: string): JsonNode =
 
 proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
     # Fixup the fileName node to contain spritesheet filename and texCoords
-    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath.parentDir()), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
+    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath).parentDir(), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
     doAssert(not im.spriteSheet.isNil)
 
     if o.textureKey.isNil:
@@ -199,16 +227,6 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
                 o.parentComponent["frameOffsets"] = frameOffsets
             frameOffsets.elems[o.frameIndex] = %*[im.srcBounds.x, im.srcBounds.y]
 
-proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: string): bool =
-    let name = jNode{"name"}
-    if not name.isNil:
-        let animations = jComp{"animations"}
-        if not animations.isNil:
-            let animName = name.str & "." & propName
-            for k, v in animations:
-                for ik, iv in v:
-                    if ik == animName: return true
-
 proc recalculateSourceBounds(im: SpriteSheetImage) =
     for o in im.occurences:
         if not o.allowAlphaCrop: return
@@ -219,6 +237,8 @@ proc recalculateSourceBounds(im: SpriteSheetImage) =
 
 proc betterDimension(tool: ImgTool, d, e: int): int =
     let r = int(d.float / tool.downsampleRatio)
+    if tool.disablePotAdjustment:
+        return r
     var changed = true
     result = case r + e * 2
         of 257 .. 400: 256
@@ -236,27 +256,22 @@ proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
     im.targetSize.height = tool.betterDimension(im.srcSize.height, im.extrusion)
 
 proc readFile(im: SpriteSheetImage) =
-    im.png = loadPNG32(im.originalPath)
-    if im.png.isNil:
+    let png = loadPNG32(im.originalPath)
+    if png.isNil:
         echo "PNG NOT LOADED: ", im.originalPath
 
-    im.actualBounds = imageBounds(im.png.data, im.png.width, im.png.height)
+    im.actualBounds = imageBounds(png.data, png.width, png.height)
 
-    im.srcBounds.width = im.png.width
-    im.srcBounds.height = im.png.height
+    im.srcBounds.width = png.width
+    im.srcBounds.height = png.height
     # im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
     # im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
 
-    if consumeLessMemory:
-        im.png = nil
+    if not (consumeLessMemory or isMultithreaded):
+        im.png = png
 
     im.srcSize = (im.srcBounds.width, im.srcBounds.height)
     im.targetSize = im.srcSize
-
-    for o in im.occurences.mitems:
-        let tr = o.parentNode["translation"]
-        o.originalTranslationInNode.x = tr[0].getFNum()
-        o.originalTranslationInNode.y = tr[1].getFNum()
 
 proc updateLastModificationDateWithFile(tool: ImgTool, path: string) =
     let modDate = getLastModificationTime(path)
@@ -338,6 +353,85 @@ proc writeIndex(tool: ImgTool) =
     writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
     echo root.pretty().replace(" \n", "\n")
 
+proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], offset: int = 0, noquant: bool = false) =
+    for i, im in images:
+        var done = false
+        for ss in spritesheets:
+            done = ss.tryPackImage(im)
+            if done: break
+        if not done:
+            let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
+            done = newSS.tryPackImage(im)
+            if done:
+                newSS.index = spritesheets.len + offset
+                newSS.noquant = noquant
+                spritesheets.add(newSS)
+            else:
+                echo "Could not pack image: ", im.originalPath
+
+proc assignImagesToSpriteSheets(tool: ImgTool) =
+    # Allocate spritesheets for images
+    # Here we try two approaches of packing. The first is to sort images
+    # by max(w, h). The second is to sort by area.
+
+    var allImages: seq[SpriteSheetImage] = @[]
+    var exceptionImages: seq[SpriteSheetImage] = @[]
+
+    if tool.exceptions.len > 0:
+        for k, v in tool.images:
+            var name = splitFile(k).name
+            if tool.exceptions.contains(name):
+                exceptionImages.add(v)
+            else:
+                allImages.add(v)
+    else:
+        allImages = toSeq(values(tool.images))
+
+    proc assign(imgs: var seq[SpriteSheetImage]) =
+        var try1 = newSeq[SpriteSheet]()
+        var try2 = newSeq[SpriteSheet]()
+
+        # First approach
+        imgs.sort do(x, y: SpriteSheetImage) -> int:
+            max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+        tool.packImagesToSpritesheets(imgs, try1)
+
+        # Second approach
+        imgs.sort do(x, y: SpriteSheetImage) -> int:
+            y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
+        tool.packImagesToSpritesheets(imgs, try2)
+
+        # Choose better approach
+        if try1.len < try2.len:
+            # Redo try1 again
+            imgs.sort do(x, y: SpriteSheetImage) -> int:
+                max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
+            try1.setLen(0)
+            tool.packImagesToSpritesheets(imgs, try1)
+            shallowCopy(tool.spriteSheets, try1)
+        else:
+            shallowCopy(tool.spriteSheets, try2)
+    assign(allImages)
+    if tool.exceptions.len > 0:
+        var try3 = newSeq[SpriteSheet]()
+        tool.packImagesToSpritesheets(exceptionImages, try3, tool.spriteSheets.len, true)
+        tool.spriteSheets.add(try3)
+
+when isMultithreaded:
+    proc composeAndWriteAux(tool, ss: pointer, path: string) =
+        let tool = cast[ImgTool](tool)
+        let ss = cast[SpriteSheet](ss)
+        tool.composeAndWrite(ss, path)
+
+proc readImageFileAux(tool, im: pointer) {.inline.} =
+    let i = cast[SpriteSheetImage](im)
+    let tool = cast[ImgTool](tool)
+    i.readFile()
+    if consumeLessMemory:
+        GC_fullCollect()
+    i.recalculateSourceBounds()
+    tool.recalculateTargetSize(i)
+
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
 
@@ -361,70 +455,79 @@ proc run*(tool: ImgTool) =
     if needsUpdate:
         for i in tool.images.values:
             echo "Reading file: ", i.originalPath
-            i.readFile()
-            i.recalculateSourceBounds()
-            tool.recalculateTargetSize(i)
+            when isMultithreaded:
+                if consumeLessMemory:
+                    spawn readImageFileAux(cast[pointer](tool), cast[pointer](i))
+                else:
+                    readImageFileAux(cast[pointer](tool), cast[pointer](i))
+            else:
+                readImageFileAux(cast[pointer](tool), cast[pointer](i))
+
+        when isMultithreaded: sync() # Wait for all spawned tasks
 
         if consumeLessMemory:
             GC_fullCollect()
 
-        # Sort images by area
-        var allImages = toSeq(values(tool.images))
-        allImages.sort(proc(x, y: SpriteSheetImage): int =
-            y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
-            )
-
-        # Allocate spritesheets for images
-        echo "Packing images..."
-        for i, im in allImages:
-            var done = false
-            echo im.originalPath
-            for ss in tool.spriteSheets:
-                done = ss.tryPackImage(im)
-                if done: break
-            if not done:
-                let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
-                done = newSS.tryPackImage(im)
-                if done:
-                    newSS.index = tool.spriteSheets.len
-                    tool.spriteSheets.add(newSS)
-                else:
-                    echo "Could not pack image: ", im.originalPath
+        tool.assignImagesToSpriteSheets()
 
         # Blit images to spriteSheets and save them
         for i, ss in tool.spriteSheets:
             echo "Saving ", i + 1, " of ", tool.spriteSheets.len
             for v in ss.images:
                 echo "    - image ", v.originalPath
-            tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
+            when isMultithreaded:
+                spawn composeAndWriteAux(cast[pointer](tool), cast[pointer](ss), tool.resPath / tool.outPrefix & $i & tool.outImgExt)
+            else:
+                tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
+
+        when isMultithreaded: sync() # Wait for all spawned tasks
 
         # Readjust sprite nodes
         for im in tool.images.values:
             for o in im.occurences:
                 tool.adjustImageNode(im, o)
 
-        # Write compositions back to files
-        for i, c in tool.compositions:
-            let dstPath = tool.destPath(tool.compositionPaths[i])
-            writeFile(dstPath, c.pretty().replace(" \n", "\n"))
+        let packCompositions = false
+
+        # Write all composisions to single file
+        if packCompositions:
+            let allComps = newJObject()
+            for i, c in tool.compositions:
+                if "aep_name" in c: c.delete("aep_name")
+                var resName = tool.compositionPaths[i]
+                if not resName.startsWith("res/"):
+                    raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
+                resName = resName.substr("res/".len)
+                allComps[resName] = c
+            var str = ""
+            toUgly(str, allComps)
+            writeFile(tool.resPath / "comps.jsonpack", str)
+        else:
+            # Write compositions back to files
+            for i, c in tool.compositions:
+                let dstPath = tool.destPath(tool.compositionPaths[i])
+                createDir(dstPath.parentDir())
+                var str = ""
+                toUgly(str, c)
+                writeFile(dstPath, str)
 
         if tool.createIndex:
             tool.writeIndex()
     else:
         echo "Everyting up to date"
-    tool.removeLeftoverFiles()
+    if tool.removeOriginals:
+        tool.removeLeftoverFiles()
 
 proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =
     var tool = newImgTool()
 
-    var compositions = newSeq[string]()
     for p in compositionPatterns:
         for c in walkFiles(p):
-            compositions.add(c)
+            tool.compositionPaths.add(c)
 
-    tool.compositionPaths = compositions
     tool.outPrefix = outPrefix
     tool.compressOutput = compressOutput
+    tool.removeOriginals = true
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime

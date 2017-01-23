@@ -73,15 +73,11 @@ method draw*(b: Blink) =
         setUniform("uLightPos", b.currLightPos / b.mask.size.width)
         setUniform("uScale", scale)
 
-
 method getBBox*(b: Blink): BBox =
     let img = b.mask
-    if img.isNil:
-        return nil
-
-    result = newBBox()
-    result.maxPoint = newVector3(0, 0, 0.0)
-    result.minPoint = newVector3(img.size.width, img.size.height, 0.01)
+    if not img.isNil:
+        result.maxPoint = newVector3(0, 0, 0.0)
+        result.minPoint = newVector3(img.size.width, img.size.height, 0.01)
 
 method deserialize*(b: Blink, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "mask", b.mask)
@@ -106,4 +102,4 @@ method visitProperties*(b: Blink, p: var PropertyVisitor) =
     p.visitProperty("speed", b.speed)
     p.visitProperty("period", b.period)
 
-registerComponent[Blink]()
+registerComponent(Blink)

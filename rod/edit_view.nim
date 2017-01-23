@@ -1,4 +1,4 @@
-import math, algorithm, strutils, tables, json
+import math, algorithm, strutils, tables, json, logging
 
 import nimx.view
 import nimx.types, nimx.matrixes
@@ -50,6 +50,7 @@ type EventCatchingView* = ref object of View
     keyDownDelegate*: proc(event: var Event): bool
     keyUpDelegate*: proc(event: var Event): bool
     mouseScrrollDelegate*: proc(event: var Event)
+    allowGameInput: bool
 
 type EventCatchingListener = ref object of BaseScrollListener
     view: EventCatchingView
@@ -57,12 +58,10 @@ type EventCatchingListener = ref object of BaseScrollListener
 method acceptsFirstResponder(v: EventCatchingView): bool = true
 
 method onKeyUp(v: EventCatchingView, e : var Event): bool =
-    echo "editor onKeyUp ", e.keyCode
     if not v.keyUpDelegate.isNil:
         result = v.keyUpDelegate(e)
 
 method onKeyDown(v: EventCatchingView, e : var Event): bool =
-    echo "editor onKeyUp ", e.keyCode
     if not v.keyDownDelegate.isNil:
         result = v.keyDownDelegate(e)
 
@@ -158,29 +157,33 @@ when loadingAndSavingAvailable:
             var s = Serializer.new()
             var sData = selectedNode.serialize(s)
             s.save(sData, path)
-            # s.save(selectedNode, path)
 
     proc loadNode(editor: Editor) =
         let path = callDialogFileOpen("Load Json or DAE")
         if not path.isNil:
-            if path.endsWith(".dae"):
-                var sip = editor.outlineView.selectedIndexPath
-                var p = editor.rootNode
-                if sip.len == 0:
-                    sip.add(0)
-                else:
-                    p = editor.outlineView.itemAtIndexPath(sip).get(Node3D)
+            try:
+                if path.endsWith(".dae"):
+                    var sip = editor.outlineView.selectedIndexPath
+                    var p = editor.rootNode
+                    if sip.len == 0:
+                        sip.add(0)
+                    else:
+                        p = editor.outlineView.itemAtIndexPath(sip).get(Node3D)
 
-                editor.outlineView.expandRow(sip)
-                loadSceneAsync path, proc(n: Node) =
-                    p.addChild(n)
-            elif path.endsWith(".json"):
-                let ln = newNodeWithResource(path)
-                if not editor.selectedNode.isNil:
-                    editor.selectedNode.addChild(ln)
-                else:
-                    editor.rootNode.addChild(ln)
-            editor.sceneTreeDidChange()
+                    editor.outlineView.expandRow(sip)
+                    loadSceneAsync path, proc(n: Node) =
+                        p.addChild(n)
+                elif path.endsWith(".json"):
+                    let ln = newNodeWithResource(path)
+                    if not editor.selectedNode.isNil:
+                        editor.selectedNode.addChild(ln)
+                    else:
+                        editor.rootNode.addChild(ln)
+                editor.sceneTreeDidChange()
+            except:
+                error "ERROR:: Resource at path doesn't load ", path
+                error "Exception caught: ", getCurrentExceptionMsg()
+                error "stack trace: ", getCurrentException().getStackTrace()
 
 proc newTreeView(e: Editor): View =
     result = View.new(newRect(0, 0, 200, 500)) #700
@@ -286,6 +289,13 @@ proc newTreeView(e: Editor): View =
         e.sceneTreeDidChange()
     result.addSubview(refreshButton)
 
+proc selectNode*(editor: Editor, node: Node) =
+    var indexPath = newSeq[int]()
+    editor.getTreeViewIndexPathForNode(node, indexPath)
+
+    if indexPath.len > 1:
+        editor.outlineView.selectItemAtIndexPath(indexPath)
+
 #import tables
 proc onTouchDown*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
@@ -315,12 +325,7 @@ proc onTouchDown*(editor: Editor, e: var Event) =
             return
 
         # make node select
-        var indexPath = newSeq[int]()
-        editor.getTreeViewIndexPathForNode(castResult[0].node, indexPath)
-
-        if indexPath.len > 1:
-            editor.outlineView.selectItemAtIndexPath(indexPath)
-            editor.outlineView.expandBranch(indexPath)
+        editor.selectNode(castResult[0].node)
 
 
 proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
@@ -363,6 +368,13 @@ proc createZoomSelectionButton(e: Editor) =
             let cam = e.rootNode.findNode("camera")
             if not cam.isNil:
                 e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
+
+proc createGameInputToggle(e: Editor) =
+    let toggle = e.newToolbarButton("Game Input")
+    toggle.behavior = bbToggle
+    toggle.onAction do():
+        e.eventCatchingView.allowGameInput = (toggle.value == 1)
+    toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
 
 proc createCameraSelector(e: Editor) =
     e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
@@ -507,6 +519,10 @@ proc createWorkspaceLayout(e: Editor) =
     sceneClipView.addSubview(e.sceneView)
     sceneClipView.addSubview(e.eventCatchingView)
 
+method onTouchEv*(v: EventCatchingView, e: var Event): bool =
+    if not v.allowGameInput:
+        result = procCall v.View.onTouchEv(e)
+
 proc createEventCatchingView(e: Editor) =
     e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
     e.eventCatchingView.resizingMask = "wh"
@@ -547,6 +563,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     # Toolbar buttons
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()
+    editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
     if startFromGame:

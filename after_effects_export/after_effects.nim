@@ -18,6 +18,7 @@ type
     ProjectObj {.importc.} = object of RootObj
         selection*: seq[Item]
         rootFolder*: FolderItem
+        file*: File
 
     ColorLabel* = range[0 .. 16]
 
@@ -30,6 +31,10 @@ type
         comment*: cstring
         color*: ColorLabel
         parentFolder*: FolderItem
+
+    MarkerValue* = ref MarkerValueObj
+    MarkerValueObj {.importc.} = object of RootObj
+        comment*: cstring
 
     AVItem* = ref AVItemObj
     AVItemObj {.importc.} = object of ItemObj
@@ -67,7 +72,7 @@ type
         hasTrackMatte*: bool
         timeRemapEnabled*: bool
         nullLayer*: bool
-
+        threeDLayer*: bool
         ## The start time of the layer, expressed in composition time (seconds).
         ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.
         startTime*: float
@@ -78,8 +83,10 @@ type
     PropertyBase* = ref PropertyBaseObj
     PropertyBaseObj {.importc.} = object of RootObj
         name*: cstring
+        matchName*: cstring
         enabled*: bool
         active*: bool
+        isEffect*: bool
         parentProperty*: PropertyGroup
         canSetEnabled*: bool
 
@@ -139,6 +146,9 @@ type
         strokeWidth*: float
         strokeColor*: array[3, float]
         applyStroke*: bool
+        pointText*: bool
+        boxText*: bool
+        boxTextSize*: array[2, int]
 
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
@@ -155,6 +165,10 @@ type
         ## Value in the range [0.1..100.0]
         influence*: float
 
+    Rect* = ref RectObj
+    RectObj {.importc.} = object of RootObj
+        top*, left*, width*, height*: float
+
 template `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
 template len*[T](c: Collection[T]): int = cast[seq[type(c.fieldToCheckType)]](c).len
 
@@ -163,6 +177,8 @@ proc remove*(i: Item) {.importcpp.}
 proc layers*(c: Composition): Collection[Layer] = {.emit:"`result` = `c`.layers;".}
 proc selectedLayers*(c: Composition): seq[Layer] = {.emit:"`result` = `c`.selectedLayers; if (`result`.length === undefined) { `result` = [`result`]; }".}
 proc layer*(c: Composition, name: cstring): Layer {.importcpp.}
+
+proc sourceRectAtTime*(layer: Layer, time: float, extents: bool): Rect {.importcpp.}
 
 proc activeItem*(p: Project, T: typedesc): T = {.emit: "`result` = `p`.activeItem;".}
 
@@ -204,6 +220,7 @@ template valueTypeFromType(t: typedesc[float32]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[float]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[cstring]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[TextDocument]): untyped = [pvtTextDocument]
+template valueTypeFromType(t: typedesc[MarkerValue]): untyped = [pvtMarker]
 
 template isPropertyGroup*(p: PropertyBase): bool = p.propertyType != ptProperty
 

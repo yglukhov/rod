@@ -206,7 +206,7 @@ method visitProperties*(pa:ParticleAttractor, p: var PropertyVisitor) =
     p.visitProperty("gravity", pa.gravity)
     p.visitProperty("radius", pa.radius)
 
-registerComponent[ParticleEmitter]()
-registerComponent[Particle]()
-registerComponent[ParticleAttractor]()
+registerComponent(ParticleEmitter, "ParticleSystem")
+registerComponent(Particle, "ParticleSystem")
+registerComponent(ParticleAttractor, "ParticleSystem")
 

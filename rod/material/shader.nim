@@ -3,6 +3,7 @@ import math
 import tables
 import hashes
 import sets
+import variant
 
 import nimx.types
 import nimx.portable_gl
@@ -88,39 +89,66 @@ proc bindShader*(sh: Shader) =
     let gl = currentContext().gl
     gl.useProgram(sh.program)
 
-template setUniform*(sh: Shader, name: string, uniform: int) =
+proc setUniform*(sh: Shader, name: string, uniform: int) =
     let gl = currentContext().gl
     gl.uniform1i(gl.getUniformLocation(sh.program, name), uniform.GLint)
 
-template setUniform*(sh: Shader, name: string, uniform: float) =
+proc setUniform*(sh: Shader, name: string, uniform: float) =
     let gl = currentContext().gl
     gl.uniform1f(gl.getUniformLocation(sh.program, name), uniform)
 
-template setUniform*(sh: Shader, name: string, uniform: Vector2) =
+proc setUniform*(sh: Shader, name: string, uniform: Vector2) =
     let gl = currentContext().gl
     gl.uniform2fv(gl.getUniformLocation(sh.program, name), uniform)
 
-template setUniform*(sh: Shader, name: string, uniform: Vector3) =
+proc setUniform*(sh: Shader, name: string, uniform: Vector3) =
     let gl = currentContext().gl
     gl.uniform3fv(gl.getUniformLocation(sh.program, name), uniform)
 
-template setUniform*(sh: Shader, name: string, uniform: Vector4) =
+proc setUniform*(sh: Shader, name: string, uniform: Vector4) =
     let gl = currentContext().gl
     gl.uniform4fv(gl.getUniformLocation(sh.program, name), uniform)
 
-template setUniform*(sh: Shader, name: string, uniform: Color) =
+proc setUniform*(sh: Shader, name: string, uniform: Color) =
     let gl = currentContext().gl
     let arr = [uniform.r, uniform.g, uniform.b, uniform.a]
     gl.uniform4fv(gl.getUniformLocation(sh.program, name), arr)
 
-template setUniform*(sh: Shader, name: string, uniform: Size) =
+proc setUniform*(sh: Shader, name: string, uniform: Size) =
+    let gl = currentContext().gl
     currentContext().setPointUniform(gl.getUniformLocation(sh.program, name), newPoint(uniform.width, uniform.height))
 
-template setUniform*(sh: Shader, name: string, uniform: Matrix4) =
+proc setUniform*(sh: Shader, name: string, uniform: Matrix4) =
     let gl = currentContext().gl
     gl.uniformMatrix4fv(gl.getUniformLocation(sh.program, name), false, uniform)
 
-template setTransformUniform*(sh: Shader) =
+proc setTransformUniform*(sh: Shader) =
     currentContext().setTransformUniform(sh.program)
 
+proc setUniform[T](sh: Shader, name: string, uniform: T) =
+    sh.setUniform(name, uniform)
 
+
+# static uniforms
+# this uniforms assign only one time
+# but they will setup automatically after bind shader
+var procRegistry = initTable[TypeId, proc(sh: Shader, name: string, v: Variant)]()
+
+proc registerProc[T]( setUniformProc: proc(sh: Shader, name: string, value: T) ) =
+    procRegistry[getTypeId(T)] = proc(sh: Shader, name: string, v: Variant) =
+        let value = v.get(T)
+        sh.setUniformProc(name, value)
+
+proc addStaticUniform*[T](sh: Shader, name: string, uniform: T) =
+    var u = newVariant(uniform)
+    let setter = procRegistry.getOrDefault(u.typeId)
+    sh.setter(name, u)
+
+registerProc(setUniform[float])
+registerProc(setUniform[int])
+registerProc(setUniform[Vector2])
+registerProc(setUniform[Vector3])
+registerProc(setUniform[Vector4])
+registerProc(setUniform[Color])
+registerProc(setUniform[Size])
+registerProc(setUniform[Matrix4])

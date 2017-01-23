@@ -21,16 +21,20 @@ method init*(c: Camera) =
     c.fov = 30
 
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
+    let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
+    var winSize = absBounds.size
+    if not c.node.sceneView.window.isNil:
+        winSize = c.node.sceneView.window.bounds.size
+
+    let cy = absBounds.y + absBounds.height / 2
+    let cx = absBounds.x + absBounds.width / 2
+
     case c.projectionMode
     of cpOrtho:
         var logicalSize = c.viewportSize
-        let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
         if logicalSize == zeroSize:
             logicalSize = absBounds.size
         let k = absBounds.height / logicalSize.height
-        let cy = absBounds.y + absBounds.height / 2
-        let cx = absBounds.x + absBounds.width / 2
-        let winSize = c.node.sceneView.window.bounds.size
         let top = -cy / k
         let bottom = (winSize.height - cy) / k
         let left = -cx / k
@@ -39,10 +43,6 @@ proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D)
         mat.ortho(left, right, bottom, top, c.zNear, c.zFar)
 
     of cpPerspective:
-        let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
-        let cy = absBounds.y + absBounds.height / 2
-        let cx = absBounds.x + absBounds.width / 2
-        let winSize = c.node.sceneView.window.bounds.size
         let top = -cy
         let bottom = winSize.height - cy
         let left = -cx
@@ -73,4 +73,4 @@ method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("fov", c.fov)
     p.visitProperty("projMode", c.projectionMode)
 
-registerComponent[Camera]()
+registerComponent(Camera)

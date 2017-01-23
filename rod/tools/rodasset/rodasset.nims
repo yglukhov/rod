@@ -3,4 +3,5 @@
 --stackTrace:off
 --lineTrace:off
 --d:nimTrMacros
---checks:off
+--checks:on
+--threads:on

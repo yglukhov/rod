@@ -1,7 +1,7 @@
 import sequtils, intsets, tables
 import nimx.view, nimx.table_view, nimx.scroll_view, nimx.button, nimx.text_field
 import nimx.popup_button, nimx.window, nimx.linear_layout
-import nimx.menu, nimx.event, nimx.property_visitor
+import nimx.menu, nimx.event, nimx.property_visitor, nimx.system_logger
 import variant
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view
@@ -124,16 +124,19 @@ proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
         for ap in a.animatedProperties:
             var ep: EditedProperty
             ep.name = ap.name
-            ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.name)
-            template createCurve(T: typedesc): typed =
-                if ap.sampler of BezierKeyFrameAnimationSampler[T]:
-                    ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
-                else:
-                    ep.curve = newAnimationCurve[T]()
-            template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
-            switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
-            ep.curve.color = colors[v.editedProperties.len mod colors.len]
-            v.editedProperties.add(ep)
+            try:
+                ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.name)
+                template createCurve(T: typedesc): typed =
+                    if ap.sampler of BezierKeyFrameAnimationSampler[T]:
+                        ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
+                    else:
+                        ep.curve = newAnimationCurve[T]()
+                template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+                switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
+                ep.curve.color = colors[v.editedProperties.len mod colors.len]
+                v.editedProperties.add(ep)
+            except:
+                logi "ERROR: Could not attach animatable property: ", getCurrentExceptionMsg()
     v.propertyTableView.reloadData()
     v.updateDopesheetCurves()
 
@@ -151,7 +154,7 @@ proc createPlayButton(v: AnimationEditView): Button =
             currentlyPlayingAnimation = nil
             b.title = "Play"
         elif v.animationSelector.selectedIndex >= 0 and not v.mEditedNode.isNil:
-            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem)
+            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
             if not a.isNil:
                 currentlyPlayingAnimation = a
                 a.onComplete do():
@@ -179,7 +182,7 @@ method init*(v: AnimationEditView, r: Rect) =
     leftPaneView.addSubview(v.animationSelector)
     v.animationSelector.onAction do():
         if v.animationSelector.selectedIndex >= 0:
-            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem)
+            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
             if a of PropertyAnimation:
                 v.editedAnimation = PropertyAnimation(a)
             else:

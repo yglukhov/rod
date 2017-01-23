@@ -4,6 +4,8 @@ import nimx.event
 import nimx.view_event_handling
 import nimx.view_event_handling_new
 import nimx.system_logger
+import nimx.property_visitor
+
 import rod.component
 import rod.ray
 import rod.viewport
@@ -18,7 +20,7 @@ proc view*(c: UIComponent): View =
     if not c.mView.isNil:
         result = c.mView.subviews[0]
 
-proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool =
+proc intersectsWithUIPlane(uiComp: UIComponent, r: Ray, res: var Vector3): bool=
     let n = uiComp.node
     let worldPointOnPlane = n.localToWorld(newVector3())
     var worldNormal = n.localToWorld(newVector3(0, 0, 1))
@@ -26,11 +28,12 @@ proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool 
     worldNormal.normalize()
     result = r.intersectWithPlane(worldNormal, worldPointOnPlane, res)
 
-    if result and not uiComp.mView.isNil:
+proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool =
+    if uiComp.intersectsWithUIPlane(r, res) and not uiComp.mView.isNil:
         let v = uiComp.view
         if not v.isNil:
             var localres : Vector3
-            if n.tryWorldToLocal(res, localres):
+            if uiComp.node.tryWorldToLocal(res, localres):
                 result = localres.x >= v.frame.x and localres.x <= v.frame.maxX and
                     localres.y >= v.frame.y and localres.y <= v.frame.maxY
 
@@ -43,7 +46,7 @@ method convertPointFromParent*(v: UICompView, p: Point): Point =
     if not v.uiComp.node.sceneView.isNil:
         let r = v.uiComp.node.sceneView.rayWithScreenCoords(p)
         var res : Vector3
-        if v.uiComp.intersectsWithUINode(r, res):
+        if v.uiComp.intersectsWithUIPlane(r, res):
             if v.uiComp.node.tryWorldToLocal(res, res):
                 result = newPoint(res.x, res.y)
 
@@ -58,6 +61,7 @@ proc `view=`*(c: UIComponent, v: View) =
     cv.uiComp = c
     cv.superview = c.node.sceneView
     c.mView = cv
+    c.enabled = true
     cv.addSubview(v)
 
 proc moveToWindow(v: View, w: Window) =
@@ -65,12 +69,14 @@ proc moveToWindow(v: View, w: Window) =
     for s in v.subviews:
         s.moveToWindow(w)
 
-proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
+proc handleScrollEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
     var res : Vector3
     if c.node.tryWorldToLocal(intersection, res):
         let v = c.view
         e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
-        result = v.recursiveHandleMouseEvent(e)
+        if e.localPosition.inRect(v.bounds):
+            result = v.processMouseWheelEvent(e)
+
 
 proc handleTouchEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
     var res : Vector3
@@ -101,4 +107,8 @@ method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
         if i != -1:
             sv.uiComponents.del(i)
 
-registerComponent[UIComponent]()
+method visitProperties*(ui: UIComponent, p: var PropertyVisitor) =
+    p.visitProperty("enabled", ui.enabled)
+    ui.view.visitProperties(p)
+
+registerComponent(UIComponent)

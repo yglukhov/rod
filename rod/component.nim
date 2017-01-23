@@ -5,6 +5,7 @@ import json
 import nimx.types
 import nimx.property_visitor
 import nimx.matrixes
+import nimx.class_registry
 
 import node
 import rod_types
@@ -15,28 +16,46 @@ export Component
 
 method init*(c: Component) {.base.} = discard
 
-var componentRegistry = initTable[string, proc(): Component]()
+var componentGroupsTable* = initTable[string, seq[string]]()
 
-proc registeredComponents*(): seq[string] = toSeq(keys(componentRegistry))
+proc registerComponentGroup(group, component: string) =
+    var validatedGroup = group
+    if validatedGroup.isNil:
+        validatedGroup = "Other"
 
-proc registerComponent*[T]() =
-    componentRegistry.add T.name, proc(): Component =
-        result = T.new()
+    var g = componentGroupsTable.getOrDefault(validatedGroup)
+    if g.isNil:
+        g = newSeq[string]()
 
-proc registerComponent*[T](creator: proc(): Component) =
-    componentRegistry.add T.name, creator
+    g.add(component)
+    componentGroupsTable[validatedGroup] = g
+
+proc registeredComponents*(): seq[string] =
+    result = newSeq[string]()
+    for c in registeredClassesOfType(Component):
+        result.add(c)
+
+template registerComponent*(T: typedesc, group: string = nil ) =
+    registerClass(T)
+    registerComponentGroup(group, typetraits.name(T))
+
+template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: string = nil ) =
+    registerClass(T, creator)
+    registerComponentGroup(group, typetraits.name(T))
 
 proc createComponent*(name: string): Component =
-    let p = componentRegistry.getOrDefault(name)
-    if not p.isNil:
-        result = p()
-        result.init()
-    if result.isNil:
+    if isClassRegistered(name) == false:
         raise newException(Exception, "Component " & name & " is not registered")
+
+    result = newObjectOfClass(name).Component
+    result.init()
 
 proc createComponent*[T](): T = createComponent(T.name).T
 
-method draw*(c: Component) {.base.} = discard
+method draw*(c: Component) {.base.} = discard # Deprecated.
+method beforeDraw*(c: Component, index: int): bool {.base.} = discard
+method afterDraw*(c: Component, index: int) {.base.} = discard
+
 method update*(c: Component) {.base.} = discard
 method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
@@ -53,13 +72,7 @@ type UpdateProcComponent = ref object of Component
 type DrawProcComponent = ref object of Component
     drawProc: proc()
 
-proc newBBox*(): BBox =
-    result.new()
-
-proc newBBox*(min, max: Vector3): BBox =
-    result.new()
-    result.minPoint = min
-    result.maxPoint = max
+template isEmpty*(b: BBox): bool = (b.maxPoint - b.minPoint == newVector3())
 
 proc newComponentWithUpdateProc*(p: proc()): Component =
     var r : UpdateProcComponent
@@ -89,7 +102,7 @@ method componentNodeWillBeRemovedFromSceneView*(c: OverlayComponent) =
 
 method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
     let bbox = c.getBBox()
-    if bbox.isNil:
+    if bbox.isEmpty:
         return false
 
     var inv_mat: Matrix4

@@ -16,7 +16,7 @@ type
         mTranslation*: Vector3
         mRotation*: Quaternion
         mScale*: Vector3
-        components*: TableRef[string, Component]
+        components*: seq[Component]
         children*: seq[Node3D]
         mParent*: Node3D
         name*: string
@@ -27,18 +27,20 @@ type
         worldMatrix*: Matrix4
         isDirty*: bool
         layer*: int
+        isEnabled*: bool
+        mAnchorPoint*: Vector3
+        affectsChildren*: bool # Should posteffects affect only this node or its children as well
 
     Node2D* = Node3D
 
     Node* = Node3D
 
-    BBox* = ref object of RootObj
+    BBox* = object
         maxPoint*: Vector3
         minPoint*: Vector3
 
-    Component* = ref object of RootObj
+    Component* = ref object of RootRef
         node*: Node3D
-        bbox*: BBox
 
     PostprocessContext* = ref object
         shader*: ProgramRef
@@ -79,6 +81,7 @@ type
 
     UIComponent* = ref object of Component
         mView*: View
+        enabled*: bool
 
     LightSource* = ref object of Component
         mLightAmbient*: float32

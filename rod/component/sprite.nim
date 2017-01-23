@@ -36,14 +36,18 @@ proc `image=`*(s: Sprite, i: Image) =
     s.images[0] = i
     s.currentFrame = 0
 
+proc getOffset*(s: Sprite): Point =
+    result = s.offset
+    if s.frameOffsets.len > s.currentFrame:
+        result += s.frameOffsets[s.currentFrame]
+
 method draw*(s: Sprite) =
     let c = currentContext()
+
     let i = s.image
     if not i.isNil:
         var r: Rect
-        r.origin = s.offset
-        if s.frameOffsets.len > s.currentFrame:
-            r.origin += s.frameOffsets[s.currentFrame]
+        r.origin = s.getOffset()
         r.size = i.size
         c.drawImage(i, r, zeroRect)
 
@@ -58,12 +62,9 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
 
 method getBBox*(s: Sprite): BBox =
     let img = s.image
-    if img.isNil:
-        return nil
-
-    result = newBBox()
-    result.maxPoint = newVector3(-s.offset.x, -s.offset.y, 0.0)
-    result.minPoint = newVector3(img.size.width - s.offset.x, img.size.height - s.offset.y, 0.01)
+    if not img.isNil:
+        result.maxPoint = newVector3(img.size.width + s.offset.x, img.size.height + s.offset.y, 0.01)
+        result.minPoint = newVector3(s.offset.x, s.offset.y, 0.0)
 
 method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
@@ -91,9 +92,12 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     if s.images.len > 1:
         s.createFrameAnimation()
 
+    serealizer.deserializeValue(j, "offset", s.offset)
+
 method serialize*(c: Sprite, s: Serializer): JsonNode =
     result = newJObject()
     result.add("currentFrame", s.getValue(c.currentFrame))
+    result.add("offset", s.getValue(c.offset))
 
     var imagesNode = newJArray()
     result.add("fileNames", s.getValue(imagesNode))
@@ -103,5 +107,6 @@ method serialize*(c: Sprite, s: Serializer): JsonNode =
 method visitProperties*(t: Sprite, p: var PropertyVisitor) =
     p.visitProperty("image", t.image)
     p.visitProperty("curFrame", t.currentFrame)
+    p.visitProperty("offset", t.offset)
 
-registerComponent[Sprite]()
+registerComponent(Sprite)

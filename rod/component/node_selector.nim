@@ -101,7 +101,7 @@ method init*(ns: NodeSelector) =
 proc createBoxes(ns: NodeSelector) =
     for k, v in ns.node.components:
         let bbox = v.getBBox()
-        if not bbox.isNil:
+        if not bbox.isEmpty:
             # echo "node ", ns.node.name, "  min  ", bbox.minPoint, "  max  ", bbox.maxPoint
             ns.vertexData = newSeq[GLfloat]()
             ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.minPoint.z])
@@ -195,8 +195,8 @@ proc startTransform*(ns: NodeSelector, selectedGizmo: Node, position: Point) =
     offset = ns.gizmo.worldPos - ns.node.sceneView.screenToWorldPoint(newVector3(position.x, position.y, screenPoint.z))
 
 proc proccesTransform*(ns: NodeSelector, position: Point) =
-    let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
-    let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
+    # let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
+    # let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
 
     let curScreenPoint = newVector3(position.x, position.y, screenPoint.z)
     var curPosition: Vector3
@@ -214,4 +214,4 @@ proc stopTransform*(ns: NodeSelector) =
 method visitProperties*(ns: NodeSelector, p: var PropertyVisitor) =
     p.visitProperty("color", ns.color)
 
-registerComponent[NodeSelector]()
+registerComponent(NodeSelector)

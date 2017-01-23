@@ -1,168 +1,111 @@
 {
-  "name": "ps_anchor", 
-  "components": 
-  {}, 
-  "alpha": 1.0, 
-  "translation": [
-    0.0, 
-    0.0, 
-    0.0
-  ], 
-  "scale": [
-    1.0, 
-    1.0, 
-    1.0
-  ], 
-  "children": [
+  "layer": 0,
+  "name": "New Node",
+  "components": [
     {
-      "name": "attr", 
-      "components": 
-      {
-        "PSModifierSpiral": 
-        {
-          "speed": 800.0
-        }
-      }, 
-      "alpha": 1.0, 
-      "translation": [
-        10.0, 
-        0.0, 
-        0.0
-      ], 
-      "scale": [
-        1.0, 
-        1.0, 
-        1.0
-      ], 
-      "children": [], 
-      "rotation": [
-        0.0, 
-        0.0, 
-        0.0, 
-        1.0
-      ]
-    }, 
+      "is2D": true,
+      "_c": "ConePSGenShape",
+      "angle": -20.0,
+      "radius": 2.0
+    },
     {
-      "name": "New Node", 
-      "components": 
-      {
-        "ConePSGenShape": 
-        {
-          "is2D": true, 
-          "angle": -20.0, 
-          "radius": 2.0
-        }, 
-        "ParticleSystem": 
-        {
-          "airDensity": 0.0, 
-          "startVelocity": 8.0, 
-          "lifetime": 8.0, 
-          "modifierNode": "attr", 
-          "duration": 3.0, 
-          "birthRate": 100.0, 
-          "randVelocityTo": 0.0, 
-          "speed": 9.0, 
-          "randScaleTo": 0.0, 
-          "distance": 40.0, 
-          "randRotVelocityTo": [
-            0.0, 
-            0.0, 
-            0.0
-          ], 
-          "scaleSeq": [], 
-          "startScale": [
-            3.0, 
-            3.0, 
-            3.0
-          ], 
-          "randScaleFrom": 0.0, 
-          "colorMode": 0, 
-          "isLooped": true, 
-          "startColor": [
-            1.0, 
-            0.0, 
-            0.0, 
-            1.0
-          ], 
-          "randVelocityFrom": 0.0, 
-          "scaleMode": 0, 
-          "dstScale": [
-            0.0, 
-            0.0, 
-            0.0
-          ], 
-          "genShapeNode": "New Node", 
-          "isMove": false, 
-          "is3dRotation": false, 
-          "dstColor": [
-            1.0, 
-            0.0, 
-            0.0, 
-            1.0
-          ], 
-          "isBlendAdd": false, 
-          "gravity": [
-            0.0, 
-            0.0, 
-            0.0
-          ], 
-          "randRotVelocityFrom": [
-            0.0, 
-            0.0, 
-            0.0
-          ], 
-          "colorSeq": [
-            [
-              0.0, 
-              1.0, 
-              0.0, 
-              0.0, 
-              1.0
-            ], 
-            [
-              0.5, 
-              0.0, 
-              1.0, 
-              0.0, 
-              1.0
-            ], 
-            [
-              1.0, 
-              0.0, 
-              0.0, 
-              1.0, 
-              1.0
-            ]
-          ], 
-          "isPlayed": true, 
-          "amplitude": 5.0, 
-          "frequency": 0.4
-        }
-      }, 
-      "alpha": 1.0, 
-      "translation": [
-        0.0, 
-        0.0, 
+      "airDensity": 0.0,
+      "startVelocity": 8.0,
+      "lifetime": 8.0,
+      "modifierNode": "attr",
+      "duration": 3.0,
+      "birthRate": 100.0,
+      "randVelocityTo": 0.0,
+      "randScaleTo": 0.0,
+      "_c": "ParticleSystem",
+      "randRotVelocityTo": [
+        0.0,
+        0.0,
         0.0
-      ], 
-      "scale": [
-        1.0, 
-        1.0, 
+      ],
+      "scaleSeq": [],
+      "startScale": [
+        3.0,
+        3.0,
+        3.0
+      ],
+      "randScaleFrom": 0.0,
+      "colorMode": 0,
+      "isLooped": true,
+      "startColor": [
+        1.0,
+        0.0,
+        0.0,
         1.0
-      ], 
-      "children": [], 
-      "rotation": [
-        -0.5, 
-        0.0, 
-        0.0, 
-        0.8660253882408142
-      ]
+      ],
+      "randVelocityFrom": 0.0,
+      "scaleMode": 0,
+      "dstScale": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "genShapeNode": "New Node",
+      "is3dRotation": false,
+      "dstColor": [
+        1.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "isBlendAdd": false,
+      "gravity": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "randRotVelocityFrom": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "colorSeq": [
+        [
+          0.0,
+          1.0,
+          0.0,
+          0.0,
+          1.0
+        ],
+        [
+          0.5,
+          0.0,
+          1.0,
+          0.0,
+          1.0
+        ],
+        [
+          1.0,
+          0.0,
+          0.0,
+          1.0,
+          1.0
+        ]
+      ],
+      "isPlayed": true
     }
-  ], 
-  "rotation": [
-    0.0, 
-    0.0, 
-    0.0, 
+  ],
+  "alpha": 1.0,
+  "translation": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "scale": [
+    1.0,
+    1.0,
     1.0
+  ],
+  "children": [],
+  "rotation": [
+    -0.5,
+    0.0,
+    0.0,
+    0.8660253882408142
   ]
 }

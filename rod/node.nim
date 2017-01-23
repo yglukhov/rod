@@ -34,6 +34,8 @@ proc newNode*(name: string = nil): Node =
     result.name = name
     result.alpha = 1.0
     result.isDirty = true
+    result.isEnabled = true
+    result.affectsChildren = true
 
 proc setDirty(n: Node) =
     if n.isDirty == false:
@@ -44,6 +46,11 @@ proc setDirty(n: Node) =
 template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
 proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
     n.mTranslation = p
+    n.setDirty()
+
+template enabled*(n: Node): bool = n.isEnabled
+proc `enabled=`*(n: Node, v: bool) =
+    n.isEnabled = v
     n.setDirty()
 
 proc `translate=`*(n: Node, p: Vector3) =
@@ -112,6 +119,13 @@ proc `scaleZ=`*(n: Node, value: Coord) =
     n.mScale.z = value
     n.setDirty()
 
+proc `anchor=`*(n: Node, v: Vector3) =
+    n.mAnchorPoint = v
+    n.setDirty()
+
+proc anchor*(n: Node): Vector3 =
+    result = n.mAnchorPoint
+
 proc parent*(n: Node): Node = n.mParent
 proc `parent=`*(n: Node, p: Node) =
     n.mParent = p
@@ -124,48 +138,75 @@ proc createComponentForNode(n: Node, name: string): Component =
     if not n.mSceneView.isNil:
         result.componentNodeWasAddedToSceneView()
 
-proc component*(n: Node, name: string): Component =
+proc addComponent*(n: Node, name: string): Component =
     if n.components.isNil:
-        n.components = newTable[string, Component]()
-        result = createComponentForNode(n, name)
-        n.components[name] = result
-    else:
-        result = n.components.getOrDefault(name)
-        if result.isNil:
-            result = createComponentForNode(n, name)
-            n.components[name] = result
+        n.components = newSeq[Component]()
+
+    result = createComponentForNode(n, name)
+    n.components.add(result)
+
+proc addComponent*(n: Node, T: typedesc): Component =
+    result = n.addComponent(T.name)
+
+proc getComponent*(n: Node, name: string): Component =
+    if n.components.isNil:
+        return nil
+
+    for v in n.components:
+        if v.className == name:
+            return v
+
+    return nil
+
+proc getComponent*(n: Node, T: typedesc[Component]): T =
+    if n.components.isNil:
+        return nil
+
+    for v in n.components:
+        type TT = T
+        if v of TT:
+            return v.TT
+
+    return nil
+
+proc component*(n: Node, name: string): Component =
+    result = n.getComponent(name)
+    if result.isNil:
+        result = n.addComponent(name)
 
 proc component*(n: Node, T: typedesc[Component]): T =
     type TT = T
     result = TT(n.component(T.name))
 
 proc componentIfAvailable*(n: Node, name: string): Component =
-    if not n.components.isNil:
-        result = n.components.getOrDefault(name)
+    result = n.getComponent(name)
 
 proc componentIfAvailable*(n: Node, T: typedesc[Component]): T =
-    type TT = T
-    result = TT(n.componentIfAvailable(T.name))
+    result = n.getComponent(T)
 
 proc setComponent*(n: Node, name: string, c: Component) =
     if n.components.isNil:
-        n.components = newTable[string, Component]()
-    n.components[name] = c
+        n.components = newSeq[Component]()
+    n.components.add(c)
+
+proc insertComponent*(n: Node, c: Component, index: int) =
+    if n.components.isNil:
+        n.components = newSeq[Component]()
+
+    let i = clamp(index, 0, n.components.len)
+    c.componentNodeWasAddedToSceneView()
+    n.components.insert(c, i)
+
+proc removeComponent*(n: Node, c: Component) =
+    let compPos = n.components.find(c)
+    if compPos > -1:
+        c.componentNodeWillBeRemovedFromSceneView()
+        n.components.delete(compPos)
 
 proc removeComponent*(n: Node, name: string) =
     if not n.components.isNil:
-        let c = n.components.getOrDefault(name)
-        if not c.isNil:
-            c.componentNodeWillBeRemovedFromSceneView()
-            n.components.del(name)
-
-proc getComponent*(n: Node, T: typedesc[Component]): T =
-    for k, v in n.components:
-        type TT = T
-        if v of TT:
-            return v.TT
-
-    return nil
+        let c = n.getComponent(name)
+        n.removeComponent(c)
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
@@ -177,6 +218,13 @@ proc update(n: Node) =
 proc recursiveUpdate*(n: Node) =
     n.update()
     for c in n.children: c.recursiveUpdate()
+
+proc anchorMatrix(n: Node): Matrix4=
+    result[0] = 1; result[1] = 0; result[2] = 0;
+    result[4] = 0; result[5] = 1; result[6] = 0;
+    result[8] = 0; result[9] = 0; result[10] = 1;
+    result[12] = -n.mAnchorPoint.x;  result[13] = -n.mAnchorPoint.y; result[14] = -n.mAnchorPoint.z;
+    result[15] = 1;
 
 proc makeTransform(n: Node): Matrix4 =
     var rot = n.mRotation.toMatrix4()
@@ -190,73 +238,81 @@ proc makeTransform(n: Node): Matrix4 =
     # // No projection term
     result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
 
-
 proc getTransform*(n: Node, mat: var Matrix4) =
     mat.multiply(n.makeTransform(), mat)
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
-    # if n.isDirty:
-    n.mMatrix = n.makeTransform()
-        # n.isDirty = false
-
+    n.mMatrix = n.makeTransform() * n.anchorMatrix()
     return n.mMatrix
 
-proc recursiveDraw*(n: Node) =
-    if n.alpha < 0.0000001: return
+proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
+
+proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
+    if n.alpha < 0.0000001 or not n.enabled: return
+
+    var tr: Transform3d
     let c = currentContext()
-    var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+
     let oldAlpha = c.alpha
     c.alpha *= n.alpha
 
-    c.withTransform tr:
-        var hasPosteffectComponent = false
-        if not n.components.isNil:
-            for v in values(n.components):
-                v.draw()
-                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
+    var lastDrawComp = -1
+    var hasPosteffectComponent = false
 
-    if not hasPosteffectComponent:
-        for c in n.children: c.recursiveDraw()
+    var compLen = n.components.len
+
+    if compLen > 0:
+        tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+        c.withTransform tr:
+            for c in n.components:
+                inc lastDrawComp
+                if c.beforeDraw(lastDrawComp): break
+
+            # Legacy api support. Will be removed soon.
+            for c in n.components:
+                c.draw()
+                hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
+
+    let shouldDrawChildren = recursive and not hasPosteffectComponent
+
+    if shouldDrawChildren and n.affectsChildren:
+        for c in n.children:
+            c.drawNode(recursive, drawTable)
+
+    assert(compLen == n.components.len, "Components changed during drawing.")
+    if compLen > 0:
+        c.withTransform tr:
+            while lastDrawComp >= 0:
+                n.components[lastDrawComp].afterDraw(lastDrawComp)
+                dec lastDrawComp
+
+    if shouldDrawChildren and not n.affectsChildren:
+        for c in n.children:
+            c.drawNode(recursive, drawTable)
+
     c.alpha = oldAlpha
 
-
-proc drawNode*(n: Node): bool =
-    if n.alpha < 0.0000001: return
-    let c = currentContext()
-    var tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-    let oldAlpha = c.alpha
-    c.alpha *= n.alpha
-
-    c.withTransform tr:
-        var hasPosteffectComponent = false
-        if not n.components.isNil:
-            for v in values(n.components):
-                v.draw()
-                hasPosteffectComponent = hasPosteffectComponent or v.isPosteffectComponent()
-
-    c.alpha = oldAlpha
-    result = hasPosteffectComponent
-
-proc recursiveDraw*(n: Node, drawTable: var TableRef[int, seq[Node]]) =
+proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
     if n.layer == 0:
-        if n.alpha < 0.0000001: return
-        var hasPosteffectComponent = n.drawNode()
-
-        if not hasPosteffectComponent:
-            for c in n.children:
-                c.recursiveDraw(drawTable)
-
-    else:
+        drawNodeAux(n, recursive, drawTable)
+    elif not drawTable.isNil:
         var drawNodes = drawTable.getOrDefault(n.layer)
         if drawNodes.isNil:
             drawNodes = newSeq[Node]()
+            shallow(drawNodes)
 
         drawNodes.add(n)
         drawTable[n.layer] = drawNodes
 
-        for c in n.children:
-            c .recursiveDraw(drawTable)
+        if recursive:
+            for c in n.children:
+                c.drawNode(recursive, drawTable)
+    else:
+        drawNodeAux(n, recursive, drawTable)
+
+template recursiveDraw*(n: Node) =
+    n.drawNode(true, nil)
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
@@ -268,33 +324,49 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
+        # echo "find in node ": n.name
         n.name == name
 
+let nodeLoadRefTable = newTable[string, seq[proc(nodeValue: Node)]]()
 
-let nodeLoadRefTable = newTable[string, proc(nodeValue: Node)]()
 template addNodeRef*(refNode: var Node, name: string) =
-    let refProc = proc(nodeValue: Node) = refNode = nodeValue
-    nodeLoadRefTable[name] = refProc
+    let refProc = proc(nodeValue: Node) {.closure.} = refNode = nodeValue
+    if name in nodeLoadRefTable:
+        # Hacky workaround for closure compiler
+        var s = nodeLoadRefTable[name]
+        s.add(refProc)
+        nodeLoadRefTable[name] = s
+    else:
+        # Hacky workaround for closure compiler
+        nodeLoadRefTable[name] = @[refProc]
 
 proc checkNodeRefs(n: Node) =
     for k, v in nodeLoadRefTable:
         let foundNode = n.findNode(k)
         if not foundNode.isNil:
-            v(foundNode)
+            for s in v:
+                s(foundNode)
 
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     if not n.components.isNil:
-        for c in n.components.values: c.componentNodeWillBeRemovedFromSceneView()
+        for c in n.components: c.componentNodeWillBeRemovedFromSceneView()
     if not n.children.isNil:
         for c in n.children: c.nodeWillBeRemovedFromSceneView()
     n.mSceneView = nil
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
-    n.mSceneView = v
-    if not n.components.isNil:
-        for c in n.components.values: c.componentNodeWasAddedToSceneView()
-    if not n.children.isNil:
-        for c in n.children: c.nodeWasAddedToSceneView(v)
+    if n.mSceneView.isNil:
+        n.mSceneView = v
+        if not n.components.isNil:
+            for c in n.components: c.componentNodeWasAddedToSceneView()
+        if not n.children.isNil:
+            for c in n.children: c.nodeWasAddedToSceneView(v)
+    else:
+        # There may be cases where this proc has already been called.
+        # E.g. component adds child node to its node in
+        # `componentNodeWasAddedToSceneView`.
+        # In such case we don't have to do anything
+        assert(n.mSceneView == v)
 
 proc removeChild(n, child: Node) =
     for i, c in n.children:
@@ -341,6 +413,10 @@ proc childNamed*(n: Node, name: string): Node =
     for c in n.children:
         if c.name == name: return c
 
+proc setBoneMatrix*(n: Node, mat: Matrix4) =
+    n.isDirty = false
+    mat.multiply(n.transform, n.worldMatrix)
+
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 
 proc worldTransform*(n: Node): Matrix4 =
@@ -367,7 +443,7 @@ proc tryWorldToLocal*(n: Node, p: Vector3, res: var Vector3): bool =
         result = true
 
 proc worldPos*(n: Node): Vector3 =
-    result = n.localToWorld(newVector3())
+    result = n.localToWorld(n.mAnchorPoint)
 
 proc `worldPos=`*(n: Node, p: Vector3) =
     if n.parent.isNil:
@@ -381,6 +457,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("worldPos", n.worldPos)
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
+    p.visitProperty("anchor", n.anchor)
     p.visitProperty("alpha", n.alpha)
 
     p.visitProperty("tX", n.positionX, { pfAnimatable })
@@ -391,6 +468,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
 
     p.visitProperty("layer", n.layer)
+    p.visitProperty("enabled", n.enabled)
 
 proc reparentTo*(n, newParent: Node) =
     # Change parent of a node preserving its world transform
@@ -423,8 +501,14 @@ proc loadComposition*(n: Node, resourceName: string) =
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(fullPath)
         let serializer = Serializer.new()
-        n.deserialize(j, serializer)
-        popParentResource()
+        try:
+            n.deserialize(j, serializer)
+        except:
+            echo "Could not deserialize ", resourceName, ": ", getCurrentExceptionMsg()
+            echo getCurrentException().getStackTrace()
+            raise
+        finally:
+            popParentResource()
 
 proc loadComposition*(n: Node, j: JsonNode) =
     let serializer = Serializer.new()
@@ -432,40 +516,38 @@ proc loadComposition*(n: Node, j: JsonNode) =
 
 import rod.animation.property_animation
 
-# proc deserialize*(n: Node, s: Serializer) =
-#     proc toValue(j: JsonNode, s: var string) =
-#         s = j.str
-
-#     proc jsonNameForPropName(s: string): string =
-#         case s
-#         of "bEnableBackfaceCulling": "culling"
-#         else: s
-
-#     for k, v in n[].fieldPairs:
-#         echo "deserialize mesh = ", k
-#         jNode{jsonNameForPropName(k)}.toValue(v)
-
-
 proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if n.name.isNil:
         s.deserializeValue(j, "name", n.name)
     s.deserializeValue(j, "translation", n.position)
     s.deserializeValue(j, "scale", n.mScale)
     s.deserializeValue(j, "rotation", n.mRotation)
+    s.deserializeValue(j, "anchor", n.anchor)
     s.deserializeValue(j, "alpha", n.alpha)
     s.deserializeValue(j, "layer", n.layer)
+    s.deserializeValue(j, "enabled", n.enabled)
+    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
 
     var v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
             n.addChild(newNodeFromJson(v[i], s))
+
     v = j{"components"}
     if not v.isNil:
-        for k, c in v:
-            if k == "NodeSelector":
-                continue
-            let comp = n.component(k)
-            comp.deserialize(c, s)
+        if v.kind == JArray:
+            for i in 0 ..< v.len:
+                var className: string
+                s.deserializeValue(v[i], "_c", className)
+                let comp = n.addComponent(className)
+                comp.deserialize(v[i], s)
+        else:
+            # Deprecated. Old save format support
+            for k, c in v:
+                if k == "NodeSelector":
+                    continue
+                let comp = n.component(k)
+                comp.deserialize(c, s)
 
     let animations = j{"animations"}
     if not animations.isNil and animations.len > 0:
@@ -498,19 +580,25 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("translation", s.getValue(n.position))
     result.add("scale", s.getValue(n.scale))
     result.add("rotation", s.getValue(n.rotation))
+    result.add("anchor", s.getValue(n.anchor))
     result.add("alpha", s.getValue(n.alpha))
     result.add("layer", s.getValue(n.layer))
+    result.add("enabled", s.getValue(n.enabled))
 
     if not n.components.isNil:
-        var componentsNode = newJObject()
+        var componentsNode = newJArray()
         result.add("components", componentsNode)
 
-        for key, value in n.components:
+        for value in n.components:
+            if value.className() == "NodeSelector":
+                continue
+
             var jcomp: JsonNode
             jcomp = value.serialize( s )
 
             if not jcomp.isNil:
-                componentsNode.add(key, jcomp)
+                jcomp.add("_c", %value.className())
+                componentsNode.add(jcomp)
 
     var childsNode = newJArray()
     result.add("children", childsNode)
@@ -525,9 +613,19 @@ proc getDepth*(n: Node): int =
         inc result
         p = p.parent
 
+proc printParents(n: Node, indent: var string) =
+    echo "" & indent & " name ", n.name
+    indent = indent & "+"
+    if not n.parent.isNil:
+        n.parent.printParents(indent)
+
 proc getTreeDistance*(x, y: Node): int =
-    var xLevel = x.getDepth()
-    var yLevel = y.getDepth()
+    assert(x != y)
+
+    let xxLevel = x.getDepth()
+    let yyLevel = y.getDepth()
+    var xLevel = xxLevel
+    var yLevel = yyLevel
     var px = x
     var py = y
 
@@ -538,7 +636,14 @@ proc getTreeDistance*(x, y: Node): int =
         dec yLevel
         py = py.parent
 
-    assert(px != py)
+    if px == py:
+        # One node is child of another
+        if xxLevel > yyLevel:
+            return -1
+        else:
+            return 1
+
+    #assert(px != py)
     var cx, cy : Node
     while px != py:
         cx = px
