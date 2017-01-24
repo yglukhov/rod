@@ -327,6 +327,22 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
         let startColor = addPropDesc(layer, compIndex, "color", p.property("Color", Vector4))
         startColor.setInitialValueToResult(result)
         result["_c"] = %"ColorFill"
+
+    of "ADBE Tint": # Tint
+        result = newJObject()
+        let blackColor = addPropDesc(layer, compIndex, "black", p.property("Map Black To", Vector4))do(v: Vector4) -> JsonNode:
+            %[v[0], v[1], v[2], 1.0]
+        blackColor.setInitialValueToResult(result)
+
+        let whiteColor = addPropDesc(layer, compIndex, "white", p.property("Map White To", Vector4))do(v: Vector4) -> JsonNode:
+            %[v[0], v[1], v[2], 1.0]
+
+        whiteColor.setInitialValueToResult(result)
+        let amount = addPropDesc(layer, compIndex, "amount", p.property("Amount to Tint", float)) do(v: float) -> JsonNode:
+            %(v / 100)
+        amount.setInitialValueToResult(result)
+        result["_c"] = %"Tint"
+
     else:
         logi "WARNING: Effect not supported. Layer: ", layer.name
         dumpPropertyTree(p)
@@ -492,7 +508,7 @@ proc serializeLayer(layer: Layer): JsonNode =
 
         if chres.len > 0:
             chres.elems.reverse()
-        result["children"] = chres
+            result["children"] = chres
 
     if layer.layerIsCompositionRef():
         result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
@@ -762,7 +778,7 @@ proc serializeComposition(composition: Composition): JsonNode =
     if not f.isNil:
         result["aep_name"] = % $f.name
 
-proc replacer(n: JsonNode): ref RootObj {.exportc.} =
+proc replacer(n: JsonNode): ref RootObj =
     case n.kind
     of JNull: result = nil
     of JBool:
@@ -790,7 +806,8 @@ proc replacer(n: JsonNode): ref RootObj {.exportc.} =
             {.emit: "`result`[`ck`] = `val`;".}
 
 proc fastJsonStringify(n: JsonNode): cstring =
-    {.emit: "`result` = JSON.stringify(`replacer`(`n`), null, 2);".}
+    let r = replacer(n)
+    {.emit: "`result` = JSON.stringify(`r`, null, 2);".}
 
 proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
     logTextField.text = ""

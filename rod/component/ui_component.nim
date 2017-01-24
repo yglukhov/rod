@@ -69,13 +69,6 @@ proc moveToWindow(v: View, w: Window) =
     for s in v.subviews:
         s.moveToWindow(w)
 
-proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
-    var res : Vector3
-    if c.node.tryWorldToLocal(intersection, res):
-        let v = c.view
-        e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
-        result = v.recursiveHandleMouseEvent(e)
-
 proc handleScrollEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
     var res : Vector3
     if c.node.tryWorldToLocal(intersection, res):

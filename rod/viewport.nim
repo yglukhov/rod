@@ -393,32 +393,6 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
     if not result:
         result = procCall v.View.onTouchEv(e)
 
-method handleMouseEvent*(v: SceneView, e: var Event): bool =
-    result = procCall v.View.handleMouseEvent(e)
-    if v.uiComponents.len > 0:
-        let r = v.rayWithScreenCoords(e.localPosition)
-
-        type Inter = tuple[i: Vector3, c: UIComponent]
-        var intersections = newSeq[Inter]()
-
-        for c in v.uiComponents:
-            var inter : Vector3
-            if c.intersectsWithUINode(r, inter):
-                intersections.add((inter, c))
-
-        template dist(a, b): auto = (b - a).length
-
-        if intersections.len > 0:
-            intersections.sort(proc (x, y: Inter): int =
-                result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
-                if result == 0:
-                    result = getTreeDistance(x.c.node, y.c.node)
-            )
-
-            for i in intersections:
-                result = i.c.handleMouseEvent(r, e, i.i)
-                if result: break
-
 method viewOnEnter*(v:SceneView){.base.} = discard
 method viewOnExit*(v:SceneView){.base.} = discard
 
