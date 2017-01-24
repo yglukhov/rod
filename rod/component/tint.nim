@@ -39,8 +39,6 @@ method beforeDraw*(c: Tint, index: int): bool =
 method afterDraw*(c: Tint, index: int) =
     popPostEffect()
 
-method isPosteffectComponent*(c: Tint): bool = true
-
 method visitProperties*(c: Tint, p: var PropertyVisitor) =
     p.visitProperty("black", c.black)
     p.visitProperty("white", c.white)

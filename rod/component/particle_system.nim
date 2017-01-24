@@ -119,7 +119,7 @@ void main()
     // calculate anim frame
     int currFrame = int( mod(aLifeTime * uFPS, float(uFramesCount - 1)) );
     int row = currFrame / uAnimColumns;
-    int col = int(mod(float(currFrame), float(uAnimColumns)));
+    int col = int(mod(float(currFrame) + 0.5, float(uAnimColumns)));
     vec2 fc = vec2(uFrameSize.x * float(col), uFrameSize.y * float(row));
 
     if (aID == 0.0) { vertexOffset = vec3(-0.5,  0.5,  0); texCoords = vec2(fc.x, fc.y);}
@@ -185,6 +185,8 @@ void main()
 #endif
 }
 """
+
+var ps_gravity_y_direction = 1.0
 
 type
     ParticleModeEnum* = enum
@@ -530,7 +532,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
 
         ps.particles[i].velocity.x += ps.gravity.x*dt
-        ps.particles[i].velocity.y += ps.gravity.y*dt
+        ps.particles[i].velocity.y += ps.gravity.y*dt * ps_gravity_y_direction
         ps.particles[i].velocity.z += ps.gravity.z*dt
         ps.particles[i].position.x += ps.particles[i].velocity.x*dt
         ps.particles[i].position.y += ps.particles[i].velocity.y*dt
@@ -660,6 +662,11 @@ proc update(ps: ParticleSystem, dt: float) =
                 ps.newParticles.add(ps.createParticle(i, pCount, dt))
 
             ps.lastBirthTime = curTime
+
+    let view = ps.node.sceneView
+    var projMatrix : Matrix4
+    view.camera.getProjectionMatrix(view.bounds, projMatrix)
+    ps_gravity_y_direction = abs(projMatrix[5]) / projMatrix[5]
 
     ps.updateParticlesBuffer(dt)
     ps.newParticles.setLen(0)
