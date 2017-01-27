@@ -145,8 +145,9 @@ proc addComponent*(n: Node, name: string): Component =
     result = createComponentForNode(n, name)
     n.components.add(result)
 
-proc addComponent*(n: Node, T: typedesc): Component =
-    result = n.addComponent(T.name)
+proc addComponent*(n: Node, T: typedesc): T =
+    type TT = T
+    result = n.addComponent(T.name).TT
 
 proc getComponent*(n: Node, name: string): Component =
     if n.components.isNil:
