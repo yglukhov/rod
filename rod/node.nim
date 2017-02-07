@@ -586,7 +586,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("layer", s.getValue(n.layer))
     result.add("enabled", s.getValue(n.enabled))
 
-    if not n.components.isNil:
+    if not n.components.isNil and n.components.len > 0:
         var componentsNode = newJArray()
         result.add("components", componentsNode)
 
@@ -595,16 +595,17 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
                 continue
 
             var jcomp: JsonNode
-            jcomp = value.serialize( s )
+            jcomp = value.serialize(s)
 
             if not jcomp.isNil:
                 jcomp.add("_c", %value.className())
                 componentsNode.add(jcomp)
 
-    var childsNode = newJArray()
-    result.add("children", childsNode)
-    for child in n.children:
-        childsNode.add( child.serialize(s) )
+    if not n.children.isNil and n.children.len > 0:
+        var childsNode = newJArray()
+        result.add("children", childsNode)
+        for child in n.children:
+            childsNode.add(child.serialize(s))
 
 proc getDepth*(n: Node): int =
     result = 0
