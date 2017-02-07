@@ -21,16 +21,18 @@ method init*(vm: VisualModifier) =
     vm.blendMode = COLOR_ADD
 
 method draw*(vm: VisualModifier) =
-    let c = currentContext()
-    let gl = c.gl
+    for n in vm.node.children: n.recursiveDraw()
+
+method beforeDraw*(vm: VisualModifier, index: int): bool =
+    let gl = currentContext().gl
 
     if vm.blendMode == COLOR_SCREEN:
         gl.blendFunc(GL_ONE, vm.blendMode.GLenum)
     else:
         gl.blendFunc(gl.SRC_ALPHA, vm.blendMode.GLenum)
 
-    for n in vm.node.children: n.recursiveDraw()
-
+method afterDraw*(vm: VisualModifier, index: int) =
+    let gl = currentContext().gl
     gl.blendFunc(gl.SRC_ALPHA, COLOR_MULTIPLY.GLenum)
 
 method isPosteffectComponent*(vm: VisualModifier): bool = true
