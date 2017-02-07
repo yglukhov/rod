@@ -20,9 +20,6 @@ method init*(vm: VisualModifier) =
     procCall vm.Component.init()
     vm.blendMode = COLOR_ADD
 
-method draw*(vm: VisualModifier) =
-    for n in vm.node.children: n.recursiveDraw()
-
 method beforeDraw*(vm: VisualModifier, index: int): bool =
     let gl = currentContext().gl
 
@@ -34,8 +31,6 @@ method beforeDraw*(vm: VisualModifier, index: int): bool =
 method afterDraw*(vm: VisualModifier, index: int) =
     let gl = currentContext().gl
     gl.blendFunc(gl.SRC_ALPHA, COLOR_MULTIPLY.GLenum)
-
-method isPosteffectComponent*(vm: VisualModifier): bool = true
 
 method deserialize*(vm: VisualModifier, j: JsonNode, serealizer: Serializer) =
     var v = j{"blendMode"}
