@@ -46,6 +46,9 @@ proc `%`*(v: Color): JsonNode =
     for k, val in v.fieldPairs:
         result.add( %val )
 
+proc `%`*(v: Rect): JsonNode=
+    result = vectorToJNode(newVector4(v.origin.x, v.origin.y, v.size.width, v.size.height))
+
 proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path
     when not defined(js) and not defined(android) and not defined(ios):
@@ -89,6 +92,11 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Quaterni
     let jN = j{name}
     if not jN.isNil:
         val = newQuaternion(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum(), jN[3].getFnum())
+
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Rect) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newRect(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum(), jN[3].getFnum())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Size) =
     let jN = j{name}

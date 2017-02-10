@@ -5,8 +5,8 @@ import nimx.portable_gl
 import nimx.view
 import nimx.property_visitor
 
-import rod.node, rod.viewport, rod.component
-
+import rod.node, rod.viewport, rod.component, rod.tools.serializer
+import json
 import opengl
 
 const clippingRectWithScissors = true
@@ -84,4 +84,13 @@ method isPosteffectComponent*(c: ClippingRectComponent): bool = true
 method visitProperties*(cl: ClippingRectComponent, p: var PropertyVisitor) =
     p.visitProperty("rect", cl.clippingRect)
 
+method serialize*(c: ClippingRectComponent, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("rect", s.getValue(c.clippingRect))
+
+method deserialize*(c: ClippingRectComponent, j: JsonNode, s: Serializer) =
+    s.deserializeValue(j, "rect", c.clippingRect)
+
 registerComponent(ClippingRectComponent)
+
+

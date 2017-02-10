@@ -4,7 +4,8 @@ import os
 proc aeScriptsFolder(): string =
     when defined(windows):
         const searchPaths = [
-            "C:/Program Files/Adobe/Adobe After Effects CC 2015.3/Support Files/Scripts"
+            "C:/Program Files/Adobe/Adobe After Effects CC 2015.3/Support Files/Scripts",
+            "C:/Program Files/Adobe/Adobe After Effects CC 2017/Support Files/Scripts"
         ]
     else:
         const searchPaths = [
