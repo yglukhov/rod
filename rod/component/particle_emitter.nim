@@ -8,6 +8,7 @@ import rod.quaternion
 import rod.node
 import rod.component
 import rod.rod_types
+import rod.viewport
 
 import nimx.matrixes
 import nimx.animation
@@ -120,10 +121,11 @@ template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: fl
     part.rotation = newRotation
 
 template drawParticle(p: ParticleEmitter, part: ParticleData) =
+    let camScale = p.node.sceneView.camera.node.scale
     let proto = p.particlePrototype
     proto.position = part.coord
     proto.rotation = part.rotation
-    proto.scale = part.scale
+    proto.scale = newVector3(part.scale.x * camScale.x, part.scale.y * camScale.y, part.scale.z * camScale.z)
     let pc = proto.component(Particle)
     pc.remainingLifetime = part.remainingLifetime
     pc.initialLifetime = part.initialLifetime
