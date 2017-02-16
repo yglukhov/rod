@@ -17,27 +17,38 @@ type ColorBalanceHLS* = ref object of Component
     lightness*: float32
     enabled: bool
 
-var effect = newPostEffect("""
-vec3 cbhls_effect_rgb2hsv(vec3 c) {
-    vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
-    vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
-    vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+# This effect is borrowed from https://github.com/greggman/hsva-unity  /  HSL version
 
-    float d = q.x - min(q.w, q.y);
-    float e = 1.0e-10;
-    return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+var effect = newPostEffect("""
+float cbhls_effect_Epsilon = 1e-10;
+
+vec3 cbhls_effect_rgb2hcv(vec3 RGB) {
+    // Based on work by Sam Hocevar and Emil Persson
+    vec4 P = mix(vec4(RGB.bg, -1.0, 2.0/3.0), vec4(RGB.gb, 0.0, -1.0/3.0), step(RGB.b, RGB.g));
+    vec4 Q = mix(vec4(P.xyw, RGB.r), vec4(RGB.r, P.yzx), step(P.x, RGB.r));
+    float C = Q.x - min(Q.w, Q.y);
+    float H = abs((Q.w - Q.y) / (6.0 * C + cbhls_effect_Epsilon) + Q.z);
+    return vec3(H, C, Q.x);
 }
 
-vec3 cbhls_effect_hsv2rgb(vec3 c) {
-    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
-    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
-    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+vec3 cbhls_effect_rgb2hsl(vec3 RGB) {
+    vec3 HCV = cbhls_effect_rgb2hcv(RGB);
+    float L = HCV.z - HCV.y * 0.5;
+    float S = HCV.y / (1.0 - abs(L * 2.0 - 1.0) + cbhls_effect_Epsilon);
+    return vec3(HCV.x, S, L);
+}
+
+vec3 cbhls_effect_hsl2rgb(vec3 c) {
+    c = vec3(fract(c.x), clamp(c.yz, 0.0, 1.0));
+    vec3 rgb = clamp(abs(mod(c.x * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0);
+    return c.z + c.y * (rgb - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
 }
 
 void cbhls_effect(float hue, float saturation, float lightness) {
-    vec3 p = cbhls_effect_rgb2hsv(gl_FragColor.rgb);
-    p.x = fract(p.x + hue);
-    gl_FragColor.rgb = cbhls_effect_hsv2rgb(p);
+    vec3 hsl = cbhls_effect_rgb2hsl(gl_FragColor.rgb);
+    vec3 adjustment = vec3(hue, saturation, lightness);
+    adjustment.xy *= step(0.001, hsl.x + hsl.y);
+    gl_FragColor.rgb = cbhls_effect_hsl2rgb(hsl + adjustment);
 }
 """, "cbhls_effect", ["float", "float", "float"])
 
@@ -51,6 +62,12 @@ method deserialize*(c: ColorBalanceHLS, j: JsonNode, s: Serializer) =
     c.hue = j["hue"].getFNum()
     c.saturation = j["saturation"].getFNum()
     c.lightness = j["lightness"].getFNum()
+
+method serialize*(c: ColorBalanceHLS, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("hue", s.getValue(c.hue))
+    result.add("saturation", s.getValue(c.saturation))
+    result.add("lightness", s.getValue(c.lightness))
 
 method beforeDraw*(c: ColorBalanceHLS, index: int): bool =
     c.enabled = not c.areValuesNormal()
