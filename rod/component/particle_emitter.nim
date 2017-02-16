@@ -83,7 +83,7 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
     part.pid = random(1.0)
 
     let velocityLen = p.velocity + p.velocity * pmRandom(p.velocityRandom)
-    part.velocity = aroundZ(p.direction + p.direction * pmRandom(p.directionRandom)) * newVector3(velocityLen, 0, 0)
+    part.velocity = aroundZ(p.direction + pmRandom(p.directionRandom)) * newVector3(velocityLen, 0, 0)
     part.initialLifetime = p.lifetime + p.lifetime * pmRandom(0.1)
     part.remainingLifetime = part.initialLifetime
     part.rotVelocity = newQuaternion(pmRandom(3.0), ForwardVector)
