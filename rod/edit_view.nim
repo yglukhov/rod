@@ -1,30 +1,14 @@
 import math, algorithm, strutils, tables, json, logging
 
-import nimx.context
-import nimx.portable_gl
-import nimx.view
-import nimx.types, nimx.matrixes
-import nimx.button, nimx.popup_button
-import nimx.outline_view
-import nimx.toolbar
-import nimx.font
+import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
+                outline_view, toolbar, color_picker, scroll_view, clip_view,
+                text_field, table_view_cell, gesture_detector_newtouch,
+                key_commands, linear_layout, view_event_handling_new ]
 
-import node
-import inspector_view
-import rod_types
-
-import nimx.animation
-import nimx.color_picker
-import nimx.scroll_view
-import nimx.clip_view
-import nimx.text_field
-import nimx.table_view_cell
-import nimx.gesture_detector_newtouch
-import nimx.key_commands
-import nimx.linear_layout
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
 
+import rod_types, node, inspector_view
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
@@ -34,7 +18,6 @@ import rod.editor.gizmo_axis
 import tools.serializer
 
 import ray
-import nimx.view_event_handling_new
 import viewport
 
 import variant
@@ -49,14 +32,34 @@ const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
 when loadingAndSavingAvailable:
     import native_dialogs
 
-type EventCatchingView* = ref object of View
-    keyDownDelegate*: proc(event: var Event): bool
-    keyUpDelegate*: proc(event: var Event): bool
-    mouseScrrollDelegate*: proc(event: var Event)
-    allowGameInput: bool
 
-type EventCatchingListener = ref object of BaseScrollListener
-    view: EventCatchingView
+type
+    Editor* = ref object
+        rootNode*: Node
+        workspaceView: View
+        eventCatchingView*: EventCatchingView
+        treeView*: View
+        animationEditView*: AnimationEditView
+        toolbar*: Toolbar
+        sceneView*: SceneView
+        mSelectedNode: Node
+        outlineView*: OutlineView
+        inspector*: InspectorView
+        cameraController*: EditorCameraController
+        cameraSelector: PopupButton
+        gizmo: GizmoAxis
+
+    WorkspaceView = ref object of View
+        editor: Editor
+
+    EventCatchingView* = ref object of View
+        keyDownDelegate*: proc(event: var Event): bool
+        keyUpDelegate*: proc(event: var Event): bool
+        mouseScrrollDelegate*: proc(event: var Event)
+        allowGameInput: bool
+
+    EventCatchingListener = ref object of BaseScrollListener
+        view: EventCatchingView
 
 method acceptsFirstResponder(v: EventCatchingView): bool = true
 
@@ -85,26 +88,6 @@ method onScrollProgress*(ecl: EventCatchingListener, dx, dy : float32, e : var E
 
 method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
     procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
-
-
-type
-    Editor* = ref object
-        rootNode*: Node
-        workspaceView: View
-        eventCatchingView*: EventCatchingView
-        treeView*: View
-        animationEditView*: AnimationEditView
-        toolbar*: Toolbar
-        sceneView*: SceneView
-        mSelectedNode: Node
-        outlineView*: OutlineView
-        inspector*: InspectorView
-        cameraController*: EditorCameraController
-        cameraSelector: PopupButton
-        gizmo: GizmoAxis
-
-    WorkspaceView = ref object of View
-        editor: Editor
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
