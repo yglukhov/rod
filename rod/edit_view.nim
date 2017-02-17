@@ -1,5 +1,7 @@
 import math, algorithm, strutils, tables, json, logging
 
+import nimx.context
+import nimx.portable_gl
 import nimx.view
 import nimx.types, nimx.matrixes
 import nimx.button, nimx.popup_button
@@ -580,6 +582,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     let gizmo = editor.gizmo.addComponent(GizmoAxis)
     editor.gizmo.nodeWasAddedToSceneView(editor.sceneView)
     editor.sceneView.afterDrawProc = proc() =
+        currentContext().gl.clearDepthStencil()
         editor.gizmo.drawNode(true, nil)
 
     return editor
