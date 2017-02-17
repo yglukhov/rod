@@ -460,6 +460,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("rotation", n.rotation)
     p.visitProperty("anchor", n.anchor)
     p.visitProperty("alpha", n.alpha)
+    p.visitProperty("affectsCh", n.affectsChildren)
 
     p.visitProperty("tX", n.positionX, { pfAnimatable })
     p.visitProperty("tY", n.positionY, { pfAnimatable })

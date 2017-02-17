@@ -881,8 +881,8 @@ function buildUI(contextObj) {
   transitiveEffectsCheckBox.value = `transitiveEffects`[0];
 
   transitiveEffectsCheckBox.onClick = function(e) {
-    `transitiveEffects`[0] = affectsChildrenCheckBox.value;
-    app.settings.saveSetting("rodExport", "transitiveEffects", affectsChildrenCheckBox.value + "");
+    `transitiveEffects`[0] = transitiveEffectsCheckBox.value;
+    app.settings.saveSetting("rodExport", "transitiveEffects", transitiveEffectsCheckBox.value + "");
   };
 
   var exportButton = topGroup.add("button", undefined,
