@@ -87,20 +87,24 @@ method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
     procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
 
 
-type Editor* = ref object
-    rootNode*: Node
-    workspaceView: View
-    eventCatchingView*: EventCatchingView
-    treeView*: View
-    animationEditView*: AnimationEditView
-    toolbar*: Toolbar
-    sceneView*: SceneView
-    mSelectedNode: Node
-    outlineView*: OutlineView
-    inspector*: InspectorView
-    cameraController*: EditorCameraController
-    cameraSelector: PopupButton
-    gizmo: GizmoAxis
+type
+    Editor* = ref object
+        rootNode*: Node
+        workspaceView: View
+        eventCatchingView*: EventCatchingView
+        treeView*: View
+        animationEditView*: AnimationEditView
+        toolbar*: Toolbar
+        sceneView*: SceneView
+        mSelectedNode: Node
+        outlineView*: OutlineView
+        inspector*: InspectorView
+        cameraController*: EditorCameraController
+        cameraSelector: PopupButton
+        gizmo: GizmoAxis
+
+    WorkspaceView = ref object of View
+        editor: Editor
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -465,13 +469,17 @@ proc onKeyUp(editor: Editor, e: var Event): bool =
     if e.keyCode == VirtualKey.F:
         editor.cameraController.setToNode(editor.selectedNode)
 
+method onKeyDown(v: WorkspaceView, e: var Event): bool = v.editor.onKeyDown(e)
+method onKeyUp(v: WorkspaceView, e: var Event): bool = v.editor.onKeyUp(e)
+
 proc newTabView(): TabView =
     result = TabView.new(newRect(0, 0, 100, 100))
     result.dockingTabs = true
     result.userConfigurable = true
 
 proc createWorkspaceLayout(e: Editor) =
-    let v = View.new(e.sceneView.frame)
+    let v = WorkspaceView.new(e.sceneView.frame)
+    v.editor = e
     e.workspaceView = v
     v.autoresizingMask = e.sceneView.autoresizingMask
     # Initial setup:
