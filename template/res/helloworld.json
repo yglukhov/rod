@@ -29,8 +29,8 @@
     {
       "name": "nimlogo",
       "translation": [
-        -199.25,
-        -131.4900054931641,
+        388.0,
+        357.9999694824219,
         0.0
       ],
       "scale": [
@@ -45,11 +45,11 @@
         1.0
       ],
       "anchor": [
-        0.0,
-        0.0,
+        593.5,
+        450.0,
         0.0
       ],
-      "alpha": 0.2800000011920929,
+      "alpha": 0.6000000238418579,
       "layer": 0,
       "enabled": true,
       "components": [
@@ -64,98 +64,100 @@
           ],
           "_c": "Sprite"
         }
-      ]
-    },
-    {
-      "name": "hellotext",
-      "translation": [
-        0.0,
-        0.0,
-        0.0
       ],
-      "scale": [
-        1.0,
-        1.0,
-        1.0
-      ],
-      "rotation": [
-        0.0,
-        0.0,
-        0.0,
-        1.0
-      ],
-      "anchor": [
-        0.0,
-        0.0,
-        0.0
-      ],
-      "alpha": 1.0,
-      "layer": 0,
-      "enabled": true,
-      "components": [
+      "children": [
         {
-          "text": "Hello world!",
-          "color": [
+          "name": "hellotext",
+          "translation": [
+            210.0,
+            228.9900054931641,
+            0.0
+          ],
+          "scale": [
+            1.0,
+            1.0,
+            1.0
+          ],
+          "rotation": [
             0.0,
             0.0,
             0.0,
             1.0
           ],
-          "shadowX": 0.0,
-          "shadowY": 0.0,
-          "shadowRadius": 0.0,
-          "shadowSpread": 0.0,
-          "shadowColor": [
-            0.0,
+          "anchor": [
             0.0,
             0.0,
             0.0
           ],
-          "Tracking Amount": 0.0,
-          "lineSpacing": 2.0,
-          "fontSize": 152.0,
-          "strokeSize": 0.0,
-          "strokeColor": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "isColorGradient": false,
-          "colorFrom": [
-            0.0,
-            0.0,
-            0.0,
-            1.0
-          ],
-          "colorTo": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "isStrokeGradient": false,
-          "strokeColorFrom": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "strokeColorTo": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "bounds": [
-            0.0,
-            0.0,
-            0.0,
-            0.0
-          ],
-          "justification": "left",
-          "verticalAlignment": "top",
-          "_c": "Text"
+          "alpha": 1.0,
+          "layer": 0,
+          "enabled": true,
+          "components": [
+            {
+              "text": "Hello world!",
+              "color": [
+                1.0,
+                1.0,
+                0.6200000047683716,
+                1.0
+              ],
+              "shadowX": 0.0,
+              "shadowY": 0.0,
+              "shadowRadius": 0.0,
+              "shadowSpread": 0.0,
+              "shadowColor": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "Tracking Amount": 0.0,
+              "lineSpacing": 2.0,
+              "fontSize": 152.0,
+              "strokeSize": 1.340000033378601,
+              "strokeColor": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "isColorGradient": false,
+              "colorFrom": [
+                1.0,
+                1.0,
+                0.6200000047683716,
+                1.0
+              ],
+              "colorTo": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "isStrokeGradient": false,
+              "strokeColorFrom": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "strokeColorTo": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "bounds": [
+                0.0,
+                0.0,
+                0.0,
+                0.0
+              ],
+              "justification": "left",
+              "verticalAlignment": "top",
+              "_c": "Text"
+            }
+          ]
         }
       ]
     }

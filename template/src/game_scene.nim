@@ -43,14 +43,14 @@ method onKeyDown*(gs: GameScene, e: var Event): bool =
         discard startEditingNodeInView(gs.rootNode, gs)
         result = true
 
-method init*(ev: GameScene, frame: Rect)=
-    procCall ev.SceneView.init(frame)
-    ev.rootNode = newNode("root")
-    ev.addDefaultOrthoCamera("camera")
+method init*(gs: GameScene, frame: Rect)=
+    procCall gs.SceneView.init(frame)
+    gs.rootNode = newNode("root")
+    gs.addDefaultOrthoCamera("camera")
 
 ## viewOnEnter called when SceneView was added to Window
-method viewOnEnter*(ev: GameScene)=
-    let gui = ev.rootNode.newChild("Gui")
+method viewOnEnter*(gs: GameScene)=
+    let gui = gs.rootNode.newChild("Gui")
 
     ## load seialized node from json, constructed in editor
     let hello = newNodeWithResource("helloworld.json")
@@ -62,10 +62,23 @@ method viewOnEnter*(ev: GameScene)=
         quit()
 
     let btnParent = newNode()
-    btnParent.position = newVector3(960.0, 400.0)
-    btnParent.anchor = newVector3(100.0, 0.0)
+    btnParent.position = newVector3(1920.0, 1080.0)
+    btnParent.anchor = newVector3(220.0, 70.0)
     gui.addChild(btnParent)
 
     btnParent.addComponent(UIComponent).view = btnExit
+
+    let logo = hello.findNode("nimlogo")
+
+    let logoScale = logo.scale
+
+    let anim = newAnimation()
+    anim.loopDuration = 2.0
+    anim.numberOfLoops = -1
+    anim.loopPattern = lpStartToEndToStart
+    anim.onAnimate = proc(p: float) =
+        logo.scale = interpolate(logoScale, logoScale * 1.1, backEaseInOut(p))
+
+    gs.addAnimation(anim)
 
     logi "GameScene viewOnEnter"
