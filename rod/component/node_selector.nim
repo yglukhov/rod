@@ -49,8 +49,6 @@ type NodeSelector* = ref object of Component
     modelMatrix*: Matrix4
     vertexData: seq[GLfloat]
     color*: Color
-    gizmo: Node
-    gizmoAxis: Vector3
 
 proc trySetupTransformfromNode(ns: NodeSelector, n: Node): bool =
     if not n.isNil:
@@ -116,37 +114,12 @@ proc createBoxes(ns: NodeSelector) =
 
             ns.createVBO()
 
-proc updateGizmo(ns: NodeSelector) =
-    var projConstant = 0.005
-    ns.gizmo.position = ns.node.worldPos
-
-    var size = (ns.node.sceneView.camera.node.worldPos - ns.node.worldPos).length
-    if size < 0.01:
-        size = 0.01
-
-    if ns.node.sceneView.camera.projectionMode == cpPerspective:
-        ns.gizmo.scale = newVector3(size, size, size) * projConstant
-    else:
-        size = 10
-        ns.gizmo.scale = newVector3(size, size, size)
 
 method componentNodeWasAddedToSceneView*(ns: NodeSelector) =
     ns.createBoxes()
 
-    ns.gizmo = newNode()
-    let distance = (ns.node.worldPos - ns.node.sceneView.camera.node.worldPos).length()
-    if distance > 0.1:
-        ns.gizmo.loadComposition( getMoveAxisJson() )
-        ns.node.mSceneView.rootNode.addChild(ns.gizmo)
-    ns.updateGizmo()
-
-method componentNodeWillBeRemovedFromSceneView*(ns: NodeSelector) =
-    if not ns.gizmo.isNil:
-        ns.gizmo.removeFromParent()
 
 method draw*(ns: NodeSelector) =
-    ns.updateGizmo()
-
     if not ns.vertexData.isNil:
 
         let c = currentContext()
@@ -181,35 +154,6 @@ method draw*(ns: NodeSelector) =
 
         #TODO to default settings
         gl.disable(gl.DEPTH_TEST)
-
-var screenPoint, offset: Vector3
-proc startTransform*(ns: NodeSelector, selectedGizmo: Node, position: Point) =
-    if selectedGizmo.name.contains("gizmo_axis_x"):
-        ns.gizmoAxis = newVector3(1.0, 0.0, 0.0)
-    elif selectedGizmo.name.contains("gizmo_axis_y"):
-        ns.gizmoAxis = newVector3(0.0, 1.0, 0.0)
-    elif selectedGizmo.name.contains("gizmo_axis_z"):
-        ns.gizmoAxis = newVector3(0.0, 0.0, 1.0)
-
-    screenPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
-    offset = ns.gizmo.worldPos - ns.node.sceneView.screenToWorldPoint(newVector3(position.x, position.y, screenPoint.z))
-
-proc proccesTransform*(ns: NodeSelector, position: Point) =
-    # let scrPoint = ns.node.sceneView.worldToScreenPoint(ns.gizmo.worldPos)
-    # let worldPoint = ns.node.sceneView.screenToWorldPoint(scrPoint)
-
-    let curScreenPoint = newVector3(position.x, position.y, screenPoint.z)
-    var curPosition: Vector3
-    curPosition = ns.node.sceneView.screenToWorldPoint(curScreenPoint) + offset
-    curPosition = curPosition - ns.gizmo.worldPos
-    ns.gizmo.position = ns.gizmo.worldPos + curPosition * ns.gizmoAxis
-    if not ns.node.parent.isNil:
-        ns.node.position = ns.node.parent.worldToLocal(ns.gizmo.position)
-    else:
-        ns.node.position = ns.gizmo.position
-
-proc stopTransform*(ns: NodeSelector) =
-    ns.gizmoAxis = newVector3(0.0, 0.0, 0.0)
 
 method visitProperties*(ns: NodeSelector, p: var PropertyVisitor) =
     p.visitProperty("color", ns.color)

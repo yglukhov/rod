@@ -18,7 +18,6 @@ let move_axis_node = """{
   ],
   "children": [
     {
-      "layer": 1,
       "name": "gizmo_axis_y",
       "components":
       [
@@ -1224,7 +1223,6 @@ let move_axis_node = """{
       ]
     },
     {
-      "layer": 1,
       "name": "gizmo_axis_x",
       "components":
       [
@@ -2430,7 +2428,6 @@ let move_axis_node = """{
       ]
     },
     {
-      "layer": 1,
       "name": "gizmo_axis_z",
       "components":
       [
