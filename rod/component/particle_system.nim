@@ -875,22 +875,34 @@ method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
     result.add("genShapeNode", s.getValue(c.genShapeNode))
 
 method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
-    proc onLoopedChange() =
-        echo "onLoopedChange"
+    template isLoopedAux(ps: ParticleSystem): bool = ps.isLooped
+    template `isLoopedAux=`(ps: ParticleSystem, f: bool) =
+        ps.isLooped = f
         ps.remainingDuration = ps.duration
         ps.lastBirthTime = epochTime()
 
-    proc onTextureChange() =
-        if not ps.texture.isNil:
-            ps.frameSize = ps.texture.size
-
-    proc onPlayedChange() =
+    template isPlayedAux(ps: ParticleSystem): bool = ps.isLooped
+    template `isPlayedAux=`(ps: ParticleSystem, f: bool) =
+        ps.isPlayed = f
         if ps.isPlayed:
             ps.start()
         else:
             ps.stop()
 
-    proc toCalculateVertexDesc() =
+    template textureAux(ps: ParticleSystem): Image = ps.texture
+    template `textureAux=`(ps: ParticleSystem, t: Image) =
+        ps.texture = t
+        if not ps.texture.isNil:
+            ps.frameSize = ps.texture.size
+
+    template is3dRotationAux(ps: ParticleSystem): bool = ps.is3dRotation
+    template `is3dRotationAux=`(ps: ParticleSystem, f: bool) =
+        ps.is3dRotation = f
+        ps.vertexDesc = ps.calculateVertexDesc()
+
+    template isTextureAnimatedAux(ps: ParticleSystem): bool = ps.isTextureAnimated
+    template `isTextureAnimatedAux=`(ps: ParticleSystem, f: bool) =
+        ps.isTextureAnimated = f
         ps.vertexDesc = ps.calculateVertexDesc()
 
     p.visitProperty("scaleMode", ps.scaleMode)
@@ -907,8 +919,8 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     else:
         p.visitProperty("colorSeq", ps.colorSeq)
     p.visitProperty("duration", ps.duration)
-    p.visitProperty("isLooped", ps.isLooped, onLoopedChange)
-    p.visitProperty("isPlayed", ps.isPlayed, onPlayedChange)
+    p.visitProperty("isLooped", ps.isLoopedAux)
+    p.visitProperty("isPlayed", ps.isPlayedAux)
     p.visitProperty("genShapeNode", ps.genShapeNode)
     p.visitProperty("modifierNode", ps.modifierNode)
     p.visitProperty("birthRate", ps.birthRate)
@@ -916,7 +928,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("startVelocity", ps.startVelocity)
     p.visitProperty("randVelFrom", ps.randVelocityFrom)
     p.visitProperty("randVelTo", ps.randVelocityTo)
-    p.visitProperty("is3dRotation", ps.is3dRotation, toCalculateVertexDesc)
+    p.visitProperty("is3dRotation", ps.is3dRotationAux)
     p.visitProperty("randRotVelFrom", ps.randRotVelocityFrom)
     p.visitProperty("randRotVelTo", ps.randRotVelocityTo)
     p.visitProperty("randScaleFrom", ps.randScaleFrom)
@@ -924,8 +936,8 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("isBlendAdd", ps.isBlendAdd)
     p.visitProperty("gravity", ps.gravity)
     p.visitProperty("airDensity", ps.airDensity)
-    p.visitProperty("texture", ps.texture, onTextureChange)
-    p.visitProperty("isTexAnim", ps.isTextureAnimated, toCalculateVertexDesc)
+    p.visitProperty("texture", ps.textureAux)
+    p.visitProperty("isTexAnim", ps.isTextureAnimatedAux)
     p.visitProperty("texSize", ps.frameSize)
     p.visitProperty("animColumns", ps.animColumns)
     p.visitProperty("framesCount", ps.framesCount)
