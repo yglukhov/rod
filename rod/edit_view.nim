@@ -26,6 +26,7 @@ import nimx.pasteboard.pasteboard
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
+import rod.component.gizmo_axis
 import rod.editor_camera_controller
 import rod.editor.animation_edit_view
 import tools.serializer
@@ -97,6 +98,7 @@ type Editor* = ref object
     inspector*: InspectorView
     cameraController*: EditorCameraController
     cameraSelector: PopupButton
+    gizmo: Node
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -107,6 +109,8 @@ proc `selectedNode=`*(e: Editor, n: Node) =
             discard e.mSelectedNode.component(NodeSelector)
         e.inspector.inspectedNode = n
         e.animationEditView.editedNode = n
+
+        e.gizmo.getComponent(GizmoAxis).editedNode = e.mSelectedNode
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 
@@ -296,17 +300,10 @@ proc selectNode*(editor: Editor, node: Node) =
     if indexPath.len > 1:
         editor.outlineView.selectItemAtIndexPath(indexPath)
 
-#import tables
-proc onTouchDown*(editor: Editor, e: var Event) =
-    #TODO Hack to sync node tree and treeView
-    editor.outlineView.reloadData()
-
-    if e.keyCode != VirtualKey.MouseButtonPrimary:
-        return
-
-    let r = editor.sceneView.rayWithScreenCoords(e.localPosition)
+proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
+    let r = editor.sceneView.rayWithScreenCoords(coords)
     var castResult = newSeq[RayCastInfo]()
-    editor.sceneView.rootNode().rayCast(r, castResult)
+    node.rayCast(r, castResult)
 
     if castResult.len > 0:
         castResult.sort( proc (x, y: RayCastInfo): int =
@@ -317,15 +314,24 @@ proc onTouchDown*(editor: Editor, e: var Event) =
                     result = getTreeDistance(x.node, y.node) )
 
         echo "cast ", castResult[0].node.name
-        #work with gizmo
-        if castResult[0].node.name.contains("gizmo_axis") and (not editor.selectedNode.isNil):
-            let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-            if not nodeSelector.isNil:
-                nodeSelector.startTransform(castResult[0].node, e.position)
-            return
+        result = castResult[0].node
 
-        # make node select
-        editor.selectNode(castResult[0].node)
+proc onTouchDown*(editor: Editor, e: var Event) =
+    #TODO Hack to sync node tree and treeView
+    editor.outlineView.reloadData()
+
+    if e.keyCode != VirtualKey.MouseButtonPrimary:
+        return
+
+    var castedNode = editor.rayCastFirstNode(editor.gizmo, e.localPosition)
+    if not castedNode.isNil:
+        let gizmo = editor.gizmo.getComponent(GizmoAxis)
+        gizmo.startTransform(castedNode, e.localPosition)
+        return
+
+    castedNode = editor.rayCastFirstNode(editor.rootNode, e.localPosition)
+    if not castedNode.isNil:
+        editor.selectNode(castedNode)
 
 
 proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
@@ -333,16 +339,15 @@ proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
         return
 
     let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-    if not nodeSelector.isNil:
-        nodeSelector.proccesTransform(e.position)
+    editor.gizmo.getComponent(GizmoAxis).proccesTransform(e.localPosition)
+
 
 proc onTouchUp*(editor: Editor, e: var Event) =
     if editor.selectedNode.isNil:
         return
 
     let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-    if not nodeSelector.isNil:
-        nodeSelector.stopTransform()
+    editor.gizmo.getComponent(GizmoAxis).stopTransform()
 
 proc newToolbarButton(e: Editor, title: string): Button =
     let f = systemFont()
@@ -570,5 +575,11 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
         editor.createCloseEditorButton()
 
     editor.createWorkspaceLayout()
+
+    editor.gizmo = newNode("gizmo_node")
+    let gizmo = editor.gizmo.addComponent(GizmoAxis)
+    editor.gizmo.nodeWasAddedToSceneView(editor.sceneView)
+    editor.sceneView.afterDrawProc = proc() =
+        editor.gizmo.drawNode(true, nil)
 
     return editor

@@ -65,6 +65,7 @@ type
         uiComponents*: seq[UIComponent]
         postprocessContext*: PostprocessContext
         editing*: bool
+        afterDrawProc*: proc()
 
     Viewport* {.deprecated.} = SceneView
 
