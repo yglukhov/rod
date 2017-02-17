@@ -28,9 +28,9 @@ import nimx.pasteboard.pasteboard
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
-import rod.component.gizmo_axis
 import rod.editor_camera_controller
 import rod.editor.animation_edit_view
+import rod.editor.gizmo_axis
 import tools.serializer
 
 import ray
@@ -100,7 +100,7 @@ type Editor* = ref object
     inspector*: InspectorView
     cameraController*: EditorCameraController
     cameraSelector: PopupButton
-    gizmo: Node
+    gizmo: GizmoAxis
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -112,7 +112,7 @@ proc `selectedNode=`*(e: Editor, n: Node) =
         e.inspector.inspectedNode = n
         e.animationEditView.editedNode = n
 
-        e.gizmo.getComponent(GizmoAxis).editedNode = e.mSelectedNode
+        e.gizmo.editedNode = e.mSelectedNode
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 
@@ -325,10 +325,9 @@ proc onTouchDown*(editor: Editor, e: var Event) =
     if e.keyCode != VirtualKey.MouseButtonPrimary:
         return
 
-    var castedNode = editor.rayCastFirstNode(editor.gizmo, e.localPosition)
+    var castedNode = editor.rayCastFirstNode(editor.gizmo.gizmoNode, e.localPosition)
     if not castedNode.isNil:
-        let gizmo = editor.gizmo.getComponent(GizmoAxis)
-        gizmo.startTransform(castedNode, e.localPosition)
+        editor.gizmo.startTransform(castedNode, e.localPosition)
         return
 
     castedNode = editor.rayCastFirstNode(editor.rootNode, e.localPosition)
@@ -341,7 +340,7 @@ proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
         return
 
     let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-    editor.gizmo.getComponent(GizmoAxis).proccesTransform(e.localPosition)
+    editor.gizmo.proccesTransform(e.localPosition)
 
 
 proc onTouchUp*(editor: Editor, e: var Event) =
@@ -349,7 +348,7 @@ proc onTouchUp*(editor: Editor, e: var Event) =
         return
 
     let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-    editor.gizmo.getComponent(GizmoAxis).stopTransform()
+    editor.gizmo.stopTransform()
 
 proc newToolbarButton(e: Editor, title: string): Button =
     let f = systemFont()
@@ -578,11 +577,11 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
 
     editor.createWorkspaceLayout()
 
-    editor.gizmo = newNode("gizmo_node")
-    let gizmo = editor.gizmo.addComponent(GizmoAxis)
-    editor.gizmo.nodeWasAddedToSceneView(editor.sceneView)
+    editor.gizmo = newGizmoAxis()
+    editor.gizmo.gizmoNode.nodeWasAddedToSceneView(editor.sceneView)
     editor.sceneView.afterDrawProc = proc() =
         currentContext().gl.clearDepthStencil()
-        editor.gizmo.drawNode(true, nil)
+        editor.gizmo.updateGizmo()
+        editor.gizmo.gizmoNode.drawNode(true, nil)
 
     return editor
