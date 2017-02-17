@@ -4,4 +4,5 @@
 import blink, particle_system, particle_helpers, camera, channel_levels, mesh_component,
     overlay, particle_emitter, solid,
     sprite, text_component, light, clipping_rect_component,
-    blur_component, visual_modifier, node_selector, tracer, trail, fxaa_post
+    blur_component, visual_modifier, tracer, trail, fxaa_post,
+    color_balance_hls, gradient_fill, color_fill, tint

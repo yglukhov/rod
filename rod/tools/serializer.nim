@@ -38,10 +38,16 @@ proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
 proc `%`*(v: Size): JsonNode =
     result = vectorToJNode(newVector2(v.width, v.height))
 
+proc `%`*(v: Point): JsonNode =
+    result = vectorToJNode(newVector2(v.x, v.y))
+
 proc `%`*(v: Color): JsonNode =
     result = newJArray()
     for k, val in v.fieldPairs:
         result.add( %val )
+
+proc `%`*(v: Rect): JsonNode=
+    result = vectorToJNode(newVector4(v.origin.x, v.origin.y, v.size.width, v.size.height))
 
 proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path
@@ -87,10 +93,20 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Quaterni
     if not jN.isNil:
         val = newQuaternion(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum(), jN[3].getFnum())
 
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Rect) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newRect(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum(), jN[3].getFnum())
+
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Size) =
     let jN = j{name}
     if not jN.isNil:
         val = newSize(jN[0].getFnum(), jN[1].getFnum())
+
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Point) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newPoint(jN[0].getFnum(), jN[1].getFnum())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Image) =
     val = deserializeImage(j{name})

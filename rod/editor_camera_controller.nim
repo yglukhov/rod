@@ -116,7 +116,11 @@ proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event
         cc.camPivot.rotation = q
 
     if cc.currMouseKey == VirtualKey.MouseButtonMiddle:
-        var shift_pos = newVector3(prev_x - dx, -prev_y + dy, 0.0) * 0.1
+        var speed = 0.1
+        if cc.currKey == VirtualKey.LeftShift:
+            speed = 1.0
+
+        var shift_pos = newVector3(prev_x - dx, -prev_y + dy, 0.0) * speed
         var rotMat = cc.camPivot.rotation.toMatrix4()
         rotMat.multiply(shift_pos, shift_pos)
 
@@ -127,28 +131,22 @@ proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event
 
     cc.updateCamera()
 
+
 proc onMouseScrroll*(cc: EditorCameraController, e : var Event) =
-    var dir = cc.camPivot.worldPos - cc.camAnchor.worldPos
-    dir.normalize()
-    cc.camAnchor.worldPos = cc.camAnchor.worldPos + dir * e.offset.y
+    var dir: Vector3 = cc.camPivot.worldPos - cc.camAnchor.worldPos
+    let ndir: Vector3 = normalized(dir)
+    let offset: Vector3 = ndir * e.offset.y - ndir * e.offset.x * 10.0
+
+    if cc.editedView.camera.projectionMode == cpOrtho:
+        cc.editedView.camera.node.scale = cc.editedView.camera.node.scale + e.offset.x * 0.1
+
+    # 0 coord lock protection
+    if length(offset) > length(dir) - 0.1 and dot(offset, dir) > 0.5:
+        return
+
+    cc.camAnchor.worldPos = cc.camAnchor.worldPos + offset
 
     cc.updateCamera()
 
-# proc onScrollProgress*(cc: EditorCameraController, dx, dy : float32, e : var Event) =
-#     cc.currentAngle.x = dy
-#     cc.currentAngle.y = dx
-#     let q = newQuaternionFromEulerYXZ(cc.currentAngle.x, cc.currentAngle.y, cc.currentAngle.z)
-#     cc.camPivot.rotation = q
-
-#     var scale: Vector3
-#     var rot: Quaternion
-#     var pivotMatrix = cc.camPivot.worldTransform()
-
-#     var lookMat = toLookAt(cc.camPivot.worldPos(), cc.camAnchor.worldPos(), newVector3(0,1,0))
-#     var lookquat = lookMat.fromMatrix4()
-
-#     cc.camera.rotation = lookquat
-#     cc.camera.translation = cc.camAnchor.worldPos()
-#     cc.camera.sceneView.setNeedsDisplay()
 
 

@@ -1,54 +1,31 @@
 import nimx.types
-import nimx.context
 import nimx.composition
 import nimx.portable_gl
-import nimx.render_to_image
 import nimx.matrixes
 
 import rod.node
-import rod.viewport
-
 import rod.component
 
 type Overlay* = ref object of OverlayComponent
 
 var overlayPostEffect = newPostEffect("""
-uniform Image uBackground;
-uniform vec2 viewportSize;
 
-vec2 fbUv(vec4 imgTexCoords) {
-    vec2 pos = gl_FragCoord.xy;
-    pos.y = viewportSize.y - pos.y;
-    return imgTexCoords.xy + (imgTexCoords.zw - imgTexCoords.xy) * (pos / viewportSize);
-}
-
-void overlay() {
-    vec2 bgUv = fbUv(uBackground.texCoords);
-    vec4 burnColor = texture2D(uBackground.tex, bgUv);
+void overlay_effect(float spike, float spike1) {
     vec4 maskColor = gl_FragColor;
-    gl_FragColor.rgb = burnColor.rgb * (1.0 + maskColor.a * 2.0);
+    gl_FragColor.rgba = vec4(maskColor.a);
 }
-""", "overlay")
+""", "overlay_effect", ["float", "float"])
 
-method draw*(o: Overlay) =
-    let vp = o.node.sceneView
-
-    vp.swapCompositingBuffers()
+method beforeDraw*(o: Overlay, index: int): bool =
     let c = currentContext()
+    c.gl.enable(c.gl.BLEND)
+    c.gl.blendFunc(c.gl.DST_COLOR, c.gl.ONE)
 
-    let bfb = vp.mBackupFrameBuffer
+    pushPostEffect(overlayPostEffect, 0.0, 0.0)
 
-    let vpbounds = c.gl.getViewport()
-    let vpSize = newSize(vpbounds[2].Coord, vpbounds[3].Coord)
-
-    pushPostEffect overlayPostEffect:
-        setUniform("uBackground", bfb)
-        setUniform("viewportSize", vpSize)
-
-    for c in o.node.children: c.recursiveDraw()
-
+method afterDraw*(o: Overlay, index: int) =
+    let c = currentContext()
+    c.gl.blendFunc(c.gl.SRC_ALPHA, c.gl.ONE_MINUS_SRC_ALPHA)
     popPostEffect()
-
-method isPosteffectComponent*(c: Overlay): bool = true
 
 registerComponent(Overlay, "Effects")

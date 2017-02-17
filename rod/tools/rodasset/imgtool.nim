@@ -9,6 +9,7 @@ import nimx.types except Point, Size, Rect
 import nimx.pathutils
 
 import imgtools.imgtools, imgtools.texcompress
+import tree_traversal
 
 type Rect = imgtools.Rect
 type Point = tuple[x, y: int32]
@@ -85,34 +86,6 @@ proc newImgTool*(): ImgTool =
     result.downsampleRatio = 1.0
     result.extrusion = 1
     result.compositionPaths = @[]
-
-iterator allComponentNodesOfType(n: JsonNode, typ: string): (JsonNode, JsonNode) =
-    var stack = @[n]
-    var comps = newSeq[JsonNode]()
-    while stack.len > 0:
-        let n = stack.pop()
-        let components = n{"components"}
-        if not components.isNil:
-            comps.setLen(0)
-            if components.kind == JObject:
-                let c = components{typ}
-                if not c.isNil:
-                    comps.add(c)
-            elif components.kind == JArray:
-                for c in components.elems:
-                    if c["_c"].str == typ:
-                        comps.add(c)
-            for componentNode in comps:
-                yield(n, componentNode)
-        let children = n{"children"}
-        if not children.isNil:
-            stack.add(children.elems)
-
-iterator allSpriteNodes(n: JsonNode): (JsonNode, JsonNode) =
-    for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
-
-iterator allMeshComponentNodes(n: JsonNode): (JsonNode, JsonNode) =
-    for n, c in allComponentNodesOfType(n, "MeshComponent"): yield(n, c)
 
 proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
     im.pos = ss.packer.packAndGrow(im.targetSize.width.int32 + im.extrusion.int32 * 2, im.targetSize.height.int32 + im.extrusion.int32 * 2)
@@ -253,16 +226,6 @@ proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
                     frameOffsets.add %*[0, 0]
                 o.parentComponent["frameOffsets"] = frameOffsets
             frameOffsets.elems[o.frameIndex] = %*[im.srcBounds.x, im.srcBounds.y]
-
-proc compositionContainsAnimationForNode(jComp, jNode: JsonNode, propName: string): bool =
-    let name = jNode{"name"}
-    if not name.isNil:
-        let animations = jComp{"animations"}
-        if not animations.isNil:
-            let animName = name.str & "." & propName
-            for k, v in animations:
-                for ik, iv in v:
-                    if ik == animName: return true
 
 proc recalculateSourceBounds(im: SpriteSheetImage) =
     for o in im.occurences:
@@ -524,11 +487,29 @@ proc run*(tool: ImgTool) =
             for o in im.occurences:
                 tool.adjustImageNode(im, o)
 
-        # Write compositions back to files
-        for i, c in tool.compositions:
-            let dstPath = tool.destPath(tool.compositionPaths[i])
-            createDir(dstPath.parentDir())
-            writeFile(dstPath, c.pretty().replace(" \n", "\n"))
+        let packCompositions = false
+
+        # Write all composisions to single file
+        if packCompositions:
+            let allComps = newJObject()
+            for i, c in tool.compositions:
+                if "aep_name" in c: c.delete("aep_name")
+                var resName = tool.compositionPaths[i]
+                if not resName.startsWith("res/"):
+                    raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
+                resName = resName.substr("res/".len)
+                allComps[resName] = c
+            var str = ""
+            toUgly(str, allComps)
+            writeFile(tool.resPath / "comps.jsonpack", str)
+        else:
+            # Write compositions back to files
+            for i, c in tool.compositions:
+                let dstPath = tool.destPath(tool.compositionPaths[i])
+                createDir(dstPath.parentDir())
+                var str = ""
+                toUgly(str, c)
+                writeFile(dstPath, str)
 
         if tool.createIndex:
             tool.writeIndex()

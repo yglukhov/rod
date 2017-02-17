@@ -52,7 +52,10 @@ proc createComponent*(name: string): Component =
 
 proc createComponent*[T](): T = createComponent(T.name).T
 
-method draw*(c: Component) {.base.} = discard
+method draw*(c: Component) {.base.} = discard # Deprecated.
+method beforeDraw*(c: Component, index: int): bool {.base.} = discard
+method afterDraw*(c: Component, index: int) {.base.} = discard
+
 method update*(c: Component) {.base.} = discard
 method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard

@@ -1,7 +1,23 @@
 import os, strutils, times, tables, osproc
-import imgtool, asset_cache
+import imgtool, asset_cache, settings, migrator
 
-proc hash(audio: string = "ogg", path: string) = echo dirHash(path, audio)
+template settingsWithCmdLine(): Settings =
+    let s = newSettings()
+    s.audio.extension = audio
+    s.graphics.downsampleRatio = downsampleRatio
+    s.graphics.compressOutput = not nocompress
+    s.graphics.extrusion = extrusion
+    s.graphics.disablePotAdjustment = disablePotAdjustment
+    s.graphics.compressToPVR = compressToPVR
+    s.graphics.compressionExceptions = exceptions
+    s
+
+proc hash(audio: string = "ogg", downsampleRatio: float = 1.0, nocompress: bool = false,
+    compressToPVR: bool = false, extrusion: int = 1, disablePotAdjustment: bool = false,
+    exceptions: string = "",
+    path: string) =
+    let s = settingsWithCmdLine()
+    echo dirHash(path, s)
 
 var gAudioConvTool = ""
 
@@ -34,14 +50,16 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
             of ".png":
                 if unixToNativePath(r) notin tool.images:
                     doCopy = true
-            of ".wav":
+            of ".wav", ".mp3", ".ogg":
                 createDir(d.parentDir())
                 let ssf = d.splitFile()
-                if isMp3:
+                if isMp3 and sf.ext != ".mp3":
                     convertWavToMP3(r, ssf.dir / ssf.name & ".mp3")
-                else:
+                elif sf.ext != ".ogg":
                     convertWavToOgg(r, ssf.dir / ssf.name & ".ogg")
-            of ".json":
+                else:
+                    doCopy = true
+            of ".json", ".rab":
                 discard
             else:
                 doCopy = true
@@ -59,7 +77,8 @@ proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = fal
     let src = expandTilde(src)
     let dst = expandTilde(dst)
     let cache = getCache(cache)
-    let h = dirHash(src, audio)
+    let s = settingsWithCmdLine()
+    let h = dirHash(src, s)
     let c = cache / h
     echo "rodasset Cache: ", c
     if not dirExists(c):
@@ -93,4 +112,4 @@ proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = fal
 
 when isMainModule:
     import cligen
-    dispatchMulti([hash], [pack])
+    dispatchMulti([hash], [pack], [upgradeAssetBundle])

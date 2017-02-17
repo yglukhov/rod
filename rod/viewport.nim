@@ -105,6 +105,7 @@ proc getViewProjectionMatrix*(v: SceneView): Matrix4 =
     result = projTransform * v.viewMatrixCached
 
 proc worldToScreenPoint*(v: SceneView, point: Vector3): Vector3 =
+    let absBounds = v.convertRectToWindow(v.bounds)
     let clipSpacePos = v.viewProjMatrix * newVector4(point.x, point.y, point.z, 1.0)
     var ndcSpacePos: Vector3
     if clipSpacePos[3] > 0:
@@ -112,8 +113,8 @@ proc worldToScreenPoint*(v: SceneView, point: Vector3): Vector3 =
     else:
         ndcSpacePos = newVector3(clipSpacePos[0], clipSpacePos[1], clipSpacePos[2])
 
-    result.x = ((ndcSpacePos.x + 1.0) / 2.0) * v.bounds.width
-    result.y = ((1.0 - ndcSpacePos.y) / 2.0) * v.bounds.height
+    result.x = ((ndcSpacePos.x + 1.0) / 2.0) * v.window.bounds.width - absBounds.x
+    result.y = ((1.0 - ndcSpacePos.y) / 2.0) * v.window.bounds.height - absBounds.y
     result.z = (1.0 + ndcSpacePos.z) * 0.5
 
 proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
@@ -199,16 +200,19 @@ method draw*(v: SceneView, r: Rect) =
     let c = currentContext()
     v.prepareFramebuffers()
 
-    drawTable = newTable[int, seq[Node]]()
+    if drawTable.isNil:
+        drawTable = newTable[int, seq[Node]]()
+    elif drawTable.len > 0:
+        drawTable.clear()
     v.viewProjMatrix = v.getViewProjectionMatrix()
     c.withTransform v.viewProjMatrix:
         if v.editing: v.drawGrid()
 
-        v.rootNode.recursiveDraw(drawTable)
+        v.rootNode.drawNode(true, drawTable)
         for k, v in drawTable:
             c.gl.clearDepthStencil()
             for node in v:
-                discard node.drawNode()
+                node.drawNode(false, nil)
 
     if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
         # When some compositing nodes are optimized away, we have
@@ -388,32 +392,6 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
 
     if not result:
         result = procCall v.View.onTouchEv(e)
-
-method handleMouseEvent*(v: SceneView, e: var Event): bool =
-    result = procCall v.View.handleMouseEvent(e)
-    if v.uiComponents.len > 0:
-        let r = v.rayWithScreenCoords(e.localPosition)
-
-        type Inter = tuple[i: Vector3, c: UIComponent]
-        var intersections = newSeq[Inter]()
-
-        for c in v.uiComponents:
-            var inter : Vector3
-            if c.intersectsWithUINode(r, inter):
-                intersections.add((inter, c))
-
-        template dist(a, b): auto = (b - a).length
-
-        if intersections.len > 0:
-            intersections.sort(proc (x, y: Inter): int =
-                result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
-                if result == 0:
-                    result = getTreeDistance(x.c.node, y.c.node)
-            )
-
-            for i in intersections:
-                result = i.c.handleMouseEvent(r, e, i.i)
-                if result: break
 
 method viewOnEnter*(v:SceneView){.base.} = discard
 method viewOnExit*(v:SceneView){.base.} = discard

@@ -48,9 +48,9 @@ varying float vAlpha;
     varying vec2 texCoords;
 #endif
 #ifdef GL_ES
-    varying highp float vColor;
+    varying highp vec3 vColor;
 #else
-    varying float vColor;
+    varying vec3 vColor;
 #endif
 
 #ifdef ANIMATED_TEXTURE
@@ -100,17 +100,26 @@ varying float vAlpha;
     }
 #endif
 
+vec3 encodeRgbFromFloat( float f )
+{
+    vec3 color;
+    color.b = floor(f / (256.0 * 256.0));
+    color.g = floor((f - color.b * 256.0 * 256.0) / 256.0);
+    color.r = floor(f - color.b * 256.0 * 256.0 - color.g * 256.0);
+    return color / 256.0;
+}
+
 void main()
 {
     vAlpha = aAlpha;
-    vColor = aColor;
-    vec3 vertexOffset;
+    vec3 vertexOffset = vec3(0.0,0.0,0.0);
+    vColor = encodeRgbFromFloat(aColor);
 
 #ifdef ANIMATED_TEXTURE
     // calculate anim frame
     int currFrame = int( mod(aLifeTime * uFPS, float(uFramesCount - 1)) );
     int row = currFrame / uAnimColumns;
-    int col = int(mod(float(currFrame), float(uAnimColumns)));
+    int col = int(mod(float(currFrame) + 0.5, float(uAnimColumns)));
     vec2 fc = vec2(uFrameSize.x * float(col), uFrameSize.y * float(row));
 
     if (aID == 0.0) { vertexOffset = vec3(-0.5,  0.5,  0); texCoords = vec2(fc.x, fc.y);}
@@ -152,9 +161,9 @@ const ParticleFragmentShader = """
 #ifdef GL_ES
     #extension GL_OES_standard_derivatives : enable
     precision highp float;
-    varying highp float vColor;
+    varying highp vec3 vColor;
 #else
-    varying float vColor;
+    varying vec3 vColor;
 #endif
 
 #ifdef TEXTURED
@@ -166,27 +175,18 @@ const ParticleFragmentShader = """
 
 varying float vAlpha;
 
-vec3 encodeRgbFromFloat( float f )
-{
-    vec3 color;
-    color.b = floor(f / (256.0 * 256.0));
-    color.g = floor((f - color.b * 256.0 * 256.0) / 256.0);
-    color.r = floor(f - color.b * 256.0 * 256.0 - color.g * 256.0);
-    return color / 256.0;
-}
-
 void main()
 {
 #ifdef TEXTURED
     vec4 tex_color = texture2D(texUnit, uTexUnitCoords.xy + (uTexUnitCoords.zw - uTexUnitCoords.xy) * texCoords);
-    vec3 color = encodeRgbFromFloat(vColor);
-    gl_FragColor = tex_color * vec4(color.xyz, vAlpha);
+    gl_FragColor = tex_color * vec4(vColor.xyz, vAlpha);
 #else
-    vec3 color = encodeRgbFromFloat(vColor);
-    gl_FragColor = vec4(color.xyz, vAlpha);
+    gl_FragColor = vec4(vColor.xyz, vAlpha);
 #endif
 }
 """
+
+var ps_gravity_y_direction = 1.0
 
 type
     ParticleModeEnum* = enum
@@ -532,7 +532,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
 
         ps.particles[i].velocity.x += ps.gravity.x*dt
-        ps.particles[i].velocity.y += ps.gravity.y*dt
+        ps.particles[i].velocity.y += ps.gravity.y*dt * ps_gravity_y_direction
         ps.particles[i].velocity.z += ps.gravity.z*dt
         ps.particles[i].position.x += ps.particles[i].velocity.x*dt
         ps.particles[i].position.y += ps.particles[i].velocity.y*dt
@@ -662,6 +662,11 @@ proc update(ps: ParticleSystem, dt: float) =
                 ps.newParticles.add(ps.createParticle(i, pCount, dt))
 
             ps.lastBirthTime = curTime
+
+    let view = ps.node.sceneView
+    var projMatrix : Matrix4
+    view.camera.getProjectionMatrix(view.bounds, projMatrix)
+    ps_gravity_y_direction = abs(projMatrix[5]) / projMatrix[5]
 
     ps.updateParticlesBuffer(dt)
     ps.newParticles.setLen(0)

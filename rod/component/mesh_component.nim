@@ -58,6 +58,7 @@ type
         currMesh*: seq[Glfloat]
         vertexWeights*: seq[Glfloat]
         boneIDs*: seq[Glfloat]
+        boneMap: seq[Bone]
 
         debugSkeleton*: bool
 
@@ -224,6 +225,16 @@ proc load(m: MeshComponent) =
         m.loadFunc()
         m.loadFunc = nil
 
+proc prepareBoneMap(m: MeshComponent) =
+    m.boneMap = newSeq[Bone]()
+    let stride = int(m.vboData.vertInfo.stride / sizeof(Glfloat))
+    let vertCount = int(m.currMesh.len / stride)
+
+    for k, v in m.boneIDs:
+        let bone = m.skeleton.getBone( m.boneIDs[k].int16 )
+        m.boneMap.add(bone)
+
+
 proc setupAndDraw*(m: MeshComponent) =
     let c = currentContext()
     let gl = c.gl
@@ -236,29 +247,33 @@ proc setupAndDraw*(m: MeshComponent) =
         gl.enable(gl.CULL_FACE)
 
     if not m.skeleton.isNil:
+        if m.boneMap.isNil:
+            m.prepareBoneMap()
+
         m.skeleton.update()
 
         let stride = int(m.vboData.vertInfo.stride / sizeof(Glfloat))
         let vertCount = int(m.currMesh.len / stride)
+        var initPos: Vector3
         for i in 0 ..< vertCount:
             var pos: Vector3
-            var initPos: Vector3
-            initPos.x = m.initMesh[stride * i + 0]
-            initPos.y = m.initMesh[stride * i + 1]
-            initPos.z = m.initMesh[stride * i + 2]
+            let currStride = stride * i
+            initPos.x = m.initMesh[currStride + 0]
+            initPos.y = m.initMesh[currStride + 1]
+            initPos.z = m.initMesh[currStride + 2]
 
             for j in 0 ..< 4:
                 let index = 4*i + j
-                if m.vertexWeights[index] > 0.0:
-                    let bone = m.skeleton.getBone( m.boneIDs[index].int16 )
-                    # let resMatrix = bone.matrix * bone.invMatrix
+                let vi = m.vertexWeights[index]
+                if vi > 0.0:
+                    let bone = m.boneMap[index] #m.skeleton.getBone( m.boneIDs[index].int16 )
                     var transformedPos: Vector3
                     bone.matrix.multiply( initPos, transformedPos )
                     pos += transformedPos * m.vertexWeights[index]
 
-            m.currMesh[stride * i + 0] = pos.x
-            m.currMesh[stride * i + 1] = pos.y
-            m.currMesh[stride * i + 2] = pos.z
+            m.currMesh[currStride + 0] = pos.x
+            m.currMesh[currStride + 1] = pos.y
+            m.currMesh[currStride + 2] = pos.z
 
         gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
         gl.bufferData(gl.ARRAY_BUFFER, m.currMesh, gl.STATIC_DRAW)

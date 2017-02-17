@@ -1,4 +1,4 @@
-import json, strutils, tables
+import json, strutils, tables, parseutils
 import nimx.types, nimx.matrixes, nimx.system_logger
 import nimx.animation
 import nimx.property_visitor
@@ -21,15 +21,29 @@ template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.get
 template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
 template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
 template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
-# template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum(1))
+template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum(1))
 template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
 
-proc rawPropertyNameFromPropertyName(name: string): string =
-    var n = name
-    let dotIdx = name.rfind('.')
-    if dotIdx != -1:
-        n = name.substr(dotIdx + 1)
-    result = case n
+proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) =
+    # A property name can one of the following:
+    # nodeName.propName # looked up in node first, then in first met component
+    # nodeName.compIndex.propName # looked up only in specified component
+    propName = name
+    compIndex = -1
+    nodeName = nil
+    let dotIdx2 = name.rfind('.')
+    if dotIdx2 != -1:
+        propName = name.substr(dotIdx2 + 1)
+        let dotIdx1 = name.rfind('.', dotIdx2 - 1)
+        if dotIdx1 == -1:
+            nodeName = name.substr(0, dotIdx2 - 1)
+        elif name[dotIdx1 + 1].isDigit:
+            discard parseInt(name, compIndex, dotIdx1 + 1)
+            nodeName = name.substr(0, dotIdx1 - 1)
+        else:
+            nodeName = name.substr(0, dotIdx2 - 1)
+
+    propName = case propName
     of "Rotation": "rotation"
     of "X Position": "tX"
     of "Y Position": "tY"
@@ -41,7 +55,24 @@ proc rawPropertyNameFromPropertyName(name: string): string =
     of "Gamma": "inGamma"
     of "Output White": "outWhite"
     of "Output Black": "outBlack"
-    else: n
+    else: propName
+
+when false:
+    static:
+        block:
+            var nn, pn: string
+            var ci: int
+            splitPropertyName("myNode.12.myProp", nn, ci, pn)
+            assert(nn == "myNode" and pn == "myProp" and ci == 12)
+
+            splitPropertyName("myNode.png.myProp", nn, ci, pn)
+            assert(nn == "myNode.png" and pn == "myProp" and ci == -1)
+
+            splitPropertyName("myNode.myProp", nn, ci, pn)
+            assert(nn == "myNode" and pn == "myProp" and ci == -1)
+
+            splitPropertyName("myProp", nn, ci, pn)
+            assert(nn == nil and pn == "myProp" and ci == -1)
 
 proc newValueSampler[T](j: JsonNode, lerpBetweenFrames: bool): ArrayAnimationSampler[T] {.inline.} =
     var vals = newSeq[T](j.len)
@@ -59,6 +90,7 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): t
     of clause(Vector2): action(Vector2)
     of clause(Vector3): action(Vector3)
     of clause(Vector4): action(Vector4)
+    of clause(Color): action(Color)
     of clause(int): action(int)
     else:
         raise newException(Exception, "Unknown type id")
@@ -94,9 +126,9 @@ proc typeIdForSetterAndGetter(ap: Variant): TypeId =
     template action(T: typedesc) = result = getTypeId(T)
     switchAnimatableTypeId(ap.typeId, getSetterAndGetterTypeId, action)
 
-proc findAnimatableProperty*(n: Node, propName: string): Variant =
-    var res : Variant
-    var visitor : PropertyVisitor
+template findAnimatablePropertyAux(body: untyped) =
+    var res {.inject.} : Variant
+    var visitor {.inject.} : PropertyVisitor
     visitor.requireName = true
     visitor.requireSetter = true
     visitor.flags = { pfAnimatable }
@@ -105,30 +137,38 @@ proc findAnimatableProperty*(n: Node, propName: string): Variant =
             if visitor.name == propName:
                 res = visitor.setterAndGetter
 
-    n.visitProperties(visitor)
-
-    if res.isEmpty and not n.components.isNil:
-        for k, v in n.components:
-            v.visitProperties(visitor)
-            if not res.isEmpty: break
+    body
 
     result = res
 
-proc nodeNameFromPropertyName(name: string): string =
-    let dotIdx = name.rfind('.')
-    if dotIdx != -1:
-        result = name.substr(0, dotIdx - 1)
+proc findAnimatableProperty*(n: Node, propName: string): Variant =
+    findAnimatablePropertyAux:
+        n.visitProperties(visitor)
+
+        if res.isEmpty and not n.components.isNil:
+            for k, v in n.components:
+                v.visitProperties(visitor)
+                if not res.isEmpty: break
+
+proc findAnimatableProperty(n: Node, compIndex: int, propName: string): Variant =
+    findAnimatablePropertyAux:
+        if not n.components.isNil and n.components.len > compIndex:
+            n.components[compIndex].visitProperties(visitor)
 
 proc findAnimatablePropertyForSubtree*(n: Node, propName: string): Variant =
-    let nodeName = nodeNameFromPropertyName(propName)
+    var nodeName, rawPropName: string
+    var compIndex: int
+    splitPropertyName(propName, nodeName, compIndex, rawPropName)
     var animatedNode = n
     if not nodeName.isNil:
         animatedNode = n.findNode(nodeName)
         if animatedNode.isNil:
             raise newException(Exception, "Animated node " & nodeName & " not found")
 
-    let rawPropName = rawPropertyNameFromPropertyName(propName)
-    result = findAnimatableProperty(animatedNode, rawPropName)
+    if compIndex == -1:
+        result = findAnimatableProperty(animatedNode, rawPropName)
+    else:
+        result = findAnimatableProperty(animatedNode, compIndex, rawPropName)
     if result.isEmpty:
         raise newException(Exception, "Animated property not found: " & propName)
 

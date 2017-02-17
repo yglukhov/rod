@@ -4,6 +4,8 @@ import nimx.event
 import nimx.view_event_handling
 import nimx.view_event_handling_new
 import nimx.system_logger
+import nimx.property_visitor
+
 import rod.component
 import rod.ray
 import rod.viewport
@@ -67,13 +69,6 @@ proc moveToWindow(v: View, w: Window) =
     for s in v.subviews:
         s.moveToWindow(w)
 
-proc handleMouseEvent*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
-    var res : Vector3
-    if c.node.tryWorldToLocal(intersection, res):
-        let v = c.view
-        e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
-        result = v.recursiveHandleMouseEvent(e)
-
 proc handleScrollEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
     var res : Vector3
     if c.node.tryWorldToLocal(intersection, res):
@@ -111,5 +106,9 @@ method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
         let i = sv.uiComponents.find(ui)
         if i != -1:
             sv.uiComponents.del(i)
+
+method visitProperties*(ui: UIComponent, p: var PropertyVisitor) =
+    p.visitProperty("enabled", ui.enabled)
+    ui.view.visitProperties(p)
 
 registerComponent(UIComponent)
