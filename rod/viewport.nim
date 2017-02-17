@@ -214,6 +214,9 @@ method draw*(v: SceneView, r: Rect) =
             for node in v:
                 node.drawNode(false, nil)
 
+        if not v.afterDrawProc.isNil:
+            v.afterDrawProc()
+
     if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
         # When some compositing nodes are optimized away, we have
         # to blit current backup buffer to the screen.
@@ -235,7 +238,7 @@ proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
         result.direction.normalize()
         return
 
-    result.origin = v.camera.node.localToWorld(newVector3())
+    result.origin = v.camera.node.worldPos() #v.camera.node.localToWorld(newVector3())
     let target = v.screenToWorldPoint(newVector3(coords.x, coords.y, -1))
     result.direction = target - result.origin
     result.direction.normalize()
