@@ -814,8 +814,8 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
 
     let compositions = getSelectedCompositions()
     gExportFolderPath = $exportFolderPath
-    gAnimatedProperties.setLen(0)
     for c in compositions:
+        gAnimatedProperties.setLen(0)
         gCompExportPath = c.exportPath
         let fullExportPath = gExportFolderPath & "/" & gCompExportPath
 
