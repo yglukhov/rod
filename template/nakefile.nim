@@ -2,6 +2,5 @@ import nimx.naketools
 import osproc
 
 beforeBuild = proc(b: Builder) =
-    b.disableClosureCompiler = true
-    b.mainFile = "main"
+    b.mainFile = "main.nim"
     b.originalResourcePath = "res"
