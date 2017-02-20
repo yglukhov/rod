@@ -4,6 +4,9 @@ editor/nakefile
 build
 nvcompatlog.txt
 rod/tools/rodimgtool
+template/nimcache
+template/nakefile
+*.exe
 
 nakefile
 baner_01.png

@@ -1,37 +1,23 @@
 import math, algorithm, strutils, tables, json, logging
 
-import nimx.view
-import nimx.types, nimx.matrixes
-import nimx.button, nimx.popup_button
-import nimx.outline_view
-import nimx.toolbar
-import nimx.font
+import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
+                outline_view, toolbar, color_picker, scroll_view, clip_view,
+                text_field, table_view_cell, gesture_detector_newtouch,
+                key_commands, linear_layout, view_event_handling_new ]
 
-import node
-import inspector_view
-import rod_types
-
-import nimx.animation
-import nimx.color_picker
-import nimx.scroll_view
-import nimx.clip_view
-import nimx.text_field
-import nimx.table_view_cell
-import nimx.gesture_detector_newtouch
-import nimx.key_commands
-import nimx.linear_layout
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
 
+import rod_types, node, inspector_view
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
 import rod.editor_camera_controller
 import rod.editor.animation_edit_view
+import rod.editor.gizmo_axis
 import tools.serializer
 
 import ray
-import nimx.view_event_handling_new
 import viewport
 
 import variant
@@ -46,14 +32,34 @@ const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
 when loadingAndSavingAvailable:
     import native_dialogs
 
-type EventCatchingView* = ref object of View
-    keyDownDelegate*: proc(event: var Event): bool
-    keyUpDelegate*: proc(event: var Event): bool
-    mouseScrrollDelegate*: proc(event: var Event)
-    allowGameInput: bool
 
-type EventCatchingListener = ref object of BaseScrollListener
-    view: EventCatchingView
+type
+    Editor* = ref object
+        rootNode*: Node
+        workspaceView: View
+        eventCatchingView*: EventCatchingView
+        treeView*: View
+        animationEditView*: AnimationEditView
+        toolbar*: Toolbar
+        sceneView*: SceneView
+        mSelectedNode: Node
+        outlineView*: OutlineView
+        inspector*: InspectorView
+        cameraController*: EditorCameraController
+        cameraSelector: PopupButton
+        gizmo: GizmoAxis
+
+    WorkspaceView = ref object of View
+        editor: Editor
+
+    EventCatchingView* = ref object of View
+        keyDownDelegate*: proc(event: var Event): bool
+        keyUpDelegate*: proc(event: var Event): bool
+        mouseScrrollDelegate*: proc(event: var Event)
+        allowGameInput: bool
+
+    EventCatchingListener = ref object of BaseScrollListener
+        view: EventCatchingView
 
 method acceptsFirstResponder(v: EventCatchingView): bool = true
 
@@ -83,21 +89,6 @@ method onScrollProgress*(ecl: EventCatchingListener, dx, dy : float32, e : var E
 method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
     procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
 
-
-type Editor* = ref object
-    rootNode*: Node
-    workspaceView: View
-    eventCatchingView*: EventCatchingView
-    treeView*: View
-    animationEditView*: AnimationEditView
-    toolbar*: Toolbar
-    sceneView*: SceneView
-    mSelectedNode: Node
-    outlineView*: OutlineView
-    inspector*: InspectorView
-    cameraController*: EditorCameraController
-    cameraSelector: PopupButton
-
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
         if not e.mSelectedNode.isNil and e.mSelectedNode.componentIfAvailable(LightSource).isNil:
@@ -107,6 +98,8 @@ proc `selectedNode=`*(e: Editor, n: Node) =
             discard e.mSelectedNode.component(NodeSelector)
         e.inspector.inspectedNode = n
         e.animationEditView.editedNode = n
+
+        e.gizmo.editedNode = e.mSelectedNode
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 
@@ -296,17 +289,10 @@ proc selectNode*(editor: Editor, node: Node) =
     if indexPath.len > 1:
         editor.outlineView.selectItemAtIndexPath(indexPath)
 
-#import tables
-proc onTouchDown*(editor: Editor, e: var Event) =
-    #TODO Hack to sync node tree and treeView
-    editor.outlineView.reloadData()
-
-    if e.keyCode != VirtualKey.MouseButtonPrimary:
-        return
-
-    let r = editor.sceneView.rayWithScreenCoords(e.localPosition)
+proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
+    let r = editor.sceneView.rayWithScreenCoords(coords)
     var castResult = newSeq[RayCastInfo]()
-    editor.sceneView.rootNode().rayCast(r, castResult)
+    node.rayCast(r, castResult)
 
     if castResult.len > 0:
         castResult.sort( proc (x, y: RayCastInfo): int =
@@ -317,15 +303,23 @@ proc onTouchDown*(editor: Editor, e: var Event) =
                     result = getTreeDistance(x.node, y.node) )
 
         echo "cast ", castResult[0].node.name
-        #work with gizmo
-        if castResult[0].node.name.contains("gizmo_axis") and (not editor.selectedNode.isNil):
-            let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-            if not nodeSelector.isNil:
-                nodeSelector.startTransform(castResult[0].node, e.position)
-            return
+        result = castResult[0].node
 
-        # make node select
-        editor.selectNode(castResult[0].node)
+proc onTouchDown*(editor: Editor, e: var Event) =
+    #TODO Hack to sync node tree and treeView
+    editor.outlineView.reloadData()
+
+    if e.keyCode != VirtualKey.MouseButtonPrimary:
+        return
+
+    var castedNode = editor.rayCastFirstNode(editor.gizmo.gizmoNode, e.localPosition)
+    if not castedNode.isNil:
+        editor.gizmo.startTransform(castedNode, e.localPosition)
+        return
+
+    castedNode = editor.rayCastFirstNode(editor.rootNode, e.localPosition)
+    if not castedNode.isNil:
+        editor.selectNode(castedNode)
 
 
 proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
@@ -333,16 +327,15 @@ proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
         return
 
     let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-    if not nodeSelector.isNil:
-        nodeSelector.proccesTransform(e.position)
+    editor.gizmo.proccesTransform(e.localPosition)
+
 
 proc onTouchUp*(editor: Editor, e: var Event) =
     if editor.selectedNode.isNil:
         return
 
     let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
-    if not nodeSelector.isNil:
-        nodeSelector.stopTransform()
+    editor.gizmo.stopTransform()
 
 proc newToolbarButton(e: Editor, title: string): Button =
     let f = systemFont()
@@ -459,13 +452,17 @@ proc onKeyUp(editor: Editor, e: var Event): bool =
     if e.keyCode == VirtualKey.F:
         editor.cameraController.setToNode(editor.selectedNode)
 
+method onKeyDown(v: WorkspaceView, e: var Event): bool = v.editor.onKeyDown(e)
+method onKeyUp(v: WorkspaceView, e: var Event): bool = v.editor.onKeyUp(e)
+
 proc newTabView(): TabView =
     result = TabView.new(newRect(0, 0, 100, 100))
     result.dockingTabs = true
     result.userConfigurable = true
 
 proc createWorkspaceLayout(e: Editor) =
-    let v = View.new(e.sceneView.frame)
+    let v = WorkspaceView.new(e.sceneView.frame)
+    v.editor = e
     e.workspaceView = v
     v.autoresizingMask = e.sceneView.autoresizingMask
     # Initial setup:
@@ -570,5 +567,12 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
         editor.createCloseEditorButton()
 
     editor.createWorkspaceLayout()
+
+    editor.gizmo = newGizmoAxis()
+    editor.gizmo.gizmoNode.nodeWasAddedToSceneView(editor.sceneView)
+    editor.sceneView.afterDrawProc = proc() =
+        currentContext().gl.clearDepthStencil()
+        editor.gizmo.updateGizmo()
+        editor.gizmo.gizmoNode.drawNode(true, nil)
 
     return editor

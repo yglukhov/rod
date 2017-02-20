@@ -35,7 +35,7 @@ when not defined(android) and not defined(ios):
     type ImagePercent = tuple
         s: Image
         v: float32
-    proc newMaterialImagePropertyView(editedObject: Variant, setter: proc(t: ImagePercent), getter: proc(): ImagePercent): PropertyEditorView =
+    proc newMaterialImagePropertyView(setter: proc(t: ImagePercent), getter: proc(): ImagePercent): PropertyEditorView =
         let pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
 
         var loadedImage = getter().s
