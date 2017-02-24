@@ -585,6 +585,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("anchor", s.getValue(n.anchor))
     result.add("alpha", s.getValue(n.alpha))
     result.add("layer", s.getValue(n.layer))
+    result.add("affectsChildren", s.getValue(n.affectsChildren))
     result.add("enabled", s.getValue(n.enabled))
 
     if not n.components.isNil and n.components.len > 0:

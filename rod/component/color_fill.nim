@@ -25,16 +25,15 @@ method deserialize*(c: ColorFill, j: JsonNode, s: Serializer) =
     var v = j["color"]
     c.color = newColor(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
 
-method draw*(c: ColorFill) =
+method beforeDraw*(c: ColorFill, index: int): bool =
     const dummyUniform = 0.0'f32 # This unpleasantness is originated from the fact
                                 # that new `pushPostEffect` is conflicting with the
                                 # old one when number of uniforms is 1.
                                 # Should be cleaned up when old `pushPostEffect` is removed
     pushPostEffect(effect, c.color, dummyUniform)
-    for c in c.node.children: c.recursiveDraw()
-    popPostEffect()
 
-method isPosteffectComponent*(c: ColorFill): bool = true
+method afterDraw*(c: ColorFill, index: int) =
+    popPostEffect()
 
 method visitProperties*(c: ColorFill, p: var PropertyVisitor) =
     p.visitProperty("color", c.color)
