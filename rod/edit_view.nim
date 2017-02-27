@@ -404,6 +404,9 @@ proc endEditing*(e: Editor) =
         if not nodeSelector.isNil:
             e.selectedNode.removeComponent(NodeSelector)
 
+    e.gizmo.gizmoNode.nodeWillBeRemovedFromSceneView()
+    e.sceneView.afterDrawProc = nil
+    e.gizmo = nil
     e.sceneView.removeFromSuperview()
     e.sceneView.setFrame(e.workspaceView.frame)
     let rootEditorView = e.workspaceView.superview
