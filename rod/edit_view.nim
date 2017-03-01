@@ -17,6 +17,8 @@ import rod.editor.animation_edit_view
 import rod.editor.gizmo_axis
 import tools.serializer
 
+import rod.standard_objects.cube
+import rod.standard_objects.sphere
 import ray
 import viewport
 
@@ -369,6 +371,20 @@ proc createGameInputToggle(e: Editor) =
         e.eventCatchingView.allowGameInput = (toggle.value == 1)
     toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
 
+proc createNewCubeButton(e: Editor) =
+    e.newToolbarButton("New Cube").onAction do():
+        if not e.selectedNode.isNil:
+            e.selectedNode.addChild(newCube())
+        else:
+            e.rootNode.addChild(newCube())
+
+proc createNewSphereButton(e: Editor) =
+    e.newToolbarButton("New Sphere").onAction do():
+        if not e.selectedNode.isNil:
+            e.selectedNode.addChild(newSphere())
+        else:
+            e.rootNode.addChild(newSphere())
+
 proc createCameraSelector(e: Editor) =
     e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
     e.updateCameraSelector()
@@ -563,6 +579,8 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     # Toolbar buttons
     editor.createOpenAndSaveButtons()
     editor.createZoomSelectionButton()
+    editor.createNewCubeButton()
+    editor.createNewSphereButton()
     editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
