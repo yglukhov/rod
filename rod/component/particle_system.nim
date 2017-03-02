@@ -299,6 +299,9 @@ proc calculateVertexDesc(ps: ParticleSystem): VertexDesc =
                                      else: 1.int32
     result = newVertexDesc(3, rotationSize, 2, 1, 1, 1, lifeTimeSize)
 
+proc maxParticlesCount(ps: ParticleSystem): int =
+    result = int(ceil(ps.birthRate) * ceil(ps.lifetime))
+
 proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle =
     result = Particle.new()
     result.node = ps.node
@@ -326,9 +329,7 @@ proc fillIBuffer(ps: ParticleSystem) =
     let gl = currentContext().gl
     var ib = newSeq[GLushort]()
 
-    ps.indexBufferSize = int(ceil(ps.birthRate) * ceil(ps.lifetime)) * 6
-    if ps.indexBufferSize <= 1:
-        ps.indexBufferSize = 60000
+    ps.indexBufferSize = ps.maxParticlesCount() * 6
 
     for i in 0 ..< ps.indexBufferSize:
         ib.add(GLushort(4*i + 0))
@@ -350,13 +351,13 @@ proc initSystem(ps: ParticleSystem) =
     ps.animation.numberOfLoops = -1
 
     ps.vertexDesc = ps.calculateVertexDesc()
-    ps.particlesVertexBuff = newSeq[float32]( int(ceil(ps.birthRate) * ceil(ps.lifetime)) * ps.getVertexSize() )
+    ps.particlesVertexBuff = newSeq[float32]( ps.maxParticlesCount() * ps.getVertexSize() )
     ps.vertexBuffer = gl.createBuffer()
     ps.indexBuffer = gl.createBuffer()
     ps.fillIBuffer()
 
     ps.newParticles = newSeq[Particle]()
-    ps.particles = newSeq[Particle]( int(ceil(ps.birthRate) * ceil(ps.lifetime)) )
+    ps.particles = newSeq[Particle]( ps.maxParticlesCount() )
 
     if particleShader.isNil:
         particleShader = newShader(ParticleVertexShader, ParticleFragmentShader,
@@ -513,7 +514,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             continue
 
         if ps.particlesVertexBuff.len <= (ps.count + 1) * 4 * vertexSize:
-            for j in 0 .. 4*vertexSize:
+            for j in 0 .. 4 * vertexSize:
                 ps.particlesVertexBuff.add(0.0)
 
         ps.particles[i].lifetime -= dt
@@ -631,6 +632,9 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
 
         ps.count.inc()
 
+        if ps.count > ps.maxParticlesCount():
+            return
+
     # if we have new particles
     for i in 0 .. newParticlesCount - 1:
         ps.particles.add(ps.newParticles[i])
@@ -650,7 +654,7 @@ proc update(ps: ParticleSystem, dt: float) =
         ps.modifier = ps.modifierNode.getComponent(PSModifier)
 
     # chek IB size (need for runtime property editing)
-    if ps.indexBufferSize < int(ceil(ps.birthRate) * ceil(ps.lifetime)):
+    if ps.indexBufferSize < ps.maxParticlesCount():
         ps.fillIBuffer()
 
     if (ps.remainingDuration > 0 or ps.isLooped) and ps.isPlayed:
@@ -670,7 +674,6 @@ proc update(ps: ParticleSystem, dt: float) =
 
     ps.updateParticlesBuffer(dt)
     ps.newParticles.setLen(0)
-
 
 method draw*(ps: ParticleSystem) =
     let dt = getDeltaTime() #ps.currentTime - ps.lastTime
