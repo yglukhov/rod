@@ -1193,7 +1193,7 @@ let move_axis_node = """{
             0.7022539973258972,
             0.8969460129737854
           ],
-          "light": true,
+          "light": false,
           "wireframe": false,
           "specular": [
             0.0,
@@ -2398,7 +2398,7 @@ let move_axis_node = """{
             0.7022539973258972,
             0.8969460129737854
           ],
-          "light": true,
+          "light": false,
           "wireframe": false,
           "specular": [
             0.0,
@@ -3603,7 +3603,7 @@ let move_axis_node = """{
             0.7022539973258972,
             0.8969460129737854
           ],
-          "light": true,
+          "light": false,
           "wireframe": false,
           "specular": [
             0.0,

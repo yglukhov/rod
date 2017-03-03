@@ -112,4 +112,4 @@ proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = fal
 
 when isMainModule:
     import cligen
-    dispatchMulti([hash], [pack], [upgradeAssetBundle])
+    dispatchMulti("?", [hash], [pack], [upgradeAssetBundle])

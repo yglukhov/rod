@@ -426,6 +426,8 @@ method init*(v: SceneView, frame: Rect) =
     v.deltaTimeAnimation.onAnimate = proc(p: float) =
         deltaTime = v.deltaTimeAnimation.curLoop.float + p - oldTime
         oldTime = v.deltaTimeAnimation.curLoop.float + p
+        if deltaTime < 0.0001:
+            deltaTime = 0.0001
 
     v.addAnimation(v.deltaTimeAnimation)
 
