@@ -13,10 +13,19 @@ type File = after_effects.File
 
 const exportSampledAnimations = true
 const exportKeyframeAnimations = false
+var exportInOut = true
 
 const exportedVersion = 1
 
-const useObsoleteNullLayerCheck = false # Flip this if you have problems with exporting null layers
+proc duration*(layer: Layer): float =
+    var source = layer.source
+    if source.jsObjectType == "FootageItem":
+        let footageSource = FootageItem(source)
+        if not footageSource.file.isNil:
+            result = footageSource.duration
+    elif source.jsObjectType == "CompItem":
+        let compItem = Composition(source)
+        result = compItem.duration
 
 proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item], typeName: string): seq[t] =
     for i in collection:
@@ -173,13 +182,8 @@ proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string
 
 proc isSolidLayer(layer: Layer): bool =
     let source = FootageItem(layer.source)
-    when useObsoleteNullLayerCheck:
-        ($source.name).find("Null") != 0 and
-            not source.mainSource.isNil and
-            source.mainSource.jsObjectType == "SolidSource"
-    else:
-        not layer.nullLayer and not source.mainSource.isNil and
-            source.mainSource.jsObjectType == "SolidSource"
+    result = not layer.nullLayer and not source.mainSource.isNil and
+        source.mainSource.jsObjectType == "SolidSource"
 
 proc isTextMarkerValid(layer: Layer): bool =
     let textMarker = layer.property("Marker", MarkerValue).valueAtTime(0).comment
@@ -449,6 +453,16 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         txt["_c"] = %"Text"
         result.add(txt)
 
+    if exportInOut:
+        let ael = newJObject()
+        ael["inPoint"] = %layer.inPoint
+        ael["outPoint"] = %layer.outPoint
+        ael["scale"] = %(layer.stretch / 100.0)
+        ael["startTime"] = %layer.startTime
+        ael["duration"] = %layer.duration()
+        ael["_c"] = %"AELayer"
+        result.add(ael)
+
 proc layerIsCompositionRef(layer: Layer): bool =
     not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
@@ -658,6 +672,7 @@ proc getPropertyAnimation(pd: PropertyDescription, marker: Marker): JsonNode =
             s += timeStep
         #  logi(JSON.stringify(sampledPropertyValues));
         #  sampledPropertyValues.push(converter(prop.valueAtTime(animationEndTime, false)));
+
         result["values"] = sampledPropertyValues
 
     result["duration"] = %(animationEndTime - animationStartTime)
@@ -724,6 +739,7 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
 
     let anim = newJObject()
     anim["duration"] = %(animationEndTime - animationStartTime)
+    anim["animScale"] = %(layer.stretch / 100.0)
     anim["frameLerp"] = %false
     anim["values"] = sampledPropertyValues
     if marker.loops != 0: anim["numberOfLoops"] = %marker.loops
@@ -731,10 +747,49 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
     var fullyQualifiedPropName = layer.mangledName & ".curFrame"
     result[fullyQualifiedPropName] = anim
 
-proc serializeCompositionAnimations(composition: Composition): JsonNode =
+proc serializeCompositionBuffers(composition: Composition): JsonNode=
+    result = newJArray()
+    var animationsBuffer = newJObject()
+    var allCompositionMarker : Marker
+    allCompositionMarker.time = 0.0
+    allCompositionMarker.duration = composition.duration
+    allCompositionMarker.animation = "aeAllCompositionAnimation"
+
+    for pd in gAnimatedProperties:
+        animationsBuffer[pd.fullyQualifiedName] = getPropertyAnimation(pd, allCompositionMarker)
+
+    var aeContainingLayers = newJArray()
+
+    for layer in composition.layers:
+        if shouldSerializeLayer(layer):
+            aeContainingLayers.add(%layer.mangledName)
+            if layer.isSequenceLayer():
+                getSequenceLayerAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
+
+    var animations = newJObject()
     var animationMarkers = getAnimationMarkers(composition)
+    animationMarkers.add(allCompositionMarker)
+
+    for m in animationMarkers:
+        var markerTime = newJObject()
+        markerTime["start"] = %m.time
+        markerTime["duration"] = %m.duration
+        animations[m.animation] = markerTime
+
+    var compC = newJObject()
+    if animationsBuffer.len > 0:
+        compC["buffers"] = animationsBuffer
+    compC["markers"] = animations
+    if aeContainingLayers.len > 0:
+        compC["layers"] = aeContainingLayers
+    compC["_c"] = %"AEComposition"
+
+    result.add(compC)
+
+proc serializeCompositionAnimations(composition: Composition): JsonNode =
     result = newJObject()
 
+    var animationMarkers = getAnimationMarkers(composition)
     for m in animationMarkers:
         var animations = newJObject()
         logi("Exporting animation: ", m.animation, ": ", epochTime())
@@ -770,13 +825,18 @@ proc serializeComposition(composition: Composition): JsonNode =
         if children.len > 0:
             result["children"] = children
 
-    let animations = serializeCompositionAnimations(composition)
+    if exportInOut:
+        let animComp = serializeCompositionBuffers(composition)
+        result["components"] = animComp
+    else:
+        let animations = serializeCompositionAnimations(composition)
+        if animations.len > 0:
+            result["animations"] = animations
 
-    if animations.len > 0:
-        result["animations"] = animations
     let f = app.project.file
     if not f.isNil:
         result["aep_name"] = % $f.name
+
 
 proc replacer(n: JsonNode): ref RootObj =
     case n.kind

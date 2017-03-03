@@ -76,6 +76,9 @@ type
         ## The start time of the layer, expressed in composition time (seconds).
         ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.
         startTime*: float
+        stretch*: float
+        outPoint*: float
+        inPoint*: float
 
     TextLayer* = ref TextLayerObj
     TextLayerObj {.importc.} = object of LayerObj

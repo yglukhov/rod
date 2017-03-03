@@ -12,7 +12,9 @@ type
     AnimatedProperty* = ref object
         name*: string
         sampler*: AbstractAnimationSampler
+        scale*: float
         progressSetter*: proc(p: float)
+
 
     PropertyAnimation* = ref object of Animation
         animatedProperties*: seq[AnimatedProperty]
@@ -188,14 +190,17 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
     shallow(result.animatedProperties)
 
     result.loopDuration = 0.0 # TODO: Hack - remove
-
     for k, jp in j:
         result.loopDuration = max(jp["duration"].getFNum(), result.loopDuration) # TODO: Hack - remove
         result.numberOfLoops = jp{"numberOfLoops"}.getNum(1).int # TODO: Hack - remove
+        var animScale = 1.0
+        if "animScale" in jp:
+            animScale = 1.0 / jp["animScale"].getFNum()
 
         var ap: AnimatedProperty
         ap.new()
         ap.name = k
+        ap.scale = animScale
         let sng = findAnimatablePropertyForSubtree(n, k)
         var t: TypeId
         try:
@@ -210,11 +215,13 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
             ap.sampler = newValueSampler(t, jp["values"], jp{"frameLerp"}.getBVal(true))
 
         ap.progressSetter = makeProgressSetter(sng, ap.sampler)
+
         result.animatedProperties.add(ap)
 
     let res = result
     result.onAnimate = proc(p: float) =
-        for ap in res.animatedProperties: ap.progressSetter(p)
+        for ap in res.animatedProperties:
+            ap.progressSetter(p * ap.scale)
 
 proc attachToNode*(pa: PropertyAnimation, n: Node) =
     for ap in pa.animatedProperties:
