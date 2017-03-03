@@ -63,7 +63,6 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, anim: Animation, marker:
             if c.duration < cl.duration:
                 pOut *= c.duration / cl.duration
 
-            echo "composition: ", cl.node.name, " skip: ", skip, " animScale ", cl.animScale, " in ", pIn, " out ", pOut
             let compAnim = layerComposition.compositionNamed(aeAllCompositionAnimation)
             compAnim.loopDuration = lduration
             let oldCompAnimate = compAnim.onAnimate
@@ -134,6 +133,7 @@ method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
 method componentNodeWasAddedToSceneView*(c: AEComposition) =
     if not c.layers.isNil:
         for l in c.layers:
+
             l.node.enabled = false
 
 proc play*(c: AEComposition): bool = c.testPlay
