@@ -255,6 +255,7 @@ type
         colorSeq*: seq[TVector[5, Coord]] # time, color
 
         isBlendAdd*: bool
+        hasDepthTest*: bool
 
 # -------------------- Particle System --------------------------
 proc randomBetween(fromV, toV: float32): float32 =
@@ -424,6 +425,7 @@ method init(ps: ParticleSystem) =
     ps.fps = 1.0
 
     ps.isBlendAdd = false
+    ps.hasDepthTest = true
 
     ps.scaleMode = ParticleModeEnum.BeetwenValue
     ps.colorMode = ParticleModeEnum.BeetwenValue
@@ -767,8 +769,9 @@ method draw*(ps: ParticleSystem) =
     ps.shader.setUniform("viewMatrix", viewMatrix)
     ps.shader.setUniform("uNodeScale", ps.node.scale)
 
-    gl.depthMask(false)
-    gl.enable(gl.DEPTH_TEST)
+    if ps.hasDepthTest:
+        gl.depthMask(false)
+        gl.enable(gl.DEPTH_TEST)
 
     if ps.isBlendAdd:
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE)
@@ -781,10 +784,11 @@ method draw*(ps: ParticleSystem) =
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
-    gl.disable(gl.DEPTH_TEST)
     gl.activeTexture(gl.TEXTURE0)
     gl.enable(gl.BLEND)
-    gl.depthMask(true)
+    if ps.hasDepthTest:
+        gl.disable(gl.DEPTH_TEST)
+        gl.depthMask(true)
 
     for i in 1 .. 6:
         gl.disableVertexAttribArray(GLuint(i))
@@ -835,6 +839,7 @@ method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "colorMode", ps.colorMode)
     s.deserializeValue(j, "scaleSeq", ps.scaleSeq)
     s.deserializeValue(j, "colorSeq", ps.colorSeq)
+    s.deserializeValue(j, "hasDepthTest", ps.hasDepthTest)
 
     # ps.initSystem()
 
@@ -876,6 +881,7 @@ method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
 
     result.add("modifierNode", s.getValue(c.modifierNode))
     result.add("genShapeNode", s.getValue(c.genShapeNode))
+    result.add("hasDepthTest", s.getValue(c.hasDepthTest))
 
 method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     template isLoopedAux(ps: ParticleSystem): bool = ps.isLooped
@@ -945,6 +951,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("animColumns", ps.animColumns)
     p.visitProperty("framesCount", ps.framesCount)
     p.visitProperty("fps", ps.fps)
+    p.visitProperty("hasDepthTest", ps.hasDepthTest)
 
 # -------------------- PSHolder --------------------------
 type
