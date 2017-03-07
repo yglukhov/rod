@@ -29,8 +29,9 @@ vec3 colorPow(vec3 i, float p) {
 void channelLevels(vec3 inWhiteV, vec3 inBlackV, vec3 inGammaV, vec3 outWhiteV,
         vec3 outBlackV, float inWhite, float inBlack, float inGamma, float outWhite, float outBlack) {
     vec3 inPixel = gl_FragColor.rgb;
-    inPixel = colorPow((inPixel - inBlackV) / (inWhiteV - inBlackV), inGammaV) * (outWhiteV - outBlackV) + outBlackV;
-    inPixel = colorPow((inPixel - inBlack) / (inWhite - inBlack), inGamma) * (outWhite - outBlack) + outBlack;
+    inPixel = colorPow(clamp((inPixel - inBlackV) / (inWhiteV - inBlackV), 0.0, 1.0), 1.0 / inGammaV) * (outWhiteV - outBlackV) + outBlackV;
+    inPixel = colorPow(clamp((inPixel - inBlack) / (inWhite - inBlack), 0.0, 1.0), 1.0 / inGamma) * (outWhite - outBlack) + outBlack;
+
     gl_FragColor.rgb = inPixel;
 }
 """, "channelLevels", ["vec3", "vec3", "vec3", "vec3", "vec3", "float", "float", "float", "float", "float"])
@@ -93,6 +94,21 @@ method beforeDraw*(c: ChannelLevels, index: int): bool =
 method afterDraw*(c: ChannelLevels, index: int) =
     if c.active:
         popPostEffect()
+
+method serialize*(c: ChannelLevels, s: Serializer): JsonNode =
+    result = newJObject()
+
+    result.add("inWhiteV", s.getValue(c.inWhiteV))
+    result.add("inBlackV", s.getValue(c.inBlackV))
+    result.add("inGammaV", s.getValue(c.inGammaV))
+    result.add("outWhiteV", s.getValue(c.outWhiteV))
+    result.add("outBlackV", s.getValue(c.outBlackV))
+
+    result.add("inWhite", s.getValue(c.inWhite))
+    result.add("inBlack", s.getValue(c.inBlack))
+    result.add("inGamma", s.getValue(c.inGamma))
+    result.add("outWhite", s.getValue(c.outWhite))
+    result.add("outBlack", s.getValue(c.outBlack))
 
 method visitProperties*(c: ChannelLevels, p: var PropertyVisitor) =
     p.visitProperty("inWhiteV", c.inWhiteV)
