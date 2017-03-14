@@ -19,6 +19,7 @@ type
     PropertyAnimation* = ref object of Animation
         animatedProperties*: seq[AnimatedProperty]
 
+template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBVal()
 template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFNum()
 template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
 template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
@@ -76,14 +77,14 @@ when false:
             splitPropertyName("myProp", nn, ci, pn)
             assert(nn == nil and pn == "myProp" and ci == -1)
 
-proc newValueSampler[T](j: JsonNode, lerpBetweenFrames: bool): ArrayAnimationSampler[T] {.inline.} =
+proc newValueSampler[T](j: JsonNode, lerpBetweenFrames: bool, originalLen, cutFront: int): ArrayAnimationSampler[T] {.inline.} =
     var vals = newSeq[T](j.len)
     shallow(vals)
     var i = 0
     for v in j:
         vals[i] = elementFromJson(T, v)
         inc i
-    result = newArrayAnimationSampler[T](vals, lerpBetweenFrames)
+    result = newArrayAnimationSampler[T](vals, lerpBetweenFrames, originalLen, cutFront)
 
 template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): typed =
     ## This lists all animatable types
@@ -94,12 +95,19 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): t
     of clause(Vector4): action(Vector4)
     of clause(Color): action(Color)
     of clause(int): action(int)
+    of clause(bool): action(bool)
     else:
         raise newException(Exception, "Unknown type id")
 
 proc newValueSampler(t: TypeId, j: JsonNode, lerpBetweenFrames: bool): AbstractAnimationSampler =
     template makeSampler(T: typedesc) =
-        result = newValueSampler[T](j, lerpBetweenFrames)
+        result = newValueSampler[T](j, lerpBetweenFrames, -1, -1)
+    switchAnimatableTypeId(t, getTypeId, makeSampler)
+
+proc newValueSampler(t: TypeId, j:JsonNode, lerpBetweenFrames: bool, originalLen, cutFront: int): AbstractAnimationSampler=
+    template makeSampler(T: typedesc) =
+        result = newValueSampler[T](j, lerpBetweenFrames, originalLen, cutFront)
+
     switchAnimatableTypeId(t, getTypeId, makeSampler)
 
 proc newKeyframeSampler[T](j: JsonNode): BezierKeyFrameAnimationSampler[T] {.inline.} =
@@ -211,6 +219,11 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
 
         if "keys" in jp:
             ap.sampler = newKeyframeSampler(t, jp["keys"])
+        elif "cutf" in jp:
+            let lerp = jp{"frameLerp"}.getBVal(true)
+            let olen = jp{"len"}.getNum(-1).int
+            let cutf = jp{"cutf"}.getNum(-1).int
+            ap.sampler = newValueSampler(t, jp["values"], lerp, olen, cutf)
         else:
             ap.sampler = newValueSampler(t, jp["values"], jp{"frameLerp"}.getBVal(true))
 
@@ -230,6 +243,8 @@ proc attachToNode*(pa: PropertyAnimation, n: Node) =
 
     pa.onAnimate = proc(p: float) =
         for ap in pa.animatedProperties: ap.progressSetter(p)
+
+# [1811e51ff5dc0213a5abfd0f2bb32729f40c0344] fixes #5392
 
 proc copyForNode*(pa: PropertyAnimation, n: Node): PropertyAnimation =
     result.new()

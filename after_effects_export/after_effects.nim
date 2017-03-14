@@ -426,6 +426,14 @@ proc blendMode*(layer: Layer): BlendingMode =
     else:
         result = BlendingMode.NORMAL
 
+proc activeAtTime*(layer: Layer, t: float): bool=
+    var res = false
+    {.emit: """
+        `res` = `layer`.activeAtTime(`t`);
+    """
+    .}
+    result = res
+
 proc getSetting*(s: Settings, sectionName, keyName: cstring): cstring {.importcpp.}
 proc saveSetting*(s: Settings, sectionName, keyName, value: cstring) {.importcpp.}
 proc haveSetting*(s: Settings, sectionName, keyName: cstring): bool {.importcpp.}

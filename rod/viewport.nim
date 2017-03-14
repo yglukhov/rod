@@ -421,6 +421,7 @@ method init*(v: SceneView, frame: Rect) =
     v.animationRunner = newAnimationRunner()
 
     v.deltaTimeAnimation = newAnimation()
+    v.deltaTimeAnimation.tag = "deltaTimeAnimation"
     v.deltaTimeAnimation.numberOfLoops = -1
     v.deltaTimeAnimation.loopDuration = 1.0
     v.deltaTimeAnimation.onAnimate = proc(p: float) =

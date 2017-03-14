@@ -44,40 +44,31 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation
 
-proc applyLayerSettings*(c: AEComposition, cl: AELayer, anim: Animation, marker: AEMarker)=
+proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): ComposeMarker=
     let layerIn = cl.inPoint / c.duration
     let layerOut = cl.outPoint / c.duration
 
-    cl.node.enabled = false
+    # anim.addLoopProgressHandler(layerIn, false) do():
+    let layerComposition = cl.node.componentIfAvailable(AEComposition)
+    if not layerComposition.isNil:
 
-    anim.addLoopProgressHandler(layerIn, false) do():
-        cl.node.enabled = true
-        let layerComposition = cl.node.componentIfAvailable(AEComposition)
-        if not layerComposition.isNil:
+        let lduration = cl.duration * cl.animScale
+        let skip = if cl.startTime < 0.0: abs(cl.startTime/lduration) else: 0.0
+        let pIn = cl.inPoint/lduration + skip
+        var pOut = cl.outPoint/lduration + skip
 
-            let lduration = cl.duration * cl.animScale
-            let skip = if cl.startTime < 0.0: abs(cl.startTime/lduration) else: 0.0
-            let pIn = cl.inPoint/lduration + skip
-            var pOut = cl.outPoint/lduration + skip
+        if c.duration < cl.duration:
+            pOut *= c.duration / cl.duration
 
-            if c.duration < cl.duration:
-                pOut *= c.duration / cl.duration
+        let prop = layerComposition.compositionNamed(aeAllCompositionAnimation)
+        prop.loopDuration = lduration
+        let oldCompAnimate = prop.onAnimate
+        prop.animate prog in pIn..pOut:
+            oldCompAnimate(prog)
+            echo "animate prop ", marker.name
 
-            let compAnim = layerComposition.compositionNamed(aeAllCompositionAnimation)
-            compAnim.loopDuration = lduration
-            let oldCompAnimate = compAnim.onAnimate
-            compAnim.animate prog in pIn..pOut:
-                oldCompAnimate(prog)
-
-            if not c.node.sceneView.isNil:
-                c.node.sceneView.addAnimation(compAnim)
-
-    if layerIn <= 0.001:
-        cl.node.enabled = true
-
-    if layerOut < 1.0:
-        anim.addLoopProgressHandler(layerOut, false) do():
-            cl.node.enabled = false
+        result = newComposeMarker(layerIn, layerOut, prop)
+        result.numberOfLoops = 1
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation =
     var marker: AEMarker
@@ -88,15 +79,22 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
 
     if marker.name.len > 0:
         var prop = c.setCompositionMarker(marker)
+        var composeMarkers = newSeq[ComposeMarker]()
+        composeMarkers.add(newComposeMarker(0.0, 1.0, prop))
+
         if not exceptions.isNil:
             for ael in c.layers:
                 if ael.node.name notin exceptions:
-                    c.applyLayerSettings(ael, prop, marker)
+                    let cm = c.applyLayerSettings(ael, marker)
+                    if not cm.isNil:
+                        composeMarkers.add(cm)
         else:
             for ael in c.layers:
-                c.applyLayerSettings(ael, prop, marker)
+                let cm = c.applyLayerSettings(ael, marker)
+                if not cm.isNil:
+                    composeMarkers.add(cm)
 
-        result = prop
+        result = newCompositAnimation(c.duration, composeMarkers)
 
 method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
     c.layers = @[]

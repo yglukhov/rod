@@ -18,7 +18,7 @@ method numberOfKeys*[T](c: AnimationCurve[T]): int = c.sampler.keys.len
 
 method numberOfDimensions*(c: AbstractAnimationCurve): int {.base.} = 0
 method numberOfDimensions*[T](c: AnimationCurve[T]): int =
-    when T is Coord | int:
+    when T is Coord | int | bool:
         1
     elif T is Vector2:
         2
@@ -69,7 +69,7 @@ proc `[]=`(c: var Color, i: int, v: Coord) =
 
 method keyValue*(c: AbstractAnimationCurve, iKey, iDimension: int): Coord {.base.} = 0
 method keyValue*[T](c: AnimationCurve[T], iKey, iDimension: int): Coord =
-    when T is Coord | int:
+    when T is Coord | int | bool:
         Coord(c.sampler.keys[iKey].v)
     elif T is Vector2 | Vector3 | Vector4 | Color:
         Coord(c.sampler.keys[iKey].v[iDimension])
@@ -78,7 +78,7 @@ method keyValue*[T](c: AnimationCurve[T], iKey, iDimension: int): Coord =
 
 method setKeyValue*(c: AbstractAnimationCurve, iKey, iDimension: int, v: Coord) {.base.} = discard
 method setKeyValue*[T](c: AnimationCurve[T], iKey, iDimension: int, v: Coord) =
-    when T is Coord | int:
+    when T is Coord | int | bool:
         c.sampler.keys[iKey].v = T(v)
     elif T is Vector2 | Vector3 | Vector4 | Color:
         c.sampler.keys[iKey].v[iDimension] = v
