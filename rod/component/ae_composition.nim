@@ -48,7 +48,6 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): Compo
     let layerIn = cl.inPoint / c.duration
     let layerOut = cl.outPoint / c.duration
 
-    # anim.addLoopProgressHandler(layerIn, false) do():
     let layerComposition = cl.node.componentIfAvailable(AEComposition)
     if not layerComposition.isNil:
 
@@ -65,10 +64,8 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): Compo
         let oldCompAnimate = prop.onAnimate
         prop.animate prog in pIn..pOut:
             oldCompAnimate(prog)
-            echo "animate prop ", marker.name
 
         result = newComposeMarker(layerIn, layerOut, prop)
-        result.numberOfLoops = 1
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation =
     var marker: AEMarker
@@ -95,6 +92,7 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
                     composeMarkers.add(cm)
 
         result = newCompositAnimation(c.duration, composeMarkers)
+        result.numberOfLoops = 1
 
 method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
     c.layers = @[]
@@ -128,21 +126,37 @@ method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
         for m in c.markers:
             c.node.animations[m.name] = c.setCompositionMarker(m)
 
+method serialize*(c: AEComposition, s: Serializer): JsonNode=
+    result = newJObject()
+    result.add("buffers", c.buffers)
+
+    let markers = newJObject()
+    for m in c.markers:
+        markers[m.name] = newJObject()
+        markers[m.name]["start"] = %m.start
+        markers[m.name]["duration"] = %m.duration
+
+    result["markers"] = markers
+
+    let layers = newJArray()
+    for l in c.layers:
+        layers.add(%l.node.name)
+    result["layers"] = layers
+
 method componentNodeWasAddedToSceneView*(c: AEComposition) =
-    if not c.layers.isNil:
-        for l in c.layers:
+    let allCompAnim = c.compositionNamed(aeAllCompositionAnimation)
+    if not allCompAnim.isNil:
+        allCompAnim.onProgress(0.0)
 
-            l.node.enabled = false
+proc debugPlayAllComposition*(c: AEComposition): bool = c.testPlay
 
-proc play*(c: AEComposition): bool = c.testPlay
-
-proc `play=`*(c: AEComposition, val:bool)=
+proc `debugPlayAllComposition=`*(c: AEComposition, val:bool)=
     c.testPlay = val
     if val:
         let anim = c.compositionNamed(aeAllCompositionAnimation)
         c.node.sceneView.addAnimation(anim)
         anim.onComplete do():
-            c.play = false
+            c.debugPlayAllComposition = false
 
 method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     var ll = t.layers.len
@@ -150,23 +164,22 @@ method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     p.visitProperty("markers", ml)
     p.visitProperty("layers",  ll)
     p.visitProperty("duration", t.duration)
-    p.visitProperty("playAll", t.play)
+    p.visitProperty("playAll", t.debugPlayAllComposition)
 
 method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
-    if "inPoint" in j:
-        c.inPoint = j["inPoint"].getFNum()
+    serealizer.deserializeValue(j, "inPoint", c.inPoint)
+    serealizer.deserializeValue(j, "outPoint", c.outPoint)
+    serealizer.deserializeValue(j, "scale", c.animScale)
+    serealizer.deserializeValue(j, "startTime", c.startTime)
+    serealizer.deserializeValue(j, "duration", c.duration)
 
-    if "outPoint" in j:
-        c.outPoint = j["outPoint"].getFNum()
-
-    if "scale" in j:
-        c.animScale = j["scale"].getFNum()
-
-    if "startTime" in j:
-        c.startTime = j["startTime"].getFNum()
-
-    if "duration" in j:
-        c.duration = j["duration"].getFNum()
+method serialize*(c: AELayer, s: Serializer): JsonNode=
+    result = newJObject()
+    result.add("inPoint", s.getValue(c.inPoint))
+    result.add("outPoint", s.getValue(c.outPoint))
+    result.add("scale", s.getValue(c.animScale))
+    result.add("startTime", s.getValue(c.startTime))
+    result.add("duration", s.getValue(c.duration))
 
 method visitProperties*(t: AELayer, p: var PropertyVisitor) =
     p.visitProperty("inPoint",   t.inPoint)

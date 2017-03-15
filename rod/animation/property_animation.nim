@@ -244,8 +244,6 @@ proc attachToNode*(pa: PropertyAnimation, n: Node) =
     pa.onAnimate = proc(p: float) =
         for ap in pa.animatedProperties: ap.progressSetter(p)
 
-# [1811e51ff5dc0213a5abfd0f2bb32729f40c0344] fixes #5392
-
 proc copyForNode*(pa: PropertyAnimation, n: Node): PropertyAnimation =
     result.new()
     result[] = pa[]

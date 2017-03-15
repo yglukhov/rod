@@ -40,4 +40,8 @@ method deserialize*(vm: VisualModifier, j: JsonNode, serealizer: Serializer) =
         of "ADD": vm.blendMode = COLOR_ADD
         else: discard
 
+method serialize*(vm: VisualModifier, s: Serializer): JsonNode=
+    result = newJObject()
+    result.add("blendMode", %($vm.blendMode).substr(5))
+
 registerComponent(VisualModifier, "Effects")

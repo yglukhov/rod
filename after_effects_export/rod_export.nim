@@ -36,14 +36,14 @@ proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item],
 proc getSelectedCompositions(): seq[Composition] =
     getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
 
-proc roundTo(v: float, t: float = 1000.0): float =
+proc cutDecimal(v: float, t: float = 1000.0): float =
     if cutFloat:
         result = (v * t).int.float / t
     else:
         result = v
 
-proc roundTo[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector[I, T] =
-    for i in 0 ..< v.len: result[i] = roundTo(v[i], t)
+proc cutDecimal[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector[I, T] =
+    for i in 0 ..< v.len: result[i] = cutDecimal(v[i], t)
 
 var logTextField: EditText
 
@@ -249,13 +249,13 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
     of "ADBE Color Balance (HLS)":
         result = newJObject()
         let hue = addPropDesc(layer, compIndex, "hue", p.property("Hue", float)) do(v: float) -> JsonNode:
-            % roundTo((v / 360))
+            % cutDecimal((v / 360))
         hue.setInitialValueToResult(result)
         let saturation = addPropDesc(layer, compIndex, "saturation", p.property("Saturation", float)) do(v: float) -> JsonNode:
-            %roundTo((v / 100))
+            %cutDecimal((v / 100))
         saturation.setInitialValueToResult(result)
         let lightness = addPropDesc(layer, compIndex, "lightness", p.property("Lightness", float)) do(v: float) -> JsonNode:
-            %roundTo((v / 100))
+            %cutDecimal((v / 100))
         lightness.setInitialValueToResult(result)
         result["_c"] = %"ColorBalanceHLS"
 
@@ -465,10 +465,10 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
 
     if exportInOut:
         let ael = newJObject()
-        ael["inPoint"] = %layer.inPoint
-        ael["outPoint"] = %layer.outPoint
-        ael["scale"] = %(layer.stretch / 100.0)
-        ael["startTime"] = %layer.startTime
+        ael["inPoint"] = %cutDecimal(layer.inPoint)
+        ael["outPoint"] = %cutDecimal(layer.outPoint)
+        ael["scale"] = %cutDecimal(layer.stretch / 100.0)
+        ael["startTime"] = %cutDecimal(layer.startTime)
         ael["duration"] = %layer.duration()
         ael["_c"] = %"AELayer"
         result.add(ael)
@@ -490,14 +490,14 @@ proc serializeLayer(layer: Layer): JsonNode =
     result["name"] = % layer.mangledName
 
     let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
-        %roundTo(newVector3(v.x, v.y, v.z * -1.0))
+        %cutDecimal(newVector3(v.x, v.y, v.z * -1.0))
     position.setInitialValueToResult(result)
 
     addPropDesc(layer, -1, "tX", layer.property("X Position", float))
     addPropDesc(layer, -1, "tY", layer.property("Y Position", float))
 
     let scale = addPropDesc(layer, -1, "scale", layer.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
-        %roundTo(v / 100)
+        %cutDecimal(v / 100)
     scale.setInitialValueToResult(result)
 
     if layer.threeDLayer:
@@ -506,21 +506,21 @@ proc serializeLayer(layer: Layer): JsonNode =
         let zprop = layer.property("Z Rotation", float)
 
         let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
-            % quaternionWithEulerRotation(newVector3(roundTo(v[0]), roundTo(v[1]), roundTo(v[2])))
+            % cutDecimal(quaternionWithEulerRotation(newVector3(v[0], v[1], v[2])))
         if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
             gAnimatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
     else:
         let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
-            % quaternionWithZRotation(roundTo(v))
+            % cutDecimal(quaternionWithZRotation(v))
         rotation.setInitialValueToResult(result)
 
     let anchor = addPropDesc(layer, -1, "anchor", layer.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
-        %roundTo(v)
+        %cutDecimal(v)
     anchor.setInitialValueToResult(result)
 
     let alpha = addPropDesc(layer, -1, "alpha", layer.property("Opacity", float), 100) do(v: float) -> JsonNode:
-        %roundTo(v / 100.0)
+        %cutDecimal(v / 100.0)
     alpha.setInitialValueToResult(result)
 
     var children = layer.children
