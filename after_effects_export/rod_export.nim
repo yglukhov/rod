@@ -13,10 +13,20 @@ type File = after_effects.File
 
 const exportSampledAnimations = true
 const exportKeyframeAnimations = false
+var exportInOut = true
+var cutFloat = false
 
 const exportedVersion = 1
 
-const useObsoleteNullLayerCheck = false # Flip this if you have problems with exporting null layers
+proc duration*(layer: Layer): float =
+    var source = layer.source
+    if source.jsObjectType == "FootageItem":
+        let footageSource = FootageItem(source)
+        if not footageSource.file.isNil:
+            result = footageSource.duration
+    elif source.jsObjectType == "CompItem":
+        let compItem = Composition(source)
+        result = compItem.duration
 
 proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item], typeName: string): seq[t] =
     for i in collection:
@@ -25,6 +35,15 @@ proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item],
 
 proc getSelectedCompositions(): seq[Composition] =
     getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
+
+proc cutDecimal(v: float, t: float = 1000.0): float =
+    if cutFloat:
+        result = (v * t).int.float / t
+    else:
+        result = v
+
+proc cutDecimal[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector[I, T] =
+    for i in 0 ..< v.len: result[i] = cutDecimal(v[i], t)
 
 var logTextField: EditText
 
@@ -173,13 +192,8 @@ proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string
 
 proc isSolidLayer(layer: Layer): bool =
     let source = FootageItem(layer.source)
-    when useObsoleteNullLayerCheck:
-        ($source.name).find("Null") != 0 and
-            not source.mainSource.isNil and
-            source.mainSource.jsObjectType == "SolidSource"
-    else:
-        not layer.nullLayer and not source.mainSource.isNil and
-            source.mainSource.jsObjectType == "SolidSource"
+    result = not layer.nullLayer and not source.mainSource.isNil and
+        source.mainSource.jsObjectType == "SolidSource"
 
 proc isTextMarkerValid(layer: Layer): bool =
     let textMarker = layer.property("Marker", MarkerValue).valueAtTime(0).comment
@@ -235,13 +249,13 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
     of "ADBE Color Balance (HLS)":
         result = newJObject()
         let hue = addPropDesc(layer, compIndex, "hue", p.property("Hue", float)) do(v: float) -> JsonNode:
-            %(v / 360)
+            % cutDecimal((v / 360))
         hue.setInitialValueToResult(result)
         let saturation = addPropDesc(layer, compIndex, "saturation", p.property("Saturation", float)) do(v: float) -> JsonNode:
-            %(v / 100)
+            %cutDecimal((v / 100))
         saturation.setInitialValueToResult(result)
         let lightness = addPropDesc(layer, compIndex, "lightness", p.property("Lightness", float)) do(v: float) -> JsonNode:
-            %(v / 100)
+            %cutDecimal((v / 100))
         lightness.setInitialValueToResult(result)
         result["_c"] = %"ColorBalanceHLS"
 
@@ -449,6 +463,16 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         txt["_c"] = %"Text"
         result.add(txt)
 
+    if exportInOut:
+        let ael = newJObject()
+        ael["inPoint"] = %cutDecimal(layer.inPoint)
+        ael["outPoint"] = %cutDecimal(layer.outPoint)
+        ael["scale"] = %cutDecimal(layer.stretch / 100.0)
+        ael["startTime"] = %cutDecimal(layer.startTime)
+        ael["duration"] = %layer.duration()
+        ael["_c"] = %"AELayer"
+        result.add(ael)
+
 proc layerIsCompositionRef(layer: Layer): bool =
     not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
@@ -466,14 +490,14 @@ proc serializeLayer(layer: Layer): JsonNode =
     result["name"] = % layer.mangledName
 
     let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
-        %(newVector3(v.x, v.y, v.z * -1.0))
+        %cutDecimal(newVector3(v.x, v.y, v.z * -1.0))
     position.setInitialValueToResult(result)
 
     addPropDesc(layer, -1, "tX", layer.property("X Position", float))
     addPropDesc(layer, -1, "tY", layer.property("Y Position", float))
 
     let scale = addPropDesc(layer, -1, "scale", layer.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
-        %(v / 100)
+        %cutDecimal(v / 100)
     scale.setInitialValueToResult(result)
 
     if layer.threeDLayer:
@@ -482,21 +506,21 @@ proc serializeLayer(layer: Layer): JsonNode =
         let zprop = layer.property("Z Rotation", float)
 
         let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
-            % quaternionWithEulerRotation(newVector3(v[0], v[1], v[2]))
+            % cutDecimal(quaternionWithEulerRotation(newVector3(v[0], v[1], v[2])))
         if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
             gAnimatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
     else:
         let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
-            % quaternionWithZRotation(v)
+            % cutDecimal(quaternionWithZRotation(v))
         rotation.setInitialValueToResult(result)
 
     let anchor = addPropDesc(layer, -1, "anchor", layer.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
-        %v
+        %cutDecimal(v)
     anchor.setInitialValueToResult(result)
 
     let alpha = addPropDesc(layer, -1, "alpha", layer.property("Opacity", float), 100) do(v: float) -> JsonNode:
-        %(v / 100.0)
+        %cutDecimal(v / 100.0)
     alpha.setInitialValueToResult(result)
 
     var children = layer.children
@@ -658,6 +682,7 @@ proc getPropertyAnimation(pd: PropertyDescription, marker: Marker): JsonNode =
             s += timeStep
         #  logi(JSON.stringify(sampledPropertyValues));
         #  sampledPropertyValues.push(converter(prop.valueAtTime(animationEndTime, false)));
+
         result["values"] = sampledPropertyValues
 
     result["duration"] = %(animationEndTime - animationStartTime)
@@ -724,17 +749,115 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
 
     let anim = newJObject()
     anim["duration"] = %(animationEndTime - animationStartTime)
+    anim["animScale"] = %(layer.stretch / 100.0)
     anim["frameLerp"] = %false
     anim["values"] = sampledPropertyValues
+
     if marker.loops != 0: anim["numberOfLoops"] = %marker.loops
 
     var fullyQualifiedPropName = layer.mangledName & ".curFrame"
     result[fullyQualifiedPropName] = anim
 
-proc serializeCompositionAnimations(composition: Composition): JsonNode =
+proc getLayerActiveAtTimeAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
+    var animationStartTime = marker.time
+    var animationEndTime = marker.time + marker.duration;
+
+    var fps = 30.0;
+    var timeStep = 1.0 / fps;
+    var sampledPropertyValues = newJArray()
+
+    var dEndTime = animationEndTime - 0.0001;
+    var s = animationStartTime
+    while s < dEndTime:
+        sampledPropertyValues.add(%layer.activeAtTime(s))
+        s += timeStep
+
+    let anim = newJObject()
+    anim["duration"] = %(animationEndTime - animationStartTime)
+    anim["animScale"] = %(layer.stretch / 100.0)
+    anim["values"] = sampledPropertyValues
+    anim["frameLerp"] = %false
+
+    var fullyQualifiedPropName = layer.mangledName & ".enabled"
+    result[fullyQualifiedPropName] = anim
+
+proc serializeCompositionBuffers(composition: Composition): JsonNode=
+    result = newJArray()
+    var animationsBuffer = newJObject()
+    var allCompositionMarker : Marker
+    allCompositionMarker.time = 0.0
+    allCompositionMarker.duration = composition.duration
+    allCompositionMarker.animation = "aeAllCompositionAnimation"
+
+    for pd in gAnimatedProperties:
+        animationsBuffer[pd.fullyQualifiedName] = getPropertyAnimation(pd, allCompositionMarker)
+
+    var aeContainingLayers = newJArray()
+
+    for layer in composition.layers:
+        if shouldSerializeLayer(layer):
+            aeContainingLayers.add(%layer.mangledName)
+            if layer.isSequenceLayer():
+                getSequenceLayerAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
+            getLayerActiveAtTimeAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
+
+    for k, v in animationsBuffer:
+        var values = v["values"]
+        var cutVals = newJArray()
+        var valsBack = newJArray()
+        let valuesLen = values.len
+
+        var cutFront, cutBack: int
+        var isFrontCutting = true
+        var isBackCutting = true
+
+        for i in 0 ..< valuesLen:
+            let curFront = values[i]
+            let curBack = values[valuesLen - 1 - i]
+            if $curFront == $values[0] and isFrontCutting:
+                inc cutFront
+            else:
+                isFrontCutting = false
+
+            if $curBack == $values[valuesLen - 1] and isBackCutting:
+                inc cutBack
+            else:
+                isBackCutting = false
+
+        for i in (cutFront - 1) .. (valuesLen - cutBack):
+            cutVals.add(values[i])
+
+        if cutFront == valuesLen:
+            cutVals.add(values[0])
+
+        v["len"] = %valuesLen
+        v["cutf"] = %(cutFront - 1)
+        v["values"] = cutVals
+
+    var animations = newJObject()
     var animationMarkers = getAnimationMarkers(composition)
+    animationMarkers.add(allCompositionMarker)
+
+    for m in animationMarkers:
+        var markerTime = newJObject()
+        markerTime["start"] = %m.time
+        markerTime["duration"] = %m.duration
+        animations[m.animation] = markerTime
+
+    var compC = newJObject()
+    if animationsBuffer.len > 0:
+        compC["buffers"] = animationsBuffer
+    compC["markers"] = animations
+    if aeContainingLayers.len > 0:
+        compC["layers"] = aeContainingLayers
+    compC["_c"] = %"AEComposition"
+
+    result.add(compC)
+
+proc serializeCompositionAnimations(composition: Composition): JsonNode =
     result = newJObject()
 
+    var animationMarkers = getAnimationMarkers(composition)
     for m in animationMarkers:
         var animations = newJObject()
         logi("Exporting animation: ", m.animation, ": ", epochTime())
@@ -770,13 +893,18 @@ proc serializeComposition(composition: Composition): JsonNode =
         if children.len > 0:
             result["children"] = children
 
-    let animations = serializeCompositionAnimations(composition)
+    if exportInOut:
+        let animComp = serializeCompositionBuffers(composition)
+        result["components"] = animComp
+    else:
+        let animations = serializeCompositionAnimations(composition)
+        if animations.len > 0:
+            result["animations"] = animations
 
-    if animations.len > 0:
-        result["animations"] = animations
     let f = app.project.file
     if not f.isNil:
         result["aep_name"] = % $f.name
+
 
 proc replacer(n: JsonNode): ref RootObj =
     case n.kind
@@ -859,14 +987,20 @@ function buildUI(contextObj) {
   var topGroup = mainWindow.add("group{orientation:'row'}");
   topGroup.alignment = ["fill", "top"];
 
-  var setPathButton = topGroup.add("button", undefined, "Browse");
-  setPathButton.alignment = ["left", "center"];
+  var browseGroup = topGroup.add("group{orientation:'column'}");
+  browseGroup.alignment = ["fill", "top"];
 
-  var filePath = topGroup.add("statictext");
-  filePath.alignment = ["fill", "fill"];
+  var setPathButton = browseGroup.add("button", undefined, "Browse");
+  setPathButton.alignment = ["left", "top"];
 
-  var copyResourcesCheckBox = topGroup.add("checkbox", undefined, "Copy resources");
-  copyResourcesCheckBox.alignment = ["right", "center"];
+  var filePath = browseGroup.add("statictext");
+  filePath.alignment = ["fill", "bottom"];
+
+  var exportOptionsGroup = topGroup.add("group{orientation:'column'}");
+  exportOptionsGroup.alignment = ["fill", "top"];
+
+  var copyResourcesCheckBox = exportOptionsGroup.add("checkbox", undefined, "Copy resources");
+  copyResourcesCheckBox.alignment = ["fill", "top"];
   copyResourcesCheckBox.value = true;
   app.settings.saveSetting("rodExport", "copyResources", "true");
 
@@ -874,8 +1008,8 @@ function buildUI(contextObj) {
     app.settings.saveSetting("rodExport", "copyResources", copyResourcesCheckBox.value + "");
   };
 
-  var transitiveEffectsCheckBox = topGroup.add("checkbox", undefined, "Transitive effects");
-  transitiveEffectsCheckBox.alignment = ["right", "center"];
+  var transitiveEffectsCheckBox = exportOptionsGroup.add("checkbox", undefined, "Transitive effects");
+  transitiveEffectsCheckBox.alignment = ["fill", "bottom"];
   `transitiveEffects`[0] = app.settings.haveSetting("rodExport", "transitiveEffects") &&
     app.settings.getSetting("rodExport", "transitiveEffects") == "true";
   transitiveEffectsCheckBox.value = `transitiveEffects`[0];
@@ -884,6 +1018,31 @@ function buildUI(contextObj) {
     `transitiveEffects`[0] = transitiveEffectsCheckBox.value;
     app.settings.saveSetting("rodExport", "transitiveEffects", transitiveEffectsCheckBox.value + "");
   };
+
+  var exportInOutGroup = topGroup.add("group{orientation:'column'}");
+  exportInOutGroup.alignment = ["fill", "top"];
+
+  var inOutCheckBox = exportInOutGroup.add("checkbox", undefined, "Export InOut");
+  inOutCheckBox.alignment = ["fill", "top"];
+
+  `exportInOut`[0] = app.settings.haveSetting("rodExport", "exportInOut") &&
+     app.settings.getSetting("rodExport", "exportInOut") == "true";
+  copyResourcesCheckBox.value = `exportInOut`[0];
+
+  inOutCheckBox.onClick = function(e) {
+    `exportInOut`[0] = inOutCheckBox.value;
+    app.settings.saveSetting("rodExport", "exportInOut", inOutCheckBox.value + "");
+  }
+
+  var cutFloatsCheckBox = exportInOutGroup.add("checkbox", undefined, "Cut decimal");
+  cutFloatsCheckBox.alignment = ["fill", "bottom"];
+  `cutFloat`[0] = app.settings.haveSetting("rodExport", "cutFloat") &&
+     app.settings.getSetting("rodExport", "cutFloat") == "true";
+
+  cutFloatsCheckBox.onClick = function(e){
+    `cutFloat`[0] = cutFloatsCheckBox.value;
+    app.settings.saveSetting("rodExport", "cutFloat", cutFloatsCheckBox.value + "");
+  }
 
   var exportButton = topGroup.add("button", undefined,
     "Export selected compositions");

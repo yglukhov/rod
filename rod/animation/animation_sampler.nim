@@ -21,27 +21,51 @@ type
     BezierKeyFrameAnimationSampler*[T] = ref object of AnimationSampler[T]
         keys*: seq[BezierKeyFrame[T]]
 
-proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true): ArrayAnimationSampler[T] =
+proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true, originalLen, cutFront: int): ArrayAnimationSampler[T] =
     result.new()
     result.values = values
     result.valueType = getTypeId(T)
     if lerpBetweenFrames:
-        result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
-            let s = cast[ArrayAnimationSampler[T]](sampler)
-            let ln = s.values.len - 1
-            let index = clamp(p * ln.float, 0.float, ln.float)
-            let i = index.int
-            if i == ln:
-                result = s.values[i]
-            else:
-                let m = index mod 1.0
-                result = interpolate(s.values[i], s.values[i + 1], m)
+        if originalLen == -1:
+            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+                let s = cast[ArrayAnimationSampler[T]](sampler)
+                let ln = s.values.len - 1
+                let index = clamp(p * ln.float, 0.float, ln.float)
+                let i = index.int
+                if i == ln:
+                    result = s.values[i]
+                else:
+                    let m = index mod 1.0
+                    result = interpolate(s.values[i], s.values[i + 1], m)
+
+        else:
+            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+                let s = cast[ArrayAnimationSampler[T]](sampler)
+                let ln = originalLen - 1
+                let index = clamp(p * ln.float, 0.float, ln.float)
+                var i = clamp(index.int - cutFront, 0, s.values.len - 1)
+
+                if i == s.values.len - 1:
+                    result = s.values[i]
+                elif index.int < cutFront:
+                    result = s.values[0]
+                else:
+                    let m = index mod 1.0
+                    result = interpolate(s.values[i], s.values[i + 1], m)
     else:
-        result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
-            let s = cast[ArrayAnimationSampler[T]](sampler)
-            let ln = s.values.len - 1
-            let index = clamp(int(p * ln.float), 0, ln)
-            result = s.values[index]
+        if originalLen == -1:
+            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+                let s = cast[ArrayAnimationSampler[T]](sampler)
+                let ln = s.values.len - 1
+                let index = clamp(int(p * ln.float), 0, ln)
+                result = s.values[index]
+        else:
+            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+                let s = cast[ArrayAnimationSampler[T]](sampler)
+                let ln = originalLen - 1
+                let index = clamp(int(p * ln.float), 0, ln)
+                var i = clamp(index.int - cutFront, 0, s.values.len - 1)
+                result = s.values[i]
 
 proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): LinearKeyFrameAnimationSampler[T] =
     result.new()

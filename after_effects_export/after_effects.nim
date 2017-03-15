@@ -76,6 +76,9 @@ type
         ## The start time of the layer, expressed in composition time (seconds).
         ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.
         startTime*: float
+        stretch*: float
+        outPoint*: float
+        inPoint*: float
 
     TextLayer* = ref TextLayerObj
     TextLayerObj {.importc.} = object of LayerObj
@@ -422,6 +425,14 @@ proc blendMode*(layer: Layer): BlendingMode =
         result = BlendingMode.ADD
     else:
         result = BlendingMode.NORMAL
+
+proc activeAtTime*(layer: Layer, t: float): bool=
+    var res = false
+    {.emit: """
+        `res` = `layer`.activeAtTime(`t`);
+    """
+    .}
+    result = res
 
 proc getSetting*(s: Settings, sectionName, keyName: cstring): cstring {.importcpp.}
 proc saveSetting*(s: Settings, sectionName, keyName, value: cstring) {.importcpp.}
