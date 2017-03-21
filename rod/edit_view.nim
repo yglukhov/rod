@@ -326,15 +326,12 @@ proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
     if editor.selectedNode.isNil:
         return
 
-    let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
     editor.gizmo.proccesTransform(e.localPosition)
-
 
 proc onTouchUp*(editor: Editor, e: var Event) =
     if editor.selectedNode.isNil:
         return
 
-    let nodeSelector = editor.selectedNode.getComponent(NodeSelector)
     editor.gizmo.stopTransform()
 
 proc newToolbarButton(e: Editor, title: string): Button =
