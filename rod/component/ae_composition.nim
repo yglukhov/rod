@@ -33,7 +33,7 @@ type AEComposition* = ref object of Component
 
 proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     let pStart = m.start / c.duration
-    let pEnd = m.duration / c.duration
+    let pEnd = m.duration / c.duration + pStart
 
     var prop = newPropertyAnimation(c.node, c.buffers)
     prop.loopDuration = m.duration
@@ -45,8 +45,8 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation
 
 proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): ComposeMarker=
-    let layerIn = cl.inPoint / c.duration
-    let layerOut = cl.outPoint / c.duration
+    let layerIn = cl.inPoint / c.duration - marker.start/c.duration
+    let layerOut = cl.outPoint / c.duration - marker.start/c.duration
 
     let layerComposition = cl.node.componentIfAvailable(AEComposition)
     if not layerComposition.isNil:
@@ -93,6 +93,14 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
 
         result = newCompositAnimation(c.duration, composeMarkers)
         result.numberOfLoops = 1
+
+proc play*(c: AEComposition, name: string, exceptions: seq[string] = nil): Animation {.discardable.} =
+    result = c.compositionNamed(name, exceptions)
+    if not c.node.sceneView.isNil:
+        c.node.sceneView.addAnimation(result)
+
+proc playAll*(c: AEComposition, exceptions: seq[string] = nil): Animation {.discardable.} =
+    result = c.play(aeAllCompositionAnimation)
 
 method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
     c.layers = @[]
