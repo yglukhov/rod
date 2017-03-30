@@ -472,12 +472,34 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("layer", n.layer)
     p.visitProperty("enabled", n.enabled)
 
-proc reparentTo*(n, newParent: Node) =
+proc reparentTo*(n, newParent: Node) {.deprecated.} =
     # Change parent of a node preserving its world transform
     let oldWorldTransform = n.worldTransform
     newParent.addChild(n)
     let newTransform = newParent.worldTransform.inversed() * oldWorldTransform
     n.mTranslation = translationFromMatrix(newTransform)
+
+proc reattach*(n, newParent: Node, index = -1) =
+    let worldTransform = n.worldTransform
+    let worldPos = n.worldPos
+
+    var inv_mat: Matrix4
+    if tryInverse(newParent.worldTransform(), inv_mat) == false:
+        return
+
+    let localMatrix = worldTransform * inv_mat
+    var localScale = newVector3(1.0)
+    var localRotation: Vector4
+    discard localMatrix.tryGetScaleRotationFromModel(localScale, localRotation)
+
+    if index >= 0:
+        newParent.insertChild(n, index)
+    else:
+        newParent.addChild(n)
+
+    n.worldPos = worldPos
+    n.scale = localScale
+    n.rotation = localRotation
 
 proc animationNamed*(n: Node, name: string, preserveHandlers: bool = false): Animation =
     if not n.animations.isNil:
