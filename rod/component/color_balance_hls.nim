@@ -15,6 +15,8 @@ type ColorBalanceHLS* = ref object of Component
     hue*: float32
     saturation*: float32
     lightness*: float32
+    hlsMin*: float32
+    hlsMax*: float32
     enabled: bool
 
 # This effect is borrowed from https://github.com/greggman/hsva-unity  /  HSL version
@@ -44,13 +46,18 @@ vec3 cbhls_effect_hsl2rgb(vec3 c) {
     return c.z + c.y * (rgb - 0.5) * (1.0 - abs(2.0 * c.z - 1.0));
 }
 
-void cbhls_effect(float hue, float saturation, float lightness) {
+void cbhls_effect(float hue, float saturation, float lightness, float hlsMin, float hlsMax) {
     vec3 hsl = cbhls_effect_rgb2hsl(gl_FragColor.rgb);
     vec3 adjustment = vec3(hue, saturation, lightness);
     adjustment.xy *= step(0.001, hsl.x + hsl.y);
-    gl_FragColor.rgb = cbhls_effect_hsl2rgb(hsl + adjustment);
+    float affectMult = step(hlsMin, hsl.r) * step(hsl.r, hlsMax);
+    gl_FragColor.rgb = cbhls_effect_hsl2rgb(hsl + adjustment * affectMult);
 }
-""", "cbhls_effect", ["float", "float", "float"])
+""", "cbhls_effect", ["float", "float", "float", "float", "float"])
+
+method init*(c: ColorBalanceHLS) =
+    procCall c.Component.init()
+    c.hlsMax = 1.0
 
 # Dirty hack to optimize out extra drawing:
 template `~==`(f1, f2: float32): bool = (f1 > f2 - 0.02 and f1 < f2 + 0.02)
@@ -62,17 +69,21 @@ method deserialize*(c: ColorBalanceHLS, j: JsonNode, s: Serializer) =
     c.hue = j["hue"].getFNum()
     c.saturation = j["saturation"].getFNum()
     c.lightness = j["lightness"].getFNum()
+    c.hlsMin = j{"hlsMin"}.getFNum()
+    c.hlsMax = j{"hlsMax"}.getFNum(1.0)
 
 method serialize*(c: ColorBalanceHLS, s: Serializer): JsonNode =
     result = newJObject()
     result.add("hue", s.getValue(c.hue))
     result.add("saturation", s.getValue(c.saturation))
     result.add("lightness", s.getValue(c.lightness))
+    result.add("hlsMin", s.getValue(c.hlsMin))
+    result.add("hlsMax", s.getValue(c.hlsMax))
 
 method beforeDraw*(c: ColorBalanceHLS, index: int): bool =
     c.enabled = not c.areValuesNormal()
     if c.enabled:
-        pushPostEffect(effect, c.hue, c.saturation, c.lightness)
+        pushPostEffect(effect, c.hue, c.saturation, c.lightness, c.hlsMin, c.hlsMax)
 
 method afterDraw*(c: ColorBalanceHLS, index: int) =
     if c.enabled:
@@ -82,5 +93,7 @@ method visitProperties*(c: ColorBalanceHLS, p: var PropertyVisitor) =
     p.visitProperty("hue", c.hue)
     p.visitProperty("saturation", c.saturation)
     p.visitProperty("lightness", c.lightness)
+    p.visitProperty("hlsMin", c.hlsMin)
+    p.visitProperty("hlsMax", c.hlsMax)
 
 registerComponent(ColorBalanceHLS, "Effects")
