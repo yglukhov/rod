@@ -78,6 +78,9 @@ var transitiveEffects = false
 var layerNames = initTable[int, string]()
 var resourcePaths: seq[string] = @[]
 
+var gTrckMatteLayer: Layer
+var gTrckMatteLayerEnabled: bool
+
 proc mangledName(layer: Layer): string =
     result = layerNames.getOrDefault(layer.index)
     if result.len == 0:
@@ -361,6 +364,45 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
         logi "WARNING: Effect not supported. Layer: ", layer.name
         dumpPropertyTree(p)
 
+proc copyAndPrepareFootageItem(footageSource: FootageItem): JsonNode =
+    var imageFiles = if footageSource.duration > 0:
+            getSequenceFilesFromSource(footageSource)
+        else:
+            @[footageSource.file]
+
+    # Paths relative to currently exported composition
+    let imageFileRelativeExportPaths = newJArray()
+
+    let footagePath = $footageSource.projectPath
+    for i, f in imageFiles:
+        imageFileRelativeExportPaths.add(%getExportPathFromSourceFile(footageSource, f))
+
+        # Copy the file to the resources
+        if app.settings.getSetting("rodExport", "copyResources") == "true":
+            let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
+            if not resourcePaths.contains(resourcePath):
+                logi "Copying: ", resourcePath
+                resourcePaths.add(resourcePath)
+                let targetFile = newFile(resourcePath)
+                if not targetFile.parent.create():
+                    logi "ERROR: Could not create folder for ", resourcePath
+                if not f.copy(targetFile):
+                    logi "ERROR: Could not copy ", resourcePath
+
+    result = imageFileRelativeExportPaths
+
+proc setTrackMattLayer(layer: Layer) =
+    gTrckMatteLayer = layer
+    gTrckMatteLayerEnabled = gTrckMatteLayer.enabled
+    gTrckMatteLayer.enabled = true
+
+proc newTrackMattComponent(layer: Layer): JsonNode =
+    result = newJObject()
+    result["layerName"] = % $gTrckMatteLayer.name
+    result["maskType"] = %($layer.trackMatteType())
+    result["_c"] = %"Mask"
+    gTrckMatteLayer = nil
+
 proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJArray()
 
@@ -380,37 +422,18 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                 layerHasRenderableComponents = layerHasRenderableComponents or renderableComponent
                 if not c.isNil: result.add(c)
 
+    if not gTrckMatteLayer.isNil and layer.hasTrackMatte:
+        let traсkMatte = newTrackMattComponent(layer)
+        if not traсkMatte.isNil:
+            result.add(traсkMatte)
+
     var source = layer.source
     if not source.isNil:
         if source.jsObjectType == "FootageItem":
             let footageSource = FootageItem(source)
             if not footageSource.file.isNil:
-                var imageFiles = if footageSource.duration > 0:
-                        getSequenceFilesFromSource(footageSource)
-                    else:
-                        @[footageSource.file]
-
-                # Paths relative to currently exported composition
-                let imageFileRelativeExportPaths = newJArray()
-
-                let footagePath = $footageSource.projectPath
-                for i, f in imageFiles:
-                    imageFileRelativeExportPaths.add(%getExportPathFromSourceFile(footageSource, f))
-
-                    # Copy the file to the resources
-                    if app.settings.getSetting("rodExport", "copyResources") == "true":
-                        let resourcePath = gExportFolderPath & footagePath & "/" & $decodeURIComponent(f.name)
-                        if not resourcePaths.contains(resourcePath):
-                            logi "Copying: ", resourcePath
-                            resourcePaths.add(resourcePath)
-                            let targetFile = newFile(resourcePath)
-                            if not targetFile.parent.create():
-                                logi "ERROR: Could not create folder for ", resourcePath
-                            if not f.copy(targetFile):
-                                logi "ERROR: Could not copy ", resourcePath
-
                 var sprite = newJObject()
-                sprite["fileNames"] = imageFileRelativeExportPaths
+                sprite["fileNames"] = copyAndPrepareFootageItem(footageSource)
                 sprite["_c"] = %"Sprite"
                 result.add(sprite)
 
@@ -527,9 +550,12 @@ proc serializeLayer(layer: Layer): JsonNode =
     if children.len > 0:
         var chres = newJArray()
         for child in children:
+            if child.isTrackMatte:
+                setTrackMattLayer(child)
             if shouldSerializeLayer(child):
                 chres.add(serializeLayer(child))
-
+            if not gTrckMatteLayer.isNil:
+                gTrckMatteLayer.enabled = gTrckMatteLayerEnabled
         if chres.len > 0:
             chres.elems.reverse()
             result["children"] = chres
@@ -538,6 +564,9 @@ proc serializeLayer(layer: Layer): JsonNode =
         result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
 
     if not transitiveEffects: result["affectsChildren"] = %false
+
+    if layer.isTrackMatte:
+        result["enabled"] = %gTrckMatteLayerEnabled
 
     var components = serializeLayerComponents(layer)
     if components.len > 0: result["components"] = components
@@ -799,7 +828,8 @@ proc serializeCompositionBuffers(composition: Composition): JsonNode=
             aeContainingLayers.add(%layer.mangledName)
             if layer.isSequenceLayer():
                 getSequenceLayerAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
-            getLayerActiveAtTimeAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
+            if not layer.isTrackMatte:
+                getLayerActiveAtTimeAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
 
     for k, v in animationsBuffer:
         var values = v["values"]
@@ -887,8 +917,12 @@ proc serializeComposition(composition: Composition): JsonNode =
         var children = newJArray();
         for layer in composition.layers:
             if layer.parent.isNil:
+                if layer.isTrackMatte:
+                    setTrackMattLayer(layer)
                 if shouldSerializeLayer(layer):
                     children.add(serializeLayer(layer))
+                if not gTrckMatteLayer.isNil:
+                    gTrckMatteLayer.enabled = gTrckMatteLayerEnabled
         children.elems.reverse()
         if children.len > 0:
             result["children"] = children
@@ -1027,7 +1061,7 @@ function buildUI(contextObj) {
 
   `exportInOut`[0] = app.settings.haveSetting("rodExport", "exportInOut") &&
      app.settings.getSetting("rodExport", "exportInOut") == "true";
-  copyResourcesCheckBox.value = `exportInOut`[0];
+  inOutCheckBox.value = `exportInOut`[0];
 
   inOutCheckBox.onClick = function(e) {
     `exportInOut`[0] = inOutCheckBox.value;
@@ -1038,7 +1072,7 @@ function buildUI(contextObj) {
   cutFloatsCheckBox.alignment = ["fill", "bottom"];
   `cutFloat`[0] = app.settings.haveSetting("rodExport", "cutFloat") &&
      app.settings.getSetting("rodExport", "cutFloat") == "true";
-
+  cutFloatsCheckBox.value = `cutFloat`[0];
   cutFloatsCheckBox.onClick = function(e){
     `cutFloat`[0] = cutFloatsCheckBox.value;
     app.settings.saveSetting("rodExport", "cutFloat", cutFloatsCheckBox.value + "");
