@@ -2,12 +2,9 @@ import nimx/[types, context, image, animation, property_visitor, system_logger]
 
 import json, strutils, tables
 
-import rod/[ rod_types, node, ray, component, viewport ]
+import rod/[ rod_types, node, component, viewport ]
 import rod.tools.serializer
-import rod.utils.image_serialization
 import rod.animation.property_animation
-import nimx.property_editors.standard_editors
-import rod.property_editors.propedit_registry
 
 const aeAllCompositionAnimation = "aeAllCompositionAnimation"
 
