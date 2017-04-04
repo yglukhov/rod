@@ -93,13 +93,13 @@ proc findComponents*(n: Node, T: typedesc[Component]): auto =
         if not comp.isNil: compSeq.add(comp)
     return compSeq
 
-proc setupMaskComponent*(msk: Mask)
-proc trySetupMask*(msk: Mask)
+proc setupMaskComponent(msk: Mask)
+proc trySetupMask(msk: Mask)
 
 template maskNode*(msk: Mask): Node = msk.mMaskNode
 template `maskNode=`*(msk: Mask, val: Node) =
     msk.mMaskNode = val
-    msk.trySetupMask()
+    trySetupMask(msk)
 
 template maskSprite*(msk: Mask): Sprite = msk.mMaskSprite
 template `maskSprite=`*(msk: Mask, val: Sprite) = msk.mMaskSprite = val
@@ -107,7 +107,7 @@ template `maskSprite=`*(msk: Mask, val: Sprite) = msk.mMaskSprite = val
 template maskType*(msk: Mask): MaskType = msk.mMaskType
 template `maskType=`*(msk: Mask, val: MaskType) = msk.mMaskType = val
 
-proc setupMaskComponent*(msk: Mask) =
+proc setupMaskComponent(msk: Mask) =
     if not msk.maskNode.isNil:
         let spriteCmps = msk.maskNode.findComponents(Sprite)
         let solidCmps = msk.maskNode.findComponents(Solid)
@@ -122,7 +122,7 @@ proc setupMaskComponent*(msk: Mask) =
         else:
             msk.maskSprite = nil
 
-proc trySetupMask*(msk: Mask) =
+proc trySetupMask(msk: Mask) =
     try: msk.setupMaskComponent()
     except Exception:
         let ex = getCurrentException()
