@@ -396,12 +396,11 @@ proc setTrackMattLayer(layer: Layer) =
     gTrckMatteLayerEnabled = gTrckMatteLayer.enabled
     gTrckMatteLayer.enabled = true
 
-proc newTrackMattComponent(layer: Layer): JsonNode =
+proc newTrackMattComponent(layer: Layer, name: string): JsonNode =
     result = newJObject()
-    result["layerName"] = % $gTrckMatteLayer.name
-    result["maskType"] = %($layer.trackMatteType())
+    result["layerName"] = %name
+    result["maskType"] = %layer.trackMatteType.int
     result["_c"] = %"Mask"
-    gTrckMatteLayer = nil
 
 proc serializeLayerComponents(layer: Layer): JsonNode =
     result = newJArray()
@@ -423,7 +422,8 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                 if not c.isNil: result.add(c)
 
     if not gTrckMatteLayer.isNil and layer.hasTrackMatte:
-        let traсkMatte = newTrackMattComponent(layer)
+        let traсkMatte = newTrackMattComponent(layer, $gTrckMatteLayer.name)
+        gTrckMatteLayer = nil
         if not traсkMatte.isNil:
             result.add(traсkMatte)
 

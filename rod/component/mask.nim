@@ -77,7 +77,7 @@ var effect = [
 ]
 
 type MaskType* = enum
-    mAlpha, mAlphaInverted, mLuma, mLumaInverted, mNone
+    tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
 
 type Mask* = ref object of Component
     mMaskType: MaskType
@@ -93,8 +93,9 @@ proc findComponents*(n: Node, T: typedesc[Component]): auto =
         if not comp.isNil: compSeq.add(comp)
     return compSeq
 
-proc setupMaskComponent(msk: Mask)
-proc trySetupMask(msk: Mask)
+proc setupMaskComponent*(msk: Mask)
+proc trySetupMask*(msk: Mask)
+
 template maskNode*(msk: Mask): Node = msk.mMaskNode
 template `maskNode=`*(msk: Mask, val: Node) =
     msk.mMaskNode = val
@@ -106,7 +107,7 @@ template `maskSprite=`*(msk: Mask, val: Sprite) = msk.mMaskSprite = val
 template maskType*(msk: Mask): MaskType = msk.mMaskType
 template `maskType=`*(msk: Mask, val: MaskType) = msk.mMaskType = val
 
-proc setupMaskComponent(msk: Mask) =
+proc setupMaskComponent*(msk: Mask) =
     if not msk.maskNode.isNil:
         let spriteCmps = msk.maskNode.findComponents(Sprite)
         let solidCmps = msk.maskNode.findComponents(Solid)
@@ -121,7 +122,7 @@ proc setupMaskComponent(msk: Mask) =
         else:
             msk.maskSprite = nil
 
-proc trySetupMask(msk: Mask) =
+proc trySetupMask*(msk: Mask) =
     try: msk.setupMaskComponent()
     except Exception:
         let ex = getCurrentException()
@@ -141,7 +142,7 @@ template inv(m: Matrix4): Matrix4 =
     res
 
 method beforeDraw*(msk: Mask, index: int): bool =
-    if not msk.maskSprite.isNil and msk.maskType != mNone:
+    if not msk.maskSprite.isNil and msk.maskType != tmNone:
 
         if msk.mWithRTI:
             # TODO RTI
@@ -154,10 +155,10 @@ method beforeDraw*(msk: Mask, index: int): bool =
         let trInv = (msk.node.worldTransform.inv() * msk.maskSprite.node.worldTransform()).inv()
         let maskAlpha = msk.maskSprite.node.getGlobalAlpha()
 
-        pushPostEffect(effect[msk.maskType.int], msk.maskSprite.image, maskImgCoords, maskBounds, trInv, maskAlpha)
+        pushPostEffect(effect[msk.maskType.int-1], msk.maskSprite.image, maskImgCoords, maskBounds, trInv, maskAlpha)
 
 method afterDraw*(msk: Mask, index: int) =
-    if not msk.maskSprite.isNil and msk.maskType != mNone:
+    if not msk.maskSprite.isNil and msk.maskType != tmNone:
         popPostEffect()
 
 method serialize*(msk: Mask, serealizer: Serializer): JsonNode =
@@ -166,15 +167,7 @@ method serialize*(msk: Mask, serealizer: Serializer): JsonNode =
     result.add("layerName", serealizer.getValue(msk.maskNode))
 
 method deserialize*(msk: Mask, j: JsonNode, serealizer: Serializer) =
-    let v = j{"maskType"}
-    if not v.isNil:
-        case v.getStr()
-        of "tmLuma": msk.maskType = mLuma
-        of "tmAlpha": msk.maskType = mAlpha
-        of "tmLumaInverted": msk.maskType = mLumaInverted
-        of "tmAlphaInverted": msk.maskType = mAlphaInverted
-        else: serealizer.deserializeValue(j, "maskType", msk.maskType)
-
+    serealizer.deserializeValue(j, "maskType", msk.maskType)
     var layerName: string
     serealizer.deserializeValue(j, "layerName", layerName)
     addNodeRef(msk.maskNode, layerName)
