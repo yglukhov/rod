@@ -54,7 +54,7 @@ proc logi(args: varargs[string, `$`]) =
         logTextField.text &= i
     logTextField.text &= "\n"
 
-proc shouldSerializeLayer(layer: Layer): bool = return layer.enabled
+proc shouldSerializeLayer(layer: Layer): bool = layer.enabled and ((layer.name.len > 0 and layer.name[0] != '@') or layer.name.len == 0)
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
 template quaternionWithEulerRotation(euler: Vector3): Quaternion = newQuaternionFromEulerXYZ(euler.x, euler.y, euler.z)
@@ -247,7 +247,7 @@ proc dumpPropertyTree(p: PropertyBase | Layer, indentLevel = 0) =
             let p = p.toPropertyGroup()
             dumpChildren(p)
 
-proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableComponent: var bool): JsonNode =
+proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup): JsonNode =
     case $p.matchName
     of "ADBE Color Balance (HLS)":
         result = newJObject()
@@ -314,14 +314,6 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup, renderableC
             addPropDesc(layer, compIndex, propertyNameMap["Red " & n], p.property("Red " & n, float))
             addPropDesc(layer, compIndex, propertyNameMap["Green " & n], p.property("Green " & n, float))
             addPropDesc(layer, compIndex, propertyNameMap["Blue " & n], p.property("Blue " & n, float))
-
-    of "ADBE Numbers2": # Numbers
-        renderableComponent = true
-        result = newJObject()
-        var color = p.property("Fill Color", Vector4).valueAtTime(0)
-        result["color"] = %color
-        result["fontSize"] = % p.property("Size", float).valueAtTime(0)
-        result["_c"] = %"Text"
 
     of "ADBE Ramp": # Ramp
         result = newJObject()
@@ -396,36 +388,80 @@ proc setTrackMattLayer(layer: Layer) =
     gTrckMatteLayerEnabled = gTrckMatteLayer.enabled
     gTrckMatteLayer.enabled = true
 
-proc newTrackMattComponent(layer: Layer, name: string): JsonNode =
+proc newTrackMatteComponent(layer: Layer, name: string): JsonNode =
     result = newJObject()
     result["layerName"] = %name
     result["maskType"] = %layer.trackMatteType.int
     result["_c"] = %"Mask"
 
-proc serializeLayerComponents(layer: Layer): JsonNode =
-    result = newJArray()
+iterator effects(layer: Layer): PropertyGroup =
+    let effectsGroup = layer.propertyGroup("Effects")
+    if not effectsGroup.isNil:
+        for i in 0 ..< effectsGroup.numProperties:
+            let p = effectsGroup.property(i)
+            if p.isPropertyGroup and p.canSetEnabled and p.enabled:
+                yield p.toPropertyGroup()
 
+proc effectWithMatchName(layer: Layer, name: cstring): PropertyGroup =
+    for e in layer.effects:
+        if e.matchName == name: return e
+
+proc serializeEffectComponents(layer: Layer, result: JsonNode) =
     let blendMode = layer.blendMode
     if blendMode != BlendingMode.NORMAL:
         result.add(%*{"_c": "VisualModifier", "blendMode": % $blendMode})
 
-    var layerHasRenderableComponents = false
-    let effects = layer.propertyGroup("Effects")
-    if not effects.isNil:
-        for i in 0 ..< effects.numProperties:
-            let p = effects.property(i)
-            if p.isPropertyGroup and p.canSetEnabled and p.enabled:
-                let p = p.toPropertyGroup()
-                var renderableComponent = false
-                let c = serializeEffect(layer, result.len, p, renderableComponent)
-                layerHasRenderableComponents = layerHasRenderableComponents or renderableComponent
-                if not c.isNil: result.add(c)
+    for p in layer.effects:
+        let c = serializeEffect(layer, result.len, p)
+        if not c.isNil: result.add(c)
 
     if not gTrckMatteLayer.isNil and layer.hasTrackMatte:
-        let traсkMatte = newTrackMattComponent(layer, $gTrckMatteLayer.name)
+        let traсkMatte = newTrackMatteComponent(layer, $gTrckMatteLayer.name)
         gTrckMatteLayer = nil
         if not traсkMatte.isNil:
             result.add(traсkMatte)
+
+    if exportInOut:
+        let ael = newJObject()
+        ael["inPoint"] = %cutDecimal(layer.inPoint)
+        ael["outPoint"] = %cutDecimal(layer.outPoint)
+        ael["scale"] = %cutDecimal(layer.stretch / 100.0)
+        ael["startTime"] = %cutDecimal(layer.startTime)
+        ael["duration"] = %layer.duration()
+        ael["_c"] = %"AELayer"
+        result.add(ael)
+
+proc isNinePartSprite(layer: Layer): bool =
+    let ch = layer.children
+    ch.len == 1 and ch[0].name == "@NinePartMarker"
+
+proc ninePartSpriteGeometry(layer: Layer): array[4, float] =
+    let mLayer = layer.children[0]
+    let pp = mLayer.property("Position", Vector3).value
+    let sp = mLayer.property("Scale", Vector3).value
+    let ap = mLayer.property("Anchor Point", Vector3).value
+
+    let x = pp.x.float - ap.x.float
+    let y = pp.y.float - ap.y.float
+    let w = mLayer.width.float * sp.x / 100
+    let h = mLayer.height.float * sp.y / 100
+
+    let marginLeft = x
+    let marginRight = layer.width.float - (x + w)
+    let marginTop = y
+    let marginBottom = layer.height.float - (y + h)
+
+    result = [marginLeft, marginRight, marginTop, marginBottom]
+
+proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
+    let numbers = layer.effectWithMatchName("ADBE Numbers2")
+    if not numbers.isNil:
+        let num = newJObject()
+        let color = numbers.property("Fill Color", Vector4).valueAtTime(0)
+        num["color"] = %color
+        num["fontSize"] = % numbers.property("Size", float).valueAtTime(0)
+        num["_c"] = %"Text"
+        result.add(num)
 
     var source = layer.source
     if not source.isNil:
@@ -435,9 +471,12 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
                 var sprite = newJObject()
                 sprite["fileNames"] = copyAndPrepareFootageItem(footageSource)
                 sprite["_c"] = %"Sprite"
+                if layer.isNinePartSprite():
+                    let g = layer.ninePartSpriteGeometry()
+                    sprite["segments"] = %g
                 result.add(sprite)
 
-            elif layer.isSolidLayer and not layerHasRenderableComponents:
+            elif layer.isSolidLayer and numbers.isNil:
                 var solid = newJObject()
                 let solidSource = SolidSource(footageSource.mainSource)
                 solid["color"] = %* solidSource.color
@@ -486,16 +525,6 @@ proc serializeLayerComponents(layer: Layer): JsonNode =
         txt["_c"] = %"Text"
         result.add(txt)
 
-    if exportInOut:
-        let ael = newJObject()
-        ael["inPoint"] = %cutDecimal(layer.inPoint)
-        ael["outPoint"] = %cutDecimal(layer.outPoint)
-        ael["scale"] = %cutDecimal(layer.stretch / 100.0)
-        ael["startTime"] = %cutDecimal(layer.startTime)
-        ael["duration"] = %layer.duration()
-        ael["_c"] = %"AELayer"
-        result.add(ael)
-
 proc layerIsCompositionRef(layer: Layer): bool =
     not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
@@ -505,6 +534,24 @@ proc exportPath(c: Item): string =
         result = "compositions"
     else:
         result = result[1 .. ^1]
+
+proc metadata(layer: Layer): JsonNode =
+    if layer.comment.len > 0:
+        var c = $layer.comment
+        # After effects may insert funny chars instead of quotes.
+        c = c.replace("“", "\"")
+        c = c.replace("”", "\"")
+        try:
+            result = parseJson(c)
+        except:
+            logi "Could not parse layer comment"
+            logi c
+
+proc hasCompRefComponent(metadata: JsonNode): bool =
+    let comps = metadata{"components"}
+    if not comps.isNil:
+        for c in comps:
+            if c{"_c"}.getStr() == "CompRef": return true
 
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
@@ -546,19 +593,23 @@ proc serializeLayer(layer: Layer): JsonNode =
         %cutDecimal(v / 100.0)
     alpha.setInitialValueToResult(result)
 
-    var children = layer.children
-    if children.len > 0:
-        var chres = newJArray()
-        for child in children:
-            if child.isTrackMatte:
-                setTrackMattLayer(child)
-            if shouldSerializeLayer(child):
-                chres.add(serializeLayer(child))
-            if not gTrckMatteLayer.isNil:
-                gTrckMatteLayer.enabled = gTrckMatteLayerEnabled
-        if chres.len > 0:
-            chres.elems.reverse()
-            result["children"] = chres
+    let md = layer.metadata()
+    let hasCompRef = md.hasCompRefComponent()
+
+    if not hasCompRef and not layer.isNinePartSprite():
+        var children = layer.children
+        if children.len > 0:
+            var chres = newJArray()
+            for child in children:
+                if child.isTrackMatte:
+                    setTrackMattLayer(child)
+                if shouldSerializeLayer(child):
+                    chres.add(serializeLayer(child))
+                if not gTrckMatteLayer.isNil:
+                    gTrckMatteLayer.enabled = gTrckMatteLayerEnabled
+            if chres.len > 0:
+                chres.elems.reverse()
+                result["children"] = chres
 
     if layer.layerIsCompositionRef():
         result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
@@ -568,7 +619,19 @@ proc serializeLayer(layer: Layer): JsonNode =
     if layer.isTrackMatte:
         result["enabled"] = %gTrckMatteLayerEnabled
 
-    var components = serializeLayerComponents(layer)
+    var components = newJArray()
+    layer.serializeEffectComponents(components)
+
+    let additionalComponents = md{"components"}
+    if not additionalComponents.isNil:
+        for c in additionalComponents:
+            if c{"_c"}.getStr() == "CompRef":
+                c["size"] = %[layer.width, layer.height]
+            components.add(c)
+
+    if not hasCompRef:
+        layer.serializeDrawableComponents(components)
+
     if components.len > 0: result["components"] = components
 
 type Marker = object
