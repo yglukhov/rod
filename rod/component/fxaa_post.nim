@@ -166,10 +166,10 @@ method draw*(r: FXAAPost) =
     var projTransform : Transform3D
     vp.camera.getProjectionMatrix(newRect(0,0, r.resolution[0], r.resolution[1]), projTransform)
 
-    r.image.flipVertically()
     r.image.draw do():
         c.withTransform projTransform*vp.viewMatrix()*r.node.worldTransform:
             for n in r.node.children: n.recursiveDraw()
+    r.image.flipVertically()
 
     gl.bindBuffer(gl.ARRAY_BUFFER, FXAAPostSharedVertexBuffer)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, FXAAPostSharedIndexBuffer)
@@ -190,9 +190,9 @@ method draw*(r: FXAAPost) =
         gl.bindTexture(gl.TEXTURE_2D, getTextureQuad(r.image, gl, theQuad))
         gl.uniform4fv(gl.getUniformLocation(FXAAPostSharedShader, "uTexUnitCoords"), theQuad)
         gl.uniform1i(gl.getUniformLocation(FXAAPostSharedShader, "texUnit"), 0)
-
+    gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.drawElements(gl.TRIANGLES, FXAAPostSharedNumberOfIndexes, gl.UNSIGNED_SHORT)
-
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
 

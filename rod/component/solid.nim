@@ -6,6 +6,7 @@ import nimx.matrixes
 import nimx.property_visitor
 
 import rod.node
+import rod.rod_types
 import rod.component
 import rod.tools.serializer
 
@@ -36,6 +37,10 @@ method draw*(s: Solid) =
     c.fillColor = s.color
     c.strokeWidth = 0
     c.drawRect(r)
+
+method getBBox*(s: Solid): BBox =
+    result.minPoint = newVector3(0.0, 0.0, 0.01)
+    result.maxPoint = newVector3(s.size.width, s.size.height, 0.0)
 
 method visitProperties*(c: Solid, p: var PropertyVisitor) =
     p.visitProperty("size", c.size)
