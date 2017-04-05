@@ -45,8 +45,8 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation
 
 proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): ComposeMarker=
-    let layerIn = cl.inPoint / c.duration - marker.start/c.duration
-    let layerOut = cl.outPoint / c.duration - marker.start/c.duration
+    let layerIn = cl.inPoint / c.duration - marker.start/ marker.duration
+    let layerOut = cl.outPoint / c.duration - marker.start/ marker.duration
 
     let layerComposition = cl.node.componentIfAvailable(AEComposition)
     if not layerComposition.isNil:
@@ -91,7 +91,7 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
                 if not cm.isNil:
                     composeMarkers.add(cm)
 
-        result = newCompositAnimation(c.duration, composeMarkers)
+        result = newCompositAnimation(marker.duration, composeMarkers)
         result.numberOfLoops = 1
 
 proc play*(c: AEComposition, name: string, exceptions: seq[string] = nil): Animation {.discardable.} =
