@@ -31,7 +31,7 @@ method init*(t: Text) =
 
 proc `text=`*(t: Text, text: string) =
     t.mText.text = text
-    #t.mTextSize = t.font.sizeOfString(t.mText)
+    t.mText.processAttributedText()
     if not t.node.isNil and not t.node.sceneView.isNil:
         t.node.sceneView.setNeedsDisplay()
 
@@ -40,6 +40,9 @@ proc `boundingSize=`*(t: Text, boundingSize: Size) =
 
 proc `horizontalAlignment=`*(t: Text, horizontalAlignment: HorizontalTextAlignment) =
     t.mText.horizontalAlignment = horizontalAlignment
+
+proc `verticalAlignment=`*(t: Text, verticalAlignment: VerticalAlignment) =
+    t.mText.verticalAlignment = verticalAlignment
 
 proc text*(t: Text) : string =
     result = t.mText.text
