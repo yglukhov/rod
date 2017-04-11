@@ -56,9 +56,16 @@ method draw*(cl: ClippingRectComponent) =
     when clippingRectWithScissors:
         let gl = currentContext().gl
         gl.enable(gl.SCISSOR_TEST)
-        let pr = sv.window.pixelRatio
+        var pr = 1.0'f32
+        var b: Rect
+        if sv.window.isNil:
+            b = sv.bounds
+        else:
+            pr = sv.window.pixelRatio
+            b = sv.window.bounds
+
         var x = GLint(tlp.x * pr)
-        var y = GLint((sv.window.bounds.height - brp.y) * pr)
+        var y = GLint((b.height - brp.y) * pr)
         var w = GLsizei((brp.x - tlp.x) * pr)
         var h = GLSizei((brp.y - tlp.y) * pr)
         gl.scissor(x, y, w, h)

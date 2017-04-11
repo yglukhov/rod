@@ -113,8 +113,10 @@ proc worldToScreenPoint*(v: SceneView, point: Vector3): Vector3 =
     else:
         ndcSpacePos = newVector3(clipSpacePos[0], clipSpacePos[1], clipSpacePos[2])
 
-    result.x = ((ndcSpacePos.x + 1.0) / 2.0) * v.window.bounds.width - absBounds.x
-    result.y = ((1.0 - ndcSpacePos.y) / 2.0) * v.window.bounds.height - absBounds.y
+    let b = if v.window.isNil: v.bounds else: v.window.bounds
+
+    result.x = ((ndcSpacePos.x + 1.0) / 2.0) * b.width - absBounds.x
+    result.y = ((1.0 - ndcSpacePos.y) / 2.0) * b.height - absBounds.y
     result.z = (1.0 + ndcSpacePos.z) * 0.5
 
 proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
@@ -299,7 +301,7 @@ proc swapCompositingBuffers*(v: SceneView) =
             gl.bindFramebuffer(v.mBackupFrameBuffer, false)
             gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
         var bounds = v.convertRectToWindow(v.bounds)
-        let pixelRatio = v.window.pixelRatio
+        let pixelRatio = if v.window.isNil: 1.0 else: v.window.pixelRatio
         bounds.origin.x *= pixelRatio
         bounds.origin.y *= pixelRatio
         bounds.size.width *= pixelRatio
