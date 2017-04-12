@@ -18,36 +18,17 @@ import rod.utils.image_serialization
 type Serializer* = ref object
     savePath*: string
 
-proc vectorToJNode[T](vec: T): JsonNode =
-    result = newJArray()
-    for k, v in vec:
-        result.add(%v)
-
 proc `%`*(n: Node): JsonNode =
     if not n.isNil:
         result = newJString(n.name)
     else:
         result = newJString("")
 
-proc `%`*[T: enum](v: T): JsonNode =
-    result = newJInt(v.ord)
-
-proc `%`*[I: static[int], T](vec: TVector[I, T]): JsonNode =
-    result = vectorToJNode(vec)
-
-proc `%`*(v: Size): JsonNode =
-    result = vectorToJNode(newVector2(v.width, v.height))
-
-proc `%`*(v: Point): JsonNode =
-    result = vectorToJNode(newVector2(v.x, v.y))
-
-proc `%`*(v: Color): JsonNode =
-    result = newJArray()
-    for k, val in v.fieldPairs:
-        result.add( %val )
-
-proc `%`*(v: Rect): JsonNode=
-    result = vectorToJNode(newVector4(v.origin.x, v.origin.y, v.size.width, v.size.height))
+proc `%`*[T: enum](v: T): JsonNode = %v.ord
+proc `%`*(v: Size): JsonNode = %[v.width, v.height]
+proc `%`*(v: Point): JsonNode = %[v.x, v.y]
+proc `%`*(v: Color): JsonNode = %[v.r, v.g, v.b, v.a]
+proc `%`*(v: Rect): JsonNode = %[v.x, v.y, v.width, v.height]
 
 proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path
@@ -56,7 +37,6 @@ proc getRelativeResourcePath*(s: Serializer, path: string): string =
 
     result = relativePathToPath(resourcePath, path)
     echo "save path = ", resourcePath, "  relative = ", result
-
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) =
     let jN = j{name}
@@ -180,4 +160,3 @@ proc save*(s: Serializer, n: JsonNode, path: string) =
             echo "save at path ", path
     else:
         echo "serializer::save don't support js"
-
