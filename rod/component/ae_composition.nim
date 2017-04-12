@@ -42,27 +42,31 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation
 
 proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): ComposeMarker=
-    let layerIn = cl.inPoint / c.duration - marker.start/ marker.duration
-    let layerOut = cl.outPoint / c.duration - marker.start/ marker.duration
+    let lc = cl.node.componentIfAvailable(AEComposition)
+    if not lc.isNil:
 
-    let layerComposition = cl.node.componentIfAvailable(AEComposition)
-    if not layerComposition.isNil:
+        let layerIn = (cl.inPoint - marker.start) / marker.duration
+        let layerOut = ((cl.outPoint - marker.start) * cl.animScale) / marker.duration
+        if layerIn >= 1.0 or layerOut <= 0.0:
+            return #skip layers from other markers
 
-        let lduration = cl.duration * cl.animScale
-        let skip = if cl.startTime < 0.0: abs(cl.startTime/lduration) else: 0.0
-        let pIn = cl.inPoint/lduration + skip
-        var pOut = cl.outPoint/lduration + skip
+        let pDur = (layerOut - layerIn) * marker.duration / cl.animScale
+        var pIn = 0.0 #todo: startTime support
+        if layerIn < 0.0:
+            pIn += abs(layerIn) / (abs(layerIn) + layerOut)
 
-        if c.duration < cl.duration:
-            pOut *= c.duration / cl.duration
+        var pOut = 1.0
+        if layerOut > 1.0:
+            pOut /= layerOut
 
-        let prop = layerComposition.compositionNamed(aeAllCompositionAnimation)
-        prop.loopDuration = lduration
+        let prop = lc.compositionNamed(aeAllCompositionAnimation)
+
+        prop.loopDuration *= (pOut - pIn) * cl.animScale
         let oldCompAnimate = prop.onAnimate
         prop.animate prog in pIn..pOut:
             oldCompAnimate(prog)
 
-        result = newComposeMarker(layerIn, layerOut, prop)
+        result = newComposeMarker(max(0.0, layerIn), min(layerOut, 1.0), prop)
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation =
     var marker: AEMarker
@@ -88,8 +92,14 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
                 if not cm.isNil:
                     composeMarkers.add(cm)
 
-        result = newCompositAnimation(marker.duration, composeMarkers)
+        let ca = newCompositAnimation(marker.duration, composeMarkers)
+        ca.numberOfLoops = 1
+
+        result = newAnimation()
+        result.loopDuration = marker.duration
         result.numberOfLoops = 1
+        result.onAnimate = proc(p: float)=
+            ca.onProgress(p)
 
 proc play*(c: AEComposition, name: string, exceptions: seq[string] = nil): Animation {.discardable.} =
     result = c.compositionNamed(name, exceptions)
