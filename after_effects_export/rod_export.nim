@@ -78,8 +78,8 @@ var transitiveEffects = false
 var layerNames = initTable[int, string]()
 var resourcePaths: seq[string] = @[]
 
-var gTrckMatteLayer: Layer
-var gTrckMatteLayerEnabled: bool
+var gTrckMatteLayers = initTable[string, tuple[layer: Layer, layerEnabled: bool]]()
+var gCurrTrckMatteLayer: Layer
 
 proc mangledName(layer: Layer): string =
     result = layerNames.getOrDefault(layer.index)
@@ -384,9 +384,9 @@ proc copyAndPrepareFootageItem(footageSource: FootageItem): JsonNode =
     result = imageFileRelativeExportPaths
 
 proc setTrackMattLayer(layer: Layer) =
-    gTrckMatteLayer = layer
-    gTrckMatteLayerEnabled = gTrckMatteLayer.enabled
-    gTrckMatteLayer.enabled = true
+    gCurrTrckMatteLayer = layer
+    gTrckMatteLayers[$layer.name] = (layer, layer.enabled)
+    gCurrTrckMatteLayer.enabled = true
 
 proc newTrackMatteComponent(layer: Layer, name: string): JsonNode =
     result = newJObject()
@@ -415,9 +415,9 @@ proc serializeEffectComponents(layer: Layer, result: JsonNode) =
         let c = serializeEffect(layer, result.len, p)
         if not c.isNil: result.add(c)
 
-    if not gTrckMatteLayer.isNil and layer.hasTrackMatte:
-        let traсkMatte = newTrackMatteComponent(layer, $gTrckMatteLayer.name)
-        gTrckMatteLayer = nil
+    if not gCurrTrckMatteLayer.isNil and layer.hasTrackMatte:
+        let traсkMatte = newTrackMatteComponent(layer, $gCurrTrckMatteLayer.name)
+        gCurrTrckMatteLayer = nil
         if not traсkMatte.isNil:
             result.add(traсkMatte)
 
@@ -605,8 +605,6 @@ proc serializeLayer(layer: Layer): JsonNode =
                     setTrackMattLayer(child)
                 if shouldSerializeLayer(child):
                     chres.add(serializeLayer(child))
-                if not gTrckMatteLayer.isNil:
-                    gTrckMatteLayer.enabled = gTrckMatteLayerEnabled
             if chres.len > 0:
                 chres.elems.reverse()
                 result["children"] = chres
@@ -617,7 +615,9 @@ proc serializeLayer(layer: Layer): JsonNode =
     if not transitiveEffects: result["affectsChildren"] = %false
 
     if layer.isTrackMatte:
-        result["enabled"] = %gTrckMatteLayerEnabled
+        let lrr = gTrckMatteLayers.getOrDefault($layer.name)
+        if not lrr.layer.isNil:
+            result["enabled"] = %lrr.layerEnabled
 
     var components = newJArray()
     layer.serializeEffectComponents(components)
@@ -984,8 +984,6 @@ proc serializeComposition(composition: Composition): JsonNode =
                     setTrackMattLayer(layer)
                 if shouldSerializeLayer(layer):
                     children.add(serializeLayer(layer))
-                if not gTrckMatteLayer.isNil:
-                    gTrckMatteLayer.enabled = gTrckMatteLayerEnabled
         children.elems.reverse()
         if children.len > 0:
             result["children"] = children
@@ -1064,6 +1062,10 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
             let s = getCurrentException().getStackTrace()
             if not s.isNil: logi s
         file.close()
+
+    for k, v in gTrckMatteLayers:
+        v.layer.enabled = v.layerEnabled
+    gTrckMatteLayers = initTable[string, tuple[layer: Layer, layerEnabled: bool]]()
 
     logi("Done. ", epochTime())
 
