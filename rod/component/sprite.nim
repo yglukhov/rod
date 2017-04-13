@@ -18,11 +18,12 @@ import rod.utils.image_serialization
 
 type Sprite* = ref object of Component
     offset*: Point
+    size*: Size
     frameOffsets*: seq[Point]
     images*: seq[Image]
     currentFrame*: int
     motionBlurRadius*: float
-    prevRootOffset: Vector3
+    segmentsGeometry: seq[float32] # Used for nine-part images
 
 proc image*(s: Sprite): Image =
     if not s.images.isNil and s.images.len > s.currentFrame:
@@ -41,6 +42,20 @@ proc getOffset*(s: Sprite): Point =
     if s.frameOffsets.len > s.currentFrame:
         result += s.frameOffsets[s.currentFrame]
 
+template isNinePart(s: Sprite): bool = not s.segmentsGeometry.isNil
+template marginLeft(s: Sprite): float32 = s.segmentsGeometry[0]
+template marginRight(s: Sprite): float32 = s.segmentsGeometry[1]
+template marginTop(s: Sprite): float32 = s.segmentsGeometry[2]
+template marginBottom(s: Sprite): float32 = s.segmentsGeometry[3]
+
+proc calculatedSize(s: Sprite): Size =
+    if s.size == zeroSize:
+        let i = s.image
+        if not i.isNil:
+            result = i.size
+    else:
+        result = s.size
+
 method draw*(s: Sprite) =
     let c = currentContext()
 
@@ -48,8 +63,11 @@ method draw*(s: Sprite) =
     if not i.isNil:
         var r: Rect
         r.origin = s.getOffset()
-        r.size = i.size
-        c.drawImage(i, r, zeroRect)
+        r.size = s.calculatedSize()
+        if s.isNinePart:
+            c.drawNinePartImage(i, r, s.marginLeft, s.marginTop, s.marginRight, s.marginBottom)
+        else:
+            c.drawImage(i, r)
 
 proc createFrameAnimation(s: Sprite) {.inline.} =
     let a = newAnimation()
@@ -61,10 +79,9 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
     s.node.registerAnimation("sprite", a)
 
 method getBBox*(s: Sprite): BBox =
-    let img = s.image
-    if not img.isNil:
-        result.maxPoint = newVector3(img.size.width + s.offset.x, img.size.height + s.offset.y, 0.01)
-        result.minPoint = newVector3(s.offset.x, s.offset.y, 0.0)
+    let sz = s.calculatedSize()
+    result.maxPoint = newVector3(sz.width + s.offset.x, sz.height + s.offset.y, 0.01)
+    result.minPoint = newVector3(s.offset.x, s.offset.y, 0.0)
 
 method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
@@ -93,6 +110,15 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
         s.createFrameAnimation()
 
     serealizer.deserializeValue(j, "offset", s.offset)
+
+    v = j{"segments"}
+    if not v.isNil and v.len == 4:
+        s.segmentsGeometry = newSeq[float32](4)
+        for i in 0 ..< 4: s.segmentsGeometry[i] = v[i].getFNum().float32
+
+    v = j{"size"}
+    if not v.isNil:
+        s.size = newSize(v[0].getFNum(), v[1].getFNum())
 
 method serialize*(c: Sprite, s: Serializer): JsonNode =
     result = newJObject()
