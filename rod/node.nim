@@ -328,20 +328,22 @@ proc findNode*(n: Node, name: string): Node =
         # echo "find in node ": n.name
         n.name == name
 
-let nodeLoadRefTable = newTable[string, seq[proc(nodeValue: Node)]]()
+type
+    NodeRefResolveProc = proc(nodeValue: Node)
+    NodeRefTable = TableRef[string, seq[NodeRefResolveProc]]
+
+var nodeLoadRefTable: NodeRefTable
 
 template addNodeRef*(refNode: var Node, name: string) =
+    assert(not nodeLoadRefTable.isNil)
     let refProc = proc(nodeValue: Node) {.closure.} = refNode = nodeValue
     if name in nodeLoadRefTable:
-        # Hacky workaround for closure compiler
-        var s = nodeLoadRefTable[name]
-        s.add(refProc)
-        nodeLoadRefTable[name] = s
+        nodeLoadRefTable[name].add(refProc)
     else:
-        # Hacky workaround for closure compiler
         nodeLoadRefTable[name] = @[refProc]
 
-proc checkNodeRefs(n: Node) =
+proc resolveNodeRefs(n: Node) =
+    assert(not nodeLoadRefTable.isNil)
     for k, v in nodeLoadRefTable:
         let foundNode = n.findNode(k)
         if not foundNode.isNil:
@@ -520,23 +522,28 @@ proc getGlobalAlpha*(n: Node): float =
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
+proc loadComposition*(n: Node, j: JsonNode) =
+    let serializer = Serializer.new()
+
+    let oldNodeRefTab = nodeLoadRefTable
+    nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
+    defer: nodeLoadRefTable = oldNodeRefTab
+
+    n.deserialize(j, serializer)
+    n.resolveNodeRefs()
+
 proc loadComposition*(n: Node, resourceName: string) =
     let fullPath = pathForResource(resourceName)
     loadJsonResourceAsync resourceName, proc(j: JsonNode) =
         pushParentResource(fullPath)
-        let serializer = Serializer.new()
         try:
-            n.deserialize(j, serializer)
+            n.loadComposition(j)
         except:
             echo "Could not deserialize ", resourceName, ": ", getCurrentExceptionMsg()
             echo getCurrentException().getStackTrace()
             raise
         finally:
             popParentResource()
-
-proc loadComposition*(n: Node, j: JsonNode) =
-    let serializer = Serializer.new()
-    n.deserialize(j, serializer)
 
 import rod.animation.property_animation
 
@@ -583,16 +590,13 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         n.loadComposition(compositionRef)
 
-proc newNodeFromJson*(j: JsonNode, s: Serializer): Node =
+proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
     result.deserialize(j, s)
 
 proc newNodeWithResource*(name: string): Node =
     result = newNode()
     result.loadComposition(name)
-
-    result.checkNodeRefs()
-    nodeLoadRefTable.clear()
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
