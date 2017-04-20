@@ -1,4 +1,4 @@
-import strutils
+import strutils, tables, times
 
 import nimx.view
 import nimx.text_field
@@ -9,6 +9,8 @@ import nimx.font
 import nimx.linear_layout
 import nimx.property_visitor
 import nimx.numeric_text_field
+import nimx.slider
+import nimx.animation
 
 import nimx.property_editors.standard_editors
 import rod.property_editors.propedit_registry
@@ -16,6 +18,7 @@ import rod.node
 import rod.viewport
 import rod.quaternion
 import rod.component.mesh_component
+import rod.component.ae_composition
 
 import variant
 
@@ -140,5 +143,90 @@ proc newQuaternionPropertyView(setter: proc(s: Quaternion), getter: proc(): Quat
         textField.onAction complexSetter
         horLayout.addSubview(textField)
 
+proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEComposition): PropertyEditorView =
+    let compos = getter()
+    result = PropertyEditorView.new(newRect(0, 0, 208, (editorRowHeight * 3 + 10.0) * compos.markers.len().float + 20))
+    var y = 0.0
+
+    var animT = initTable[string, Animation]()
+
+    let a = newAnimation()
+    a.numberOfLoops = 1
+    a.finished = true
+
+    for marker in compos.markers:
+        y += 10.0
+        let label = newLabel(newRect(0, y, 100, 15))
+        label.text = marker.name
+        label.textColor = newGrayColor(0.9)
+        result.addSubview(label)
+        label.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+        y += editorRowHeight
+
+        let slider = new(Slider, newRect(0, y, 200, editorRowHeight))
+        result.addSubview(slider)
+        slider.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+        y += editorRowHeight
+
+        let durationLabel = newLabel(newRect(0, y, 30, 15))
+        durationLabel.text = ($marker.duration).substr(0, 4)
+        durationLabel.textColor = newGrayColor(0.9)
+        result.addSubview(durationLabel)
+
+        let progLabel = newNumericTextField(newRect(45, y, 50, 15))
+        progLabel.font = editorFont()
+        result.addSubview(progLabel)
+
+        let goBttn = newButton(newRect(100, y, 40, 15))
+        goBttn.title = "go"
+        result.addSubview(goBttn)
+
+        let playBttn = newButton(newRect(140, y, 40, 15))
+        playBttn.title = "play"
+        result.addSubview(playBttn)
+        y += editorRowHeight
+
+        animT[marker.name] = compos.compositionNamed(marker.name)
+        animT[marker.name].prepare(epochTime())
+
+        closureScope:
+            let mName = marker.name
+            let sl = slider
+            let pl = progLabel
+            let gb = goBttn
+            let pb = playBttn
+            sl.onAction do():
+                let anim = animT.getOrDefault(mName)
+                if not anim.isNil:
+                    anim.onProgress(sl.value)
+                    pl.text = ($sl.value).substr(0, 4)
+
+            gb.onAction do():
+                let anim = animT.getOrDefault(mName)
+                if not anim.isNil:
+                    anim.onProgress(pl.text.parseFloat())
+                    sl.value = pl.text.parseFloat()
+
+            pb.onAction do():
+                let anim = animT.getOrDefault(mName)
+                if not anim.isNil:
+                    if not a.finished:
+                        pb.title = "play"
+                        a.cancel()
+
+                    else:
+                        pb.title = "stop"
+                        a.loopDuration = anim.loopDuration
+
+                        a.onAnimate = proc(p:float)=
+                            anim.onProgress(p)
+                            sl.value = p
+                            pl.text = ($p).substr(0, 4)
+
+                        compos.node.sceneView.addAnimation(a)
+                        a.onComplete() do():
+                            pb.title = "play"
+
 registerPropertyEditor(newNodePropertyView)
 registerPropertyEditor(newQuaternionPropertyView)
+registerPropertyEditor(newAEMarkerPropertyView)
