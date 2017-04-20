@@ -319,9 +319,16 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
         result = n
     else:
-        for c in n.children:
-            result = c.findNode(p)
-            if not result.isNil: break
+        var children = n.children
+        var nChildren = newSeq[Node]()
+        while children.len > 0:
+            nChildren.setLen(0)
+            for ch in children:
+                if p(ch):
+                    return ch
+                else:
+                    nChildren.add(ch.children)
+            swap(children, nChildren)
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
