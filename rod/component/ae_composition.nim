@@ -1,6 +1,6 @@
 import nimx/[types, context, image, animation, property_visitor, system_logger]
 
-import json, strutils, tables
+import json, strutils, tables, times
 
 import rod/[ rod_types, node, component, viewport ]
 import rod.tools.serializer
@@ -8,10 +8,10 @@ import rod.animation.property_animation
 
 const aeAllCompositionAnimation = "aeAllCompositionAnimation"
 
-type AEMarker = object
-    start: float
-    duration: float
-    name: string
+type AEMarker* = object
+    start*: float
+    duration*: float
+    name*: string
 
 type AELayer* = ref object of Component
     inPoint*: float
@@ -34,6 +34,7 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     let pEnd = m.duration / c.duration + pStart
 
     result = newAnimation()
+    result.tag = c.node.name & "_" & m.name
     result.numberOfLoops = 1
     result.loopDuration = m.duration
     result.animate prog in pStart..pEnd:
@@ -94,6 +95,7 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
 
         let ca = newCompositAnimation(marker.duration, composeMarkers)
         ca.numberOfLoops = 1
+        ca.prepare(epochTime())
 
         result = newAnimation()
         result.loopDuration = marker.duration
@@ -103,6 +105,7 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
 
 proc play*(c: AEComposition, name: string, exceptions: seq[string] = nil): Animation {.discardable.} =
     result = c.compositionNamed(name, exceptions)
+
     if not c.node.sceneView.isNil:
         c.node.sceneView.addAnimation(result)
 
@@ -181,6 +184,9 @@ method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     p.visitProperty("layers",  ll)
     p.visitProperty("duration", t.duration)
     p.visitProperty("playAll", t.debugPlayAllComposition)
+
+    var r = t
+    p.visitProperty("AECompos", r)
 
 method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "inPoint", c.inPoint)

@@ -24,7 +24,6 @@ proc `%`*(n: Node): JsonNode =
     else:
         result = newJString("")
 
-proc `%`*[T: enum](v: T): JsonNode = %v.ord
 proc `%`*(v: Size): JsonNode = %[v.width, v.height]
 proc `%`*(v: Point): JsonNode = %[v.x, v.y]
 proc `%`*(v: Color): JsonNode = %[v.r, v.g, v.b, v.a]
@@ -136,7 +135,10 @@ proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: 
             val.add( seqVal )
 
 proc getValue*[T](s: Serializer, v: T): JsonNode =
-    result = %v
+    when T is enum:
+        result = %(int(v))
+    else:
+        result = %v
 
 template deserializeValue*(s: Serializer, j: JsonNode, name: string, val: untyped) =
     let jN = j{name}
