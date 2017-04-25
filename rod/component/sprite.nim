@@ -48,7 +48,8 @@ template marginRight(s: Sprite): float32 = s.segmentsGeometry[1]
 template marginTop(s: Sprite): float32 = s.segmentsGeometry[2]
 template marginBottom(s: Sprite): float32 = s.segmentsGeometry[3]
 
-proc calculatedSize(s: Sprite): Size =
+proc effectiveSize*(s: Sprite): Size =
+    ## If size is zeroSize - return image size.
     if s.size == zeroSize:
         let i = s.image
         if not i.isNil:
@@ -63,7 +64,7 @@ method draw*(s: Sprite) =
     if not i.isNil:
         var r: Rect
         r.origin = s.getOffset()
-        r.size = s.calculatedSize()
+        r.size = s.effectiveSize()
         if s.isNinePart:
             c.drawNinePartImage(i, r, s.marginLeft, s.marginTop, s.marginRight, s.marginBottom)
         else:
@@ -79,7 +80,7 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
     s.node.registerAnimation("sprite", a)
 
 method getBBox*(s: Sprite): BBox =
-    let sz = s.calculatedSize()
+    let sz = s.effectiveSize()
     result.maxPoint = newVector3(sz.width + s.offset.x, sz.height + s.offset.y, 0.01)
     result.minPoint = newVector3(s.offset.x, s.offset.y, 0.0)
 
