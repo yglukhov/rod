@@ -165,8 +165,6 @@ method componentNodeWasAddedToSceneView*(c: AEComposition) =
     if c.allCompAnim.isNil:
         c.allCompAnim = newPropertyAnimation(c.node, c.buffers)
 
-    c.allCompAnim.onProgress(0.0)
-
 proc debugPlayAllComposition*(c: AEComposition): bool = c.testPlay
 
 proc `debugPlayAllComposition=`*(c: AEComposition, val:bool)=
