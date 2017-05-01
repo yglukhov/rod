@@ -164,9 +164,6 @@ method componentNodeWasAddedToSceneView*(c: AEComposition) =
     if c.allCompAnim.isNil:
         c.allCompAnim = newPropertyAnimation(c.node, c.buffers)
 
-    c.allCompAnim.onProgress(0.0)
-
-
 method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     var ll = t.layers.len
     var ml = t.markers.len
