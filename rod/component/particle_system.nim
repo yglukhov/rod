@@ -230,6 +230,7 @@ type
         startScale*, dstScale*: Vector3
         randScaleFrom*, randScaleTo*: float32
         startVelocity*, randVelocityFrom*, randVelocityTo*: float32
+        startRotation*: Vector3
         randRotVelocityFrom*, randRotVelocityTo*: Vector3 # deg
         gravity*: Vector3
         airDensity*: float32
@@ -322,7 +323,7 @@ proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle 
 
     result.scale = ps.startScale
     result.randStartScale = randomBetween(ps.randScaleFrom, ps.randScaleTo)
-    result.rotation = newVector3(0.0, 0.0, 0.0)
+    result.rotation = ps.startRotation
     result.rotationVelocity = randomBetween(ps.randRotVelocityFrom, ps.randRotVelocityTo)
     result.lifetime = ps.lifetime
 
@@ -810,6 +811,7 @@ method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "randVelocityFrom", ps.randVelocityFrom)
     s.deserializeValue(j, "randVelocityTo", ps.randVelocityTo)
     s.deserializeValue(j, "is3dRotation", ps.is3dRotation)
+    s.deserializeValue(j, "startRotation", ps.startRotation)
     s.deserializeValue(j, "randRotVelocityFrom", ps.randRotVelocityFrom)
     s.deserializeValue(j, "randRotVelocityTo", ps.randRotVelocityTo)
     s.deserializeValue(j, "startScale", ps.startScale)
@@ -854,6 +856,7 @@ method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
     result.add("randVelocityFrom", s.getValue(c.randVelocityFrom))
     result.add("randVelocityTo", s.getValue(c.randVelocityTo))
     result.add("is3dRotation", s.getValue(c.is3dRotation))
+    result.add("startRotation", s.getValue(c.startRotation))
     result.add("randRotVelocityFrom", s.getValue(c.randRotVelocityFrom))
     result.add("randRotVelocityTo", s.getValue(c.randRotVelocityTo))
     result.add("startScale", s.getValue(c.startScale))
@@ -938,6 +941,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     p.visitProperty("randVelFrom", ps.randVelocityFrom)
     p.visitProperty("randVelTo", ps.randVelocityTo)
     p.visitProperty("is3dRotation", ps.is3dRotationAux)
+    p.visitProperty("startRotation", ps.startRotation)
     p.visitProperty("randRotVelFrom", ps.randRotVelocityFrom)
     p.visitProperty("randRotVelTo", ps.randRotVelocityTo)
     p.visitProperty("randScaleFrom", ps.randScaleFrom)

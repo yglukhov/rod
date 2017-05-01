@@ -26,7 +26,6 @@ type AEComposition* = ref object of Component
     duration*: float
     animScale*: float
     buffers: JsonNode
-    testPlay: bool
     allCompAnim: Animation
 
 proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
@@ -167,23 +166,12 @@ method componentNodeWasAddedToSceneView*(c: AEComposition) =
 
     c.allCompAnim.onProgress(0.0)
 
-proc debugPlayAllComposition*(c: AEComposition): bool = c.testPlay
-
-proc `debugPlayAllComposition=`*(c: AEComposition, val:bool)=
-    c.testPlay = val
-    if val:
-        let anim = c.compositionNamed(aeAllCompositionAnimation)
-        c.node.sceneView.addAnimation(anim)
-        anim.onComplete do():
-            c.debugPlayAllComposition = false
-
 method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     var ll = t.layers.len
     var ml = t.markers.len
     p.visitProperty("markers", ml)
     p.visitProperty("layers",  ll)
     p.visitProperty("duration", t.duration)
-    p.visitProperty("playAll", t.debugPlayAllComposition)
 
     var r = t
     p.visitProperty("AECompos", r)
