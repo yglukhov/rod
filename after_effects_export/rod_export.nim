@@ -583,21 +583,23 @@ proc serializeLayer(layer: Layer): JsonNode =
     logi("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
     result["name"] = % layer.mangledName
 
-    let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+    let transform = layer.propertyGroup("Transform")
+
+    let position = addPropDesc(layer, -1, "translation", transform.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
         %cutDecimal(newVector3(v.x, v.y, v.z * -1.0))
     position.setInitialValueToResult(result)
 
-    addPropDesc(layer, -1, "tX", layer.property("X Position", float))
-    addPropDesc(layer, -1, "tY", layer.property("Y Position", float))
+    addPropDesc(layer, -1, "tX", transform.property("X Position", float))
+    addPropDesc(layer, -1, "tY", transform.property("Y Position", float))
 
-    let scale = addPropDesc(layer, -1, "scale", layer.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
+    let scale = addPropDesc(layer, -1, "scale", transform.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
         %cutDecimal(v / 100)
     scale.setInitialValueToResult(result)
 
     if layer.threeDLayer:
-        let xprop = layer.property("X Rotation", float)
-        let yprop = layer.property("Y Rotation", float)
-        let zprop = layer.property("Z Rotation", float)
+        let xprop = transform.property("X Rotation", float)
+        let yprop = transform.property("Y Rotation", float)
+        let zprop = transform.property("Z Rotation", float)
 
         let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
             % cutDecimal(quaternionWithEulerRotation(newVector3(v[0], v[1], v[2])))
@@ -605,11 +607,11 @@ proc serializeLayer(layer: Layer): JsonNode =
             gAnimatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
     else:
-        let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
+        let rotation = addPropDesc(layer, -1, "rotation", transform.property("Rotation", float), 0) do(v: float) -> JsonNode:
             % cutDecimal(quaternionWithZRotation(v))
         rotation.setInitialValueToResult(result)
 
-    let anchor = addPropDesc(layer, -1, "anchor", layer.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+    let anchor = addPropDesc(layer, -1, "anchor", transform.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
         %cutDecimal(v)
     anchor.setInitialValueToResult(result)
 
