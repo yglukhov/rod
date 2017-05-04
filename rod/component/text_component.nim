@@ -16,6 +16,8 @@ import rod.tools.serializer
 import rod.tools.debug_draw
 import rod.utils.attributed_text
 
+export formatted_text
+
 type TextJustification* = enum
     tjLeft
     tjCenter

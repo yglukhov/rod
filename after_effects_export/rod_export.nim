@@ -54,6 +54,15 @@ proc logi(args: varargs[string, `$`]) =
         logTextField.text &= i
     logTextField.text &= "\n"
 
+proc printPropertiesTree*(p: PropertyOwner, offset: string = " ") =
+    logi offset, "propertyOwner name ", p.name
+    for i in 0 ..< p.numProperties:
+        let prop = p.property(i)
+        if prop.isPropertyGroup:
+            prop.toPropertyGroup().printPropertiesTree(offset & "  ")
+        else:
+            logi offset, "  property name ", prop.name
+
 proc shouldSerializeLayer(layer: Layer): bool = layer.enabled and ((layer.name.len > 0 and layer.name[0] != '@') or layer.name.len == 0)
 
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
@@ -492,14 +501,29 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
         txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
+        var textRect: Rect
+        var boxSize: Vector2
         if textDoc.boxText:
-            let r = layer.sourceRectAtTime(0, false)
-            txt["bounds"] = % [r.left, r.top, r.width, r.height]
+            textRect = layer.sourceRectAtTime(0, false)
+            if textDoc.boxTextSize[0] > 0:
+                boxSize = newVector2(textDoc.boxTextSize[0].float, textDoc.boxTextSize[1].float)
+            else:
+                boxSize = newVector2(textRect.width, textRect.height)
+            txt["bounds"] = % [textRect.left, textRect.top, boxSize.x, boxSize.y]
 
         case textDoc.justification
-        of tjLeft: txt["justification"] = %"left"
-        of tjRight: txt["justification"] = %"right"
-        of tjCenter: txt["justification"] = %"center"
+        of tjLeft:
+            txt["justification"] = %"left"
+            if not textRect.isNil:
+                txt["bounds"] = % [textRect.left, textRect.top, boxSize.x, boxSize.y]
+        of tjRight:
+            txt["justification"] = %"right"
+            if not textRect.isNil:
+                txt["bounds"] = % [textRect.left + textRect.width - boxSize.x, textRect.top, boxSize.x, boxSize.y]
+        of tjCenter:
+            txt["justification"] = %"center"
+            if not textRect.isNil:
+                txt["bounds"] = % [textRect.left + textRect.width / 2.0 - boxSize.x / 2.0, textRect.top, boxSize.x, boxSize.y]
 
         let layerStyles = layer.propertyGroup("Layer Styles")
         let shadow = layerStyles.propertyGroup("Drop Shadow")
@@ -559,21 +583,23 @@ proc serializeLayer(layer: Layer): JsonNode =
     logi("LAYER: ", layer.name, ", w: ", layer.width, " h: ", layer.height);
     result["name"] = % layer.mangledName
 
-    let position = addPropDesc(layer, -1, "translation", layer.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+    let transform = layer.propertyGroup("Transform")
+
+    let position = addPropDesc(layer, -1, "translation", transform.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
         %cutDecimal(newVector3(v.x, v.y, v.z * -1.0))
     position.setInitialValueToResult(result)
 
-    addPropDesc(layer, -1, "tX", layer.property("X Position", float))
-    addPropDesc(layer, -1, "tY", layer.property("Y Position", float))
+    addPropDesc(layer, -1, "tX", transform.property("X Position", float))
+    addPropDesc(layer, -1, "tY", transform.property("Y Position", float))
 
-    let scale = addPropDesc(layer, -1, "scale", layer.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
+    let scale = addPropDesc(layer, -1, "scale", transform.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
         %cutDecimal(v / 100)
     scale.setInitialValueToResult(result)
 
     if layer.threeDLayer:
-        let xprop = layer.property("X Rotation", float)
-        let yprop = layer.property("Y Rotation", float)
-        let zprop = layer.property("Z Rotation", float)
+        let xprop = transform.property("X Rotation", float)
+        let yprop = transform.property("Y Rotation", float)
+        let zprop = transform.property("Z Rotation", float)
 
         let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
             % cutDecimal(quaternionWithEulerRotation(newVector3(v[0], v[1], v[2])))
@@ -581,11 +607,11 @@ proc serializeLayer(layer: Layer): JsonNode =
             gAnimatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
     else:
-        let rotation = addPropDesc(layer, -1, "rotation", layer.property("Rotation", float), 0) do(v: float) -> JsonNode:
+        let rotation = addPropDesc(layer, -1, "rotation", transform.property("Rotation", float), 0) do(v: float) -> JsonNode:
             % cutDecimal(quaternionWithZRotation(v))
         rotation.setInitialValueToResult(result)
 
-    let anchor = addPropDesc(layer, -1, "anchor", layer.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+    let anchor = addPropDesc(layer, -1, "anchor", transform.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
         %cutDecimal(v)
     anchor.setInitialValueToResult(result)
 
