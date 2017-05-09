@@ -2,7 +2,7 @@ import math, algorithm, strutils, tables, json, logging
 
 import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
                 outline_view, toolbar, color_picker, scroll_view, clip_view,
-                text_field, table_view_cell, gesture_detector_newtouch,
+                text_field, table_view_cell, gesture_detector,
                 key_commands, linear_layout, view_event_handling_new ]
 
 import nimx.editor.tab_view
