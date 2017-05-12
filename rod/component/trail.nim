@@ -915,6 +915,7 @@ method deserialize*(t: Trail, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "bDepth", t.bDepth)
     s.deserializeValue(j, "bStretch", t.bStretch)
     s.deserializeValue(j, "bCollapsible", t.bCollapsible)
+    s.deserializeValue(j, "cutSpeed", t.cutSpeed)
     s.deserializeValue(j, "isWireframe", t.isWireframe)
     s.deserializeValue(j, "imagePercent", t.imagePercent)
     s.deserializeValue(j, "matcapPercent", t.matcapPercent)
@@ -943,6 +944,7 @@ method serialize*(t: Trail, s: Serializer): JsonNode =
     result.add("bStretch", s.getValue(t.bStretch))
     result.add("bCollapsible", s.getValue(t.bCollapsible))
     result.add("isWireframe", s.getValue(t.isWireframe))
+    result.add("cutSpeed", s.getValue(t.cutSpeed))
     result.add("bIsTiled", s.getValue(t.bIsTiled))
     result.add("tiles", s.getValue(t.tiles))
     if not t.image.isNil:
