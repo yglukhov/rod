@@ -433,9 +433,8 @@ proc onKeyDown(editor: Editor, e: var Event): bool =
         let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
         if not pbi.isNil:
             let j = parseJson(pbi.data)
-            let serializer = Serializer.new()
             let n = newNode()
-            n.deserialize(j, serializer)
+            n.loadComposition(j)
             if not editor.mSelectedNode.isNil:
                 editor.mSelectedNode.addChild(n)
                 editor.sceneTreeDidChange()
