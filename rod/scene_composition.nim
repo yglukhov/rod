@@ -24,6 +24,9 @@ import nimx.portable_gl
 import nimx.window
 import nimx.animation
 import nimx.matrixes
+import nimx.assets.asset_loading
+import nimx.assets.url_stream
+import nimx.assets.asset_manager
 
 import streams
 import strutils
@@ -466,7 +469,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
         if it.kind != NodeKind.Joint:
             result.addChild(setupFromColladaNode(it, colladaScene))
 
-proc loadColladaFromStream(s: Stream, resourceName: string): ColladaScene =
+proc loadColladaFromStream(s: Stream): ColladaScene =
     var loader: ColladaLoader
     result = loader.load(s)
     s.close()
@@ -482,7 +485,7 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
         loadResourceAsync resourceName, proc(s: Stream) =
             pushParentResource(fullResourcePath)
 
-            let colladaScene = loadColladaFromStream(s, resourceName)
+            let colladaScene = loadColladaFromStream(s)
             registerResource(resourceName, colladaScene)
 
             let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
@@ -501,10 +504,11 @@ proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
         popParentResource()
         handler(res)
 
-registerResourcePreloader(["dae"]) do(name: string, callback: proc(r: ColladaScene)):
-    let fullResourcePath = pathForResource(name)
-    loadResourceAsync(name) do(s: Stream):
-        pushParentResource(fullResourcePath)
-        let colladaScene = loadColladaFromStream(s, name)
-        popParentResource()
+registerAssetLoader(["dae"]) do(url: string, callback: proc(s: ColladaScene)):
+    openStreamForUrl(url) do(s: Stream, err: string):
+        let colladaScene = loadColladaFromStream(s)
         callback(colladaScene)
+
+registerResourcePreloader(["dae"]) do(name: string, callback: proc(r: ColladaScene)):
+    sharedAssetManager().getAssetAtPath(name, false) do(scene: ColladaScene, err: string):
+        callback(scene)
