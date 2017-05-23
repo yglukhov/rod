@@ -105,8 +105,9 @@ proc compressPng(tool: ImgTool, path: string, noquant: bool = false) =
     var res = 1
     var qPath = quoteShell(path)
 
-    if noquant:
+    if not noquant:
         let tmp = path & "__tmp"
+
         moveFile(path, tmp)
         try:
             res = execCmd("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
@@ -118,7 +119,6 @@ proc compressPng(tool: ImgTool, path: string, noquant: bool = false) =
             moveFile(tmp, path)
         else:
             removeFile(tmp)
-    else:
         try:
             res = execCmd("pngquant --force --speed 1  -o " & qPath & " " & qPath)
         except:
