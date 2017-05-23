@@ -12,7 +12,6 @@ import rod.node
 import rod.ray
 import rod.tools.serializer
 import rod.component
-import rod.utils.image_serialization
 
 #import image_blur
 
@@ -99,7 +98,7 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     else:
         s.images = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:
-            s.images[i] = deserializeImage(v[i])
+            s.images[i] = deserializeImage(v[i], serealizer)
 
     v = j{"frameOffsets"}
     if not v.isNil:

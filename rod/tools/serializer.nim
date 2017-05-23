@@ -1,9 +1,4 @@
-import json
-import tables
-import typetraits
-import streams
-when not defined(js) and not defined(android) and not defined(ios):
-    import os
+import json, tables, typetraits, streams, logging, strutils, ospaths
 
 import nimx.image
 import nimx.types
@@ -13,10 +8,9 @@ import nimx.portable_gl
 
 import rod.rod_types
 import rod.quaternion
-import rod.utils.image_serialization
 
 type Serializer* = ref object
-    savePath*: string
+    path*: string
 
 proc `%`*(n: Node): JsonNode =
     if not n.isNil:
@@ -32,10 +26,13 @@ proc `%`*(v: Rect): JsonNode = %[v.x, v.y, v.width, v.height]
 proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path
     when not defined(js) and not defined(android) and not defined(ios):
-        resourcePath = parentDir(s.savePath)
+        resourcePath = parentDir(s.path)
 
     result = relativePathToPath(resourcePath, path)
     echo "save path = ", resourcePath, "  relative = ", result
+
+proc toAbsolutePath*(s: Serializer, relativeOrAbsolutePath: string): string =
+    relativeOrAbsolutePath.toAbsolutePath(parentDir(s.path))
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) =
     let jN = j{name}
@@ -87,8 +84,33 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Point) =
     if not jN.isNil:
         val = newPoint(jN[0].getFnum(), jN[1].getFnum())
 
+proc deserializeImage*(j: JsonNode, s: Serializer): Image =
+    if j.isNil:
+        discard
+    elif j.kind == JString:
+        let name = j.getStr()
+        if name.endsWith(".sspart"):
+            let parts1 = name.split(" - ")
+            let parts = parts1[1].split('.')
+            let rect = newRect(parts[^5].parseFloat(), parts[^4].parseFloat(), parts[^3].parseFloat(), parts[^2].parseFloat())
+            let realName = parts1[0]
+            let ss = imageWithResource(s.toAbsolutePath(realName))
+            result = ss.subimageWithRect(rect)
+            warn "sspart images are deprecated"
+        else:
+            result = imageWithResource(s.toAbsolutePath(name))
+    else:
+        let realName = j["file"].getStr()
+        let uv = j["tex"]
+        let sz = j["size"]
+        let ss = imageWithResource(s.toAbsolutePath(realName))
+        result = ss.subimageWithTexCoords(
+                        newSize(sz[0].getFNum(), sz[1].getFNum()),
+                        [uv[0].getFNum().float32, uv[1].getFNum(), uv[2].getFNum(), uv[3].getFNum()]
+                        )
+
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Image) =
-    val = deserializeImage(j{name})
+    val = deserializeImage(j{name}, s)
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var bool) =
     let jN = j{name}
@@ -149,7 +171,7 @@ template deserializeValue*(s: Serializer, j: JsonNode, name: string, val: untype
 
 proc save*(s: Serializer, n: JsonNode, path: string) =
     when not defined(js) and not defined(android) and not defined(ios):
-        s.savePath = path
+        s.path = path
         var nd = n #s.getNodeData(n)
         var str = nd.pretty()
 
