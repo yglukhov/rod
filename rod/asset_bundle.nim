@@ -21,10 +21,10 @@ when defined(js) or defined(emscripten):
         result.path = path
         result.hash = hash
         let href = parentDir(getCurrentHref())
-        if href.find("localhost") == -1:
-            result.mBasePath = href / hash
-        else:
+        if href.find("localhost") != -1 or href.startsWith("file://"):
             result.mBasePath = href / "res" / path
+        else:
+            result.mBasePath = href / hash
 
     method urlForPath*(ab: WebAssetBundle, path: string): string =
         result = ab.mBasePath / path
