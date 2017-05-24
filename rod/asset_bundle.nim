@@ -79,6 +79,14 @@ proc isConfigRabExternal(configRab: string): bool {.compileTime.} =
 
 import nimx.resource_cache
 
+proc getEnvCt(k: string): string {.compileTime.} =
+    when defined(buildOnWindows): # This should be defined by the naketools.nim
+        result = staticExec("cmd /c \"echo %" & k & "%\"")
+    else:
+        result = staticExec("echo $" & k)
+    result.removeSuffix()
+    if result == "": result = nil
+
 proc assetBundleDescriptor*(path: static[string]): AssetBundleDescriptor {.compileTime.} =
     const rabFilePath = path / "config.rab"
 
@@ -89,7 +97,8 @@ proc assetBundleDescriptor*(path: static[string]): AssetBundleDescriptor {.compi
         const isExternal = isConfigRabExternal(configRab)
 
     when isExternal:
-        const abHash = staticExec("rodasset hash " & path)
+        let prefix = getEnvCt("NIMX_RES_PATH") / path
+        let abHash = staticRead(prefix / ".hash")
         result.hash = abHash
     else:
         result.hash = ""
