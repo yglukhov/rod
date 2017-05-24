@@ -34,7 +34,6 @@ type
         radius*: float
         gravity*: float
         resetRadius*: float
-        mOnParticleUpdate: proc(p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3)
 
     ParticleEmitter* = ref object of Component
         lifetime*: float
@@ -67,8 +66,26 @@ method init(p: ParticleEmitter) =
     p.currentParticles = 0
     p.oneShot = false
 
-proc onParticleUpdate*(pa: ParticleAttractor, onUpdProc: proc(p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3))=
-    pa.mOnParticleUpdate = onUpdProc
+method onParticleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3)=
+    var destination = origin - part.coord
+    const rad = 1.0.float
+    let rad_m_resetRadius = 1.01
+    var dest_len = destination.length
+    var dist = if dest_len > 0: dest_len / pa.radius
+                          else: 0.0
+
+    if dist <= rad:
+        if dist < pa.resetRadius:
+            part.remainingLifetime = -1
+        else:
+            var force = (rad_m_resetRadius - dist) * pa.gravity
+            destination.normalize()
+            var upd_velocity = destination * force
+            part.velocity *= 0.9
+            part.velocity += upd_velocity
+    else:
+        part.velocity += p.gravity
+
 
 method setAttractor*(pe: ParticleEmitter, pa: ParticleAttractor) {.base.}=
     if pe.attractor != pa:
@@ -95,8 +112,8 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
 template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) =
     part.remainingLifetime -= timeDiff
 
-    if p.attractor != nil and not p.attractor.mOnParticleUpdate.isNil:
-        p.attractor.mOnParticleUpdate(p, part, timeDiff, origin)
+    if not p.attractor.isNil:
+        p.attractor.onParticleUpdate(p, part, timeDiff, origin)
     else:
         part.velocity += p.gravity
 
