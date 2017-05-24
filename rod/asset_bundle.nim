@@ -56,7 +56,7 @@ else:
             result.mBaseUrl = "file://" & getAppDir() / "res" / path
 
     method urlForPath*(ab: NativeAssetBundle, path: string): string =
-        result = ab.mBaseUrl / path
+        result = ab.mBaseUrl & '/' & path
 
     when defined(android):
         type AndroidAssetBundle* = ref object of AssetBundle
@@ -125,7 +125,7 @@ proc isDownloadable*(abd: AssetBundleDescriptor): bool {.inline.} =
 proc cacheDir(): string =
     "/tmp/rodappcache"
 
-when not defined(js) and not defined(emscripten):
+when not defined(js) and not defined(emscripten) and not defined(windows):
     import os, threadpool, httpclient, net
     import nimx.perform_on_main_thread
     import zip.zipfiles
@@ -189,7 +189,7 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
         if abd.isDownloaded:
             handler(nil)
         else:
-            when not defined(js) and not defined(emscripten):
+            when not defined(js) and not defined(emscripten) and not defined(windows):
                 assert(not getURLForAssetBundle.isNil)
                 let url = getURLForAssetBundle(abd.hash)
                 var ctx: DownloadCtx
