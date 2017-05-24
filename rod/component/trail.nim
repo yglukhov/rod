@@ -922,13 +922,8 @@ method deserialize*(t: Trail, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "bIsTiled", t.bIsTiled)
     s.deserializeValue(j, "tiles", t.tiles)
 
-    proc getTexture(name: string): Image =
-        let jNode = j{name}
-        if not jNode.isNil:
-            result = imageWithResource(jNode.getStr())
-
-    t.trailImage = getTexture("trailImage")
-    t.trailMatcap = getTexture("trailMatcap")
+    t.trailImage = deserializeImage(j{"trailImage"}, s)
+    t.trailMatcap = deserializeImage(j{"trailMatcap"}, s)
 
 method serialize*(t: Trail, s: Serializer): JsonNode =
     result = newJObject()

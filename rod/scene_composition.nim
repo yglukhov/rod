@@ -17,8 +17,6 @@ import rod.dae_animation
 import component.animation.skeleton
 
 import nimx.image
-import nimx.resource
-import nimx.resource_cache
 import nimx.context
 import nimx.portable_gl
 import nimx.window
@@ -27,14 +25,9 @@ import nimx.matrixes
 import nimx.assets.asset_loading
 import nimx.assets.url_stream
 import nimx.assets.asset_manager
+import nimx.pathutils
 
-import streams
-import strutils
-import algorithm
-import tables
-import hashes
-
-import math
+import streams, strutils, algorithm, tables, hashes, math
 
 proc parseVector4(source: string): Vector4 =
   var i = 0
@@ -258,9 +251,11 @@ proc getNodeByName(cnode: ColladaNode, name: string): ColladaNode =
     for child in cnode.children:
         return child.getNodeByName(name)
 
-proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node
+proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string): Node
+
 proc loadBones(bone: var Bone, animDuration: var float, node: var Node,
-                cn: ColladaNode, colladaScene: ColladaScene, skinController: ColladaSkinController, boneID: var int) =
+                cn: ColladaNode, colladaScene: ColladaScene,
+                skinController: ColladaSkinController, boneID: var int, resourcePath: string) =
     bone = newBone()
     bone.name = cn.name
     bone.startMatrix = parseMatrix4(cn.matrix)
@@ -313,17 +308,17 @@ proc loadBones(bone: var Bone, animDuration: var float, node: var Node,
 
     for joint in cn.children:
         if joint.kind != NodeKind.Joint:
-            let newNode = setupFromColladaNode(joint, colladaScene)
+            let newNode = setupFromColladaNode(joint, colladaScene, resourcePath)
             node.addChild(newNode)
             bone.atachedNodes.add(newNode)
             continue
 
         var b: Bone
-        b.loadBones(animDuration, node, joint, colladaScene, skinController, boneID)
+        b.loadBones(animDuration, node, joint, colladaScene, skinController, boneID, resourcePath)
         if not b.isNil:
             bone.children.add(b)
 
-proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: ColladaScene) =
+proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string) =
     if cn.matrix != nil:
         var modelMatrix = parseMatrix4(cn.matrix)
 
@@ -369,7 +364,7 @@ proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: Collada
         var bones: Bone
         var animDuration = 0.0
         var boneID = 0
-        bones.loadBones(animDuration, node, rootBoneColladaNode, colladaScene, skinController, boneID)
+        bones.loadBones(animDuration, node, rootBoneColladaNode, colladaScene, skinController, boneID, resourcePath)
 
         if not bones.isNil:
             let nodeMesh = node.getComponent(MeshComponent)
@@ -377,7 +372,7 @@ proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: Collada
             nodeMesh.skeleton.setBones(bones)
             nodeMesh.skeleton.animDuration = animDuration
 
-proc setupMaterialFromCollada(nodeMesh: var MeshComponent, cm: ColladaMaterial, colladaScene: ColladaScene) =
+proc setupMaterialFromCollada(nodeMesh: var MeshComponent, cm: ColladaMaterial, colladaScene: ColladaScene, resourcePath: string) =
     var transparency = cm.transparency
     if transparency < 1.0:
         nodeMesh.material.blendEnable = true
@@ -400,26 +395,26 @@ proc setupMaterialFromCollada(nodeMesh: var MeshComponent, cm: ColladaMaterial, 
     if cm.diffuseTextureName != nil:
         var texName = colladaScene.getTextureLocationByName(cm.diffuseTextureName)
         if texName != nil:
-            nodeMesh.material.albedoTexture = imageWithResource(texName)
+            nodeMesh.material.albedoTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
             nodeMesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
 
     if cm.reflectiveTextureName != nil:
         var texName = colladaScene.getTextureLocationByName(cm.reflectiveTextureName)
         if texName != nil:
-            nodeMesh.material.reflectionTexture = imageWithResource(texName)
+            nodeMesh.material.reflectionTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
             nodeMesh.material.reflectionPercent = cm.reflectivity
 
     if cm.specularTextureName != nil:
         var texName = colladaScene.getTextureLocationByName(cm.specularTextureName)
         if texName != nil:
-            nodeMesh.material.specularTexture = imageWithResource(texName)
+            nodeMesh.material.specularTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
     # normalmap tex seted manually in dae file
     if cm.normalmapTextureName != nil:
         var texName = colladaScene.getTextureLocationByName(cm.normalmapTextureName)
         if texName != nil:
-            nodeMesh.material.normalTexture = imageWithResource(texName)
+            nodeMesh.material.normalTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
 
-proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
+proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string): Node =
     var node = newNode(cn.name)
     var materialInited = false
     var geometryInited = false
@@ -433,7 +428,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
             geometryInited = true
             nodeMesh = node.component(MeshComponent)
 
-    node.setupNodeFromCollada(cn, colladaScene)
+    node.setupNodeFromCollada(cn, colladaScene, resourcePath)
 
     if cn.material != nil:
         for mat in colladaScene.childNodesMaterial:
@@ -442,7 +437,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
                 materialInited = true
 
     if materialInited and not nodeMesh.isNil:
-        nodeMesh.setupMaterialFromCollada(childColladaMaterial, colladaScene)
+        nodeMesh.setupMaterialFromCollada(childColladaMaterial, colladaScene, resourcePath)
 
     if geometryInited:
         nodeMesh.resourceName = childColladaGeometry.name
@@ -467,7 +462,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene): Node =
     result = node
     for it in cn.children:
         if it.kind != NodeKind.Joint:
-            result.addChild(setupFromColladaNode(it, colladaScene))
+            result.addChild(setupFromColladaNode(it, colladaScene, resourcePath))
 
 proc loadColladaFromStream(s: Stream): ColladaScene =
     var loader: ColladaLoader
@@ -475,40 +470,14 @@ proc loadColladaFromStream(s: Stream): ColladaScene =
     s.close()
 
 # --------------- TODO ------
-proc loadSceneAsync*(resourceName: string, handler: proc(n: Node3D)) =
-    let colladaScene = findCachedResource[ColladaScene](resourceName)
-    let fullResourcePath = pathForResource(resourceName)
-
-    if colladaScene.isNil:
-        resourceNotCached(resourceName)
-
-        loadResourceAsync resourceName, proc(s: Stream) =
-            pushParentResource(fullResourcePath)
-
-            let colladaScene = loadColladaFromStream(s)
-            registerResource(resourceName, colladaScene)
-
-            let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
-            for anim in colladaScene.animations:
-                discard animationWithCollada(res, anim)
-
-            popParentResource()
-            handler(res)
-    else:
-        pushParentResource(fullResourcePath)
-
-        let res = setupFromColladaNode(colladaScene.rootNode, colladaScene)
+proc loadSceneAsync*(resourcePath: string, handler: proc(n: Node3D)) =
+    sharedAssetManager().getAssetAtPath(resourcePath) do(colladaScene: ColladaScene, err: string):
+        let res = setupFromColladaNode(colladaScene.rootNode, colladaScene, resourcePath)
         for anim in colladaScene.animations:
             discard animationWithCollada(res, anim)
-
-        popParentResource()
         handler(res)
 
 registerAssetLoader(["dae"]) do(url: string, callback: proc(s: ColladaScene)):
     openStreamForUrl(url) do(s: Stream, err: string):
         let colladaScene = loadColladaFromStream(s)
         callback(colladaScene)
-
-registerResourcePreloader(["dae"]) do(name: string, callback: proc(r: ColladaScene)):
-    sharedAssetManager().getAssetAtPath(name, false) do(scene: ColladaScene, err: string):
-        callback(scene)

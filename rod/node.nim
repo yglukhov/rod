@@ -13,6 +13,8 @@ import nimx.portable_gl
 import nimx.view
 import nimx.property_visitor
 
+import nimx.assets.asset_manager
+
 import quaternion
 import ray
 import rod.tools.serializer
@@ -315,6 +317,16 @@ proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
 template recursiveDraw*(n: Node) =
     n.drawNode(true, nil)
 
+iterator allNodes*(n: Node): Node =
+    var s = @[n]
+    var i = 0
+    while i < s.len:
+        let n = s[i]
+        yield n
+        if n.children.len > 0:
+            s.add(n.children)
+        inc i
+
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
         result = n
@@ -522,8 +534,9 @@ proc getGlobalAlpha*(n: Node): float =
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
-proc loadComposition*(n: Node, j: JsonNode) =
+proc loadComposition*(n: Node, j: JsonNode, path: string = "") =
     let serializer = Serializer.new()
+    serializer.path = path
 
     let oldNodeRefTab = nodeLoadRefTable
     nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
@@ -532,18 +545,14 @@ proc loadComposition*(n: Node, j: JsonNode) =
     n.deserialize(j, serializer)
     n.resolveNodeRefs()
 
-proc loadComposition*(n: Node, resourceName: string) =
-    let fullPath = pathForResource(resourceName)
-    loadJsonResourceAsync resourceName, proc(j: JsonNode) =
-        pushParentResource(fullPath)
-        try:
-            n.loadComposition(j)
-        except:
-            echo "Could not deserialize ", resourceName, ": ", getCurrentExceptionMsg()
-            echo getCurrentException().getStackTrace()
-            raise
-        finally:
-            popParentResource()
+proc loadComposition*(n: Node, resourcePath: string) =
+    let j = sharedAssetManager().cachedAsset(JsonNode, resourcePath)
+    try:
+        n.loadComposition(j, resourcePath)
+    except:
+        echo "Could not deserialize ", resourcePath, ": ", getCurrentExceptionMsg()
+        echo getCurrentException().getStackTrace()
+        raise
 
 import rod.animation.property_animation
 
@@ -588,15 +597,15 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
 
     let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
-        n.loadComposition(compositionRef)
+        n.loadComposition(s.toAbsolutePath(compositionRef))
 
 proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
     result.deserialize(j, s)
 
-proc newNodeWithResource*(name: string): Node =
+proc newNodeWithResource*(path: string): Node =
     result = newNode()
-    result.loadComposition(name)
+    result.loadComposition(path)
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
