@@ -66,7 +66,7 @@ method init(p: ParticleEmitter) =
     p.currentParticles = 0
     p.oneShot = false
 
-method onParticleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) {.base.} =
+method particleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) {.base.} =
     var destination = origin - part.coord
     const rad = 1.0.float
     let rad_m_resetRadius = 1.01
@@ -113,7 +113,7 @@ template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: fl
     part.remainingLifetime -= timeDiff
 
     if not p.attractor.isNil:
-        p.attractor.onParticleUpdate(p, part, timeDiff, origin)
+        p.attractor.particleUpdate(p, part, timeDiff, origin)
     else:
         part.velocity += p.gravity
 
