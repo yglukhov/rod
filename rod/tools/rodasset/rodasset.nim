@@ -16,7 +16,7 @@ template settingsWithCmdLine(): Settings =
 
 proc hash(audio: string = "ogg", downsampleRatio: float = 1.0, nocompress: bool = false,
     compressToPVR: bool = false, extrusion: int = 1, disablePotAdjustment: bool = false,
-    exceptions: string = "",
+    exceptions: string = "", noposterize: string = "",
     path: string) =
     let s = settingsWithCmdLine()
     echo dirHash(path, s)
@@ -71,7 +71,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
                 createDir(d.parentDir())
                 copyFile(r, d)
 
-proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = false, nocompress: bool = false,
+proc pack(cache: string = "", exceptions: string = "", noposterize: string = "", compressToPVR: bool = false, nocompress: bool = false,
         downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
         disablePotAdjustment: bool = false, audio: string = "ogg",
         onlyCache: bool = false,
@@ -88,11 +88,14 @@ proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = fal
         var tool = newImgTool()
 
         tool.exceptions = @[]
+        tool.noposterize = @[]
         for f in walkDirRec(src):
             if f.endsWith(".json"):
                 tool.compositionPaths.add(f)
         for e in split(exceptions, ","):
             tool.exceptions.add(e)
+        for e in split(noposterize, ","):
+            tool.noposterize.add(e)
         tool.originalResPath = src
         tool.resPath = tmpCacheDir
         createDir(tmpCacheDir)

@@ -44,6 +44,7 @@ type
         images: seq[SpriteSheetImage]
         packer: RectPacker
         noquant: bool
+        noposterize: bool
 
 proc newSpriteSheetImage(path: string, extrusion: int = 1): SpriteSheetImage =
     result.new()
@@ -76,6 +77,7 @@ type ImgTool* = ref object
     images*: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
     exceptions*: seq[string]
+    noposterize*: seq[string]
     latestOriginalModificationDate: Time
 
 
@@ -101,23 +103,24 @@ proc outImgExt(tool: ImgTool): string =
     else:
         result = ".png"
 
-proc compressPng(tool: ImgTool, path: string, noquant: bool = false) =
+proc compressPng(tool: ImgTool, path: string, noquant: bool = false, noposterize: bool = false) =
     var res = 1
     var qPath = quoteShell(path)
 
     if noquant:
-        let tmp = path & "__tmp"
-        moveFile(path, tmp)
-        try:
-            res = execCmd("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
-        except:
-            discard
-        if res != 0:
-            echo "WARNING: posterize failed or not found ", path
-            removeFile(path)
-            moveFile(tmp, path)
-        else:
-            removeFile(tmp)
+        if not noposterize:
+            let tmp = path & "__tmp"
+            moveFile(path, tmp)
+            try:
+                res = execCmd("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
+            except:
+                discard
+            if res != 0:
+                echo "WARNING: posterize failed or not found ", path
+                removeFile(path)
+                moveFile(tmp, path)
+            else:
+                removeFile(tmp)
     else:
         try:
             res = execCmd("pngquant --force --speed 1  -o " & qPath & " " & qPath)
@@ -186,7 +189,7 @@ proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
     else:
         discard savePNG32(path, data, ss.packer.width, ss.packer.height)
         if tool.compressOutput:
-            tool.compressPNG(path, ss.noquant)
+            tool.compressPNG(path, ss.noquant, ss.noposterize)
 
     if consumeLessMemory:
         GC_fullCollect()
@@ -353,7 +356,7 @@ proc writeIndex(tool: ImgTool) =
     writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
     echo root.pretty().replace(" \n", "\n")
 
-proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], offset: int = 0, noquant: bool = false) =
+proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], offset: int = 0, noquant: bool = false, noposterize: bool = false) =
     for i, im in images:
         var done = false
         for ss in spritesheets:
@@ -365,6 +368,7 @@ proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage]
             if done:
                 newSS.index = spritesheets.len + offset
                 newSS.noquant = noquant
+                newSS.noposterize = noposterize
                 spritesheets.add(newSS)
             else:
                 echo "Could not pack image: ", im.originalPath
@@ -376,12 +380,22 @@ proc assignImagesToSpriteSheets(tool: ImgTool) =
 
     var allImages: seq[SpriteSheetImage] = @[]
     var exceptionImages: seq[SpriteSheetImage] = @[]
+    var noposterizeImages: seq[SpriteSheetImage] = @[]
+    var noprocessImages: seq[SpriteSheetImage] = @[]
 
-    if tool.exceptions.len > 0:
+    if tool.exceptions.len > 0 or tool.noposterize.len > 0:
         for k, v in tool.images:
             var name = splitFile(k).name
-            if tool.exceptions.contains(name):
+            var exc = tool.exceptions.contains(name)
+            var nopost = tool.noposterize.contains(name)
+            var noproc = exc and nopost
+
+            if noproc:
+                noprocessImages.add(v)
+            elif exc:
                 exceptionImages.add(v)
+            elif nopost:
+                noposterizeImages.add(v)
             else:
                 allImages.add(v)
     else:
@@ -412,10 +426,18 @@ proc assignImagesToSpriteSheets(tool: ImgTool) =
         else:
             shallowCopy(tool.spriteSheets, try2)
     assign(allImages)
-    if tool.exceptions.len > 0:
-        var try3 = newSeq[SpriteSheet]()
-        tool.packImagesToSpritesheets(exceptionImages, try3, tool.spriteSheets.len, true)
-        tool.spriteSheets.add(try3)
+    if exceptionImages.len > 0:
+        var exc = newSeq[SpriteSheet]()
+        tool.packImagesToSpritesheets(exceptionImages, exc, tool.spriteSheets.len, true)
+        tool.spriteSheets.add(exc)
+    if noposterizeImages.len > 0:
+        var nopost = newSeq[SpriteSheet]()
+        tool.packImagesToSpritesheets(noposterizeImages, nopost, tool.spriteSheets.len, false, true)
+        tool.spriteSheets.add(nopost)
+    if noprocessImages.len > 0:
+        var noproc = newSeq[SpriteSheet]()
+        tool.packImagesToSpritesheets(noprocessImages, noproc, tool.spriteSheets.len, true, true)
+        tool.spriteSheets.add(noproc)
 
 when isMultithreaded:
     proc composeAndWriteAux(tool, ss: pointer, path: string) =
