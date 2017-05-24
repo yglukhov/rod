@@ -77,6 +77,9 @@ type AssetBundleDescriptor* = object
 proc isConfigRabExternal(configRab: string): bool {.compileTime.} =
     configRab.find("external true") != -1
 
+proc isConfigRabDebugOnly(configRab: string): bool {.compileTime.} =
+    configRab.find("debugOnly true") != -1
+
 import nimx.resource_cache
 
 proc getEnvCt(k: string): string {.compileTime.} =
@@ -90,23 +93,26 @@ proc getEnvCt(k: string): string {.compileTime.} =
 proc assetBundleDescriptor*(path: static[string]): AssetBundleDescriptor {.compileTime.} =
     const rabFilePath = path / "config.rab"
 
-    when defined(js) or defined(emscripten):
-        const isExternal = true
-    else:
-        const configRab = staticRead(rabFilePath)
-        const isExternal = isConfigRabExternal(configRab)
+    const configRab = staticRead(rabFilePath)
+    const debugOnly = isConfigRabDebugOnly(configRab)
 
-    when isExternal:
-        let prefix = getEnvCt("NIMX_RES_PATH") / path
-        let abHash = staticRead(prefix / ".hash")
-        result.hash = abHash
-    else:
-        result.hash = ""
+    when not (defined(release) and debugOnly):
+        when defined(js) or defined(emscripten):
+            const isExternal = true
+        else:
+            const isExternal = isConfigRabExternal(configRab)
 
-    result.path = path
-    result.resources = getResourceNames(path)
-    for i in 0 ..< result.resources.len:
-        result.resources[i] = result.resources[i].substr(path.len + 1)
+        when isExternal:
+            let prefix = getEnvCt("NIMX_RES_PATH") / path
+            let abHash = staticRead(prefix / ".hash")
+            result.hash = abHash
+        else:
+            result.hash = ""
+
+        result.path = path
+        result.resources = getResourceNames(path)
+        for i in 0 ..< result.resources.len:
+            result.resources[i] = result.resources[i].substr(path.len + 1)
 
 proc isExternal(abd: AssetBundleDescriptor): bool = abd.hash.len > 0
 
