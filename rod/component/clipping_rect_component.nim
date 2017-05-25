@@ -5,7 +5,7 @@ import nimx.portable_gl
 import nimx.view
 import nimx.property_visitor
 
-import rod.node, rod.viewport, rod.component, rod.tools.serializer
+import rod.node, rod.viewport, rod.component, rod.tools.serializer, rod.rod_types
 import json
 import opengl
 
@@ -87,6 +87,10 @@ method draw*(cl: ClippingRectComponent) =
         cl.debugDraw(cl.clippingRect)
 
 method isPosteffectComponent*(c: ClippingRectComponent): bool = true
+
+method getBBox*(c: ClippingRectComponent): BBox =
+    result.minPoint = newVector3(c.clippingRect.x, c.clippingRect.y, 0.0)
+    result.maxPoint = newVector3(c.clippingRect.width, c.clippingRect.height, 0.01)
 
 method visitProperties*(cl: ClippingRectComponent, p: var PropertyVisitor) =
     p.visitProperty("rect", cl.clippingRect)

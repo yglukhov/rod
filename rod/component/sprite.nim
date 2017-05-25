@@ -12,7 +12,6 @@ import rod.node
 import rod.ray
 import rod.tools.serializer
 import rod.component
-import rod.utils.image_serialization
 
 #import image_blur
 
@@ -49,12 +48,20 @@ template marginTop(s: Sprite): float32 = s.segmentsGeometry[2]
 template marginBottom(s: Sprite): float32 = s.segmentsGeometry[3]
 
 proc calculatedSize(s: Sprite): Size =
+    ## If size is zeroSize - return image size.
     if s.size == zeroSize:
         let i = s.image
         if not i.isNil:
             result = i.size
     else:
         result = s.size
+
+proc effectiveSize*(s: Sprite): Size =
+    result = s.calculatedSize()
+    let off = s.getOffset()
+
+    result.width += off.x
+    result.height += off.y
 
 method draw*(s: Sprite) =
     let c = currentContext()
@@ -79,7 +86,7 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
     s.node.registerAnimation("sprite", a)
 
 method getBBox*(s: Sprite): BBox =
-    let sz = s.calculatedSize()
+    let sz = s.effectiveSize()
     result.maxPoint = newVector3(sz.width + s.offset.x, sz.height + s.offset.y, 0.01)
     result.minPoint = newVector3(s.offset.x, s.offset.y, 0.0)
 
@@ -98,7 +105,10 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     else:
         s.images = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:
-            s.images[i] = deserializeImage(v[i])
+            closureScope:
+                let ii = i
+                deserializeImage(v[ii], serealizer) do(img: Image, err: string):
+                    s.images[ii] = img
 
     v = j{"frameOffsets"}
     if not v.isNil:

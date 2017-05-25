@@ -175,6 +175,7 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
 
         let progLabel = newNumericTextField(newRect(45, y, 50, 15))
         progLabel.font = editorFont()
+        progLabel.text = "0.0"
         result.addSubview(progLabel)
 
         let goBttn = newButton(newRect(100, y, 40, 15))

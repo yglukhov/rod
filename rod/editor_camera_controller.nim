@@ -1,7 +1,7 @@
 import nimx.matrixes
 import nimx.types
 import nimx.event
-import nimx.gesture_detector_newtouch
+import nimx.gesture_detector
 import nimx.view
 
 import rod.viewport

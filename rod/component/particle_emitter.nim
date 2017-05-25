@@ -16,7 +16,7 @@ import nimx.context
 import nimx.types
 import nimx.property_visitor
 
-type ParticleData = tuple
+type ParticleData* = tuple
     coord: Vector3
     rotation: Quaternion
     scale: Vector3
@@ -66,6 +66,27 @@ method init(p: ParticleEmitter) =
     p.currentParticles = 0
     p.oneShot = false
 
+method particleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) {.base.} =
+    var destination = origin - part.coord
+    const rad = 1.0.float
+    let rad_m_resetRadius = 1.01
+    var dest_len = destination.length
+    var dist = if dest_len > 0: dest_len / pa.radius
+                          else: 0.0
+
+    if dist <= rad:
+        if dist < pa.resetRadius:
+            part.remainingLifetime = -1
+        else:
+            var force = (rad_m_resetRadius - dist) * pa.gravity
+            destination.normalize()
+            var upd_velocity = destination * force
+            part.velocity *= 0.9
+            part.velocity += upd_velocity
+    else:
+        part.velocity += p.gravity
+
+
 method setAttractor*(pe: ParticleEmitter, pa: ParticleAttractor) {.base.}=
     if pe.attractor != pa:
         pe.attractor = pa
@@ -91,26 +112,8 @@ template createParticle(p: ParticleEmitter, part: var ParticleData) =
 template updateParticle(p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) =
     part.remainingLifetime -= timeDiff
 
-    if p.attractor != nil:
-        var destination = origin - part.coord
-        const rad = 1.0.float
-        let rad_m_resetRadius = 1.01
-        var dest_len = destination.length
-        var dist = if dest_len > 0: dest_len / p.attractor.radius
-                              else: 0.0
-
-        if dist <= rad:
-            if dist < p.attractor.resetRadius:
-                part.remainingLifetime = -1
-            else:
-                var force = (rad_m_resetRadius - dist) * p.attractor.gravity
-                destination.normalize()
-                var upd_velocity = destination * force
-                part.velocity *= 0.9
-                part.velocity += upd_velocity
-        else:
-            part.velocity += p.gravity
-
+    if not p.attractor.isNil:
+        p.attractor.particleUpdate(p, part, timeDiff, origin)
     else:
         part.velocity += p.gravity
 
@@ -164,6 +167,7 @@ method draw*(p: ParticleEmitter) =
     if p.particlePrototype.mSceneView.isNil:
         p.particlePrototype.recursiveSetViewToPrototype(p.node.mSceneView)
 
+    var activeParticles = 0
     for i in 0 ..< p.particles.len:
         var needsToDraw = false
         if p.particles[i].remainingLifetime <= 0:
@@ -174,9 +178,11 @@ method draw*(p: ParticleEmitter) =
                     p.currentParticles.inc()
                     p.lastBirthTime = curTime
                     p.createParticle(p.particles[i])
+
         else:
             p.updateParticle(p.particles[i], timeDiff, attractorOrigin)
             needsToDraw = true
+            inc activeParticles
 
         if needsToDraw:
             p.drawParticle(p.particles[i])
@@ -185,6 +191,9 @@ method draw*(p: ParticleEmitter) =
                 c.fillColor = newColor(1, 0, 0)
                 c.strokeWidth = 0
                 c.drawEllipseInRect(newRect(p.particles[i].coord.x - 10, p.particles[i].coord.y - 10, 20, 20))
+
+    if p.oneShot and activeParticles == 0 and p.currentParticles >= p.numberOfParticles:
+        p.animation.cancel()
 
     p.lastDrawTime = curTime
 

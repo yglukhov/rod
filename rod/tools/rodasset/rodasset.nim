@@ -1,5 +1,7 @@
 import os, strutils, times, tables, osproc
-import imgtool, asset_cache, settings, migrator
+import imgtool, asset_cache, migrator
+import settings except hash
+
 
 template settingsWithCmdLine(): Settings =
     let s = newSettings()

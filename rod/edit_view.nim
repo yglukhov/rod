@@ -2,7 +2,7 @@ import math, algorithm, strutils, tables, json, logging
 
 import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
                 outline_view, toolbar, color_picker, scroll_view, clip_view,
-                text_field, table_view_cell, gesture_detector_newtouch,
+                text_field, table_view_cell, gesture_detector,
                 key_commands, linear_layout, view_event_handling_new ]
 
 import nimx.editor.tab_view
@@ -433,9 +433,8 @@ proc onKeyDown(editor: Editor, e: var Event): bool =
         let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
         if not pbi.isNil:
             let j = parseJson(pbi.data)
-            let serializer = Serializer.new()
             let n = newNode()
-            n.deserialize(j, serializer)
+            n.loadComposition(j)
             if not editor.mSelectedNode.isNil:
                 editor.mSelectedNode.addChild(n)
                 editor.sceneTreeDidChange()

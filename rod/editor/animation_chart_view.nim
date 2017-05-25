@@ -146,10 +146,10 @@ method onTouchEv*(v: AnimationChartView, e: var Event): bool =
 
 proc processZoomEvent*(v: AnimationChartView, e: var Event, allowZoomX, allowZoomY: bool) =
     when defined(macosx):
-        let zoomByY = not (alsoPressed(VirtualKey.LeftGUI) or alsoPressed(VirtualKey.RightGUI))
+        let zoomByY = not e.modifiers.anyGui()
     else:
-        let zoomByY = not (alsoPressed(VirtualKey.LeftControl) or alsoPressed(VirtualKey.RightControl))
-    let zoomByX = not (alsoPressed(VirtualKey.LeftShift) or alsoPressed(VirtualKey.RightShift))
+        let zoomByY = not e.modifiers.anyCtrl()
+    let zoomByX = not e.modifiers.anyShift()
 
     let cp = v.localPointToCurve(e.localPosition)
     let k = 1 + e.offset.y * 0.01
