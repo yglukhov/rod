@@ -208,7 +208,6 @@ proc getImageVPM*(rti: RTI): Matrix4 =
     var mtr: Matrix4
     mtr.loadIdentity()
     mtr.translate(rti.node.worldPos)
-    # mtr.translate(rti.bbx.minPoint)
     mtr.scale(vp.camera.node.scale)
     return vp.viewProjMatrix * mtr
 
@@ -221,7 +220,6 @@ proc getImageScreenBounds*(rti: RTI): Rect =
         scrWpos = vp.worldToScreenPoint(rti.node.worldPos)
     let diff = -(scrWpos - scrMinPt) / rti.aspect
     return newRect(newPoint(diff.x, diff.y), rti.image.size / rti.aspect / rti.scaleRatio)
-    # return newRect(zeroPoint, rti.image.size / rti.aspect / rti.scaleRatio)
 
 template drawImg*(rti: RTI) =
     if rti.node.sceneView.camera.projectionMode == cpPerspective:
