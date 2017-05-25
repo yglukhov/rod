@@ -76,7 +76,7 @@ type ImgTool* = ref object
     extrusion*: int
     images*: Table[string, SpriteSheetImage]
     spriteSheets: seq[SpriteSheet]
-    exceptions*: seq[string]
+    noquant*: seq[string]
     noposterize*: seq[string]
     latestOriginalModificationDate: Time
 
@@ -383,10 +383,10 @@ proc assignImagesToSpriteSheets(tool: ImgTool) =
     var noposterizeImages: seq[SpriteSheetImage] = @[]
     var noprocessImages: seq[SpriteSheetImage] = @[]
 
-    if tool.exceptions.len > 0 or tool.noposterize.len > 0:
+    if tool.noquant.len > 0 or tool.noposterize.len > 0:
         for k, v in tool.images:
             var name = splitFile(k).name
-            var exc = tool.exceptions.contains(name)
+            var exc = tool.noquant.contains(name)
             var nopost = tool.noposterize.contains(name)
             var noproc = exc and nopost
 
