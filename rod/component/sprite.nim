@@ -47,7 +47,7 @@ template marginRight(s: Sprite): float32 = s.segmentsGeometry[1]
 template marginTop(s: Sprite): float32 = s.segmentsGeometry[2]
 template marginBottom(s: Sprite): float32 = s.segmentsGeometry[3]
 
-proc effectiveSize*(s: Sprite): Size =
+proc calculatedSize(s: Sprite): Size =
     ## If size is zeroSize - return image size.
     if s.size == zeroSize:
         let i = s.image
@@ -56,6 +56,13 @@ proc effectiveSize*(s: Sprite): Size =
     else:
         result = s.size
 
+proc effectiveSize*(s: Sprite): Size =
+    result = s.calculatedSize()
+    let off = s.getOffset()
+
+    result.width += off.x
+    result.height += off.y
+
 method draw*(s: Sprite) =
     let c = currentContext()
 
@@ -63,7 +70,7 @@ method draw*(s: Sprite) =
     if not i.isNil:
         var r: Rect
         r.origin = s.getOffset()
-        r.size = s.effectiveSize()
+        r.size = s.calculatedSize()
         if s.isNinePart:
             c.drawNinePartImage(i, r, s.marginLeft, s.marginTop, s.marginRight, s.marginBottom)
         else:
@@ -98,7 +105,10 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     else:
         s.images = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:
-            s.images[i] = deserializeImage(v[i], serealizer)
+            closureScope:
+                let ii = i
+                deserializeImage(v[ii], serealizer) do(img: Image, err: string):
+                    s.images[ii] = img
 
     v = j{"frameOffsets"}
     if not v.isNil:

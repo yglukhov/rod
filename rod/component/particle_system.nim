@@ -824,7 +824,10 @@ method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "gravity", ps.gravity)
     s.deserializeValue(j, "airDensity", ps.airDensity)
 
-    s.deserializeValue(j, "texture", ps.texture)
+
+    deserializeImage(j{"texture"}, s) do(img: Image, err: string):
+        ps.texture = img
+
     s.deserializeValue(j, "isTextureAnimated", ps.isTextureAnimated)
     s.deserializeValue(j, "texSize", ps.frameSize)
     s.deserializeValue(j, "animColumns", ps.animColumns)

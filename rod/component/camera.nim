@@ -71,6 +71,7 @@ method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("zNear", c.zNear)
     p.visitProperty("zFar", c.zFar)
     p.visitProperty("fov", c.fov)
+    p.visitProperty("vp size", c.viewportSize)
     p.visitProperty("projMode", c.projectionMode)
 
 registerComponent(Camera)

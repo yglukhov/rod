@@ -922,8 +922,11 @@ method deserialize*(t: Trail, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "bIsTiled", t.bIsTiled)
     s.deserializeValue(j, "tiles", t.tiles)
 
-    t.trailImage = deserializeImage(j{"trailImage"}, s)
-    t.trailMatcap = deserializeImage(j{"trailMatcap"}, s)
+    deserializeImage(j{"trailImage"}, s) do(img: Image, err: string):
+        t.trailImage = img
+
+    deserializeImage(j{"trailMatcap"}, s) do(img: Image, err: string):
+        t.trailMatcap = img
 
 method serialize*(t: Trail, s: Serializer): JsonNode =
     result = newJObject()

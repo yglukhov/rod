@@ -14,6 +14,7 @@ import nimx.view
 import nimx.property_visitor
 
 import nimx.assets.asset_manager
+import nimx.assets.asset_loading
 
 import quaternion
 import ray
@@ -264,13 +265,16 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
     var hasPosteffectComponent = false
 
     var compLen = n.components.len
+    var componentInterruptedDrawing = false
 
     if compLen > 0:
         tr = n.mSceneView.viewProjMatrix * n.worldTransform()
         c.withTransform tr:
             for c in n.components:
                 inc lastDrawComp
-                if c.beforeDraw(lastDrawComp): break
+                if c.beforeDraw(lastDrawComp):
+                    componentInterruptedDrawing = true
+                    break
 
             # Legacy api support. Will be removed soon.
             for c in n.components:
@@ -279,7 +283,7 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
 
     let shouldDrawChildren = recursive and not hasPosteffectComponent
 
-    if shouldDrawChildren and n.affectsChildren:
+    if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
         for c in n.children:
             c.drawNode(recursive, drawTable)
 
@@ -337,7 +341,6 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
-        # echo "find in node ": n.name
         n.name == name
 
 type
@@ -534,25 +537,28 @@ proc getGlobalAlpha*(n: Node): float =
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
-proc loadComposition*(n: Node, j: JsonNode, path: string = "") =
+proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
     let serializer = Serializer.new()
-    serializer.path = path
-
+    serializer.url = url
+    serializer.onComplete = onComplete
     let oldNodeRefTab = nodeLoadRefTable
     nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
     defer: nodeLoadRefTable = oldNodeRefTab
 
     n.deserialize(j, serializer)
     n.resolveNodeRefs()
+    serializer.finish()
 
-proc loadComposition*(n: Node, resourcePath: string) =
-    let j = sharedAssetManager().cachedAsset(JsonNode, resourcePath)
-    try:
-        n.loadComposition(j, resourcePath)
-    except:
-        echo "Could not deserialize ", resourcePath, ": ", getCurrentExceptionMsg()
-        echo getCurrentException().getStackTrace()
-        raise
+proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
+    loadAsset(url) do(j: JsonNode, err: string):
+        assert err.isNil, err
+
+        try:
+            n.loadComposition(j, url, onComplete)
+        except:
+            echo "Could not deserialize ", url, ": ", getCurrentExceptionMsg()
+            echo getCurrentException().getStackTrace()
+            raise
 
 import rod.animation.property_animation
 
@@ -597,15 +603,24 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
 
     let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
-        n.loadComposition(s.toAbsolutePath(compositionRef))
+        s.startAsyncOp()
+        n.loadComposition(s.toAbsoluteUrl(compositionRef)) do():
+            s.endAsyncOp()
 
 proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
     result.deserialize(j, s)
 
-proc newNodeWithResource*(path: string): Node =
+proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
     result = newNode()
-    result.loadComposition(path)
+    result.loadComposition(url, onComplete)
+
+proc newNodeWithResource*(path: string): Node =
+    var done = false
+    result = newNodeWithUrl("res://" & path) do():
+        done = true
+    if not done:
+        raise newException(Exception, "newNodeWithResource could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
