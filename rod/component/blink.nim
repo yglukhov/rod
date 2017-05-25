@@ -80,8 +80,11 @@ method getBBox*(b: Blink): BBox =
         result.minPoint = newVector3(img.size.width, img.size.height, 0.01)
 
 method deserialize*(b: Blink, j: JsonNode, serealizer: Serializer) =
-    serealizer.deserializeValue(j, "mask", b.mask)
-    serealizer.deserializeValue(j, "light", b.light)
+    deserializeImage(j{"mask"}, serealizer) do(img: Image, err: string):
+        b.mask = img
+    deserializeImage(j{"light"}, serealizer) do(img: Image, err: string):
+        b.light = img
+
     serealizer.deserializeValue(j, "speed", b.speed)
     serealizer.deserializeValue(j, "period", b.period)
 

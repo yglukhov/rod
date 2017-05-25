@@ -6,6 +6,7 @@ import nimx.view
 import nimx.property_visitor
 import nimx.portable_gl
 import nimx.formatted_text
+import nimx.private.font.font_data
 
 import rod.node
 import rod.component
@@ -164,7 +165,8 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 
         v = j{"bounds"}
         if not v.isNil:
-            t.mBoundingOffset = newPoint(v[0].getFNum(), v[1].getFNum())
+            let attr = newPoint(font.getCharComponent(t.text, GlyphMetricsComponent.compX), font.getCharComponent(t.text, GlyphMetricsComponent.compY))
+            t.mBoundingOffset = newPoint(v[0].getFNum() - attr.x * font.scale, v[1].getFNum() - attr.y * font.scale)
             t.mText.boundingSize = newSize(v[2].getFNum(), v[3].getFNum())
 
         t.mText.processAttributedText()
@@ -382,6 +384,7 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("strokeColorFrom", t.strokeColorFrom)
     p.visitProperty("strokeColorTo", t.strokeColorTo)
 
+    p.visitProperty("boundingOffset", t.mBoundingOffset)
     p.visitProperty("boundingSize", t.mText.boundingSize)
     p.visitProperty("horAlignment", t.mText.horizontalAlignment)
     p.visitProperty("vertAlignment", t.mText.verticalAlignment)

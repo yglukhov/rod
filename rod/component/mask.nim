@@ -6,10 +6,11 @@ import nimx.types
 import nimx.context
 import nimx.image
 import nimx.view
+import nimx.matrixes
 import nimx.composition
 import nimx.property_visitor
 import nimx.system_logger
-import nimx.render_to_image
+import nimx.portable_gl
 
 import rod.rod_types
 import rod.node
@@ -28,7 +29,7 @@ float rect_alpha(vec2 uvs, vec4 texCoord) {
 """
 const getMaskUV* = """
 vec2 get_mask_uv(vec4 mask_img_coords, vec4 mask_bounds, mat4 mvp_inv) {
-    vec2 mskVpos = vec4(mvp_inv * vec4(vPos.xy, 0.0, 1.0)).xy;
+    vec2 mskVpos = vec4(mvp_inv * vec4(gl_FragCoord.x, gl_FragCoord.y, 0.0, 1.0)).xy;
     vec2 destuv = ( mskVpos - mask_bounds.xy ) / mask_bounds.zw;
     return mask_img_coords.xy + (mask_img_coords.zw - mask_img_coords.xy) * destuv;
 }
@@ -141,6 +142,8 @@ template inv(m: Matrix4): Matrix4 =
         res.loadIdentity()
     res
 
+const clipMat: Matrix4 = [0.5.Coord,0,0,0,0,0.5,0,0,0,0,1.0,0,0.5,0.5,0,1.0]
+
 method beforeDraw*(msk: Mask, index: int): bool =
     if not msk.maskSprite.isNil and msk.maskType != tmNone:
 
@@ -148,11 +151,16 @@ method beforeDraw*(msk: Mask, index: int): bool =
             # TODO RTI
             discard
 
+        let vp = msk.node.sceneView
         var theQuad {.noinit.}: array[4, GLfloat]
         discard getTextureQuad(msk.maskSprite.image, currentContext().gl, theQuad)
         let maskImgCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
         let maskBounds = newRect(msk.maskSprite.getOffset(), msk.maskSprite.image.size)
-        let trInv = (msk.node.worldTransform.inv() * msk.maskSprite.node.worldTransform()).inv()
+
+        var trInv = (clipMat * vp.viewProjMatrix * msk.maskSprite.node.worldTransform()).inv()
+        let glvp = currentContext().gl.getViewport()
+        trInv.scale(newVector3(1.0/(glvp[2] - glvp[0]).float, 1.0/(glvp[3] - glvp[1]).float, 1.0))
+
         let maskAlpha = msk.maskSprite.node.getGlobalAlpha()
 
         pushPostEffect(effect[msk.maskType.int-1], msk.maskSprite.image, maskImgCoords, maskBounds, trInv, maskAlpha)

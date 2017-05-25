@@ -915,19 +915,18 @@ method deserialize*(t: Trail, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "bDepth", t.bDepth)
     s.deserializeValue(j, "bStretch", t.bStretch)
     s.deserializeValue(j, "bCollapsible", t.bCollapsible)
+    s.deserializeValue(j, "cutSpeed", t.cutSpeed)
     s.deserializeValue(j, "isWireframe", t.isWireframe)
     s.deserializeValue(j, "imagePercent", t.imagePercent)
     s.deserializeValue(j, "matcapPercent", t.matcapPercent)
     s.deserializeValue(j, "bIsTiled", t.bIsTiled)
     s.deserializeValue(j, "tiles", t.tiles)
 
-    proc getTexture(name: string): Image =
-        let jNode = j{name}
-        if not jNode.isNil:
-            result = imageWithResource(jNode.getStr())
+    deserializeImage(j{"trailImage"}, s) do(img: Image, err: string):
+        t.trailImage = img
 
-    t.trailImage = getTexture("trailImage")
-    t.trailMatcap = getTexture("trailMatcap")
+    deserializeImage(j{"trailMatcap"}, s) do(img: Image, err: string):
+        t.trailMatcap = img
 
 method serialize*(t: Trail, s: Serializer): JsonNode =
     result = newJObject()
@@ -943,6 +942,7 @@ method serialize*(t: Trail, s: Serializer): JsonNode =
     result.add("bStretch", s.getValue(t.bStretch))
     result.add("bCollapsible", s.getValue(t.bCollapsible))
     result.add("isWireframe", s.getValue(t.isWireframe))
+    result.add("cutSpeed", s.getValue(t.cutSpeed))
     result.add("bIsTiled", s.getValue(t.bIsTiled))
     result.add("tiles", s.getValue(t.tiles))
     if not t.image.isNil:

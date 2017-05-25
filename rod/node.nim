@@ -13,6 +13,9 @@ import nimx.portable_gl
 import nimx.view
 import nimx.property_visitor
 
+import nimx.assets.asset_manager
+import nimx.assets.asset_loading
+
 import quaternion
 import ray
 import rod.tools.serializer
@@ -262,13 +265,16 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
     var hasPosteffectComponent = false
 
     var compLen = n.components.len
+    var componentInterruptedDrawing = false
 
     if compLen > 0:
         tr = n.mSceneView.viewProjMatrix * n.worldTransform()
         c.withTransform tr:
             for c in n.components:
                 inc lastDrawComp
-                if c.beforeDraw(lastDrawComp): break
+                if c.beforeDraw(lastDrawComp):
+                    componentInterruptedDrawing = true
+                    break
 
             # Legacy api support. Will be removed soon.
             for c in n.components:
@@ -277,7 +283,7 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
 
     let shouldDrawChildren = recursive and not hasPosteffectComponent
 
-    if shouldDrawChildren and n.affectsChildren:
+    if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
         for c in n.children:
             c.drawNode(recursive, drawTable)
 
@@ -315,6 +321,16 @@ proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
 template recursiveDraw*(n: Node) =
     n.drawNode(true, nil)
 
+iterator allNodes*(n: Node): Node =
+    var s = @[n]
+    var i = 0
+    while i < s.len:
+        let n = s[i]
+        yield n
+        if n.children.len > 0:
+            s.add(n.children)
+        inc i
+
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
     if p(n):
         result = n
@@ -325,7 +341,6 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
-        # echo "find in node ": n.name
         n.name == name
 
 type
@@ -522,28 +537,28 @@ proc getGlobalAlpha*(n: Node): float =
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
-proc loadComposition*(n: Node, j: JsonNode) =
+proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
     let serializer = Serializer.new()
-
+    serializer.url = url
+    serializer.onComplete = onComplete
     let oldNodeRefTab = nodeLoadRefTable
     nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
     defer: nodeLoadRefTable = oldNodeRefTab
 
     n.deserialize(j, serializer)
     n.resolveNodeRefs()
+    serializer.finish()
 
-proc loadComposition*(n: Node, resourceName: string) =
-    let fullPath = pathForResource(resourceName)
-    loadJsonResourceAsync resourceName, proc(j: JsonNode) =
-        pushParentResource(fullPath)
+proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
+    loadAsset(url) do(j: JsonNode, err: string):
+        assert err.isNil, err
+
         try:
-            n.loadComposition(j)
+            n.loadComposition(j, url, onComplete)
         except:
-            echo "Could not deserialize ", resourceName, ": ", getCurrentExceptionMsg()
+            echo "Could not deserialize ", url, ": ", getCurrentExceptionMsg()
             echo getCurrentException().getStackTrace()
             raise
-        finally:
-            popParentResource()
 
 import rod.animation.property_animation
 
@@ -588,15 +603,24 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
 
     let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
-        n.loadComposition(compositionRef)
+        s.startAsyncOp()
+        n.loadComposition(s.toAbsoluteUrl(compositionRef)) do():
+            s.endAsyncOp()
 
 proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
     result.deserialize(j, s)
 
-proc newNodeWithResource*(name: string): Node =
+proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
     result = newNode()
-    result.loadComposition(name)
+    result.loadComposition(url, onComplete)
+
+proc newNodeWithResource*(path: string): Node =
+    var done = false
+    result = newNodeWithUrl("res://" & path) do():
+        done = true
+    if not done:
+        raise newException(Exception, "newNodeWithResource could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
