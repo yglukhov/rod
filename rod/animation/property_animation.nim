@@ -4,7 +4,7 @@ import nimx.animation
 import nimx.property_visitor
 
 import variant
-import rod.node, rod.component, rod.animation.animation_sampler
+import rod.node, rod.component, rod.animation.animation_sampler, rod.quaternion
 
 export animation
 
@@ -19,13 +19,14 @@ type
     PropertyAnimation* = ref object of Animation
         animatedProperties*: seq[AnimatedProperty]
 
-template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBVal()
+template elementFromJson(t: typedesc[Quaternion], jelem: JsonNode): Quaternion = Quaternion(newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum()))
 template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFNum()
 template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
 template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
 template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
 template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum(1))
 template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
+template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBVal()
 
 proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) =
     # A property name can one of the following:
@@ -84,7 +85,7 @@ proc newValueSampler[T](j: JsonNode, lerpBetweenFrames: bool, originalLen, cutFr
     for v in j:
         vals[i] = elementFromJson(T, v)
         inc i
-    result = newArrayAnimationSampler[T](vals, lerpBetweenFrames, originalLen, cutFront)
+    result = newArrayAnimationSampler(vals, lerpBetweenFrames, originalLen, cutFront)
 
 template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): typed =
     ## This lists all animatable types
@@ -93,6 +94,7 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): t
     of clause(Vector2): action(Vector2)
     of clause(Vector3): action(Vector3)
     of clause(Vector4): action(Vector4)
+    of clause(Quaternion): action(Quaternion)
     of clause(Color): action(Color)
     of clause(int): action(int)
     of clause(bool): action(bool)
