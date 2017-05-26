@@ -516,7 +516,7 @@ proc reattach*(n, newParent: Node, index = -1) =
 
     n.worldPos = worldPos
     n.scale = localScale
-    n.rotation = localRotation
+    n.rotation = Quaternion(localRotation)
 
 proc animationNamed*(n: Node, name: string, preserveHandlers: bool = false): Animation =
     if not n.animations.isNil:

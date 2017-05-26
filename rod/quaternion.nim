@@ -9,7 +9,23 @@ const DownVector* = -UpVector
 const LeftVector* = newVector3(-1, 0, 0)
 const RightVector* = -LeftVector
 
-type Quaternion* = TVector4[Coord]
+type Quaternion* = distinct array[4, Coord]
+
+
+template toArr(q: Quaternion): array[4, Coord] =
+    array[4, Coord](q)
+
+template x*(v: Quaternion): Coord = toArr(v)[0]
+template y*(v: Quaternion): Coord = toArr(v)[1]
+template z*(v: Quaternion): Coord = toArr(v)[2]
+template w*(v: Quaternion): Coord = toArr(v)[3]
+
+template `x=`*(v: var Quaternion, val: Coord) = toArr(v)[0] = val
+template `y=`*(v: var Quaternion, val: Coord) = toArr(v)[1] = val
+template `z=`*(v: var Quaternion, val: Coord) = toArr(v)[2] = val
+template `w=`*(v: var Quaternion, val: Coord) = toArr(v)[3] = val
+
+proc `$`*(q: Quaternion): string {.inline.} = $(TVector4[Coord](q))
 
 proc newQuaternion*(): Quaternion =
     result.w = 1
@@ -63,10 +79,19 @@ proc `*`*(lhs, rhs: Quaternion): Quaternion =
     multiply(lhs, rhs, result)
 
 proc `*`*(lhs: Quaternion, rhs: Vector3): Vector3 =
-    let qVec = lhs.xyz
+    let qVec = newVector3(lhs.x, lhs.y, lhs.z)
     let cross1 = qVec.cross(rhs)
     let cross2 = qVec.cross(cross1)
     return rhs + (cross1 * lhs.w + cross2) * 2
+
+template `*`*(lhs: Quaternion, rhs: float32): Quaternion = Quaternion(TVector4[Coord](lhs) * rhs)
+template `/`*(lhs: Quaternion, rhs: float32): Quaternion = Quaternion(TVector4[Coord](lhs) / rhs)
+template `-`*(lhs, rhs: Quaternion): Quaternion = Quaternion(TVector4[Coord](lhs) - TVector4[Coord](rhs))
+template `+`*(lhs, rhs: Quaternion): Quaternion = Quaternion(TVector4[Coord](lhs) + TVector4[Coord](rhs))
+
+proc `*=`*(q1: var Quaternion, q2: Quaternion) =
+    var qc = q1
+    multiply(qc, q2, q1)
 
 proc newQuaternionFromEulerZXY*(x, y, z: Coord): Quaternion = aroundZ(z) * aroundX(x) * aroundY(y)
 proc newQuaternionFromEulerXYZ*(x, y, z: Coord): Quaternion = aroundX(x) * aroundY(y) * aroundZ(z)
@@ -115,7 +140,7 @@ proc normalized*(q: Quaternion): Quaternion =
     else:
         return q
 
-proc conjugated*(q: Quaternion): Quaternion = [-q.x, -q.y, -q.z, q.w]
+proc conjugated*(q: Quaternion): Quaternion = newQuaternion(-q.x, -q.y, -q.z, q.w)
 
 proc fromMatrix4*(mtx: Matrix4): Quaternion =
     var bigType: int32

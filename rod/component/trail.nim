@@ -625,10 +625,10 @@ proc needEmit(t: Trail): bool =
         t.directionVector = currDirection
         return true
 
-    if not ( (t.node.rotation[0] >= t.prevRotation[0] - t.angleThreshold and t.node.rotation[0] <= t.prevRotation[0] + t.angleThreshold) and
-             (t.node.rotation[1] >= t.prevRotation[1] - t.angleThreshold and t.node.rotation[1] <= t.prevRotation[1] + t.angleThreshold) and
-             (t.node.rotation[2] >= t.prevRotation[2] - t.angleThreshold and t.node.rotation[2] <= t.prevRotation[2] + t.angleThreshold) and
-             (t.node.rotation[3] >= t.prevRotation[3] - t.angleThreshold and t.node.rotation[3] <= t.prevRotation[3] + t.angleThreshold) ):
+    if not ( (t.node.rotation.x >= t.prevRotation.x - t.angleThreshold and t.node.rotation.x <= t.prevRotation.x + t.angleThreshold) and
+             (t.node.rotation.y >= t.prevRotation.y - t.angleThreshold and t.node.rotation.y <= t.prevRotation.y + t.angleThreshold) and
+             (t.node.rotation.z >= t.prevRotation.z - t.angleThreshold and t.node.rotation.z <= t.prevRotation.z + t.angleThreshold) and
+             (t.node.rotation.w >= t.prevRotation.w - t.angleThreshold and t.node.rotation.w <= t.prevRotation.w + t.angleThreshold) ):
 
         t.prevRotation = t.node.rotation
         t.directionVector = currDirection
