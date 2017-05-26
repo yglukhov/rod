@@ -48,10 +48,10 @@ else:
     proc newNativeAssetBundle(path: string): NativeAssetBundle =
         result.new()
         result.path = path
-        when defined(macosx):
-            result.mBaseUrl = "file://" & getAppDir() /../ "Resources" / path
-        elif defined(ios):
+        when defined(ios):
             result.mBaseUrl = "file://" & getAppDir() / path
+        elif defined(macosx):
+            result.mBaseUrl = "file://" & getAppDir() /../ "Resources" / path
         else:
             result.mBaseUrl = "file://" & getAppDir() / "res" / path
 
