@@ -73,7 +73,9 @@ proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): Linear
     result.new()
     result.keys = keys
     result.valueType = getTypeId(T)
-    result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+
+    let r = cast[AnimationSampler[T]](result)
+    r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
         let s = cast[LinearKeyFrameAnimationSampler[T]](sampler)
         if p < 0:
             return s.keys[0].v
@@ -102,9 +104,9 @@ proc newBezierKeyFrameAnimationSampler*[T](keys: seq[BezierKeyFrame[T]]): Bezier
     result.new()
     result.keys = keys
     result.valueType = getTypeId(T)
-    result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
 
-
+    let r = cast[AnimationSampler[T]](result)
+    r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
         let s = cast[BezierKeyFrameAnimationSampler[T]](sampler)
         if p < 0:
             return s.keys[0].v
