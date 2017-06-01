@@ -333,7 +333,7 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
 import component.ui_component, algorithm
 
 proc isNodeEnabledInTree(n: Node): bool =
-    return (n.parent.isNil and n.enabled) or (not n.parent.isNil and n.parent.isNodeEnabledInTree() and n.enabled)
+    return n.enabled and (n.parent.isNil or n.parent.isNodeEnabledInTree())
 
 method name*(v: SceneView): string =
     result = "SceneView"
