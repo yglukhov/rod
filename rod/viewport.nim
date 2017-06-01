@@ -332,9 +332,11 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
 
 import component.ui_component, algorithm
 
+proc isNodeEnabledInTree(n: Node): bool =
+    return n.enabled and (n.parent.isNil or n.parent.isNodeEnabledInTree())
+
 method name*(v: SceneView): string =
     result = "SceneView"
-
 
 method onScroll*(v: SceneView, e: var Event): bool =
     if v.uiComponents.len > 0:
@@ -343,7 +345,7 @@ method onScroll*(v: SceneView, e: var Event): bool =
         var intersections = newSeq[Inter]()
         for c in v.uiComponents:
             var inter : Vector3
-            if c.enabled and c.intersectsWithUINode(r, inter):
+            if c.enabled and c.node.isNodeEnabledInTree and c.intersectsWithUINode(r, inter):
                 intersections.add((inter, c))
 
             template dist(a, b): auto = (a - b).length
@@ -371,7 +373,7 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
             var intersections = newSeq[Inter]()
             for c in v.uiComponents:
                 var inter : Vector3
-                if c.enabled and c.intersectsWithUINode(r, inter):
+                if c.enabled and c.node.isNodeEnabledInTree and c.intersectsWithUINode(r, inter):
                     intersections.add((inter, c))
 
             template dist(a, b): auto = (a - b).length
