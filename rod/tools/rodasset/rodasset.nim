@@ -36,9 +36,7 @@ proc convertWavToOgg(fromFile, toFile: string) =
         ["-i", fromFile, "-acodec", "libvorbis", "-y", toFile], options={poStdErrToStdOut})
 
 proc convertWavToMP3(fromFile, toFile: string) =
-    var args = @["-i", fromFile, "-acodec", "libmp3lame", "-y"]
-    when defined(macosx):
-        args.add(["-write_xing", "0"])
+    var args = @["-i", fromFile, "-acodec", "libmp3lame", "-y", "-write_xing", "0"]
     args.add(toFile)
     echo audioConvTool().execProcess(args, options={poStdErrToStdOut})
 
