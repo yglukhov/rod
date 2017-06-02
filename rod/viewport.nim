@@ -338,29 +338,32 @@ proc isNodeEnabledInTree(n: Node): bool =
 method name*(v: SceneView): string =
     result = "SceneView"
 
+type UIComponentIntersection = tuple[i: Vector3, c: UIComponent]
+
+proc getUiComponentsIntersectingWithRay(v: SceneView, r: Ray): seq[UIComponentIntersection] =
+    result = @[]
+    for c in v.uiComponents:
+        var inter : Vector3
+        if c.enabled and c.node.isNodeEnabledInTree and c.intersectsWithUINode(r, inter):
+            result.add((inter, c))
+
+    template dist(a, b): auto = (a - b).length
+    if result.len > 1:
+        result.sort() do(x, y: UIComponentIntersection) -> int:
+            result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
+            if result == 0:
+                result = getTreeDistance(x.c.node, y.c.node)
+
 method onScroll*(v: SceneView, e: var Event): bool =
     if v.uiComponents.len > 0:
         let r = v.rayWithScreenCoords(e.localPosition)
-        type Inter = tuple[i: Vector3, c: UIComponent]
-        var intersections = newSeq[Inter]()
-        for c in v.uiComponents:
-            var inter : Vector3
-            if c.enabled and c.node.isNodeEnabledInTree and c.intersectsWithUINode(r, inter):
-                intersections.add((inter, c))
-
-            template dist(a, b): auto = (a - b).length
-            if intersections.len > 0:
-                intersections.sort(proc (x, y: Inter): int =
-                    result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
-                    if result == 0:
-                        result = getTreeDistance(x.c.node, y.c.node)
-                )
-
-                for i in intersections:
-                    result = i.c.handleScrollEv(r, e, i.i)
-                    if result:
-                        v.touchTarget = i.c.mView
-                        break
+        let intersections = v.getUiComponentsIntersectingWithRay(r)
+        if intersections.len > 0:
+            for i in intersections:
+                result = i.c.handleScrollEv(r, e, i.i)
+                if result:
+                    v.touchTarget = i.c.mView
+                    break
 
     if not result:
         result = procCall v.View.onScroll(e)
@@ -369,21 +372,8 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
     if v.uiComponents.len > 0:
         if e.buttonState == bsDown:
             let r = v.rayWithScreenCoords(e.localPosition)
-            type Inter = tuple[i: Vector3, c: UIComponent]
-            var intersections = newSeq[Inter]()
-            for c in v.uiComponents:
-                var inter : Vector3
-                if c.enabled and c.node.isNodeEnabledInTree and c.intersectsWithUINode(r, inter):
-                    intersections.add((inter, c))
-
-            template dist(a, b): auto = (a - b).length
+            let intersections = v.getUiComponentsIntersectingWithRay(r)
             if intersections.len > 0:
-                intersections.sort(proc (x, y: Inter): int =
-                    result = int((dist(x.i, r.origin) - dist(y.i, r.origin)) * 5)
-                    if result == 0:
-                        result = getTreeDistance(x.c.node, y.c.node)
-                )
-
                 for i in intersections:
                     result = i.c.handleTouchEv(r, e, i.i)
                     if result:
