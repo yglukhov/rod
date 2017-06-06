@@ -45,9 +45,14 @@ proc cutDecimal(v: float, t: float = 1000.0): float =
 proc cutDecimal[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector[I, T] =
     for i in 0 ..< v.len: result[i] = cutDecimal(v[i], t)
 
+proc cutDecimal(q: Quaternion, t: float = 1000.0): Quaternion =
+    cutDecimal(q.Vector4, t).Quaternion
+
 var logTextField: EditText
 
 proc `&=`(s, a: cstring) {.importcpp: "# += #".}
+proc `%`(q: Quaternion): JsonNode =
+    `%`(q.Vector4)
 
 proc logi(args: varargs[string, `$`]) =
     for i in args:
