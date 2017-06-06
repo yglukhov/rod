@@ -26,6 +26,7 @@ proc `%`*(v: Size): JsonNode = %[v.width, v.height]
 proc `%`*(v: Point): JsonNode = %[v.x, v.y]
 proc `%`*(v: Color): JsonNode = %[v.r, v.g, v.b, v.a]
 proc `%`*(v: Rect): JsonNode = %[v.x, v.y, v.width, v.height]
+template `%`*(v: Quaternion): JsonNode = %(TVector4[Coord](v))
 
 proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path

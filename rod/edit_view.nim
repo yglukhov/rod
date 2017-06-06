@@ -167,7 +167,7 @@ when loadingAndSavingAvailable:
                     loadSceneAsync path, proc(n: Node) =
                         p.addChild(n)
                 elif path.endsWith(".json"):
-                    let ln = newNodeWithUrl("file://" & path)
+                    let ln = newNodeWithURL("file://" & path)
                     if not editor.selectedNode.isNil:
                         editor.selectedNode.addChild(ln)
                     else:
