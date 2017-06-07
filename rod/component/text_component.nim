@@ -41,6 +41,9 @@ proc `text=`*(t: Text, text: string) =
 proc `boundingSize=`*(t: Text, boundingSize: Size) =
     t.mText.boundingSize = boundingSize
 
+proc `truncationBehavior=`*(t: Text, b: TruncationBehavior) =
+    t.mText.truncationBehavior = b
+
 proc `horizontalAlignment=`*(t: Text, horizontalAlignment: HorizontalTextAlignment) =
     t.mText.horizontalAlignment = horizontalAlignment
 
@@ -388,5 +391,6 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("boundingSize", t.mText.boundingSize)
     p.visitProperty("horAlignment", t.mText.horizontalAlignment)
     p.visitProperty("vertAlignment", t.mText.verticalAlignment)
+    p.visitProperty("truncationBehavior", t.mText.truncationBehavior)
 
 registerComponent(Text)
