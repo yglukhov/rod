@@ -42,6 +42,7 @@ type RTI* = ref object of Component
     bBlendOne*: bool
     bFreezeBounds*: bool
     bFreezeChildren*: bool
+    bDraw*: bool
 
 template withViewProj(vp: SceneView, mat: Matrix4, body: typed) =
     let old = vp.viewProjMatrix
@@ -227,9 +228,19 @@ template drawImg*(rti: RTI) =
     currentContext().withTransform rti.getImageVPM():
         currentContext().drawImage(rti.image, rti.getImageScreenBounds())
 
+template drawWithBlend*(rti: RTI) =
+    let gl = currentContext().gl
+    if rti.bBlendOne:
+        gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
+        rti.drawImg()
+        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    else:
+        rti.drawImg()
+
 method componentNodeWasAddedToSceneView*(rti: RTI) =
     rti.mOldVp = rti.node.sceneView.bounds
     rti.scaleRatio = 1.0
+    rti.bDraw = true
 
 method getBBox*(rti: RTI): BBox =
     var mtrInv = rti.node.worldTransform
@@ -287,38 +298,36 @@ method afterDraw*(rti: RTI, index: int) =
 
             rti.node.sceneView.viewProjMatrix = rti.mOldVPMat
 
-        if rti.node.sceneView.editing:
-            gl.enable(gl.DEPTH_TEST)
-            rti.drawImg()
-            gl.disable(gl.BLEND)
-            if rti.node.sceneView.camera.projectionMode == cpPerspective:
-                rti.image.flipVertically()
-            currentContext().withTransform rti.getImageVPM():
-                var r = rti.getImageScreenBounds()
-                let lineWidth = 1.0 / rti.aspect
-                r.origin = r.origin - newPoint(lineWidth, lineWidth)
-                r.size = r.size + newSize(lineWidth*2.0, lineWidth*2.0)
-                currentContext().drawImage(rti.image, r)
-            gl.enable(gl.BLEND)
-            gl.disable(gl.DEPTH_TEST)
-        else:
-            if rti.bBlendOne:
-                gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
-                rti.drawImg()
-                gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+        if rti.bDraw:
+            if rti.node.sceneView.editing:
+                gl.enable(gl.DEPTH_TEST)
+                rti.drawWithBlend()
+                gl.disable(gl.BLEND)
+                if rti.node.sceneView.camera.projectionMode == cpPerspective:
+                    rti.image.flipVertically()
+                currentContext().withTransform rti.getImageVPM():
+                    var r = rti.getImageScreenBounds()
+                    let lineWidth = 1.0 / rti.aspect
+                    r.origin = r.origin - newPoint(lineWidth, lineWidth)
+                    r.size = r.size + newSize(lineWidth*2.0, lineWidth*2.0)
+                    currentContext().drawImage(rti.image, r)
+                gl.enable(gl.BLEND)
+                gl.disable(gl.DEPTH_TEST)
             else:
-                rti.drawImg()
+                rti.drawWithBlend()
 
 method serialize*(rti: RTI, serealizer: Serializer): JsonNode =
     result = newJObject()
     result.add("bBlendOne", serealizer.getValue(rti.bBlendOne))
     result.add("expandRect", serealizer.getValue(rti.expandRect))
     result.add("scaleRatio", serealizer.getValue(rti.scaleRatio))
+    result.add("needDraw", serealizer.getValue(rti.bDraw))
 
 method deserialize*(rti: RTI, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "bBlendOne", rti.bBlendOne)
     serealizer.deserializeValue(j, "expandRect", rti.expandRect)
     serealizer.deserializeValue(j, "scaleRatio", rti.scaleRatio)
+    serealizer.deserializeValue(j, "needDraw", rti.bDraw)
 
 method visitProperties*(rti: RTI, p: var PropertyVisitor) =
 
@@ -331,5 +340,7 @@ method visitProperties*(rti: RTI, p: var PropertyVisitor) =
     p.visitProperty("freeze bb", rti.bFreezeBounds)
     p.visitProperty("freeze ch", rti.bFreezeChildren)
     p.visitProperty("blend one", rti.bBlendOne)
+    p.visitProperty("draw result", rti.bDraw)
+
 
 registerComponent(RTI, "Effects")
