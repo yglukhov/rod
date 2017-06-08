@@ -35,6 +35,7 @@ method init*(i: InspectorView, r: Rect) =
     i.resizingMask = "wh"
 
     i.propView = newVerticalLayout(newRect(0, 0, i.bounds.width, 20))
+    i.propView.name = "propView"
     i.propView.resizingMask = "wb"
     i.propView.topMargin = 5
     i.propView.bottomMargin = 5
@@ -42,6 +43,7 @@ method init*(i: InspectorView, r: Rect) =
     i.propView.rightMargin = 5
 
     i.scView = newScrollView(i.propView)
+    i.scView.name = "scView"
     i.scView.horizontalScrollBar = nil
     i.scView.resizingMask = "wh"
     i.scView.setFrame(i.bounds)
@@ -86,6 +88,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
             for v in n.components:
                 closureScope:
                     expView = newExpandingView(newRect(0, 0, 328, 20.0))
+                    expView.name = "'" & v.className & "'"
                     expView.title = v.className
                     let class_name = v.className
                     let component = v

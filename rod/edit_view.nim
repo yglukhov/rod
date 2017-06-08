@@ -180,6 +180,7 @@ when loadingAndSavingAvailable:
 
 proc newTreeView(e: Editor): View =
     result = View.new(newRect(0, 0, 200, 500)) #700
+    result.name = "treeView"
     let outlineView = OutlineView.new(newRect(0, 0, result.bounds.width, result.bounds.height - 20))
     e.outlineView = outlineView
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleMaxX }
@@ -461,6 +462,7 @@ proc newTabView(): TabView =
 
 proc createWorkspaceLayout(e: Editor) =
     let v = WorkspaceView.new(e.sceneView.frame)
+    v.name = "Workspace"
     v.editor = e
     e.workspaceView = v
     v.autoresizingMask = e.sceneView.autoresizingMask
@@ -489,9 +491,11 @@ proc createWorkspaceLayout(e: Editor) =
     a.addTab("Animation", e.animationEditView)
 
     let verticalSplit = newVerticalLayout(newRect(0, toolbarHeight, v.bounds.width, v.bounds.height - toolbarHeight))
+    verticalSplit.name = "verticalSplit"
     verticalSplit.userResizeable = true
     let horizontalSplit = newHorizontalLayout(newRect(0, 0, 800, 200))
     horizontalSplit.userResizeable = true
+    horizontalSplit.name = "horizontalSplit"
 
     horizontalSplit.addSubview(p)
     horizontalSplit.addSubview(s)
@@ -549,12 +553,15 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
 
     # Create widgets and stuff
     editor.inspector = InspectorView.new(newRect(200, toolbarHeight, 340, 700))
+    editor.inspector.name = "inspector"
     editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
+    editor.toolbar.name = "toolbar"
     editor.cameraController = newEditorCameraController(editor.sceneView)
     editor.createEventCatchingView()
     editor.treeView = newTreeView(editor)
 
     editor.animationEditView = AnimationEditView.new(newRect(0, 0, 800, 300))
+    editor.animationEditView.name = "animationEditView"
 
     # Toolbar buttons
     editor.createOpenAndSaveButtons()
