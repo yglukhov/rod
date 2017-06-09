@@ -1067,7 +1067,7 @@ proc fastJsonStringify(n: JsonNode): cstring =
     let r = replacer(n)
     {.emit: "`result` = JSON.stringify(`r`, null, 2);".}
 
-proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
+proc exportSelectedCompositions(exportFolderPath: cstring) =
     logTextField.text = ""
 
     let compositions = getSelectedCompositions()
@@ -1104,9 +1104,11 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
 
     logi("Done. ", epochTime())
 
-{.emit: """
 
-function buildUI(contextObj) {
+proc buildUI(contextObj: ref RootObj) =
+  if false: exportSelectedCompositions(nil) # Workaround for nim issue #5951
+
+  {.emit: """
   var mainWindow = null;
   if (contextObj instanceof Panel) {
     mainWindow = contextObj;
@@ -1206,7 +1208,7 @@ function buildUI(contextObj) {
   };
 
   exportButton.onClick = function(e) {
-    exportSelectedCompositions(filePath.text);
+    `exportSelectedCompositions`(filePath.text);
   };
 
   mainWindow.addEventListener("resize", function(e) {
@@ -1231,8 +1233,7 @@ function buildUI(contextObj) {
     mainWindow.layout.layout(true);
     //    readMetaData();
   }
-}
+  """.}
 
-buildUI(this);
-
-""".}
+var this {.importc.}: ref RootObj
+buildUI(this)
