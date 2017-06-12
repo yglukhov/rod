@@ -343,6 +343,12 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup): JsonNode =
         let endColor = addPropDesc(layer, compIndex, "endColor", p.property("End Color", Vector4))
         endColor.setInitialValueToResult(result)
 
+        const linearRamp = 1.0
+        const radialRamp = 2.0
+        let shape = p.property("Ramp Shape", float).valueAtTime(0)
+        if shape == linearRamp: result["shape"] = %0
+        else: result["shape"] = %1
+
         result["_c"] = %"GradientFill"
 
     of "ADBE Fill": # Fill
@@ -1110,8 +1116,8 @@ proc buildUI(contextObj: ref RootObj) =
 
   {.emit: """
   var mainWindow = null;
-  if (contextObj instanceof Panel) {
-    mainWindow = contextObj;
+  if (`contextObj` instanceof Panel) {
+    mainWindow = `contextObj`;
   } else {
     mainWindow = new Window("palette", "Animations", undefined, {
       resizeable: true
