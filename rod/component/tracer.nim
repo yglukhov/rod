@@ -50,10 +50,24 @@ type
 method componentNodeWillBeRemovedFromSceneView*(t: Tracer) =
     let c = currentContext()
     let gl = c.gl
-    gl.deleteBuffer(t.indexBuffer)
-    gl.deleteBuffer(t.vertexBuffer)
-    t.indexBuffer = invalidBuffer
-    t.vertexBuffer = invalidBuffer
+    if t.indexBuffer != invalidBuffer:
+        gl.deleteBuffer(t.indexBuffer)
+        t.indexBuffer = invalidBuffer
+    if t.vertexBuffer != invalidBuffer:
+        gl.deleteBuffer(t.vertexBuffer)
+        t.vertexBuffer = invalidBuffer
+
+proc newTracer(): Tracer =
+    new(result, proc(t: Tracer) =
+        let c = currentContext()
+        let gl = c.gl
+        if t.indexBuffer != invalidBuffer:
+            gl.deleteBuffer(t.indexBuffer)
+            t.indexBuffer = invalidBuffer
+        if t.vertexBuffer != invalidBuffer:
+            gl.deleteBuffer(t.vertexBuffer)
+            t.vertexBuffer = invalidBuffer
+    )
 
 method init*(t: Tracer) =
     procCall t.Component.init()
@@ -181,7 +195,6 @@ method draw*(t: Tracer) =
         let mvpMatrix = vp.getViewProjectionMatrix()
         gl.uniformMatrix4fv(gl.getUniformLocation(tracerShader, "mvpMatrix"), false, mvpMatrix)
 
-
         gl.drawElements(gl.LINES, t.numberOfIndexes * 2 - 1, gl.UNSIGNED_SHORT)
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
@@ -194,4 +207,7 @@ method visitProperties*(t: Tracer, p: var PropertyVisitor) =
     p.visitProperty("color", t.color)
     p.visitProperty("trace_step", t.traceStep)
 
-registerComponent(Tracer)
+proc creator(): RootRef =
+    result = newTracer()
+
+registerComponent(Tracer, creator)

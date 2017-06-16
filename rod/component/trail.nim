@@ -433,6 +433,11 @@ proc tryFill(b: Buffer, vertices: seq[GLfloat], indices: seq[GLushort]): bool =
 method componentNodeWillBeRemovedFromSceneView*(t: Trail) =
     for b in t.buffers: b.cleanup()
 
+proc newTrail(): Trail =
+    new(result, proc(t: Trail) =
+        for b in t.buffers: b.cleanup()
+    )
+
 template checkShader(t: Trail) =
     if not t.image.isNil:
         if t.bIsTiled:
@@ -990,4 +995,7 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
     p.visitProperty("quads", t.quadsToDraw)
     p.visitProperty("wireframe", t.isWireframe)
 
-registerComponent(Trail)
+proc creator(): RootRef =
+    result = newTrail()
+
+registerComponent(Trail, creator)
