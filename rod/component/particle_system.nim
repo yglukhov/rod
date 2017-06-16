@@ -382,15 +382,13 @@ proc initSystem(ps: ParticleSystem) =
 
     ps.isInited = true
 
-proc newParticleSystem(): ParticleSystem =
-    new(result, proc(ps: ParticleSystem) =
-        let c = currentContext()
-        let gl = c.gl
-        gl.deleteBuffer(ps.indexBuffer)
-        gl.deleteBuffer(ps.vertexBuffer)
-        ps.indexBuffer = invalidBuffer
-        ps.vertexBuffer = invalidBuffer
-    )
+method componentNodeWillBeRemovedFromSceneView*(ps: ParticleSystem) =
+    let c = currentContext()
+    let gl = c.gl
+    gl.deleteBuffer(ps.indexBuffer)
+    gl.deleteBuffer(ps.vertexBuffer)
+    ps.indexBuffer = invalidBuffer
+    ps.vertexBuffer = invalidBuffer
 
 method init(ps: ParticleSystem) =
     ps.isInited = false
@@ -1035,7 +1033,4 @@ method visitProperties*(h: PSHolder, p: var PropertyVisitor) =
 
 registerComponent(PSHolder, "ParticleSystem")
 
-proc creator(): RootRef =
-    result = newParticleSystem()
-
-registerComponent(ParticleSystem, creator, "ParticleSystem")
+registerComponent(ParticleSystem, "ParticleSystem")

@@ -430,10 +430,8 @@ proc tryFill(b: Buffer, vertices: seq[GLfloat], indices: seq[GLushort]): bool =
 
     return true
 
-proc newTrail(): Trail =
-    new(result, proc(t: Trail) =
-        for b in t.buffers: b.cleanup()
-    )
+method componentNodeWillBeRemovedFromSceneView*(t: Trail) =
+    for b in t.buffers: b.cleanup()
 
 template checkShader(t: Trail) =
     if not t.image.isNil:
@@ -992,7 +990,4 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
     p.visitProperty("quads", t.quadsToDraw)
     p.visitProperty("wireframe", t.isWireframe)
 
-proc creator(): RootRef =
-    result = newTrail()
-
-registerComponent(Trail, creator)
+registerComponent(Trail)
