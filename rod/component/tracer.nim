@@ -47,7 +47,7 @@ type
         traceStep*: int
         traceStepCounter: int
 
-proc cleanup(t: Tracer) =
+proc cleanup*(t: Tracer) =
     let c = currentContext()
     let gl = c.gl
     if t.indexBuffer != invalidBuffer:
@@ -57,13 +57,8 @@ proc cleanup(t: Tracer) =
         gl.deleteBuffer(t.vertexBuffer)
         t.vertexBuffer = invalidBuffer
 
-method componentNodeWillBeRemovedFromSceneView*(t: Tracer) =
-    t.cleanup()
-
 proc newTracer(): Tracer =
-    new(result, proc(t: Tracer) =
-        t.cleanup()
-    )
+    new(result, cleanup)
 
 method init*(t: Tracer) =
     procCall t.Component.init()

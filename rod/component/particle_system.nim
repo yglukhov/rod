@@ -382,7 +382,7 @@ proc initSystem(ps: ParticleSystem) =
 
     ps.isInited = true
 
-proc cleanup(ps: ParticleSystem) =
+proc cleanup*(ps: ParticleSystem) =
     let c = currentContext()
     let gl = c.gl
     if ps.indexBuffer != invalidBuffer:
@@ -392,13 +392,8 @@ proc cleanup(ps: ParticleSystem) =
         gl.deleteBuffer(ps.vertexBuffer)
         ps.vertexBuffer = invalidBuffer
 
-method componentNodeWillBeRemovedFromSceneView*(ps: ParticleSystem) =
-    ps.cleanup()
-
 proc newParticleSystem(): ParticleSystem =
-    new(result, proc(ps: ParticleSystem) =
-        ps.cleanup()
-    )
+    new(result, cleanup)
 
 method init(ps: ParticleSystem) =
     ps.isInited = false

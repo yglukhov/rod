@@ -272,14 +272,14 @@ type
         aTexCoord
 
     DataInBuffer = enum
-        First
+        First = 0
         Second
         FirstSecond
         SecondFirst
         NotInited
         Skip
 
-    Buffer = ref object of RootObj
+    Buffer = object
         vertexBuffer: BufferRef
         indexBuffer: BufferRef
 
@@ -309,7 +309,7 @@ type
 
         angleThreshold*: float32
 
-        buffers: seq[Buffer]
+        buffers: array[2, Buffer]
         currBuff: DataInBuffer
         drawMode: DataInBuffer
 
@@ -351,7 +351,7 @@ template getUniformLocation(gl: GL, t: Trail, name: cstring): UniformLocation =
 template setColorUniform(c: GraphicsContext, t: Trail, name: cstring, col: Color) =
     c.setColorUniform(c.gl.getUniformLocation(t, name), col)
 
-proc cleanup(b: Buffer) =
+proc cleanup(b: var Buffer) =
     let c = currentContext()
     let gl = c.gl
     if b.indexBuffer != invalidBuffer:
@@ -362,9 +362,10 @@ proc cleanup(b: Buffer) =
         gl.deleteBuffer(b.vertexBuffer)
         b.vertexBuffer = invalidBuffer
 
-proc bufferWithSize(gl: GL, indices, vertices: int): Buffer =
-    new( result, proc(b: Buffer) = b.cleanup() )
+    b.bActive = false
+    b.bValidData = false
 
+proc bufferWithSize(gl: GL, indices, vertices: int): Buffer =
     result.vertices.curr = 0
     result.indices.curr = 0
     result.vertices.max = vertices
@@ -379,18 +380,7 @@ proc bufferWithSize(gl: GL, indices, vertices: int): Buffer =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, result.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, (result.indices.max * sizeof(GLushort)).int32, gl.STREAM_DRAW)
 
-template bindBuffer(b: Buffer) =
-    #TODO manager of buffers
-    # if not b.bActive:
-    currentContext().gl.bindBuffer(currentContext().gl.ARRAY_BUFFER, b.vertexBuffer)
-    currentContext().gl.bindBuffer(currentContext().gl.ELEMENT_ARRAY_BUFFER, b.indexBuffer)
-    b.bActive = true
-
-template releaseBuffer(b: Buffer) =
-    if b.bActive:
-        b.bActive = false
-
-proc tryAdd(b: Buffer, vertices: openarray[GLfloat], indices: openarray[GLushort]): bool =
+proc tryAdd(b: var Buffer, vertices: openarray[GLfloat], indices: openarray[GLushort]): bool =
     let indcLen = indices.len
     if (b.indices.curr + indcLen) > b.indices.max:
         return false
@@ -400,17 +390,17 @@ proc tryAdd(b: Buffer, vertices: openarray[GLfloat], indices: openarray[GLushort
 
     let gl = currentContext().gl
 
-    b.bindBuffer()
-
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.vertexBuffer)
     gl.bufferSubData(gl.ARRAY_BUFFER, (b.vertices.curr*sizeof(GLfloat)).int32, vertices)
     b.vertices.curr += vertLen
 
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.indexBuffer)
     gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, (b.indices.curr*sizeof(GLushort)).int32, indices)
     b.indices.curr += indcLen
 
     return true
 
-proc tryFill(b: Buffer, vertices: seq[GLfloat], indices: seq[GLushort]): bool =
+proc tryFill(b: var Buffer, vertices: seq[GLfloat], indices: seq[GLushort]): bool =
     let indcLen = indices.len()
     if indcLen > b.indices.max:
         return false
@@ -420,23 +410,24 @@ proc tryFill(b: Buffer, vertices: seq[GLfloat], indices: seq[GLushort]): bool =
 
     let gl = currentContext().gl
 
-    b.bindBuffer()
-
+    gl.bindBuffer(gl.ARRAY_BUFFER, b.vertexBuffer)
     gl.bufferSubData(gl.ARRAY_BUFFER, 0.int32, vertices)
     b.vertices.curr = vertLen
 
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, b.indexBuffer)
     gl.bufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0.int32, indices)
     b.indices.curr = indcLen
 
     return true
 
-method componentNodeWillBeRemovedFromSceneView*(t: Trail) =
-    for b in t.buffers: b.cleanup()
+proc cleanup*(t: Trail) =
+    t.currBuff = NotInited
+    t.drawMode = NotInited
+    t.buffers[First.int].cleanup()
+    t.buffers[Second.int].cleanup()
 
 proc newTrail(): Trail =
-    new(result, proc(t: Trail) =
-        for b in t.buffers: b.cleanup()
-    )
+    new(result, cleanup)
 
 template checkShader(t: Trail) =
     if not t.image.isNil:
@@ -582,7 +573,6 @@ method init*(t: Trail) =
 
     t.color = newColor(1, 1, 1, 1)
 
-    t.buffers = @[]
     t.currBuff = NotInited
     t.drawMode = NotInited
 
@@ -711,15 +701,12 @@ method draw*(t: Trail) =
         t.currPos = t.node.worldPos() - t.gravityDirection
         t.prevPos = t.currPos
 
-        var firstBuffer = gl.bufferWithSize(initialIndicesCount,initialVerticesCount)
-        var secondBuffer = gl.bufferWithSize(initialIndicesCount,initialVerticesCount)
-        t.buffers.add(firstBuffer)
-        t.buffers.add(secondBuffer)
+        t.buffers[First.int] = gl.bufferWithSize(initialIndicesCount,initialVerticesCount)
+        t.buffers[Second.int] = gl.bufferWithSize(initialIndicesCount,initialVerticesCount)
 
         t.currBuff = First
         t.drawMode = First
 
-        t.buffers[t.currBuff.int].bindBuffer()
         t.emitQuad()
         t.checkShader()
 
@@ -825,16 +812,9 @@ method draw*(t: Trail) =
         if t.totalLen > t.widthOffset and not t.bStretch:
             t.cropOffset += t.currLength
 
-        # if t.bCollapsible and t.cropOffset < t.widthOffset:
-        #     t.cropOffset += t.currLength
-
-        # if t.bCollapsible and t.currLength == 0:
         if t.bCollapsible:
             if t.cutSpeed > 0:
                 t.cropOffset += t.cutSpeed * getDeltaTime()
-
-        # if t.currLength > t.widthOffset:
-        #     t.reset()
 
         t.getVertexData(t.prevVertexData)
 
@@ -878,7 +858,6 @@ method draw*(t: Trail) =
             let indicesOffset = t.buffers[currBuff.int].indices.curr - indicesCount
             gl.drawElements(gl.TRIANGLE_STRIP, indicesCount.GLsizei, gl.UNSIGNED_SHORT, (indicesOffset*sizeof(GLushort)).int )
 
-        t.buffers[nextBuff.int].bindBuffer()
         updateLastVertex(nextBuff)
         setupAttribArray()
         setupUniforms()
