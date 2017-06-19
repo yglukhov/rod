@@ -47,15 +47,18 @@ type
         traceStep*: int
         traceStepCounter: int
 
-proc newTracer(): Tracer =
-    new(result, proc(t: Tracer) =
-        let c = currentContext()
-        let gl = c.gl
+proc cleanup*(t: Tracer) =
+    let c = currentContext()
+    let gl = c.gl
+    if t.indexBuffer != invalidBuffer:
         gl.deleteBuffer(t.indexBuffer)
-        gl.deleteBuffer(t.vertexBuffer)
         t.indexBuffer = invalidBuffer
+    if t.vertexBuffer != invalidBuffer:
+        gl.deleteBuffer(t.vertexBuffer)
         t.vertexBuffer = invalidBuffer
-    )
+
+proc newTracer(): Tracer =
+    new(result, cleanup)
 
 method init*(t: Tracer) =
     procCall t.Component.init()
@@ -182,7 +185,6 @@ method draw*(t: Tracer) =
         let vp = t.node.sceneView
         let mvpMatrix = vp.getViewProjectionMatrix()
         gl.uniformMatrix4fv(gl.getUniformLocation(tracerShader, "mvpMatrix"), false, mvpMatrix)
-
 
         gl.drawElements(gl.LINES, t.numberOfIndexes * 2 - 1, gl.UNSIGNED_SHORT)
 

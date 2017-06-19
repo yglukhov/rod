@@ -21,60 +21,53 @@ import rod.component.solid
 import rod.component.camera
 import rod.viewport
 
-const rectAlpha* = """
-float rect_alpha(vec2 uvs, vec4 texCoord) {
-    if (uvs.x < texCoord.x || uvs.x > texCoord.z || uvs.y < texCoord.y || uvs.y > texCoord.w) { return 0.0; }
-    else { return 1.0; }
-}
-"""
-const getMaskUV* = """
-vec2 get_mask_uv(vec4 mask_img_coords, vec4 mask_bounds, mat4 mvp_inv) {
+const comonPrefix = """
+(sampler2D mask_img, vec4 mask_img_coords, vec4 mask_bounds, mat4 mvp_inv, float msk_alpha) {
+
     vec2 mskVpos = vec4(mvp_inv * vec4(gl_FragCoord.x, gl_FragCoord.y, 0.0, 1.0)).xy;
     vec2 destuv = ( mskVpos - mask_bounds.xy ) / mask_bounds.zw;
-    return mask_img_coords.xy + (mask_img_coords.zw - mask_img_coords.xy) * destuv;
-}
-"""
-const getRGBLuma* = """
-float rgb_luma(vec3 col) {
-    return dot(col, vec3(0.299, 0.587, 0.114));
-}
-"""
-const maskEffectPrefix = """
-void mask_effect(sampler2D mask_img, vec4 mask_img_coords, vec4 mask_bounds, mat4 mvp_inv, float msk_alpha) {
-    vec2 uv = get_mask_uv(mask_img_coords, mask_bounds, mvp_inv);
+    vec2 uv = mask_img_coords.xy + (mask_img_coords.zw - mask_img_coords.xy) * destuv;
+
     vec4 mask_color = texture2D(mask_img, uv);
+
+    float rect_alpha = 1.0;
+    if (uv.x < mask_img_coords.x || uv.x > mask_img_coords.z || uv.y < mask_img_coords.y || uv.y > mask_img_coords.w) {
+        rect_alpha = 0.0;
+    }
 """
-const maskEffectPostfixAlpha = """
-    float mask_alpha = mask_color.a * rect_alpha(uv, mask_img_coords) * msk_alpha;
+const alphaPostfix = """
+    float mask_alpha = mask_color.a * rect_alpha * msk_alpha;
     gl_FragColor.a *= mask_alpha;
 }
 """
-const maskEffectPostfixAlphaInv = """
-    float mask_alpha = mask_color.a * rect_alpha(uv, mask_img_coords) * msk_alpha;
-    gl_FragColor.a *= 1.0 - mask_alpha;
-}
-"""
-const maskEffectPostfixLuma = """
-    float luma = rgb_luma(mask_color.rgb);
-    float mask_alpha = luma * mask_color.a * rect_alpha(uv, mask_img_coords) * msk_alpha;
+const alphaInvertedPostfix = """
+    float mask_alpha = mask_color.a * rect_alpha * msk_alpha;
+    mask_alpha = 1.0 - clamp(mask_alpha, 0.0, 1.0);
     gl_FragColor.a *= mask_alpha;
 }
 """
-const maskEffectPostfixLumaInv = """
-    float luma = rgb_luma(mask_color.rgb);
-    float mask_alpha = luma * mask_color.a * rect_alpha(uv, mask_img_coords) * msk_alpha;
-    gl_FragColor.a *= 1.0 - mask_alpha;
+const lumaPostfix = """
+    float luma = dot(mask_color.rgb, vec3(0.299, 0.587, 0.114));
+    float mask_alpha = luma * mask_color.a * rect_alpha * msk_alpha;
+    gl_FragColor.a *= mask_alpha;
+}
+"""
+const lumaInvertedPostfix = """
+    float luma = dot(mask_color.rgb, vec3(0.299, 0.587, 0.114));
+    float mask_alpha = luma * mask_color.a * rect_alpha * msk_alpha;
+    mask_alpha = 1.0 - clamp(mask_alpha, 0.0, 1.0);
+    gl_FragColor.a *= mask_alpha;
 }
 """
 
-template maskPost(src: string): PostEffect =
-    newPostEffect(src, "mask_effect", ["sampler2D", "vec4", "vec4", "mat4", "float"])
+template maskPost(name, src: string): PostEffect =
+    newPostEffect("void " & name & src, name, ["sampler2D", "vec4", "vec4", "mat4", "float"])
 
 var effect = [
-    maskPost(rectAlpha & getMaskUV & maskEffectPrefix & maskEffectPostfixAlpha), # tmAlpha
-    maskPost(rectAlpha & getMaskUV & maskEffectPrefix & maskEffectPostfixAlphaInv), # tmAlphaInverted
-    maskPost(rectAlpha & getMaskUV & getRGBLuma & maskEffectPrefix & maskEffectPostfixLuma), # tmLuma
-    maskPost(rectAlpha & getMaskUV & getRGBLuma & maskEffectPrefix & maskEffectPostfixLumaInv) # tmLumaInverted
+    maskPost("maskAlphaEffect", comonPrefix & alphaPostfix), # tmAlpha
+    maskPost("maskAlphaInvertedEffect", comonPrefix & alphaInvertedPostfix), # tmAlphaInverted
+    maskPost("maskLumaEffect", comonPrefix & lumaPostfix), # tmLuma
+    maskPost("maskLumaInvertedEffect", comonPrefix & lumaInvertedPostfix) # tmLumaInverted
 ]
 
 type MaskType* = enum
@@ -89,6 +82,7 @@ type Mask* = ref object of Component
 proc findComponents*(n: Node, T: typedesc[Component]): auto =
     type TT = T
     var compSeq = newSeq[TT]()
+
     discard n.findNode do(nd: Node) -> bool:
         let comp = nd.componentIfAvailable(TT)
         if not comp.isNil: compSeq.add(comp)
@@ -145,7 +139,7 @@ template inv(m: Matrix4): Matrix4 =
 const clipMat: Matrix4 = [0.5.Coord,0,0,0,0,0.5,0,0,0,0,1.0,0,0.5,0.5,0,1.0]
 
 method beforeDraw*(msk: Mask, index: int): bool =
-    if not msk.maskSprite.isNil and msk.maskType != tmNone:
+    if not msk.maskSprite.isNil and not msk.maskSprite.image.isNil and msk.maskType != tmNone:
 
         if msk.mWithRTI:
             # TODO RTI
@@ -153,20 +147,19 @@ method beforeDraw*(msk: Mask, index: int): bool =
 
         let vp = msk.node.sceneView
         var theQuad {.noinit.}: array[4, GLfloat]
-        discard getTextureQuad(msk.maskSprite.image, currentContext().gl, theQuad)
+        let tex = getTextureQuad(msk.maskSprite.image, currentContext().gl, theQuad)
         let maskImgCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
         let maskBounds = newRect(msk.maskSprite.getOffset(), msk.maskSprite.image.size)
-
         var trInv = (clipMat * vp.viewProjMatrix * msk.maskSprite.node.worldTransform()).inv()
         let glvp = currentContext().gl.getViewport()
         trInv.scale(newVector3(1.0/(glvp[2] - glvp[0]).float, 1.0/(glvp[3] - glvp[1]).float, 1.0))
 
         let maskAlpha = msk.maskSprite.node.getGlobalAlpha()
 
-        pushPostEffect(effect[msk.maskType.int-1], msk.maskSprite.image, maskImgCoords, maskBounds, trInv, maskAlpha)
+        pushPostEffect(effect[msk.maskType.int-1], tex, maskImgCoords, maskBounds, trInv, maskAlpha)
 
 method afterDraw*(msk: Mask, index: int) =
-    if not msk.maskSprite.isNil and msk.maskType != tmNone:
+    if not msk.maskSprite.isNil and not msk.maskSprite.image.isNil and msk.maskType != tmNone:
         popPostEffect()
 
 method serialize*(msk: Mask, serealizer: Serializer): JsonNode =
