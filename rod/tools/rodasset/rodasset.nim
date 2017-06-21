@@ -1,6 +1,7 @@
 import os, strutils, times, tables, osproc
 import imgtool, asset_cache, migrator
 import settings except hash
+import tempfile
 
 
 template settingsWithCmdLine(): Settings =
@@ -80,10 +81,11 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
     let cache = getCache(cache)
     let s = settingsWithCmdLine()
     let h = dirHash(src, s)
+    createDir(cache)
     let c = cache / h
     echo "rodasset Cache: ", c
     if not dirExists(c):
-        let tmpCacheDir = c & ".tmp"
+        let tmpCacheDir = mkdtemp(h, "_tmp")
         var tool = newImgTool()
 
         tool.noquant = @[]
@@ -96,7 +98,6 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
         for e in split(noposterize, ","): tool.noposterize.add(e)
         tool.originalResPath = src
         tool.resPath = tmpCacheDir
-        createDir(tmpCacheDir)
         tool.outPrefix = "p"
         tool.compressOutput = not nocompress
         tool.compressToPVR = compressToPVR
