@@ -109,7 +109,10 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
         echo "Done. Time: ", epochTime() - startTime
 
         copyRemainingAssets(tool, src, tmpCacheDir, audio)
-        moveFile(tmpCacheDir, c)
+        when declared(moveDir):
+            moveDir(tmpCacheDir, c) # Newer nim should support it
+        else:
+            moveFile(tmpCacheDir, c)
 
     if not onlyCache:
         copyResourcesFromCache(c, h, dst)
