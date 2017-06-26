@@ -31,6 +31,14 @@ proc isHiddenFile(path: string): bool =
     if slash != -1:
         result = path[slash + 1] == '.'
 
+proc gitStatus(statusLine: string, status: char): bool {.inline.} =
+    statusLine[0] == status or statusLine[1] == status
+
+proc getFileNameFromMovedGitStatusLine(statusLine: string): string {.inline.} =
+    const separator = " -> "
+    let idx = statusLine.rfind(separator)
+    result = statusLine[idx + separator.len .. ^1]
+
 proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
     result = newStringOfCap(2048)
     result &= baseHash
@@ -39,15 +47,19 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
     let (outp, errC) = execCmdEx("git status -s " & path)
     if errC != 0:
         raise newException(Exception, "git status returned " & $errC)
-    # echo "OUTP: ", outp
+
     for ln in outp.splitLines:
         if ln.len == 0: continue
-        let f = ln[3 .. ^1]
+        var f = ln[3 .. ^1]
         if f.isHiddenFile(): continue
 
         result &= f
         result &= ';'
-        if ln[0] != 'D':
+
+        if not ln.gitStatus('D'):
+            if ln.gitStatus('R'):
+                f = getFileNameFromMovedGitStatusLine(ln)
+
             let modTime = getLastModificationTime(f)
             result &= $modTime
             result &= ';'
