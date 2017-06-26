@@ -859,6 +859,9 @@ method draw*(t: Trail) =
             gl.drawElements(gl.TRIANGLE_STRIP, indicesCount.GLsizei, gl.UNSIGNED_SHORT, (indicesOffset*sizeof(GLushort)).int )
 
         updateLastVertex(nextBuff)
+        gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[nextBuff.int].vertexBuffer)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[nextBuff.int].indexBuffer)
+
         setupAttribArray()
         setupUniforms()
         gl.drawElements(gl.TRIANGLE_STRIP, t.buffers[nextBuff.int].indices.curr.GLsizei, gl.UNSIGNED_SHORT, 0.int )
