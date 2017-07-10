@@ -2,7 +2,7 @@ import math, algorithm, strutils, tables, json, logging
 
 import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
                 outline_view, toolbar, color_picker, scroll_view, clip_view,
-                text_field, table_view_cell, gesture_detector,
+                text_field, table_view_cell, gesture_detector, menu,
                 key_commands, linear_layout, view_event_handling_new ]
 
 import nimx.editor.tab_view
@@ -334,6 +334,12 @@ proc onTouchUp*(editor: Editor, e: var Event) =
 
     editor.gizmo.stopTransform()
 
+proc currentCamera*(e: Editor): Camera =
+    if e.cameraSelector.selectedIndex >= 0:
+        let n = e.rootNode.findNode(e.cameraSelector.selectedItem)
+        if not n.isNil:
+            result = n.componentIfAvailable(Camera)
+
 proc newToolbarButton(e: Editor, title: string): Button =
     let f = systemFont()
     let width = f.sizeOfString(title).width
@@ -341,23 +347,39 @@ proc newToolbarButton(e: Editor, title: string): Button =
     result.title = title
     e.toolbar.addSubview(result)
 
-proc createOpenAndSaveButtons(e: Editor) =
+proc addToolbarMenu(e: Editor, item: MenuItem) =
+    let b = e.newToolbarButton(item.title)
+    b.onAction() do():
+        item.popupAtPoint(b, newPoint(0, 25))
+
+proc createSceneMenu(e: Editor) =
     when loadingAndSavingAvailable:
-        e.newToolbarButton("Load").onAction do():
-            e.loadNode()
+        let m = makeMenu("Scene"):
+            - "Load":
+                e.loadNode()
+            - "Save":
+                if e.outlineView.selectedIndexPath.len > 0:
+                    var selectedNode = e.outlineView.itemAtIndexPath(e.outlineView.selectedIndexPath).get(Node3D)
+                    if not selectedNode.isNil:
+                        e.saveNode(selectedNode)
+        e.addToolbarMenu(m)
 
-        e.newToolbarButton("Save J").onAction do():
-            if e.outlineView.selectedIndexPath.len > 0:
-                var selectedNode = e.outlineView.itemAtIndexPath(e.outlineView.selectedIndexPath).get(Node3D)
-                if not selectedNode.isNil:
-                    e.saveNode(selectedNode)
-
-proc createZoomSelectionButton(e: Editor) =
-    e.newToolbarButton("Zoom Selection").onAction do():
-        if not e.selectedNode.isNil:
-            let cam = e.rootNode.findNode("camera")
-            if not cam.isNil:
-                e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
+proc createViewMenu(e: Editor) =
+    when loadingAndSavingAvailable:
+        let m = makeMenu("View"):
+            - "Zoom on Selection":
+                if not e.selectedNode.isNil:
+                    let cam = e.rootNode.findNode("camera")
+                    if not cam.isNil:
+                        e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
+            - "-"
+            - "2D":
+                let cam = e.currentCamera()
+                if not cam.isNil: cam.projectionMode = cpOrtho
+            - "3D":
+                let cam = e.currentCamera()
+                if not cam.isNil: cam.projectionMode = cpPerspective
+        e.addToolbarMenu(m)
 
 proc createGameInputToggle(e: Editor) =
     let toggle = e.newToolbarButton("Game Input")
@@ -372,13 +394,10 @@ proc createCameraSelector(e: Editor) =
     e.toolbar.addSubview(e.cameraSelector)
 
     e.cameraSelector.onAction do():
-        if e.cameraSelector.selectedIndex >= 0:
-            let n = e.rootNode.findNode(e.cameraSelector.selectedItem)
-            if not n.isNil:
-                let cam = n.componentIfAvailable(Camera)
-                if not cam.isNil:
-                    e.rootNode.sceneView.camera = cam
-                    e.cameraController.setCamera(cam.node)
+        let cam = e.currentCamera()
+        if not cam.isNil:
+            e.rootNode.sceneView.camera = cam
+            e.cameraController.setCamera(cam.node)
 
 proc createChangeBackgroundColorButton(e: Editor) =
     var cPicker: ColorPickerView
@@ -558,8 +577,8 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.animationEditView = AnimationEditView.new(newRect(0, 0, 800, 300))
 
     # Toolbar buttons
-    editor.createOpenAndSaveButtons()
-    editor.createZoomSelectionButton()
+    editor.createSceneMenu()
+    editor.createViewMenu()
     editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
