@@ -21,11 +21,11 @@ import rod_types
 
 import rod.property_editors.propedit_registry
 import rod.property_editors.standard_editors
-
+import rod.editor.editor_tab
 
 const componentsViewSize = newSize(200, 300)
 
-type InspectorView* = ref object of View
+type InspectorView* = ref object of EditorTabView
     propView: LinearLayout
     scView: ScrollView
     currNode: Node
@@ -162,4 +162,13 @@ proc createComponentsView(inspector: InspectorView, n: Node) =
     stackView.setFrameOrigin(origin)
     inspector.window.addSubview(stackView)
 
+method editedNode*(v: InspectorView, n: Node)=
+    v.inspectedNode = n
 
+method tabSize*(v: InspectorView, bounds: Rect): Size=
+    result = newSize(300.0, bounds.height)
+
+method tabAnchor*(v: InspectorView): EditorTabAnchor =
+    result = etaRight
+
+registerEditorTad("Inspector", InspectorView)
