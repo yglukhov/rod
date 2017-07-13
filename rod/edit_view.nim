@@ -16,6 +16,8 @@ import rod.editor_camera_controller
 import rod.editor.animation_edit_view
 import rod.editor.gizmo_axis
 import tools.serializer
+import rod.editor.editor_tab
+import rod.editor.editor_tree_view
 
 import ray
 import viewport
@@ -25,6 +27,7 @@ import variant
 const NodePboardKind = "io.github.yglukhov.rod.node"
 
 const toolbarHeight = 30
+const defaultTabs = ["Inspector", "Tree"]
 
 const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
     not defined(emscripten) and not defined(js)
@@ -32,25 +35,24 @@ const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
 when loadingAndSavingAvailable:
     import native_dialogs
 
-
 type
     Editor* = ref object
         rootNode*: Node
-        workspaceView: View
+        workspaceView: WorkspaceView
         eventCatchingView*: EventCatchingView
-        treeView*: View
-        animationEditView*: AnimationEditView
         toolbar*: Toolbar
         sceneView*: SceneView
         mSelectedNode: Node
-        outlineView*: OutlineView
-        inspector*: InspectorView
         cameraController*: EditorCameraController
         cameraSelector: PopupButton
         gizmo: GizmoAxis
 
     WorkspaceView = ref object of View
         editor: Editor
+        tabs: seq[EditorTabView]
+        anchors: array[4, TabView]
+        horizontalLayout: LinearLayout
+        verticalLayout: LinearLayout
 
     EventCatchingView* = ref object of View
         keyDownDelegate*: proc(event: var Event): bool
@@ -60,6 +62,8 @@ type
 
     EventCatchingListener = ref object of BaseScrollListener
         view: EventCatchingView
+
+proc newTabView(): TabView
 
 method acceptsFirstResponder(v: EventCatchingView): bool = true
 
@@ -96,8 +100,9 @@ proc `selectedNode=`*(e: Editor, n: Node) =
         e.mSelectedNode = n
         if not e.mSelectedNode.isNil:
             discard e.mSelectedNode.component(NodeSelector)
-        e.inspector.inspectedNode = n
-        e.animationEditView.editedNode = n
+
+        for etv in e.workspaceView.tabs:
+            etv.editedNode(n)
 
         e.gizmo.editedNode = e.mSelectedNode
 
@@ -110,18 +115,6 @@ proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
         focusNode.position.y,
         focusNode.position.z + distance
     )
-
-proc getTreeViewIndexPathForNode(editor: Editor, n: Node3D, indexPath: var seq[int]) =
-    # running up and calculate the path to the node in the tree
-    let parent = n.parent
-    indexPath.insert(parent.children.find(n), 0)
-
-    # because there is the root node, it's necessary to add 0
-    if parent.isNil or parent == editor.rootNode:
-        indexPath.insert(0, 0)
-        return
-
-    editor.getTreeViewIndexPathForNode(parent, indexPath)
 
 proc updateCameraSelector(e: Editor) =
     var items = newSeq[string]()
@@ -139,8 +132,10 @@ proc updateCameraSelector(e: Editor) =
     e.cameraSelector.selectedIndex = selectedIndex
 
 proc sceneTreeDidChange(e: Editor) =
-    e.outlineView.reloadData()
     e.updateCameraSelector()
+
+    for t in e.workspaceView.tabs:
+        t.onSceneChanged()
 
 when loadingAndSavingAvailable:
     import os
@@ -156,138 +151,29 @@ when loadingAndSavingAvailable:
         if not path.isNil:
             try:
                 if path.endsWith(".dae"):
-                    var sip = editor.outlineView.selectedIndexPath
-                    var p = editor.rootNode
-                    if sip.len == 0:
-                        sip.add(0)
-                    else:
-                        p = editor.outlineView.itemAtIndexPath(sip).get(Node3D)
+                    var p = if not editor.selectedNode.isNil: editor.selectedNode
+                            else: editor.rootNode
 
-                    editor.outlineView.expandRow(sip)
                     loadSceneAsync path, proc(n: Node) =
                         p.addChild(n)
+                        editor.selectedNode = n
+
                 elif path.endsWith(".json"):
                     let ln = newNodeWithURL("file://" & path)
                     if not editor.selectedNode.isNil:
                         editor.selectedNode.addChild(ln)
                     else:
                         editor.rootNode.addChild(ln)
+
                 editor.sceneTreeDidChange()
             except:
                 error "ERROR:: Resource at path doesn't load ", path
                 error "Exception caught: ", getCurrentExceptionMsg()
                 error "stack trace: ", getCurrentException().getStackTrace()
 
-proc newTreeView(e: Editor): View =
-    result = View.new(newRect(0, 0, 200, 500)) #700
-    let outlineView = OutlineView.new(newRect(0, 0, result.bounds.width, result.bounds.height - 20))
-    e.outlineView = outlineView
-    outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleMaxX }
-    outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
-        if indexPath.len == 0:
-            return 1
-        else:
-            let n = item.get(Node3D)
-            if n.children.isNil:
-                return 0
-            else:
-                return n.children.len
-
-    outlineView.childOfItem = proc(item: Variant, indexPath: openarray[int]): Variant =
-        if indexPath.len == 1:
-            return newVariant(e.rootNode)
-        else:
-            return newVariant(item.get(Node3D).children[indexPath[^1]])
-
-    outlineView.createCell = proc(): TableViewCell =
-        result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
-
-    outlineView.configureCell = proc (cell: TableViewCell, indexPath: openarray[int]) =
-        let n = outlineView.itemAtIndexPath(indexPath).get(Node3D)
-        let textField = TextField(cell.subviews[0])
-        if not cell.selected:
-            textField.textColor = newGrayColor(0.9)
-        else:
-            textField.textColor = newGrayColor(0.0)
-        textField.text = if n.name.isNil: "(nil)" else: n.name
-
-    outlineView.onSelectionChanged = proc() =
-        let ip = outlineView.selectedIndexPath
-        let n = if ip.len > 0:
-                outlineView.itemAtIndexPath(ip).get(Node3D)
-            else:
-                nil
-        e.selectedNode = n
-
-    outlineView.onDragAndDrop = proc(fromIp, toIp: openarray[int]) =
-        let f = outlineView.itemAtIndexPath(fromIp).get(Node3D)
-        var tos = @toIp
-        tos.setLen(tos.len - 1)
-        let t = outlineView.itemAtIndexPath(tos).get(Node3D)
-        let toIndex = toIp[^1]
-        if f.parent == t:
-            let cIndex = t.children.find(f)
-            if toIndex < cIndex:
-                t.children.delete(cIndex)
-                t.children.insert(f, toIndex)
-            elif toIndex > cIndex:
-                t.children.delete(cIndex)
-                t.children.insert(f, toIndex - 1)
-        else:
-            f.removeFromParent()
-            t.insertChild(f, toIndex)
-        e.sceneTreeDidChange()
-
-    outlineView.reloadData()
-
-    let outlineScrollView = newScrollView(outlineView)
-    outlineScrollView.resizingMask = "wh"
-    result.addSubview(outlineScrollView)
-
-    let createNodeButton = Button.new(newRect(2, result.bounds.height - 20, 20, 20))
-    createNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
-    createNodeButton.title = "+"
-    createNodeButton.onAction do():
-        var sip = outlineView.selectedIndexPath
-        var n = e.rootNode
-        if sip.len == 0:
-            sip.add(0)
-        else:
-            n = outlineView.itemAtIndexPath(sip).get(Node3D)
-
-        outlineView.expandRow(sip)
-        discard n.newChild("New Node")
-        sip.add(n.children.len - 1)
-        e.sceneTreeDidChange()
-        outlineView.selectItemAtIndexPath(sip)
-    result.addSubview(createNodeButton)
-
-    let deleteNodeButton = Button.new(newRect(24, result.bounds.height - 20, 20, 20))
-    deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
-    deleteNodeButton.title = "-"
-    deleteNodeButton.onAction do():
-        if outlineView.selectedIndexPath.len != 0:
-            let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
-            n.removeFromParent()
-            var sip = outlineView.selectedIndexPath
-            sip.delete(sip.len-1)
-            outlineView.selectItemAtIndexPath(sip)
-            e.sceneTreeDidChange()
-    result.addSubview(deleteNodeButton)
-
-    let refreshButton = Button.new(newRect(46, result.bounds.height - 20, 60, 20))
-    refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
-    refreshButton.title = "Refresh"
-    refreshButton.onAction do():
-        e.sceneTreeDidChange()
-    result.addSubview(refreshButton)
-
 proc selectNode*(editor: Editor, node: Node) =
-    var indexPath = newSeq[int]()
-    editor.getTreeViewIndexPathForNode(node, indexPath)
-
-    if indexPath.len > 1:
-        editor.outlineView.selectItemAtIndexPath(indexPath)
+    for t in editor.workspaceView.tabs:
+        t.selectedNode(node)
 
 proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
     let r = editor.sceneView.rayWithScreenCoords(coords)
@@ -307,7 +193,8 @@ proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
 
 proc onTouchDown*(editor: Editor, e: var Event) =
     #TODO Hack to sync node tree and treeView
-    editor.outlineView.reloadData()
+    for t in editor.workspaceView.tabs:
+        t.onEditorTouchDown(e)
 
     if e.keyCode != VirtualKey.MouseButtonPrimary:
         return
@@ -320,7 +207,6 @@ proc onTouchDown*(editor: Editor, e: var Event) =
     castedNode = editor.rayCastFirstNode(editor.rootNode, e.localPosition)
     if not castedNode.isNil:
         editor.selectNode(castedNode)
-
 
 proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
     if editor.selectedNode.isNil:
@@ -358,11 +244,85 @@ proc createSceneMenu(e: Editor) =
             - "Load":
                 e.loadNode()
             - "Save":
-                if e.outlineView.selectedIndexPath.len > 0:
-                    var selectedNode = e.outlineView.itemAtIndexPath(e.outlineView.selectedIndexPath).get(Node3D)
-                    if not selectedNode.isNil:
-                        e.saveNode(selectedNode)
+                if not e.selectedNode.isNil:
+                    e.saveNode(e.selectedNode)
         e.addToolbarMenu(m)
+
+proc toggleEditTab(e: Editor, tab:EditViewEntry): proc() =
+    result = proc()=
+        var tabindex = -1
+        var tabview: EditorTabView
+        for i, t in e.workspaceView.tabs:
+            if t.name == tab.name:
+                tabindex = i
+                tabview = t
+                break
+
+        let frame = e.workspaceView.bounds
+        if tabindex >= 0:
+            let anchor = tabview.tabAnchor()
+            let anchorView = e.workspaceView.anchors[anchor.int]
+            if not anchorView.isNil:
+                let edtabi = anchorView.tabIndex(tab.name)
+                if edtabi >= 0:
+                    anchorView.removeTab(edtabi)
+                    if anchorView.tabsCount == 0:
+                        anchorView.removeFromSuperview()
+                        e.workspaceView.anchors[anchor.int] = nil
+
+            e.workspaceView.tabs.delete(tabindex)
+
+        else:
+            tabview = tab.create()
+            var anchor = tabview.tabAnchor()
+            var size = tabview.tabSize(frame)
+            tabview.rootNode = e.rootNode
+            if tab.name == "Tree": ## todo: replace on notifications
+                tabview.EditorTreeView.onNodeSelected = proc(n: Node)=
+                    e.selectedNode = n
+
+                tabview.EditorTreeView.onTreeChanged do():
+                    e.sceneTreeDidChange()
+
+            tabview.init(newRect(newPoint(0.0, 0.0), size))
+            tabview.editedNode(e.selectedNode)
+            var anchorView = e.workspaceView.anchors[anchor.int]
+            if anchorView.isNil:
+                var tb = newTabView()
+                anchorView = tb
+                let horl = e.workspaceView.horizontalLayout
+                let verl = e.workspaceView.verticalLayout
+                case anchor:
+                of etaLeft:
+                    let dps = horl.dividerPositions()
+                    horl.insertSubview(anchorView, 0)
+                    horl.setDividerPosition(size.width, 0)
+                    if dps.len > 0:
+                        horl.setDividerPosition(dps[0], dps.len)
+
+                of etaRight:
+                    let dps = horl.dividerPositions()
+                    horl.addSubview(anchorView)
+                    horl.setDividerPosition(frame.width - size.width, dps.len)
+                of etaBottom:
+                    verl.addSubview(anchorView)
+                    verl.setDividerPosition(frame.height - size.height, 0)
+                else:
+                    discard
+                e.workspaceView.anchors[anchor.int] = anchorView
+
+            anchorView.addTab(tab.name, tabview)
+            e.workspaceView.tabs.add(tabview)
+
+proc createTabView(e: Editor)=
+    var m = newMenuItem("Tabs")
+    m.children = @[]
+    for rv in registeredEditorTabs():
+        var rmi = newMenuItem(rv.name)
+        rmi.action = e.toggleEditTab(rv)
+        m.children.add(rmi)
+
+    e.addToolbarMenu(m)
 
 proc createViewMenu(e: Editor) =
     when loadingAndSavingAvailable:
@@ -379,6 +339,7 @@ proc createViewMenu(e: Editor) =
             - "3D":
                 let cam = e.currentCamera()
                 if not cam.isNil: cam.projectionMode = cpPerspective
+
         e.addToolbarMenu(m)
 
 proc createGameInputToggle(e: Editor) =
@@ -482,58 +443,40 @@ proc newTabView(): TabView =
 proc createWorkspaceLayout(e: Editor) =
     let v = WorkspaceView.new(e.sceneView.frame)
     v.editor = e
+    v.tabs = @[]
+
     e.workspaceView = v
     v.autoresizingMask = e.sceneView.autoresizingMask
-    # Initial setup:
-    # +---+--------+---+
-    # | p |   s    | i |
-    # |   |        |   |
-    # +---+--------+---+
-    # |       a        |
-    # +----------------+
 
-    # p - project (tree) view
-    # s - scene view
-    # i - inspector view
-    # a - animation view
-
-    let p = newTabView()
     let s = newTabView()
-    let i = newTabView()
-    let a = newTabView()
-
     let sceneClipView = ClipView.new(zeroRect)
-    p.addTab("Project", e.treeView)
     s.addTab("Scene", sceneClipView)
-    i.addTab("Inspector", e.inspector)
-    a.addTab("Animation", e.animationEditView)
 
-    let verticalSplit = newVerticalLayout(newRect(0, toolbarHeight, v.bounds.width, v.bounds.height - toolbarHeight))
-    verticalSplit.userResizeable = true
-    let horizontalSplit = newHorizontalLayout(newRect(0, 0, 800, 200))
-    horizontalSplit.userResizeable = true
-
-    horizontalSplit.addSubview(p)
-    horizontalSplit.addSubview(s)
-    horizontalSplit.addSubview(i)
-
-    verticalSplit.resizingMask = "wh"
-    verticalSplit.addSubview(horizontalSplit)
-    verticalSplit.addSubview(a)
+    v.verticalLayout = newVerticalLayout(newRect(0, toolbarHeight, v.bounds.width, v.bounds.height - toolbarHeight))
+    v.verticalLayout.userResizeable = true
+    v.horizontalLayout = newHorizontalLayout(newRect(0, 0, 800, 200))
+    v.horizontalLayout.userResizeable = true
+    v.horizontalLayout.resizingMask = "wh"
+    v.verticalLayout.resizingMask = "wh"
+    v.horizontalLayout.addSubview(s)
 
     v.addSubview(e.toolbar)
-    v.addSubview(verticalSplit)
-    verticalSplit.setDividerPosition(v.bounds.height - 300, 0)
-    horizontalSplit.setDividerPosition(150, 0)
-    horizontalSplit.setDividerPosition(v.bounds.width - 300, 1)
 
+    v.verticalLayout.addSubview(v.horizontalLayout)
+    v.addSubview(v.verticalLayout)
+    v.anchors[etaCenter.int] = s
     e.sceneView.editing = true
+
     let rootEditorView = e.sceneView.superview
     rootEditorView.replaceSubview(e.sceneView, v)
     e.sceneView.setFrame(sceneClipView.bounds)
     e.eventCatchingView.setFrame(sceneClipView.bounds)
     sceneClipView.addSubview(e.sceneView)
     sceneClipView.addSubview(e.eventCatchingView)
+
+    for rt in registeredEditorTabs():
+        if rt.name in defaultTabs:
+            e.toggleEditTab(rt)()
 
 method onTouchEv*(v: EventCatchingView, e: var Event): bool =
     if not v.allowGameInput:
@@ -568,17 +511,14 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
     editor.sceneView = n.sceneView
 
     # Create widgets and stuff
-    editor.inspector = InspectorView.new(newRect(200, toolbarHeight, 340, 700))
     editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
     editor.cameraController = newEditorCameraController(editor.sceneView)
     editor.createEventCatchingView()
-    editor.treeView = newTreeView(editor)
-
-    editor.animationEditView = AnimationEditView.new(newRect(0, 0, 800, 300))
 
     # Toolbar buttons
     editor.createSceneMenu()
     editor.createViewMenu()
+    editor.createTabView()
     editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
