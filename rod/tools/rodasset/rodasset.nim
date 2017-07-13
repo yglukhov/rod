@@ -1,4 +1,4 @@
-import os, strutils, times, tables, osproc
+import os, strutils, times, osproc, sets, logging
 import imgtool, asset_cache, migrator
 import settings except hash
 import tempfile
@@ -50,7 +50,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
             var doCopy = false
             case sf.ext
             of ".png":
-                if unixToNativePath(r) notin tool.images:
+                if unixToNativePath(r) notin tool.processedImages:
                     doCopy = true
             of ".wav", ".mp3", ".ogg":
                 createDir(d.parentDir())
@@ -76,6 +76,7 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
         disablePotAdjustment: bool = false, audio: string = "ogg",
         onlyCache: bool = false,
         src, dst: string) =
+    addHandler(newConsoleLogger())
     let src = expandTilde(src)
     let dst = expandTilde(dst)
     let cache = getCache(cache)
@@ -104,6 +105,7 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
         tool.downsampleRatio = downsampleRatio
         tool.extrusion = extrusion
         tool.disablePotAdjustment = disablePotAdjustment
+        tool.createIndex = true
         let startTime = epochTime()
         tool.run()
         echo "Done. Time: ", epochTime() - startTime

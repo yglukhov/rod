@@ -11,7 +11,6 @@ requires "nimx"
 requires "https://github.com/SSPKrolik/nimasset"
 requires "variant"
 requires "native_dialogs"
-requires "nimPNG"
 requires "https://github.com/yglukhov/imgtools"
 requires "cligen"
 requires "https://github.com/yglukhov/zip" # Until https://github.com/nim-lang/zip/pull/21 is merged
