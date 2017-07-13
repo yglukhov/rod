@@ -146,16 +146,20 @@ proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var se
     v.getTreeViewIndexPathForNode(parent, indexPath)
 
 method editedNode*(v: EditorTreeView, n: Node)=
-    if not n.isNil:
-        var indexPath = newSeq[int]()
+    var indexPath = newSeq[int]()
+    if n.isNil:
+        indexPath.add(0)
+    else:
         v.getTreeViewIndexPathForNode(n, indexPath)
-        if indexPath.len > 0:
-            v.outlineView.expandRow(indexPath)
+
+    if indexPath.len > 0:
+        v.outlineView.expandRow(indexPath)
 
 method selectedNode*(v: EditorTreeView, n: Node)=
     var indexPath = newSeq[int]()
     v.getTreeViewIndexPathForNode(n, indexPath)
     if indexPath.len > 0:
+        v.outlineView.selectItemAtIndexPath(indexPath)
         if not v.onNodeSelected.isNil():
             v.onNodeSelected(n)
 
