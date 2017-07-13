@@ -259,21 +259,29 @@ proc toggleEditTab(e: Editor, tab:EditViewEntry): proc() =
                 break
 
         let frame = e.workspaceView.bounds
+
         if tabindex >= 0:
-            let anchor = tabview.tabAnchor()
-            let anchorView = e.workspaceView.anchors[anchor.int]
+            var anchorView: TabView
+            var anchorIndex = -1
+
+            for i, av in e.workspaceView.anchors:
+                if not av.isNil and av.tabIndex(tab.name) >= 0:
+                    anchorIndex = i
+                    anchorView = av
+                    break
+
             if not anchorView.isNil:
                 let edtabi = anchorView.tabIndex(tab.name)
                 if edtabi >= 0:
                     anchorView.removeTab(edtabi)
                     if anchorView.tabsCount == 0:
                         anchorView.removeFromSuperview()
-                        e.workspaceView.anchors[anchor.int] = nil
+                        e.workspaceView.anchors[anchorIndex] = nil
 
             e.workspaceView.tabs.delete(tabindex)
-
         else:
             tabview = tab.create()
+
             var anchor = tabview.tabAnchor()
             var size = tabview.tabSize(frame)
             tabview.rootNode = e.rootNode
@@ -287,7 +295,7 @@ proc toggleEditTab(e: Editor, tab:EditViewEntry): proc() =
             tabview.init(newRect(newPoint(0.0, 0.0), size))
             tabview.editedNode(e.selectedNode)
             var anchorView = e.workspaceView.anchors[anchor.int]
-            if anchorView.isNil:
+            if anchorView.isNil or anchorView.tabsCount == 0:
                 var tb = newTabView()
                 anchorView = tb
                 let horl = e.workspaceView.horizontalLayout
