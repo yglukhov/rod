@@ -21,7 +21,8 @@ import rod_types
 
 import rod.property_editors.propedit_registry
 import rod.property_editors.standard_editors
-import rod.editor.editor_tab
+# import rod.editor.editor_tab
+import rod.edit_view
 
 const componentsViewSize = newSize(200, 300)
 
@@ -77,7 +78,10 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            expView.addContent(propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView))
+            let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView)
+            let propHolder = newView(propView.frame)
+            propHolder.addSubview(propView)
+            expView.addContent(propHolder)
 
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
@@ -162,7 +166,7 @@ proc createComponentsView(inspector: InspectorView, n: Node) =
     stackView.setFrameOrigin(origin)
     inspector.window.addSubview(stackView)
 
-method editedNode*(v: InspectorView, n: Node)=
+method setEditedNode*(v: InspectorView, n: Node)=
     v.inspectedNode = n
 
 method tabSize*(v: InspectorView, bounds: Rect): Size=
@@ -171,4 +175,4 @@ method tabSize*(v: InspectorView, bounds: Rect): Size=
 method tabAnchor*(v: InspectorView): EditorTabAnchor =
     result = etaRight
 
-registerEditorTad("Inspector", InspectorView)
+registerEditorTab("Inspector", InspectorView)
