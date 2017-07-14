@@ -56,13 +56,14 @@ method draw*(c: UIComponent) =
 
 proc `view=`*(c: UIComponent, v: View) =
     let cv = UICompView.new(newRect(0, 0, 20, 20))
-    cv.window = c.node.sceneView.window
     cv.backgroundColor = clearColor()
     cv.uiComp = c
     cv.superview = c.node.sceneView
     c.mView = cv
     c.enabled = true
     cv.addSubview(v)
+    if not c.node.sceneView.isNil:
+        cv.window = c.node.sceneView.window
 
 proc moveToWindow(v: View, w: Window) =
     v.window = w
@@ -104,6 +105,9 @@ method componentNodeWasAddedToSceneView*(ui: UIComponent) =
         sv.uiComponents = @[ui]
     else:
         sv.uiComponents.add(ui)
+        
+    if not ui.mView.isNil:
+        ui.mView.window = sv.window
 
 method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
     let sv = ui.node.sceneView
