@@ -1,19 +1,16 @@
 import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
     scroll_view, button, event]
 
-import editor_tab
+import rod.edit_view
 import variant
 import rod / [node, rod_types]
 
 type EditorTreeView* = ref object of EditorTabView
     outlineView: OutlineView
-    onNodeSelected*: proc(n: Node)
-    mOnTreeChanged: proc()
 
-proc onTreeChanged*(v: EditorTreeView, cb: proc)=
-    v.mOnTreeChanged = proc()=
-        v.outlineView.reloadData()
-        cb()
+proc onTreeChanged(v: EditorTreeView)=
+    v.outlineView.reloadData()
+    v.editor.sceneTreeDidChange()
 
 method init*(v: EditorTreeView, r: Rect)=
     procCall v.View.init(r)
@@ -57,8 +54,7 @@ method init*(v: EditorTreeView, r: Rect)=
             else:
                 v.rootNode
 
-        if not v.onNodeSelected.isNil():
-            v.onNodeSelected(n)
+        v.editor.selectedNode = n
 
     outlineView.onDragAndDrop = proc(fromIp, toIp: openarray[int]) =
         let f = outlineView.itemAtIndexPath(fromIp).get(Node3D)
@@ -78,8 +74,7 @@ method init*(v: EditorTreeView, r: Rect)=
             f.removeFromParent()
             t.insertChild(f, toIndex)
 
-        if not v.mOnTreeChanged.isNil():
-            v.mOnTreeChanged()
+        v.onTreeChanged()
 
     outlineView.reloadData()
 
@@ -101,8 +96,8 @@ method init*(v: EditorTreeView, r: Rect)=
         outlineView.expandRow(sip)
         discard n.newChild("New Node")
         sip.add(n.children.len - 1)
-        if not v.mOnTreeChanged.isNil():
-            v.mOnTreeChanged()
+
+        v.onTreeChanged()
 
         outlineView.selectItemAtIndexPath(sip)
     v.addSubview(createNodeButton)
@@ -117,8 +112,8 @@ method init*(v: EditorTreeView, r: Rect)=
             var sip = outlineView.selectedIndexPath
             sip.delete(sip.len-1)
             outlineView.selectItemAtIndexPath(sip)
-            if not v.mOnTreeChanged.isNil():
-                v.mOnTreeChanged()
+
+            v.onTreeChanged()
 
     v.addSubview(deleteNodeButton)
 
@@ -126,8 +121,8 @@ method init*(v: EditorTreeView, r: Rect)=
     refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     refreshButton.title = "Refresh"
     refreshButton.onAction do():
-        if not v.mOnTreeChanged.isNil():
-            v.mOnTreeChanged()
+
+        v.onTreeChanged()
 
     v.addSubview(refreshButton)
 
@@ -160,8 +155,7 @@ method selectedNode*(v: EditorTreeView, n: Node)=
     v.getTreeViewIndexPathForNode(n, indexPath)
     if indexPath.len > 0:
         v.outlineView.selectItemAtIndexPath(indexPath)
-        if not v.onNodeSelected.isNil():
-            v.onNodeSelected(n)
+        v.editor.selectedNode = n
 
 method onEditorTouchDown*(v: EditorTreeView, e: var Event)=
     v.outlineView.reloadData()
