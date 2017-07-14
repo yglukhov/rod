@@ -166,7 +166,7 @@ proc createComponentsView(inspector: InspectorView, n: Node) =
     stackView.setFrameOrigin(origin)
     inspector.window.addSubview(stackView)
 
-method editedNode*(v: InspectorView, n: Node)=
+method setEditedNode*(v: InspectorView, n: Node)=
     v.inspectedNode = n
 
 method tabSize*(v: InspectorView, bounds: Rect): Size=

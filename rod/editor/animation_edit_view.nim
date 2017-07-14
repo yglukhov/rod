@@ -268,7 +268,7 @@ method tabSize*(v: AnimationEditView, bounds: Rect): Size=
 method tabAnchor*(v: AnimationEditView): EditorTabAnchor =
     result = etaBottom
 
-method editedNode*(v: AnimationEditView, n: Node)=
+method setEditedNode*(v: AnimationEditView, n: Node)=
     v.editedNode = n
 
 registerEditorTab("Animation", AnimationEditView)

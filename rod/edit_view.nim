@@ -16,7 +16,6 @@ import rod.editor_camera_controller
 import rod.editor.gizmo_axis
 import tools.serializer
 
-# import rod.editor.animation_edit_view
 import rod.editor.editor_tab_registry
 import ray
 import viewport
@@ -74,10 +73,7 @@ type
     EventCatchingListener = ref object of BaseScrollListener
         view: EventCatchingView
 
-method editedNode*(v: EditorTabView, n: Node)=
-    discard
-
-method selectedNode*(v: EditorTabView, n: Node)=
+method setEditedNode*(v: EditorTabView, n: Node)=
     discard
 
 method tabSize*(v: EditorTabView, bounds: Rect): Size=
@@ -131,7 +127,7 @@ proc `selectedNode=`*(e: Editor, n: Node) =
             discard e.mSelectedNode.component(NodeSelector)
 
         for etv in e.workspaceView.tabs:
-            etv.editedNode(n)
+            etv.setEditedNode(n)
 
         e.gizmo.editedNode = e.mSelectedNode
 
@@ -201,8 +197,7 @@ when loadingAndSavingAvailable:
                 error "stack trace: ", getCurrentException().getStackTrace()
 
 proc selectNode*(editor: Editor, node: Node) =
-    for t in editor.workspaceView.tabs:
-        t.selectedNode(node)
+    editor.selectedNode = node
 
 proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
     let r = editor.sceneView.rayWithScreenCoords(coords)
@@ -317,7 +312,7 @@ proc toggleEditTab(e: Editor, tab:EditViewEntry): proc() =
             tabview.rootNode = e.rootNode
 
             tabview.init(newRect(newPoint(0.0, 0.0), size))
-            tabview.editedNode(e.selectedNode)
+            tabview.setEditedNode(e.selectedNode)
             var anchorView = e.workspaceView.anchors[anchor.int]
             if anchorView.isNil or anchorView.tabsCount == 0:
                 var tb = newTabView()

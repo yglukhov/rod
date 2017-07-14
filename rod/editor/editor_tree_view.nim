@@ -52,7 +52,7 @@ method init*(v: EditorTreeView, r: Rect)=
         let n = if ip.len > 0:
                 outlineView.itemAtIndexPath(ip).get(Node3D)
             else:
-                v.rootNode
+                nil
 
         v.editor.selectedNode = n
 
@@ -140,22 +140,14 @@ proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var se
 
     v.getTreeViewIndexPathForNode(parent, indexPath)
 
-method editedNode*(v: EditorTreeView, n: Node)=
+method setEditedNode*(v: EditorTreeView, n: Node)=
     var indexPath = newSeq[int]()
-    if n.isNil:
-        indexPath.add(0)
-    else:
+    if not n.isNil:
         v.getTreeViewIndexPathForNode(n, indexPath)
-
-    if indexPath.len > 0:
         v.outlineView.expandRow(indexPath)
 
-method selectedNode*(v: EditorTreeView, n: Node)=
-    var indexPath = newSeq[int]()
-    v.getTreeViewIndexPathForNode(n, indexPath)
-    if indexPath.len > 0:
+    if indexPath.len > 1:
         v.outlineView.selectItemAtIndexPath(indexPath)
-        v.editor.selectedNode = n
 
 method onEditorTouchDown*(v: EditorTreeView, e: var Event)=
     v.outlineView.reloadData()

@@ -22,4 +22,3 @@ template registerEditorTab*(tn: string, t: typedesc)=
 iterator registeredEditorTabs*():EditViewEntry=
     for rt in gRegisteredViews:
         yield rt
-
