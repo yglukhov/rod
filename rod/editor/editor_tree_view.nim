@@ -169,4 +169,4 @@ method tabSize*(v: EditorTreeView, bounds: Rect): Size=
 method tabAnchor*(v: EditorTreeView): EditorTabAnchor =
     result = etaLeft
 
-registerEditorTad("Tree", EditorTreeView)
+registerEditorTab("Tree", EditorTreeView)

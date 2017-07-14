@@ -271,4 +271,4 @@ method tabAnchor*(v: AnimationEditView): EditorTabAnchor =
 method editedNode*(v: AnimationEditView, n: Node)=
     v.editedNode = n
 
-registerEditorTad("Animation", AnimationEditView)
+registerEditorTab("Animation", AnimationEditView)

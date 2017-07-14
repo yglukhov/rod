@@ -175,4 +175,4 @@ method tabSize*(v: InspectorView, bounds: Rect): Size=
 method tabAnchor*(v: InspectorView): EditorTabAnchor =
     result = etaRight
 
-registerEditorTad("Inspector", InspectorView)
+registerEditorTab("Inspector", InspectorView)

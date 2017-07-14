@@ -8,7 +8,7 @@ type
 
 var gRegisteredViews = newSeq[EditViewEntry]()
 
-template registerEditorTad*(tn: string, t: typedesc)=
+template registerEditorTab*(tn: string, t: typedesc)=
     registerClass(t)
     var evr: EditViewEntry
     evr.name = tn
