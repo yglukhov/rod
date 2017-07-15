@@ -4,9 +4,9 @@ import settings
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
-const hashVersion = 3
+const hashVersion = 4
 
-const audioFileExtensions = [".wav", ".ogg", "mp3"]
+const audioFileExtensions = [".wav", ".ogg", ".mp3"]
 
 const max_copy_attempts = 5
 
@@ -82,6 +82,8 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
     if hasGraphics:
         result &= $hash(s.graphics)
         result &= ';'
+
+    result &= ";" & $hashVersion
 
     result = ($secureHash(result)).toLowerAscii()
 
