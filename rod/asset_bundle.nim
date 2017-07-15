@@ -91,6 +91,7 @@ else:
 
         proc newAndroidAssetBundle*(path: string): AndroidAssetBundle =
             result.new()
+            result.path = path
             result.mBaseUrl = "android_asset://" & path
 
         method realUrlForPath*(ab: AndroidAssetBundle, path: string): string =
