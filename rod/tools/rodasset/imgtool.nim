@@ -2,6 +2,8 @@ import os, osproc, json, strutils, times, sequtils, tables, sets, logging
 
 const multithreaded = compileOption("threads")
 
+const debugLogs = true
+
 when multithreaded:
     import threadpool
     template `^^`[T](e: FlowVar[T]): untyped = ^e
@@ -235,6 +237,13 @@ proc run*(tool: ImgTool) =
 
     let packer = newSpriteSheetPacker(tool.resPath / tool.outPrefix)
     packer.pack(occurences)
+
+    when debugLogs:
+        echo "Before GC"
+        echo GC_getStatistics()
+        GC_fullCollect()
+        echo "After GC"
+        echo GC_getStatistics()
 
     if tool.compressToPVR:
         for ss in packer.spriteSheets:
