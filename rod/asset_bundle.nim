@@ -6,6 +6,7 @@ import variant
 
 type AssetBundle* = ref object of nab.AssetBundle
     path*: string
+    mBaseUrl: string
     hash*: string
     index*: JsonNode
     spriteSheets*: Table[string, seq[string]] # Map spritesheet path to all image paths in it
@@ -16,7 +17,8 @@ method allAssets(ab: AssetBundle): seq[string] =
     let files = ab.index{"files"}
     for f in files: result.add(f.str)
 
-method realUrlForPath(ab: AssetBundle, path: string): string {.base.} = nil #ab.resources
+proc realUrlForPath(ab: AssetBundle, path: string): string =
+    ab.mBaseUrl / path
 
 method urlForPath*(ab: AssetBundle, path: string): string =
     if path in ab.spriteSheets:
@@ -49,12 +51,9 @@ when defined(js) or defined(emscripten):
         result.hash = hash
         let href = parentDir(getCurrentHref())
         if href.find("localhost") != -1 or href.startsWith("file://"):
-            result.mBasePath = href / "res" / path
+            result.mBaseUrl = href / "res" / path
         else:
-            result.mBasePath = href / hash
-
-    method realUrlForPath*(ab: WebAssetBundle, path: string): string =
-        result = ab.mBasePath / path
+            result.mBaseUrl = href / hash
 
 else:
     import os
@@ -62,15 +61,11 @@ else:
     type
         FileAssetBundle* = ref object of AssetBundle
         NativeAssetBundle* = ref object of AssetBundle
-            mBaseUrl: string
 
     proc newFileAssetBundle(path: string): FileAssetBundle =
         result.new()
         result.path = path
-
-    method realUrlForPath*(ab: FileAssetBundle, path: string): string =
-        result = ab.path / path
-        echo "file: ", result
+        result.mBaseUrl = path
 
     proc newNativeAssetBundle(path: string): NativeAssetBundle =
         result.new()
@@ -82,20 +77,13 @@ else:
         else:
             result.mBaseUrl = "file://" & getAppDir() / "res" / path
 
-    method realUrlForPath*(ab: NativeAssetBundle, path: string): string =
-        result = ab.mBaseUrl & '/' & path
-
     when defined(android):
         type AndroidAssetBundle* = ref object of AssetBundle
-            mBaseUrl: string
 
         proc newAndroidAssetBundle*(path: string): AndroidAssetBundle =
             result.new()
             result.path = path
             result.mBaseUrl = "android_asset://" & path
-
-        method realUrlForPath*(ab: AndroidAssetBundle, path: string): string =
-            return ab.mBaseUrl / path
 
 type AssetBundleDescriptor* = object
     hash*: string
