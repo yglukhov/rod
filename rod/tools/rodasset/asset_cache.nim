@@ -4,9 +4,9 @@ import settings
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
-const hashVersion = 3
+const hashVersion = 4
 
-const audioFileExtensions = [".wav", ".ogg", "mp3"]
+const audioFileExtensions = [".wav", ".ogg", ".mp3"]
 
 const max_copy_attempts = 5
 
@@ -17,9 +17,6 @@ proc isAudio(path: string): bool {.inline.} =
 proc isGraphics(path: string): bool {.inline.} = path.endsWith(".png")
 
 proc gitDirHash(path: string): string =
-    if getEnv("ROD_HASH_METHOD") != "git":
-        return nil
-
     let (outp, errC) = execCmdEx("git ls-tree -d HEAD " & path)
     if errC == 0:
         let comps = outp.split()
@@ -82,6 +79,8 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
     if hasGraphics:
         result &= $hash(s.graphics)
         result &= ';'
+
+    result &= ";" & $hashVersion
 
     result = ($secureHash(result)).toLowerAscii()
 

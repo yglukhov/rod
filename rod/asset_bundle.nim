@@ -1,15 +1,42 @@
-import strutils, ospaths
+import strutils, ospaths, json, tables
 import nimx.assets.abstract_asset_bundle as nab
+import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager, asset_cache ]
+import nimx / [ image, types ]
+import variant
 
 type AssetBundle* = ref object of nab.AssetBundle
     path*: string
     hash*: string
-    resources*: seq[string]
+    index*: JsonNode
+    spriteSheets*: Table[string, seq[string]] # Map spritesheet path to all image paths in it
 
-method init(ab: AssetBundle, handler: proc()) {.base.} =
-    handler()
+method allAssets(ab: AssetBundle): seq[string] =
+    result = @[]
+    for k in ab.spriteSheets.keys: result.add(k)
+    let files = ab.index{"files"}
+    for f in files: result.add(f.str)
 
-method allAssets(ab: AssetBundle): seq[string] = ab.resources
+method realUrlForPath(ab: AssetBundle, path: string): string {.base.} = nil #ab.resources
+
+method urlForPath*(ab: AssetBundle, path: string): string =
+    if path in ab.spriteSheets:
+        result = "rod_ss://" & ab.path & '/' & path
+    else:
+        result = ab.realUrlForPath(path)
+
+proc init(ab: AssetBundle, handler: proc()) {.inline.} =
+    loadJsonFromURL(ab.realUrlForPath("index.rodpack")) do(j: JsonNode):
+        ab.index = j
+        ab.spriteSheets = initTable[string, seq[string]]()
+        let packedImages = ab.index["packedImages"]
+        if not packedImages.isNil:
+            for k, v in packedImages:
+                let fn = v["file"].str
+                if fn in ab.spriteSheets:
+                    ab.spriteSheets[fn].add(k)
+                else:
+                    ab.spriteSheets[fn] = @[k]
+        handler()
 
 when defined(js) or defined(emscripten):
     import nimx.pathutils
@@ -26,7 +53,7 @@ when defined(js) or defined(emscripten):
         else:
             result.mBasePath = href / hash
 
-    method urlForPath*(ab: WebAssetBundle, path: string): string =
+    method realUrlForPath*(ab: WebAssetBundle, path: string): string =
         result = ab.mBasePath / path
 
 else:
@@ -41,7 +68,7 @@ else:
         result.new()
         result.path = path
 
-    method urlForPath*(ab: FileAssetBundle, path: string): string =
+    method realUrlForPath*(ab: FileAssetBundle, path: string): string =
         result = ab.path / path
         echo "file: ", result
 
@@ -55,7 +82,7 @@ else:
         else:
             result.mBaseUrl = "file://" & getAppDir() / "res" / path
 
-    method urlForPath*(ab: NativeAssetBundle, path: string): string =
+    method realUrlForPath*(ab: NativeAssetBundle, path: string): string =
         result = ab.mBaseUrl & '/' & path
 
     when defined(android):
@@ -64,9 +91,10 @@ else:
 
         proc newAndroidAssetBundle*(path: string): AndroidAssetBundle =
             result.new()
+            result.path = path
             result.mBaseUrl = "android_asset://" & path
 
-        method urlForPath*(ab: AndroidAssetBundle, path: string): string =
+        method realUrlForPath*(ab: AndroidAssetBundle, path: string): string =
             return ab.mBaseUrl / path
 
 type AssetBundleDescriptor* = object
@@ -110,9 +138,6 @@ proc assetBundleDescriptor*(path: static[string]): AssetBundleDescriptor {.compi
             result.hash = ""
 
         result.path = path
-        result.resources = getResourceNames(path)
-        for i in 0 ..< result.resources.len:
-            result.resources[i] = result.resources[i].substr(path.len + 1)
 
 proc isExternal(abd: AssetBundleDescriptor): bool = abd.hash.len > 0
 
@@ -213,7 +238,6 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
                 result = newAndroidAssetBundle(abd.path)
             else:
                 result = newNativeAssetBundle(abd.path)
-    result.resources = abd.resources
 
 proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) =
     abd.downloadAssetBundle() do(err: string):
@@ -237,3 +261,36 @@ proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mou
                 inc i
                 load()
     load()
+
+registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tga"]) do(url, path: string, cache: AssetCache, handler: proc()):
+    const prefix = "rod_ss://"
+    let resPath = url.substr(prefix.len)
+    let am = sharedAssetManager()
+    let ab = am.assetBundleForPath(resPath)
+    if ab of AssetBundle:
+        let rab = AssetBundle(ab)
+        # let relPath = path.substr(rab.path.len + 1)
+        # echo "relPath: ", relPath
+        let ssUrl = rab.realUrlForPath(path)
+        # echo "ssUrl: ", ssUrl
+        loadAsset(ssUrl, path, cache) do():
+            let packedImages = rab.index["packedImages"]
+            let i = cache[path].get(Image)
+            for sub in rab.spriteSheets[path]:
+                let j = packedImages[sub]
+                let jt = j["tex"]
+                let texCoords = [
+                    jt[0].getFNum().float32,
+                    jt[1].getFNum().float32,
+                    jt[2].getFNum().float32,
+                    jt[3].getFNum().float32
+                ]
+                let js = j["size"]
+                let sz = newSize(js[0].getFNum(), js[1].getFNum())
+                let imagePath = rab.path & '/' & sub
+                let si: Image = i.subimageWithTexCoords(sz, texCoords)
+                si.setFilePath(imagePath)
+                am.cacheAsset(imagePath, si)
+            handler()
+    else:
+        raise newException(Exception, "URL is not in rod asset bundle: " & url)

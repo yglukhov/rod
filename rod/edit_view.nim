@@ -8,19 +8,19 @@ import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
 
-import rod_types, node, inspector_view
+import rod_types, node
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
 import rod.editor_camera_controller
-import rod.editor.animation_edit_view
 import rod.editor.gizmo_axis
 import tools.serializer
-import rod.editor.editor_tab
-import rod.editor.editor_tree_view
 
+import rod.editor.editor_tab_registry
 import ray
 import viewport
+
+export editor_tab_registry
 
 import variant
 
@@ -36,6 +36,16 @@ when loadingAndSavingAvailable:
     import native_dialogs
 
 type
+    EditorTabAnchor* = enum
+        etaLeft
+        etaRight
+        etaBottom
+        etaCenter
+
+    EditorTabView* = ref object of View
+        rootNode*: Node
+        editor*: Editor
+
     Editor* = ref object
         rootNode*: Node
         workspaceView: WorkspaceView
@@ -62,6 +72,21 @@ type
 
     EventCatchingListener = ref object of BaseScrollListener
         view: EventCatchingView
+
+method setEditedNode*(v: EditorTabView, n: Node)=
+    discard
+
+method tabSize*(v: EditorTabView, bounds: Rect): Size=
+    result = bounds.size
+
+method tabAnchor*(v: EditorTabView): EditorTabAnchor =
+    result = etaCenter
+
+method onEditorTouchDown*(v: EditorTabView, e: var Event)=
+    discard
+
+method onSceneChanged*(v: EditorTabView)=
+    discard
 
 proc newTabView(): TabView
 
@@ -102,7 +127,7 @@ proc `selectedNode=`*(e: Editor, n: Node) =
             discard e.mSelectedNode.component(NodeSelector)
 
         for etv in e.workspaceView.tabs:
-            etv.editedNode(n)
+            etv.setEditedNode(n)
 
         e.gizmo.editedNode = e.mSelectedNode
 
@@ -131,7 +156,7 @@ proc updateCameraSelector(e: Editor) =
     e.cameraSelector.items = items
     e.cameraSelector.selectedIndex = selectedIndex
 
-proc sceneTreeDidChange(e: Editor) =
+proc sceneTreeDidChange*(e: Editor) =
     e.updateCameraSelector()
 
     for t in e.workspaceView.tabs:
@@ -172,8 +197,7 @@ when loadingAndSavingAvailable:
                 error "stack trace: ", getCurrentException().getStackTrace()
 
 proc selectNode*(editor: Editor, node: Node) =
-    for t in editor.workspaceView.tabs:
-        t.selectedNode(node)
+    editor.selectedNode = node
 
 proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
     let r = editor.sceneView.rayWithScreenCoords(coords)
@@ -280,20 +304,15 @@ proc toggleEditTab(e: Editor, tab:EditViewEntry): proc() =
 
             e.workspaceView.tabs.delete(tabindex)
         else:
-            tabview = tab.create()
+            tabview = tab.create().EditorTabView
+            tabview.editor = e
 
             var anchor = tabview.tabAnchor()
             var size = tabview.tabSize(frame)
             tabview.rootNode = e.rootNode
-            if tab.name == "Tree": ## todo: replace on notifications
-                tabview.EditorTreeView.onNodeSelected = proc(n: Node)=
-                    e.selectedNode = n
-
-                tabview.EditorTreeView.onTreeChanged do():
-                    e.sceneTreeDidChange()
 
             tabview.init(newRect(newPoint(0.0, 0.0), size))
-            tabview.editedNode(e.selectedNode)
+            tabview.setEditedNode(e.selectedNode)
             var anchorView = e.workspaceView.anchors[anchor.int]
             if anchorView.isNil or anchorView.tabsCount == 0:
                 var tb = newTabView()
@@ -520,6 +539,7 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
 
     # Create widgets and stuff
     editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
+    editor.toolbar.userResizeable = false
     editor.cameraController = newEditorCameraController(editor.sceneView)
     editor.createEventCatchingView()
 
@@ -543,3 +563,6 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
         editor.gizmo.gizmoNode.drawNode(true, nil)
 
     return editor
+
+# default tabs hacky registering
+import rod.editor.editor_default_tabs

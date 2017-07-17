@@ -2,6 +2,8 @@ import os, osproc, json, strutils, times, sequtils, tables, sets, logging
 
 const multithreaded = compileOption("threads")
 
+const debugLogs = true
+
 when multithreaded:
     import threadpool
     template `^^`[T](e: FlowVar[T]): untyped = ^e
@@ -32,7 +34,6 @@ type ImgTool* = ref object
     resPath*: string #
     compressOutput*: bool
     compressToPVR*: bool
-    createIndex*: bool
     downsampleRatio*: float
     disablePotAdjustment*: bool # If true, do not resize images to power of 2
     packUnreferredImages*: bool
@@ -40,6 +41,7 @@ type ImgTool* = ref object
     processedImages*: HashSet[string]
     noquant*: seq[string]
     noposterize*: seq[string]
+    index*: JsonNode
 
 proc newImgTool*(): ImgTool =
     result.new()
@@ -156,18 +158,14 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
                         disablePotAdjustment: tool.disablePotAdjustment
                     ))
 
-proc writeIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
-    let root = newJObject()
-    let packedImages = newJObject()
-    root["packedImages"] = packedImages
+proc createIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
+    let idx = newJObject()
     for im in occurences:
         var ssPath = im.spriteSheet.path.extractFilename()
         if tool.compressToPVR:
             ssPath = ssPath.pathToPVR()
-        packedImages[relativePathToPath(tool.originalResPath, im.path)] = im.serializedImage(ssPath)
-    #echo "Writing file: ", parentDir(tool.resPath / tool.outPrefix) / "index.rodpack"
-    writeFile(parentDir(tool.resPath / tool.outPrefix) / "index.rodpack", root.pretty().replace(" \n", "\n"))
-    #echo root.pretty().replace(" \n", "\n")
+        idx[relativePathToPath(tool.originalResPath, im.path)] = im.serializedImage(ssPath)
+    tool.index = idx
 
 proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
     for o in oc.mitems:
@@ -240,6 +238,13 @@ proc run*(tool: ImgTool) =
     let packer = newSpriteSheetPacker(tool.resPath / tool.outPrefix)
     packer.pack(occurences)
 
+    when debugLogs:
+        echo "Before GC"
+        echo GC_getStatistics()
+        GC_fullCollect()
+        echo "After GC"
+        echo GC_getStatistics()
+
     if tool.compressToPVR:
         for ss in packer.spriteSheets:
             spawnX convertSpritesheetToPVR(ss.path)
@@ -281,8 +286,7 @@ proc run*(tool: ImgTool) =
             toUgly(str, c)
             writeFile(dstPath, str)
 
-    if tool.createIndex:
-        tool.writeIndex(occurences)
+    tool.createIndex(occurences)
 
     sync() # Wait until spritesheet optimizations complete
 
@@ -295,7 +299,6 @@ proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefi
 
     tool.outPrefix = outPrefix
     tool.compressOutput = compressOutput
-    tool.createIndex = true
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime

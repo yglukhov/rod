@@ -10,7 +10,8 @@ import animation_editor_types
 import rod.node, rod.component
 import rod.animation.property_animation
 import rod.animation.animation_sampler
-import editor_tab
+
+import rod.edit_view
 
 const leftPaneWidth = 200
 
@@ -267,7 +268,7 @@ method tabSize*(v: AnimationEditView, bounds: Rect): Size=
 method tabAnchor*(v: AnimationEditView): EditorTabAnchor =
     result = etaBottom
 
-method editedNode*(v: AnimationEditView, n: Node)=
+method setEditedNode*(v: AnimationEditView, n: Node)=
     v.editedNode = n
 
-registerEditorTad("Animation", AnimationEditView)
+registerEditorTab("Animation", AnimationEditView)
