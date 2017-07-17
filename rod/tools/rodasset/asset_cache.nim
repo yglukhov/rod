@@ -17,9 +17,6 @@ proc isAudio(path: string): bool {.inline.} =
 proc isGraphics(path: string): bool {.inline.} = path.endsWith(".png")
 
 proc gitDirHash(path: string): string =
-    if getEnv("ROD_HASH_METHOD") != "git":
-        return nil
-
     let (outp, errC) = execCmdEx("git ls-tree -d HEAD " & path)
     if errC == 0:
         let comps = outp.split()
