@@ -33,7 +33,7 @@ proc audioConvTool(): string =
             gAudioConvTool = findExe("avconv")
     result = gAudioConvTool
 
-let compressAudio = true
+let compressAudio = false
 
 proc convertAudio(fromFile, toFile: string, mp3: bool) =
     var args = @["-i", fromFile, "-y", "-loglevel", "warning"]
