@@ -551,7 +551,7 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
             txt["shadowX"] = %(distance * cos(radAngle))
             txt["shadowY"] = %(- distance * sin(radAngle))
             txt["shadowRadius"] = %radius
-            txt["shadowSpread"] = %spread
+            txt["shadowSpread"] = %(1 - spread)
 
         let stroke = layerStyles.propertyGroup("Stroke")
         if not stroke.isNil and stroke.canSetEnabled and stroke.enabled:
