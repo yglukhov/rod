@@ -11,6 +11,7 @@ import rod.node, rod.component
 import rod.animation.property_animation
 import rod.animation.animation_sampler
 
+import rod.edit_view
 
 const leftPaneWidth = 200
 
@@ -20,7 +21,7 @@ type
         curve: AbstractAnimationCurve
         sng: Variant
 
-    AnimationEditView* = ref object of View
+    AnimationEditView* = ref object of EditorTabView
         curveEditView: AnimationCurvesEditView
         dopesheetView: DopesheetView
         propertyTableView: TableView
@@ -261,4 +262,13 @@ method onKeyDown*(v: AnimationEditView, e: var Event): bool =
         v.insertKeyframeAtCurPos()
         result = true
 
-registerClass(AnimationEditView)
+method tabSize*(v: AnimationEditView, bounds: Rect): Size=
+    result = newSize(bounds.width, 150.0)
+
+method tabAnchor*(v: AnimationEditView): EditorTabAnchor =
+    result = etaBottom
+
+method setEditedNode*(v: AnimationEditView, n: Node)=
+    v.editedNode = n
+
+registerEditorTab("Animation", AnimationEditView)

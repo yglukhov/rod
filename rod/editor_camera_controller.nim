@@ -38,7 +38,7 @@ proc setCamera*(cc: EditorCameraController, camNode: Node) =
     cc.camPivot.worldPos = calculatePivotPos(camNode)
 
     var scale: Vector3
-    var rot: Quaternion
+    var rot: Vector4
     discard camNode.worldTransform.tryGetScaleRotationFromModel(scale, rot)
     cc.camPivot.rotation = newQuaternion(rot.x, rot.y, rot.z, rot.w)
 
@@ -68,7 +68,7 @@ proc updateCamera(cc: EditorCameraController) =
     var worldMat = cc.camAnchor.worldTransform()
     var pos: Vector3
     var scale: Vector3
-    var rot: Quaternion
+    var rot: Vector4
     discard worldMat.tryGetTranslationFromModel(pos)
     discard worldMat.tryGetScaleRotationFromModel(scale, rot)
 

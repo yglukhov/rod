@@ -25,9 +25,11 @@ proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true, orig
     result.new()
     result.values = values
     result.valueType = getTypeId(T)
+    let r = cast[AnimationSampler[T]](result)
+
     if lerpBetweenFrames:
         if originalLen == -1:
-            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
                 let s = cast[ArrayAnimationSampler[T]](sampler)
                 let ln = s.values.len - 1
                 let index = clamp(p * ln.float, 0.float, ln.float)
@@ -39,7 +41,7 @@ proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true, orig
                     result = interpolate(s.values[i], s.values[i + 1], m)
 
         else:
-            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
                 let s = cast[ArrayAnimationSampler[T]](sampler)
                 let ln = originalLen - 1
                 let index = clamp(p * ln.float, 0.float, ln.float)
@@ -54,13 +56,13 @@ proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true, orig
                     result = interpolate(s.values[i], s.values[i + 1], m)
     else:
         if originalLen == -1:
-            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
                 let s = cast[ArrayAnimationSampler[T]](sampler)
                 let ln = s.values.len - 1
                 let index = clamp(int(p * ln.float), 0, ln)
                 result = s.values[index]
         else:
-            result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
                 let s = cast[ArrayAnimationSampler[T]](sampler)
                 let ln = originalLen - 1
                 let index = clamp(int(p * ln.float), 0, ln)
@@ -71,7 +73,9 @@ proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): Linear
     result.new()
     result.keys = keys
     result.valueType = getTypeId(T)
-    result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+
+    let r = cast[AnimationSampler[T]](result)
+    r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
         let s = cast[LinearKeyFrameAnimationSampler[T]](sampler)
         if p < 0:
             return s.keys[0].v
@@ -100,9 +104,9 @@ proc newBezierKeyFrameAnimationSampler*[T](keys: seq[BezierKeyFrame[T]]): Bezier
     result.new()
     result.keys = keys
     result.valueType = getTypeId(T)
-    result.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
 
-
+    let r = cast[AnimationSampler[T]](result)
+    r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
         let s = cast[BezierKeyFrameAnimationSampler[T]](sampler)
         if p < 0:
             return s.keys[0].v

@@ -45,9 +45,14 @@ proc cutDecimal(v: float, t: float = 1000.0): float =
 proc cutDecimal[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector[I, T] =
     for i in 0 ..< v.len: result[i] = cutDecimal(v[i], t)
 
+proc cutDecimal(q: Quaternion, t: float = 1000.0): Quaternion =
+    cutDecimal(q.Vector4, t).Quaternion
+
 var logTextField: EditText
 
 proc `&=`(s, a: cstring) {.importcpp: "# += #".}
+proc `%`(q: Quaternion): JsonNode =
+    `%`(q.Vector4)
 
 proc logi(args: varargs[string, `$`]) =
     for i in args:
@@ -342,6 +347,12 @@ proc serializeEffect(layer: Layer, compIndex: int, p: PropertyGroup): JsonNode =
 
         let endColor = addPropDesc(layer, compIndex, "endColor", p.property("End Color", Vector4))
         endColor.setInitialValueToResult(result)
+
+        const linearRamp = 1.0
+        const radialRamp = 2.0
+        let shape = p.property("Ramp Shape", float).valueAtTime(0)
+        if shape == linearRamp: result["shape"] = %0
+        else: result["shape"] = %1
 
         result["_c"] = %"GradientFill"
 
@@ -1067,7 +1078,7 @@ proc fastJsonStringify(n: JsonNode): cstring =
     let r = replacer(n)
     {.emit: "`result` = JSON.stringify(`r`, null, 2);".}
 
-proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
+proc exportSelectedCompositions(exportFolderPath: cstring) =
     logTextField.text = ""
 
     let compositions = getSelectedCompositions()
@@ -1104,12 +1115,14 @@ proc exportSelectedCompositions(exportFolderPath: cstring) {.exportc.} =
 
     logi("Done. ", epochTime())
 
-{.emit: """
 
-function buildUI(contextObj) {
+proc buildUI(contextObj: ref RootObj) =
+  if false: exportSelectedCompositions(nil) # Workaround for nim issue #5951
+
+  {.emit: """
   var mainWindow = null;
-  if (contextObj instanceof Panel) {
-    mainWindow = contextObj;
+  if (`contextObj` instanceof Panel) {
+    mainWindow = `contextObj`;
   } else {
     mainWindow = new Window("palette", "Animations", undefined, {
       resizeable: true
@@ -1206,7 +1219,7 @@ function buildUI(contextObj) {
   };
 
   exportButton.onClick = function(e) {
-    exportSelectedCompositions(filePath.text);
+    `exportSelectedCompositions`(filePath.text);
   };
 
   mainWindow.addEventListener("resize", function(e) {
@@ -1231,8 +1244,7 @@ function buildUI(contextObj) {
     mainWindow.layout.layout(true);
     //    readMetaData();
   }
-}
+  """.}
 
-buildUI(this);
-
-""".}
+var this {.importc.}: ref RootObj
+buildUI(this)

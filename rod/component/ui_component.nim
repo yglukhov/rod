@@ -56,13 +56,14 @@ method draw*(c: UIComponent) =
 
 proc `view=`*(c: UIComponent, v: View) =
     let cv = UICompView.new(newRect(0, 0, 20, 20))
-    cv.window = c.node.sceneView.window
     cv.backgroundColor = clearColor()
     cv.uiComp = c
     cv.superview = c.node.sceneView
     c.mView = cv
     c.enabled = true
     cv.addSubview(v)
+    if not c.node.sceneView.isNil:
+        cv.window = c.node.sceneView.window
 
 proc moveToWindow(v: View, w: Window) =
     v.window = w
@@ -73,20 +74,25 @@ proc handleScrollEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3
     var res : Vector3
     if c.node.tryWorldToLocal(intersection, res):
         let v = c.view
+        let tmpLocalPosition = e.localPosition
         e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
         if e.localPosition.inRect(v.bounds):
             result = v.processMouseWheelEvent(e)
 
+        e.localPosition = tmpLocalPosition
 
 proc handleTouchEv*(c: UIComponent, r: Ray, e: var Event, intersection: Vector3): bool =
     var res : Vector3
     if c.node.tryWorldToLocal(intersection, res):
         let v = c.view
+        let tmpLocalPosition = e.localPosition
         e.localPosition = v.convertPointFromParent(newPoint(res.x, res.y))
         if e.localPosition.inRect(v.bounds):
             result = v.processTouchEvent(e)
             if result and e.buttonState == bsDown:
                 c.mView.touchTarget = v
+
+        e.localPosition = tmpLocalPosition
 
 proc sceneViewWillMoveToWindow*(c: UIComponent, w: Window) =
     if not c.mView.isNil:
@@ -99,6 +105,9 @@ method componentNodeWasAddedToSceneView*(ui: UIComponent) =
         sv.uiComponents = @[ui]
     else:
         sv.uiComponents.add(ui)
+        
+    if not ui.mView.isNil:
+        ui.mView.window = sv.window
 
 method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
     let sv = ui.node.sceneView

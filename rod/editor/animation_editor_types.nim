@@ -2,7 +2,7 @@ import algorithm
 import nimx.types, nimx.matrixes, nimx.animation, nimx.property_visitor
 import variant
 
-import rod.animation.animation_sampler
+import rod.animation.animation_sampler, rod.quaternion
 
 type
     AbstractAnimationCurve* = ref object of RootObj
@@ -24,7 +24,7 @@ method numberOfDimensions*[T](c: AnimationCurve[T]): int =
         2
     elif T is Vector3:
         3
-    elif T is Vector4 | Color:
+    elif T is Vector4 | Color | Quaternion:
         4
     else:
         {.error: "Unknown type".}
@@ -73,6 +73,8 @@ method keyValue*[T](c: AnimationCurve[T], iKey, iDimension: int): Coord =
         Coord(c.sampler.keys[iKey].v)
     elif T is Vector2 | Vector3 | Vector4 | Color:
         Coord(c.sampler.keys[iKey].v[iDimension])
+    elif T is Quaternion:
+        Coord(array[4, Coord](c.sampler.keys[iKey].v)[iDimension])
     else:
         {.error: "Unknown type".}
 
@@ -82,6 +84,8 @@ method setKeyValue*[T](c: AnimationCurve[T], iKey, iDimension: int, v: Coord) =
         c.sampler.keys[iKey].v = T(v)
     elif T is Vector2 | Vector3 | Vector4 | Color:
         c.sampler.keys[iKey].v[iDimension] = v
+    elif T is Quaternion:
+        array[4, Coord](c.sampler.keys[iKey].v)[iDimension] = v
     else:
         {.error: "Unknown type".}
 

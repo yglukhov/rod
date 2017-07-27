@@ -9,7 +9,8 @@ type GraphicsSettings* = ref object
     compressToPVR*: bool
     extrusion*: int
     disablePotAdjustment*: bool
-    compressionExceptions*: string
+    quantizeExceptions*: string
+    posterizeExceptions*: string
 
 type Settings* = ref object
     graphics*: GraphicsSettings
@@ -28,6 +29,7 @@ proc newSettings*(): Settings =
     g.compressToPVR = false
     g.extrusion = 1
     g.disablePotAdjustment = false
-    g.compressionExceptions = ""
+    g.quantizeExceptions = ""
+    g.posterizeExceptions = ""
 
 proc hash*(s: AudioSettings | GraphicsSettings): Hash = hash($(s[]))

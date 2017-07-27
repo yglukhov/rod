@@ -178,6 +178,7 @@ method draw*(p: ParticleEmitter) =
                     p.currentParticles.inc()
                     p.lastBirthTime = curTime
                     p.createParticle(p.particles[i])
+                    inc activeParticles
 
         else:
             p.updateParticle(p.particles[i], timeDiff, attractorOrigin)

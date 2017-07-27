@@ -382,15 +382,18 @@ proc initSystem(ps: ParticleSystem) =
 
     ps.isInited = true
 
-proc newParticleSystem(): ParticleSystem =
-    new(result, proc(ps: ParticleSystem) =
-        let c = currentContext()
-        let gl = c.gl
+proc cleanup*(ps: ParticleSystem) =
+    let c = currentContext()
+    let gl = c.gl
+    if ps.indexBuffer != invalidBuffer:
         gl.deleteBuffer(ps.indexBuffer)
-        gl.deleteBuffer(ps.vertexBuffer)
         ps.indexBuffer = invalidBuffer
+    if ps.vertexBuffer != invalidBuffer:
+        gl.deleteBuffer(ps.vertexBuffer)
         ps.vertexBuffer = invalidBuffer
-    )
+
+proc newParticleSystem(): ParticleSystem =
+    new(result, cleanup)
 
 method init(ps: ParticleSystem) =
     ps.isInited = false

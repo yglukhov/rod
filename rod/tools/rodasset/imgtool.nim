@@ -1,64 +1,28 @@
-import nimPNG
-import os, osproc, json, strutils, times, sequtils, tables, algorithm, math, sets
+import os, osproc, json, strutils, times, sequtils, tables, sets, logging
 
-when compileOption("threads"):
+const multithreaded = compileOption("threads")
+
+when multithreaded:
     import threadpool
+    template `^^`[T](e: FlowVar[T]): untyped = ^e
+else:
+    template sync() = discard
+    template spawnX(e: typed): untyped = e
 
-import nimx.rect_packer
 import nimx.types except Point, Size, Rect
 import nimx.pathutils
 
-import imgtools.imgtools, imgtools.texcompress
+import imgtools / [ imgtools, texcompress, spritesheet_packer ]
 import tree_traversal
 
-type Rect = imgtools.Rect
-type Point = tuple[x, y: int32]
-type Size = tuple[width, height: int]
-
-let consumeLessMemory = defined(windows) or getEnv("CONSUME_LESS_MEMORY") != ""
-
-const isMultithreaded = false and compileOption("threads") # ... not defined(windows)
-
 type
-    ImageOccurence = object
+    ImageOccurenceInfo = object
         parentComposition, parentNode, parentComponent: JsonNode
         frameIndex: int
         textureKey: string
         compPath: string
-        allowAlphaCrop: bool
 
-    SpriteSheetImage = ref object
-        spriteSheet: SpriteSheet # Index of sprite sheet in tool.images array
-        srcBounds: Rect
-        actualBounds: Rect
-        originalPath: string
-        srcSize: Size
-        targetSize: Size
-        pos: Point
-        png: PNGResult
-        occurences: seq[ImageOccurence]
-        extrusion: int
-
-    SpriteSheet = ref object
-        index: int # Index of sprite sheet in tool.images array
-        images: seq[SpriteSheetImage]
-        packer: RectPacker
-        noquant: bool
-
-proc newSpriteSheetImage(path: string, extrusion: int = 1): SpriteSheetImage =
-    result.new()
-    result.originalPath = path
-    result.occurences = @[]
-    result.extrusion = extrusion
-
-proc newSpriteSheet(minSize: Size): SpriteSheet =
-    result.new()
-    let px = max(nextPowerOfTwo(minSize.width), 1024)
-    let py = max(nextPowerOfTwo(minSize.height), 1024)
-    result.packer = newPacker(px.int32, py.int32)
-    result.packer.maxX = px.int32
-    result.packer.maxY = py.int32
-    result.images = newSeq[SpriteSheetImage]()
+    ImageOccurence = spritesheet_packer.ImageOccurence[ImageOccurenceInfo]
 
 type ImgTool* = ref object
     compositionPaths*: seq[string]
@@ -68,259 +32,96 @@ type ImgTool* = ref object
     resPath*: string #
     compressOutput*: bool
     compressToPVR*: bool
-    createIndex*: bool
     downsampleRatio*: float
     disablePotAdjustment*: bool # If true, do not resize images to power of 2
-    removeOriginals*: bool
+    packUnreferredImages*: bool
     extrusion*: int
-    images*: Table[string, SpriteSheetImage]
-    spriteSheets: seq[SpriteSheet]
-    exceptions*: seq[string]
-    latestOriginalModificationDate: Time
-
+    processedImages*: HashSet[string]
+    noquant*: seq[string]
+    noposterize*: seq[string]
+    index*: JsonNode
 
 proc newImgTool*(): ImgTool =
     result.new()
-    result.images = initTable[string, SpriteSheetImage]()
-    result.spriteSheets = @[]
     result.downsampleRatio = 1.0
     result.extrusion = 1
     result.compositionPaths = @[]
-
-proc tryPackImage(ss: SpriteSheet, im: SpriteSheetImage): bool =
-    im.pos = ss.packer.packAndGrow(im.targetSize.width.int32 + im.extrusion.int32 * 2, im.targetSize.height.int32 + im.extrusion.int32 * 2)
-    result = im.pos.hasSpace
-    if result:
-        im.pos = (im.pos.x.int32 + im.extrusion.int32, im.pos.y.int32 + im.extrusion.int32)
-        ss.images.add(im)
-        im.spriteSheet = ss
-
-proc outImgExt(tool: ImgTool): string =
-    if tool.compressToPVR:
-        result = ".pvr"
-    else:
-        result = ".png"
-
-proc compressPng(tool: ImgTool, path: string, noquant: bool = false) =
-    var res = 1
-    var qPath = quoteShell(path)
-
-    if noquant:
-        let tmp = path & "__tmp"
-        moveFile(path, tmp)
-        try:
-            res = execCmd("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
-        except:
-            discard
-        if res != 0:
-            echo "WARNING: posterize failed or not found ", path
-            removeFile(path)
-            moveFile(tmp, path)
-        else:
-            removeFile(tmp)
-    else:
-        try:
-            res = execCmd("pngquant --force --speed 1  -o " & qPath & " " & qPath)
-        except:
-            discard
-        if res != 0:
-            echo "WARNING: pngquant failed ", path
-    try:
-        # Temp file path is set explicitly to reside near the target file.
-        # Otherwise pngcrush will create temp file in current dir and that may
-        # cause problems. Originally this bug was observed in docker build image.
-        let tmp = quoteShell(path & ".tmp.png")
-        res = execCmd("pngcrush -q -ow -rem allb -reduce " & qPath & " " & tmp)
-    except:
-        discard
-    if res != 0:
-        echo "WARNING: removing sRGB failed ", path
-
-proc composeAndWrite(tool: ImgTool, ss: SpriteSheet, path: string) =
-    var data = newString(ss.packer.width * ss.packer.height * 4)
-    for im in ss.images:
-        var nullifyWhenDone = false
-        var png: PNGResult
-        if im.png.isNil:
-            png = loadPNG32(im.originalPath)
-        else:
-            png = im.png
-            nullifyWhenDone = true
-
-        if png.data.len == png.width * png.height * 4:
-            zeroColorIfZeroAlpha(png.data)
-            colorBleed(png.data, png.width, png.height)
-
-        if im.srcSize == im.targetSize:
-            blitImage(
-                data, ss.packer.width, ss.packer.height, # Target image
-                im.pos.x, im.pos.y, # Position in target image
-                png.data, png.width, png.height,
-                im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height)
-        else:
-            resizeImage(png.data, png.width, png.height,
-                data, ss.packer.width, ss.packer.height,
-                im.srcBounds.x, im.srcBounds.y, im.srcBounds.width, im.srcBounds.height,
-                im.pos.x, im.pos.y, im.targetSize.width, im.targetSize.height)
-
-
-        extrudeBorderPixels(
-            data,
-            ss.packer.width,
-            ss.packer.height,
-            im.pos.x - im.extrusion,
-            im.pos.y - im.extrusion,
-            im.targetSize.width + im.extrusion * 2,
-            im.targetSize.height + im.extrusion * 2,
-            im.extrusion
-        )
-
-        if nullifyWhenDone or not isMultithreaded:
-            im.png = nil # We no longer need the data in memory
-
-    if tool.compressToPVR:
-        let tmpPath = path & ".png"
-        discard savePNG32(tmpPath, data, ss.packer.width, ss.packer.height)
-        convertToETC2(tmpPath, path, false)
-        removeFile(tmpPath)
-    else:
-        discard savePNG32(path, data, ss.packer.width, ss.packer.height)
-        if tool.compressOutput:
-            tool.compressPNG(path, ss.noquant)
-
-    if consumeLessMemory:
-        GC_fullCollect()
 
 proc destPath(tool: ImgTool, origPath: string): string =
     let relPath = relativePathToPath(tool.originalResPath, origPath)
     result = tool.resPath / relPath
 
-proc serializedImage(im: SpriteSheetImage, path: string): JsonNode =
+proc serializedImage(im: ImageOccurence, path: string): JsonNode =
     result = newJObject()
     result["file"] = %path
-    let w = im.spriteSheet.packer.width.float
-    let h = im.spriteSheet.packer.height.float
-    result["tex"] = %*[(im.pos.x.float + 0.5) / w, (im.pos.y.float + 0.5) / h, ((im.pos.x + im.targetSize.width).float - 0.5) / w, ((im.pos.y + im.targetSize.height).float - 0.5) / h]
-    result["size"] = %*[im.srcSize.width, im.srcSize.height]
+    let w = im.spriteSheet.size.width.float
+    let h = im.spriteSheet.size.height.float
+    result["tex"] = %*[(im.dstBounds.x.float + 0.5) / w, (im.dstBounds.y.float + 0.5) / h, ((im.dstBounds.x + im.dstBounds.width).float - 0.5) / w, ((im.dstBounds.y + im.dstBounds.height).float - 0.5) / h]
+    result["size"] = %*[im.srcInfo.rect.width, im.srcInfo.rect.height]
 
-proc adjustImageNode(tool: ImgTool, im: SpriteSheetImage, o: ImageOccurence) =
+proc pathToPVR(path: string): string {.inline.} =
+    result = path.changeFileExt("pvr")
+
+proc adjustImageNode(tool: ImgTool, im: ImageOccurence) =
     # Fixup the fileName node to contain spritesheet filename and texCoords
-    let result = im.serializedImage(relativePathToPath(tool.destPath(o.compPath).parentDir(), tool.resPath / tool.outPrefix & $im.spriteSheet.index & tool.outImgExt))
+    var ssPath = im.spriteSheet.path
+    if tool.compressToPVR:
+        ssPath = ssPath.pathToPVR()
+
+    let result = im.serializedImage(relativePathToPath(tool.destPath(im.info.compPath).parentDir(), ssPath))
     doAssert(not im.spriteSheet.isNil)
 
-    if o.textureKey.isNil:
+    if im.info.textureKey.isNil:
         # We are in the sprite component
-        o.parentComponent["fileNames"].elems[o.frameIndex] = result
+        im.info.parentComponent["fileNames"].elems[im.info.frameIndex] = result
     else:
         # We are in the mesh component
-        o.parentComponent[o.textureKey]= result
+        im.info.parentComponent[im.info.textureKey]= result
 
-    if o.textureKey.isNil:
+    if im.info.textureKey.isNil:
         # This image occurence is inside a sprite. If image alpha is cropped
         # from top or left we have to adjust frameOffsets in the Sprite node
-        if im.srcBounds.x > 0 or im.srcBounds.y > 0:
-            var frameOffsets = o.parentComponent{"frameOffsets"}
+        if im.srcInfo.rect.x > 0 or im.srcInfo.rect.y > 0:
+            var frameOffsets = im.info.parentComponent{"frameOffsets"}
             if frameOffsets.isNil:
                 frameOffsets = newJArray()
-                for i in 0 ..< o.parentComponent["fileNames"].len:
+                for i in 0 ..< im.info.parentComponent["fileNames"].len:
                     frameOffsets.add %*[0, 0]
-                o.parentComponent["frameOffsets"] = frameOffsets
-            frameOffsets.elems[o.frameIndex] = %*[im.srcBounds.x, im.srcBounds.y]
+                im.info.parentComponent["frameOffsets"] = frameOffsets
+            frameOffsets.elems[im.info.frameIndex] = %*[im.srcInfo.rect.x, im.srcInfo.rect.y]
 
-proc recalculateSourceBounds(im: SpriteSheetImage) =
-    for o in im.occurences:
-        if not o.allowAlphaCrop: return
+proc absImagePath(compPath, imageRelPath: string): string =
+    result = compPath.parentDir / imageRelPath
+    result.normalizePath()
 
-    im.srcBounds = im.actualBounds
-    im.srcSize.width = im.srcBounds.width
-    im.srcSize.height = im.srcBounds.height
+proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
+    result = @[]
+    shallow(result)
 
-proc betterDimension(tool: ImgTool, d, e: int): int =
-    let r = int(d.float / tool.downsampleRatio)
-    if tool.disablePotAdjustment:
-        return r
-    var changed = true
-    result = case r + e * 2
-        of 257 .. 400: 256
-        of 513 .. 700: 512
-        of 1025 .. 1300: 1024
-        else:
-            changed = false
-            r
-    if result > 2048: result = 2048
-    if changed:
-        result -= e * 2
+    var referredImages = initSet[string]()
 
-proc recalculateTargetSize(tool: ImgTool, im: SpriteSheetImage) =
-    im.targetSize.width = tool.betterDimension(im.srcSize.width, im.extrusion)
-    im.targetSize.height = tool.betterDimension(im.srcSize.height, im.extrusion)
-
-proc readFile(im: SpriteSheetImage) =
-    let png = loadPNG32(im.originalPath)
-    if png.isNil:
-        echo "PNG NOT LOADED: ", im.originalPath
-
-    im.actualBounds = imageBounds(png.data, png.width, png.height)
-
-    im.srcBounds.width = png.width
-    im.srcBounds.height = png.height
-    # im.srcBounds.width = im.actualBounds.x + im.actualBounds.width
-    # im.srcBounds.height = im.actualBounds.y + im.actualBounds.height
-
-    if not (consumeLessMemory or isMultithreaded):
-        im.png = png
-
-    im.srcSize = (im.srcBounds.width, im.srcBounds.height)
-    im.targetSize = im.srcSize
-
-proc updateLastModificationDateWithFile(tool: ImgTool, path: string) =
-    let modDate = getLastModificationTime(path)
-    if modDate > tool.latestOriginalModificationDate:
-        tool.latestOriginalModificationDate = modDate
-
-proc isDirEmpty(d: string): bool =
-    result = true
-    for k, p in walkDir(d):
-        result = false
-        break
-
-proc pruneEmptyDir(d: string) =
-    var p = d
-    while isDirEmpty(p):
-        removeDir(p)
-        p = p.parentDir()
-
-proc removeLeftoverFiles(tool: ImgTool) =
-    for imgPath in tool.images.keys:
-        let p = tool.destPath(imgPath)
-        removeFile(p)
-        pruneEmptyDir(p.parentDir())
-
-proc imageAtPath(tool: ImgTool, compPath, imageRelPath: string): SpriteSheetImage {.inline.} =
-    var absPath = compPath.parentDir / imageRelPath
-    absPath.normalizePath()
-
-    result = tool.images.getOrDefault(absPath)
-    if result.isNil:
-        if not fileExists(absPath):
-            echo "Error: file not found: ", absPath, " (reffered from ", compPath, ")"
-        result = newSpriteSheetImage(absPath, tool.extrusion)
-        tool.updateLastModificationDateWithFile(absPath)
-        tool.images[absPath] = result
-
-proc collectImageOccurences(tool: ImgTool) {.inline.} =
     for i, c in tool.compositions:
         let compPath = tool.compositionPaths[i]
+
+        template addOccurence(relPath: string, ioinfo: ImageOccurenceInfo, alphaCrop: bool = false) =
+            let ap = absImagePath(compPath, relPath)
+            referredImages.incl(ap)
+            result.add(ImageOccurence(
+                path: ap,
+                info: ioinfo,
+                extrusion: tool.extrusion,
+                downsampleRatio: tool.downsampleRatio,
+                disablePotAdjustment: tool.disablePotAdjustment,
+                allowAlphaCrop: alphaCrop
+            ))
 
         for n, s in c.allSpriteNodes:
             let fileNames = s["fileNames"]
             for ifn in 0 ..< fileNames.len:
                 if fileNames[ifn].kind == JString:
-                    var im = tool.imageAtPath(compPath, fileNames[ifn].str)
-                    im.occurences.add ImageOccurence(parentComposition: c,
+                    addOccurence(fileNames[ifn].str, ImageOccurenceInfo(parentComposition: c,
                             parentNode: n, parentComponent: s, frameIndex: ifn,
-                            compPath: compPath,
-                            allowAlphaCrop: true)
+                            compPath: compPath), true)
 
         for n, s in c.allMeshComponentNodes:
             for key in ["matcapTextureR", "matcapTextureG", "matcapTextureB",
@@ -330,8 +131,7 @@ proc collectImageOccurences(tool: ImgTool) {.inline.} =
 
                 let t = s{key}
                 if not t.isNil and t.kind == JString:
-                    var im = tool.imageAtPath(compPath, t.str)
-                    im.occurences.add(ImageOccurence(parentComposition: c,
+                    addOccurence(t.str, ImageOccurenceInfo(parentComposition: c,
                             parentNode: n, parentComponent: s, textureKey: key,
                             compPath: compPath))
 
@@ -339,184 +139,147 @@ proc collectImageOccurences(tool: ImgTool) {.inline.} =
             for key in ["texture"]:
                 let t = s{key}
                 if not t.isNil and t.kind == JString:
-                    var im = tool.imageAtPath(compPath, t.str)
-                    im.occurences.add(ImageOccurence(parentComposition: c,
+                    addOccurence(t.str, ImageOccurenceInfo(parentComposition: c,
                             parentNode: n, parentComponent: s, textureKey: key,
                             compPath: compPath))
 
-proc writeIndex(tool: ImgTool) =
-    let root = newJObject()
-    let packedImages = newJObject()
-    root["packedImages"] = packedImages
-    for im in tool.images.values:
-        packedImages[relativePathToPath(tool.originalResPath, im.originalPath)] = im.serializedImage(tool.outPrefix & $im.spriteSheet.index & tool.outImgExt)
-    writeFile(parentDir(tool.resPath / tool.outPrefix) & "index.rodpack", root.pretty().replace(" \n", "\n"))
-    echo root.pretty().replace(" \n", "\n")
+    if tool.packUnreferredImages:
+        # Collect remaining images that are not referred by anything
+        for r in walkDirRec(tool.originalResPath):
+            if r.endsWith(".png"):
+                let p = unixToNativePath(r)
+                if p notin referredImages:
+                    result.add(ImageOccurence(
+                        path: p,
+                        extrusion: tool.extrusion,
+                        downsampleRatio: tool.downsampleRatio,
+                        disablePotAdjustment: tool.disablePotAdjustment
+                    ))
 
-proc packImagesToSpritesheets(tool: ImgTool, images: openarray[SpriteSheetImage], spritesheets: var seq[SpriteSheet], offset: int = 0, noquant: bool = false) =
-    for i, im in images:
-        var done = false
-        for ss in spritesheets:
-            done = ss.tryPackImage(im)
-            if done: break
-        if not done:
-            let newSS = newSpriteSheet((im.targetSize.width + im.extrusion * 2, im.targetSize.height + im.extrusion))
-            done = newSS.tryPackImage(im)
-            if done:
-                newSS.index = spritesheets.len + offset
-                newSS.noquant = noquant
-                spritesheets.add(newSS)
-            else:
-                echo "Could not pack image: ", im.originalPath
+proc createIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
+    let idx = newJObject()
+    for im in occurences:
+        var ssPath = im.spriteSheet.path.extractFilename()
+        if tool.compressToPVR:
+            ssPath = ssPath.pathToPVR()
+        idx[relativePathToPath(tool.originalResPath, im.path)] = im.serializedImage(ssPath)
+    tool.index = idx
 
-proc assignImagesToSpriteSheets(tool: ImgTool) =
-    # Allocate spritesheets for images
-    # Here we try two approaches of packing. The first is to sort images
-    # by max(w, h). The second is to sort by area.
+proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
+    for o in oc.mitems:
+        let name = splitFile(o.path).name
+        let doQuant = not tool.noquant.contains(name)
+        let doPosterize = not tool.noposterize.contains(name)
 
-    var allImages: seq[SpriteSheetImage] = @[]
-    var exceptionImages: seq[SpriteSheetImage] = @[]
-
-    if tool.exceptions.len > 0:
-        for k, v in tool.images:
-            var name = splitFile(k).name
-            if tool.exceptions.contains(name):
-                exceptionImages.add(v)
-            else:
-                allImages.add(v)
-    else:
-        allImages = toSeq(values(tool.images))
-
-    proc assign(imgs: var seq[SpriteSheetImage]) =
-        var try1 = newSeq[SpriteSheet]()
-        var try2 = newSeq[SpriteSheet]()
-
-        # First approach
-        imgs.sort do(x, y: SpriteSheetImage) -> int:
-            max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
-        tool.packImagesToSpritesheets(imgs, try1)
-
-        # Second approach
-        imgs.sort do(x, y: SpriteSheetImage) -> int:
-            y.targetSize.width * y.targetSize.height - x.targetSize.width * x.targetSize.height
-        tool.packImagesToSpritesheets(imgs, try2)
-
-        # Choose better approach
-        if try1.len < try2.len:
-            # Redo try1 again
-            imgs.sort do(x, y: SpriteSheetImage) -> int:
-                max(y.targetSize.width, y.targetSize.height) - max(x.targetSize.width, x.targetSize.height)
-            try1.setLen(0)
-            tool.packImagesToSpritesheets(imgs, try1)
-            shallowCopy(tool.spriteSheets, try1)
+        if doQuant:
+            o.category = "quant"
+        elif doPosterize:
+            o.category = "posterize"
         else:
-            shallowCopy(tool.spriteSheets, try2)
-    assign(allImages)
-    if tool.exceptions.len > 0:
-        var try3 = newSeq[SpriteSheet]()
-        tool.packImagesToSpritesheets(exceptionImages, try3, tool.spriteSheets.len, true)
-        tool.spriteSheets.add(try3)
+            o.category = "dont_optimize"
 
-when isMultithreaded:
-    proc composeAndWriteAux(tool, ss: pointer, path: string) =
-        let tool = cast[ImgTool](tool)
-        let ss = cast[SpriteSheet](ss)
-        tool.composeAndWrite(ss, path)
+proc convertSpritesheetToPVR(path: string) =
+    let dstPath = path.pathToPVR()
+    convertToETC2(path, dstPath, false)
+    removeFile(path)
 
-proc readImageFileAux(tool, im: pointer) {.inline.} =
-    let i = cast[SpriteSheetImage](im)
-    let tool = cast[ImgTool](tool)
-    i.readFile()
-    if consumeLessMemory:
-        GC_fullCollect()
-    i.recalculateSourceBounds()
-    tool.recalculateTargetSize(i)
+proc optimizeSpritesheet(path, category: string) =
+    var res = 1
+    var qPath = quoteShell(path)
+
+    if category == "quant":
+        try:
+            let (_, r) = execCmdEx("pngquant --force --speed 1  -o " & qPath & " " & qPath)
+            res = r
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: pngquant failed ", path
+    elif category == "posterize":
+        let tmp = path & "__tmp"
+        moveFile(path, tmp)
+        try:
+            let (_, r) = execCmdEx("posterize -Q 90 -b " & quoteShell(tmp) & " " & qPath)
+            res = r
+        except:
+            discard
+        if res != 0:
+            echo "WARNING: posterize failed or not found ", path
+            removeFile(path)
+            moveFile(tmp, path)
+        else:
+            removeFile(tmp)
+
+    # Always run pngcrush
+    try:
+        # Temp file path is set explicitly to reside near the target file.
+        # Otherwise pngcrush will create temp file in current dir and that may
+        # cause problems. Originally this bug was observed in docker build image.
+        let tmp = quoteShell(path & ".tmp.png")
+        let (_, r) = execCmdEx("pngcrush -q -ow -rem allb -reduce " & qPath & " " & tmp)
+        res = r
+    except:
+        discard
+    if res != 0:
+        echo "WARNING: removing sRGB failed ", path
 
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
 
     # Parse all compositions
     for i, c in tool.compositionPaths:
-        tool.updateLastModificationDateWithFile(c)
         tool.compositions[i] = parseFile(c)
 
-    tool.collectImageOccurences()
+    var occurences = tool.collectImageOccurences()
+    tool.setCategories(occurences)
 
-    # Check if destination files are newer than original files. If yes, we
-    # don't need to do anything.
-    var needsUpdate = not fileExists(tool.resPath / tool.outPrefix & "0" & tool.outImgExt)
-    if not needsUpdate:
-        for c in tool.compositionPaths:
-            let dstPath = tool.destPath(c)
-            if not fileExists(dstPath) or getLastModificationTime(dstPath) <= tool.latestOriginalModificationDate:
-                needsUpdate = true
-                break
+    let packer = newSpriteSheetPacker(tool.resPath / tool.outPrefix)
+    packer.pack(occurences)
 
-    if needsUpdate:
-        for i in tool.images.values:
-            echo "Reading file: ", i.originalPath
-            when isMultithreaded:
-                if consumeLessMemory:
-                    spawn readImageFileAux(cast[pointer](tool), cast[pointer](i))
-                else:
-                    readImageFileAux(cast[pointer](tool), cast[pointer](i))
-            else:
-                readImageFileAux(cast[pointer](tool), cast[pointer](i))
-
-        when isMultithreaded: sync() # Wait for all spawned tasks
-
-        if consumeLessMemory:
-            GC_fullCollect()
-
-        tool.assignImagesToSpriteSheets()
-
-        # Blit images to spriteSheets and save them
-        for i, ss in tool.spriteSheets:
-            echo "Saving ", i + 1, " of ", tool.spriteSheets.len
-            for v in ss.images:
-                echo "    - image ", v.originalPath
-            when isMultithreaded:
-                spawn composeAndWriteAux(cast[pointer](tool), cast[pointer](ss), tool.resPath / tool.outPrefix & $i & tool.outImgExt)
-            else:
-                tool.composeAndWrite(ss, tool.resPath / tool.outPrefix & $i & tool.outImgExt)
-
-        when isMultithreaded: sync() # Wait for all spawned tasks
-
-        # Readjust sprite nodes
-        for im in tool.images.values:
-            for o in im.occurences:
-                tool.adjustImageNode(im, o)
-
-        let packCompositions = false
-
-        # Write all composisions to single file
-        if packCompositions:
-            let allComps = newJObject()
-            for i, c in tool.compositions:
-                if "aep_name" in c: c.delete("aep_name")
-                var resName = tool.compositionPaths[i]
-                if not resName.startsWith("res/"):
-                    raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
-                resName = resName.substr("res/".len)
-                allComps[resName] = c
-            var str = ""
-            toUgly(str, allComps)
-            writeFile(tool.resPath / "comps.jsonpack", str)
-        else:
-            # Write compositions back to files
-            for i, c in tool.compositions:
-                let dstPath = tool.destPath(tool.compositionPaths[i])
-                createDir(dstPath.parentDir())
-                var str = ""
-                toUgly(str, c)
-                writeFile(dstPath, str)
-
-        if tool.createIndex:
-            tool.writeIndex()
+    if tool.compressToPVR:
+        for ss in packer.spriteSheets:
+            spawnX convertSpritesheetToPVR(ss.path)
     else:
-        echo "Everyting up to date"
-    if tool.removeOriginals:
-        tool.removeLeftoverFiles()
+        for ss in packer.spriteSheets:
+            info "Optimizing ss: ", ss.path
+            spawnX optimizeSpritesheet(ss.path, ss.category)
+
+    # Readjust sprite nodes
+    for o in occurences:
+        if not o.info.parentComposition.isNil:
+            tool.adjustImageNode(o)
+
+    tool.processedImages = initSet[string]()
+    for o in occurences:
+        tool.processedImages.incl(o.path)
+
+    let packCompositions = false
+
+    # Write all composisions to single file
+    if packCompositions:
+        let allComps = newJObject()
+        for i, c in tool.compositions:
+            if "aep_name" in c: c.delete("aep_name")
+            var resName = tool.compositionPaths[i]
+            if not resName.startsWith("res/"):
+                raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
+            resName = resName.substr("res/".len)
+            allComps[resName] = c
+        var str = ""
+        toUgly(str, allComps)
+        writeFile(tool.resPath / "comps.jsonpack", str)
+    else:
+        # Write compositions back to files
+        for i, c in tool.compositions:
+            let dstPath = tool.destPath(tool.compositionPaths[i])
+            createDir(dstPath.parentDir())
+            var str = ""
+            toUgly(str, c)
+            writeFile(dstPath, str)
+
+    tool.createIndex(occurences)
+
+    sync() # Wait until spritesheet optimizations complete
 
 proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =
     var tool = newImgTool()
@@ -527,7 +290,6 @@ proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefi
 
     tool.outPrefix = outPrefix
     tool.compressOutput = compressOutput
-    tool.removeOriginals = true
     let startTime = epochTime()
     tool.run()
     echo "Done. Time: ", epochTime() - startTime

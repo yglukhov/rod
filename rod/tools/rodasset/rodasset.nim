@@ -1,6 +1,8 @@
-import os, strutils, times, tables, osproc
+import os, strutils, times, osproc, sets, logging
 import imgtool, asset_cache, migrator
 import settings except hash
+import json except hash
+import tempfile
 
 
 template settingsWithCmdLine(): Settings =
@@ -11,12 +13,13 @@ template settingsWithCmdLine(): Settings =
     s.graphics.extrusion = extrusion
     s.graphics.disablePotAdjustment = disablePotAdjustment
     s.graphics.compressToPVR = compressToPVR
-    s.graphics.compressionExceptions = exceptions
+    s.graphics.quantizeExceptions = exceptions & "," & noquant
+    s.graphics.posterizeExceptions = noposterize
     s
 
 proc hash(audio: string = "ogg", downsampleRatio: float = 1.0, nocompress: bool = false,
     compressToPVR: bool = false, extrusion: int = 1, disablePotAdjustment: bool = false,
-    exceptions: string = "",
+    exceptions: string = "", noposterize: string = "", noquant: string = "",
     path: string) =
     let s = settingsWithCmdLine()
     echo dirHash(path, s)
@@ -30,84 +33,113 @@ proc audioConvTool(): string =
             gAudioConvTool = findExe("avconv")
     result = gAudioConvTool
 
-proc convertWavToOgg(fromFile, toFile: string) =
-    echo audioConvTool().execProcess(
-        ["-i", fromFile, "-acodec", "libvorbis", "-y", toFile], options={poStdErrToStdOut})
+let compressAudio = false
 
-proc convertWavToMP3(fromFile, toFile: string) =
-    var args = @["-i", fromFile, "-acodec", "libmp3lame", "-y"]
-    when defined(macosx):
-        args.add(["-write_xing", "0"])
+proc convertAudio(fromFile, toFile: string, mp3: bool) =
+    var args = @["-i", fromFile, "-y", "-loglevel", "warning"]
+    if mp3:
+        args.add(["-acodec", "libmp3lame", "-write_xing", "0"])
+    else: # ogg
+        args.add(["-acodec", "libvorbis"])
+
+    if compressAudio:
+        let numChannels = 1
+        let sampleRate = 11025
+        args.add(["-ac", $numChannels, "-ar", $sampleRate])
+
     args.add(toFile)
     echo audioConvTool().execProcess(args, options={poStdErrToStdOut})
 
-proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string) =
+proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles: var seq[string]) =
     let isMp3 = audioFmt == "mp3"
     for r in walkDirRec(src):
         let sf = r.splitFile()
         if not sf.name.startsWith('.'):
-            let d = dst / substr(r, src.len)
+            var reldst = substr(r, src.len + 1)
+            let d = dst / reldst
             var doCopy = false
+            var doIndex = false
             case sf.ext
             of ".png":
-                if unixToNativePath(r) notin tool.images:
+                if unixToNativePath(r) notin tool.processedImages:
                     doCopy = true
             of ".wav", ".mp3", ".ogg":
                 createDir(d.parentDir())
-                let ssf = d.splitFile()
-                if isMp3 and sf.ext != ".mp3":
-                    convertWavToMP3(r, ssf.dir / ssf.name & ".mp3")
-                elif sf.ext != ".ogg":
-                    convertWavToOgg(r, ssf.dir / ssf.name & ".ogg")
+                let dest = d.changeFileExt(audioFmt)
+                reldst = reldst.changeFileExt(audioFmt)
+                doIndex = true
+                echo "Converting/compressing audio ", r
+                if isMp3:
+                    convertAudio(r, dest, true)
                 else:
-                    doCopy = true
-            of ".json", ".rab":
+                    convertAudio(r, dest, false)
+            of ".json":
+                doIndex = true
+            of ".rab":
                 discard
             else:
                 doCopy = true
 
-            if doCopy:
-                echo "copying remaining asset: ", r, " to ", d
-                createDir(d.parentDir())
-                copyFile(r, d)
+            if doCopy or doIndex:
+                copiedFiles.add(reldst.replace('\\', '/'))
 
-proc pack(cache: string = "", exceptions: string = "", compressToPVR: bool = false, nocompress: bool = false,
+                if doCopy:
+                    echo "Copying asset: ", r
+                    createDir(d.parentDir())
+                    copyFile(r, d)
+
+proc pack(cache: string = "", exceptions: string = "", noposterize: string = "", noquant: string = "", compressToPVR: bool = false, nocompress: bool = false,
         downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
         disablePotAdjustment: bool = false, audio: string = "ogg",
         onlyCache: bool = false,
         src, dst: string) =
+    addHandler(newConsoleLogger())
     let src = expandTilde(src)
     let dst = expandTilde(dst)
     let cache = getCache(cache)
     let s = settingsWithCmdLine()
     let h = dirHash(src, s)
+    createDir(cache)
     let c = cache / h
     echo "rodasset Cache: ", c
     if not dirExists(c):
-        let tmpCacheDir = c & ".tmp"
+        let tmpCacheDir = mkdtemp(h, "_tmp")
         var tool = newImgTool()
 
-        tool.exceptions = @[]
+        tool.noquant = @[]
+        tool.noposterize = @[]
         for f in walkDirRec(src):
             if f.endsWith(".json"):
                 tool.compositionPaths.add(f)
-        for e in split(exceptions, ","):
-            tool.exceptions.add(e)
+        for e in split(exceptions, ","): tool.noquant.add(e)
+        for e in split(noquant, ","): tool.noquant.add(e)
+        for e in split(noposterize, ","): tool.noposterize.add(e)
         tool.originalResPath = src
         tool.resPath = tmpCacheDir
-        createDir(tmpCacheDir)
         tool.outPrefix = "p"
         tool.compressOutput = not nocompress
         tool.compressToPVR = compressToPVR
         tool.downsampleRatio = downsampleRatio
         tool.extrusion = extrusion
         tool.disablePotAdjustment = disablePotAdjustment
+        tool.packUnreferredImages = true
         let startTime = epochTime()
         tool.run()
         echo "Done. Time: ", epochTime() - startTime
 
-        copyRemainingAssets(tool, src, tmpCacheDir, audio)
-        moveFile(tmpCacheDir, c)
+        var copiedFiles = newSeq[string]()
+        copyRemainingAssets(tool, src, tmpCacheDir, audio, copiedFiles)
+
+        let index = %{
+            "packedImages": tool.index,
+            "files": %copiedFiles,
+        }
+        writeFile(tmpCacheDir / "index.rodpack", index.pretty().replace(" \n", "\n"))
+
+        when declared(moveDir):
+            moveDir(tmpCacheDir, c) # Newer nim should support it
+        else:
+            moveFile(tmpCacheDir, c)
 
     if not onlyCache:
         copyResourcesFromCache(c, h, dst)
