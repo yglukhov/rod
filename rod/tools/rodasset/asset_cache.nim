@@ -57,9 +57,15 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
             if ln.gitStatus('R'):
                 f = getFileNameFromMovedGitStatusLine(ln)
 
-            let modTime = getLastModificationTime(f)
-            result &= $modTime
-            result &= ';'
+            if dirExists(f):
+                for path in walkDirRec(f):
+                    result &= $getLastModificationTime(path)
+                    result &= ';'
+                    result &= path
+                    result &= ';'
+            else:
+                result &= $getLastModificationTime(f)
+                result &= ';'
 
     var hasSound = false
     var hasGraphics = false
