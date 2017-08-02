@@ -174,7 +174,7 @@ type
 
 {.push checks:off.}
 proc `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
-{.pop checks:off.}
+{.pop.}
 template len*[T](c: Collection[T]): int = cast[seq[type(c.fieldToCheckType)]](c).len
 
 proc remove*(i: Item) {.importcpp.}
