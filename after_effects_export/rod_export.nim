@@ -213,16 +213,11 @@ proc isSolidLayer(layer: Layer): bool =
         source.mainSource.jsObjectType == "SolidSource"
 
 proc isTextMarkerValid(layer: Layer): bool =
-    let textMarker = $layer.property("Marker", MarkerValue).valueAtTime(0).comment
-    let remAttrTextMarker = removeTextAttributes(textMarker)
-    let textLayer = $layer.propertyGroup("Text").property("Source Text", TextDocument).value.text
+    let textMarker = layer.property("Marker", MarkerValue).valueAtTime(0).comment
+    let textLayer = layer.propertyGroup("Text").property("Source Text", TextDocument).value.text
 
-    logi textMarker
-    logi remAttrTextMarker
-    logi textLayer
-
-    # if textMarker == textLayer or remAttrTextMarker == textLayer:
-    return true
+    if textMarker == textLayer or removeTextAttributes($textMarker) == textLayer:
+        return true
 
 proc getText(layer: Layer): string =
     let markerText = layer.property("Marker", MarkerValue).valueAtTime(0).comment
@@ -551,7 +546,7 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
             txt["shadowColor"] = %[color.x, color.y, color.z, alpha]
             let radAngle = degToRad(angle + 180)
             let radius = shadow.property("Size", float32).valueAtTime(0)
-            let spread = shadow.property("Spread", float32).valueAtTime(0) / 100
+            let spread = 1.0 - shadow.property("Spread", float32).valueAtTime(0) / 100
             # txt["shadowOff"] = %[distance * cos(radAngle), - distance * sin(radAngle)]
             txt["shadowX"] = %(distance * cos(radAngle))
             txt["shadowY"] = %(- distance * sin(radAngle))
