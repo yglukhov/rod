@@ -172,7 +172,9 @@ type
     RectObj {.importc.} = object of RootObj
         top*, left*, width*, height*: float
 
-template `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
+{.push checks:off.}
+proc `[]`*[T](c: Collection[T], i: int): T = cast[seq[type(c.fieldToCheckType)]](c)[i + 1]
+{.pop.}
 template len*[T](c: Collection[T]): int = cast[seq[type(c.fieldToCheckType)]](c).len
 
 proc remove*(i: Item) {.importcpp.}
