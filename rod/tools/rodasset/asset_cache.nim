@@ -4,7 +4,7 @@ import settings
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
-const hashVersion = 4
+const hashVersion = 5
 
 const audioFileExtensions = [".wav", ".ogg", ".mp3"]
 
@@ -57,9 +57,15 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
             if ln.gitStatus('R'):
                 f = getFileNameFromMovedGitStatusLine(ln)
 
-            let modTime = getLastModificationTime(f)
-            result &= $modTime
-            result &= ';'
+            if dirExists(f):
+                for path in walkDirRec(f):
+                    result &= $getLastModificationTime(path)
+                    result &= ';'
+                    result &= path
+                    result &= ';'
+            else:
+                result &= $getLastModificationTime(f)
+                result &= ';'
 
     var hasSound = false
     var hasGraphics = false

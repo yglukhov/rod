@@ -56,8 +56,12 @@ proc createShader(sh: Shader) =
         sh.shadersCache[sh.shaderMacroFlags].refCount += 1
         sh.needUpdate = false
 
+proc finalize(s: Shader) =
+    if s.program != invalidProgram:
+        currentContext().gl.deleteProgram(s.program)
+
 proc newShader*(vs, fs: string, attributes: seq[tuple[index: GLuint, name: string]]): Shader =
-    result = Shader.new()
+    result.new(finalize)
     result.vertShader = vs
     result.fragShader = fs
     result.attributes = attributes
