@@ -16,6 +16,12 @@ export UIComponent
 type UICompView = ref object of View
     uiComp: UIComponent
 
+method `enabled=`*(c: UIComponent, state: bool) {.base.}=
+    c.mEnabled = state
+
+proc enabled*(c: UIComponent): bool =
+    result = c.mEnabled
+
 proc view*(c: UIComponent): View =
     if not c.mView.isNil:
         result = c.mView.subviews[0]

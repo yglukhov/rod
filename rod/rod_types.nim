@@ -82,7 +82,7 @@ type
 
     UIComponent* = ref object of Component
         mView*: View
-        enabled*: bool
+        mEnabled*: bool
 
     LightSource* = ref object of Component
         mLightAmbient*: float32
@@ -114,3 +114,4 @@ type
         color*: Color
         velocity*: Vector3
         randStartScale*: float
+
