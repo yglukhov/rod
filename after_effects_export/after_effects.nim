@@ -344,6 +344,12 @@ type
 proc newRegex*(pattern, flags: cstring): JSRegExp {.importc: "new RegExp".}
 proc newRegex*(pattern: cstring): JSRegExp {.importc: "new RegExp".}
 proc match*(str: cstring, reg: JSRegExp): seq[cstring] {.importcpp.}
+proc escapeRegExp*(str: cstring): cstring =
+    var res: cstring = ""
+    {.emit: """
+        `res` = `str`.replace(new RegExp("[\\\\^$*+?.()|[\\]{}]", "g"), "\\$&");
+    """.}
+    result = res
 
 proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
     var cacheValid = false
@@ -364,7 +370,7 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
     var startIndex = parseInt($matches[2])
     var endIndex = parseInt($matches[3])
 
-    var pattern2 = newRegex("""([^\d]*)(\d+)(.*)""")
+    var pattern2 = newRegex($escapeRegExp(matches[1]) & """(\d+)""" & $escapeRegExp(matches[^1]))
 
     type E = tuple[index: int, f: File]
     var filesWithIndexes = newSeq[E]()
@@ -372,11 +378,9 @@ proc getSequenceFilesFromSource*(source: FootageItem): seq[File] =
     for i in allFilesInDir:
         let str = decodeURIComponent(i.name)
         var fMatches = str.match(pattern2)
-        if not fMatches.isNil and fMatches.len >= 2:
-            var index = parseInt($fMatches[2])
-            if (matches[1] == fMatches[1] and
-                    matches[^1] == fMatches[^1] and
-                    index >= startIndex and index <= endIndex):
+        if not fMatches.isNil:
+            var index = parseInt($fMatches[1])
+            if index >= startIndex and index <= endIndex:
                 filesWithIndexes.add((index, i))
                 result.add(i)
 
