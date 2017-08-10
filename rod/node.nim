@@ -576,8 +576,8 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
 
     var v = j{"children"}
     if not v.isNil:
-        for i in countdown(v.len-1, 0):
-            n.insertChild(newNodeFromJson(v[i], s), 0)
+        for i in 0 ..< v.len:
+            n.addChild(newNodeFromJson(v[i], s))
 
     v = j{"components"}
     if not v.isNil:
