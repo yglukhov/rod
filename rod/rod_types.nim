@@ -83,7 +83,6 @@ type
         zNear*, zFar*, fov*: Coord
         mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
         viewportSize*: Size
-        frustum*: Frustum
 
     UIComponent* = ref object of Component
         mView*: View

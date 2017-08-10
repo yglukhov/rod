@@ -20,6 +20,31 @@ method init*(c: Camera) =
     c.zFar = 10000
     c.fov = 30
 
+proc calculateOrthoData(c: Camera): tuple[top, bottom, left, right: float] =
+    let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
+    var winSize = absBounds.size
+    if not c.node.sceneView.window.isNil:
+        winSize = c.node.sceneView.window.bounds.size
+
+    let cy = absBounds.y + absBounds.height / 2
+    let cx = absBounds.x + absBounds.width / 2
+
+    var logicalSize = c.viewportSize
+    if logicalSize == zeroSize:
+        logicalSize = absBounds.size
+    let k = absBounds.height / logicalSize.height
+    result.top = -cy / k
+    result.bottom = (winSize.height - cy) / k
+    result.left = -cx / k
+    result.right = (winSize.width - cx) / k
+
+proc getFrustum*(c: Camera): Frustum =
+    let d = c.calculateOrthoData()
+    let frustumOffset = -10.0
+    let wt = c.node.worldTransform()
+    result.min = wt * newVector3(d.left + frustumOffset, d.top + frustumOffset, 0.0)
+    result.max = wt * newVector3(d.right - frustumOffset, d.bottom - frustumOffset, 0.0)
+
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
     let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
     var winSize = absBounds.size
@@ -31,20 +56,8 @@ proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D)
 
     case c.projectionMode
     of cpOrtho:
-        var logicalSize = c.viewportSize
-        if logicalSize == zeroSize:
-            logicalSize = absBounds.size
-        let k = absBounds.height / logicalSize.height
-        let top = -cy / k
-        let bottom = (winSize.height - cy) / k
-        let left = -cx / k
-        let right = (winSize.width - cx) / k
-
-        mat.ortho(left, right, bottom, top, c.zNear, c.zFar)
-
-        let frustumOffset = -10.0
-        c.frustum.min = c.node.worldTransform() * newVector3(left + frustumOffset, top + frustumOffset, 0.0)
-        c.frustum.max = c.node.worldTransform() * newVector3(right - frustumOffset, bottom - frustumOffset, 0.0)
+        let d = c.calculateOrthoData()
+        mat.ortho(d.left, d.right, d.bottom, d.top, c.zNear, c.zFar)
 
     of cpPerspective:
         let top = -cy
@@ -66,13 +79,6 @@ proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D)
     of cpManual:
         doAssert(not c.mManualGetProjectionMatrix.isNil)
         c.mManualGetProjectionMatrix(viewportBounds, mat)
-
-proc intersectFrustum*(c: Camera, bbox: BBox): bool =
-    if c.projectionMode != cpOrtho:
-        return true
-
-    if c.frustum.min.x < bbox.maxPoint.x and bbox.minPoint.x < c.frustum.max.x and c.frustum.min.y < bbox.maxPoint.y and bbox.minPoint.y < c.frustum.max.y:
-        return true
 
 proc `manualGetProjectionMatrix=`*(c: Camera, p: proc(viewportBounds: Rect, mat: var Transform3D)) =
     c.mManualGetProjectionMatrix = p
