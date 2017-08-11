@@ -42,6 +42,7 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
 
     proc getTextAttributes(text: var string): TextAttributes =
         var tagOpened: bool
+        var tagStartFound: bool
         var currentAttr = TextAttributes.new()
         var strWithAttr = ""
         var middle: int
@@ -70,9 +71,19 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
                 var pos = strWithAttr.len
                 fastToUTF8Copy(rune, strWithAttr, pos)
             elif ordRune == ord('<') and text.continuesWith("span style=", offset):
-                currentAttr.start = i
-                startOffset = offset
-                tagOpened = true
+                if not tagStartFound:
+                    currentAttr.start = i
+                    startOffset = offset
+                    tagOpened = true
+                    tagStartFound = true
+                else:
+                    currentAttr.to = i + 1
+                    text.delete(startOffset - 1, middleOffset)
+                    break
+
+            if offset == text.len - 1:
+                currentAttr.to = i + 1
+                text.delete(startOffset - 1, middleOffset)
             i.inc()
 
         currentAttr.to = currentAttr.to - (middle - currentAttr.start)
@@ -237,4 +248,11 @@ when isMainModule:
         doAssert((second.attributes[0]).typ == TextAttributeType.fontSize)
         doAssert((fromHexColor(third.attributes[0].value)) == clr)
 
+    block: #Test unslosed tags
+        var toParse1 = "Dear guest</span>, we are glad to announce significant changes your life which make it <span style=\"color:FFFFFFFF\">even more exciting."
+        var toParse2 = "Dear <span style=\"color:FFDF90FF\">guest</span>, we are glad to announce significant changes in your life which make it <span style=\"color:FFFFFFFF\">even more exciting."
+        var toParse3 = "Dear <span style=\"color:FFDF90FF\">guest, we are glad to announce significant changes in your life which make it <span style=\"color:FFFFFFFF\">even more exciting.</span>"
 
+        discard parseAttributedStr(toParse1)
+        discard parseAttributedStr(toParse2)
+        discard parseAttributedStr(toParse3)

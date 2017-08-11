@@ -6,6 +6,27 @@ beforeBuild = proc(b: Builder) =
     b.mainFile = "editor/rodedit"
     b.originalResourcePath = "editor/res"
 
+proc filterExceptions(name: string): bool =
+    let exc = @["main", "nakefile", "rodedit", "rodasset"]
+
+    for e in exc:
+        let fileName = e & ".nim"
+        if name.contains(e):
+            return false
+
+    result = true
+
+proc doMainModuleTests() =
+    for f in walkDirRec "../rod/":
+        if f.endsWith(".nim") and f.filterExceptions():
+            let content = readFile(f)
+
+            if content.contains("isMainModule"):
+                direShell "nim c -r --threads:on " & f
+
+task "mtests", "Main module tests":
+    doMainModuleTests()
+
 task "tests", "Build and run autotests":
     let b = newBuilder()
 
@@ -17,6 +38,7 @@ task "tests", "Build and run autotests":
 
     if b.platform == "js":
         b.runAutotestsInFirefox()
+    doMainModuleTests()
 
 task "docs", "Build documentation":
     createDir "./build/doc"
