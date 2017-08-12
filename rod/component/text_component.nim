@@ -33,7 +33,7 @@ method init*(t: Text) =
     t.mText = newFormattedText()
 
 proc `text=`*(t: Text, text: string) =
-    t.mText.text = text
+    t.mText = newFormattedText(text)
     t.mText.processAttributedText()
     if not t.node.isNil and not t.node.sceneView.isNil:
         t.node.sceneView.setNeedsDisplay()
