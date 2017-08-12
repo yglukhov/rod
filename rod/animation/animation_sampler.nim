@@ -21,7 +21,7 @@ type
     BezierKeyFrameAnimationSampler*[T] = ref object of AnimationSampler[T]
         keys*: seq[BezierKeyFrame[T]]
 
-proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true, originalLen, cutFront: int): ArrayAnimationSampler[T] =
+proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true, originalLen: int = -1, cutFront: int = 0): ArrayAnimationSampler[T] =
     result.new()
     result.values = values
     result.valueType = getTypeId(T)
