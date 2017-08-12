@@ -5,6 +5,8 @@ import nimx.portable_gl
 import nimx.matrixes
 import nimx.types
 import nimx.context
+import nimx.formatted_text
+import nimx.font
 
 import rod.material.shader
 
@@ -162,3 +164,12 @@ proc DDdrawRect*(rect: Rect, color: Color = greenColor) =
     DDdrawLine( newVector3(rect.x, rect.y, 0.0), newVector3(rect.x, rect.y + rect.height, 0.0), color )
     DDdrawLine( newVector3(rect.x + rect.width, rect.y, 0.0), newVector3(rect.x + rect.width, rect.y + rect.height, 0.0), color )
     DDdrawLine( newVector3(rect.x, rect.y + rect.height, 0.0), newVector3(rect.x + rect.width, rect.y + rect.height, 0.0), color )
+
+proc DDdrawText*(text: string, p: Point, size: float = 16.0, color: Color = greenColor) =
+    var fText = newFormattedText()
+    let font = systemFontOfSize(size)
+    fText.setFontInRange(0, -1, font)
+    fText.text = text
+    fText.setTextColorInRange(0, -1, color)
+
+    currentContext().drawText(p, fText)

@@ -36,8 +36,12 @@ type
     Node* = Node3D
 
     BBox* = object
-        maxPoint*: Vector3
         minPoint*: Vector3
+        maxPoint*: Vector3
+
+    Frustum* = object
+        min*: Vector3
+        max*: Vector3
 
     Component* = ref object of RootRef
         node*: Node3D
@@ -114,4 +118,3 @@ type
         color*: Color
         velocity*: Vector3
         randStartScale*: float
-
