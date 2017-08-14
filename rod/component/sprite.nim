@@ -23,13 +23,15 @@ type Sprite* = ref object of Component
     mCurrentFrame*: int
     motionBlurRadius*: float
     segmentsGeometry: seq[float32] # Used for nine-part images
-    resourceUrl: string
+    when defined(debug):
+        resourceUrl: string
 
 template `currentFrame`*(s: Sprite): int =
     s.mCurrentFrame
 
 template `currentFrame=`*(s: Sprite, v: int)=
-    assert(v >= 0 and v < s.images.len, s.resourceUrl & " currentFrame out of range ")
+    when defined(debug):
+        assert(v >= 0 and v < s.images.len, s.resourceUrl & " currentFrame out of range ")
     s.mCurrentFrame = v
 
 proc image*(s: Sprite): Image =
@@ -103,7 +105,10 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     if not v.isNil:
         s.node.alpha = v.getFNum(1.0)
         logi "WARNING: Alpha in sprite component deprecated"
-    s.resourceUrl = serealizer.url
+        
+    when defined(debug):
+        s.resourceUrl = serealizer.url
+
     v = j{"images"}
     if v.isNil:
         v = j{"fileNames"}
