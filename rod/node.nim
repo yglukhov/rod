@@ -620,7 +620,7 @@ proc newNodeWithResource*(path: string): Node =
     result = newNodeWithUrl("res://" & path) do():
         done = true
     if not done:
-        raise newException(Exception, "newNodeWithResource could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
+        raise newException(Exception, "newNodeWithResource(" & path & ") could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
