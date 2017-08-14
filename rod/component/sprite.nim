@@ -29,9 +29,9 @@ type Sprite* = ref object of Component
 template `currentFrame`*(s: Sprite): int =
     s.mCurrentFrame
 
-template `currentFrame=`*(s: Sprite, v: int)=
-    when not defined(release):
-        assert(v >= 0 and v < s.images.len, s.resourceUrl & " currentFrame out of range ")
+template `currentFrame=`*(s: Sprite, v: int) =
+    # when not defined(release):
+    #     assert(v >= 0, s.resourceUrl & " currentFrame negative")
     s.mCurrentFrame = v
 
 proc image*(s: Sprite): Image =
