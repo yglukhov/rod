@@ -29,23 +29,11 @@ import nimx.pathutils
 
 import streams, strutils, algorithm, tables, hashes, math
 
-proc parseVector4(source: string): Vector4 =
-  var i = 0
-  for it in split(source):
-    result[i] = parseFloat(it)
-    inc(i)
-
 proc parseMatrix4(source: openarray[float32]): Matrix4 =
     var i = 0
     while i < result.len:
         result[i] = source[i]
         inc i
-
-proc isNear(v1, v2: float32): bool =
-    result = abs( v1 - v2 ) < 0.01.float32
-
-proc isEqual(v0x, v0y, v0z, v1x, v1y, v1z: float32): bool =
-    result = isNear(v0x, v1x) and isNear(v0y, v1y) and isNear(v0z, v1z)
 
 type VertexNormal = object
     vx, vy, vz, nx, ny, nz, tx, ty: float
