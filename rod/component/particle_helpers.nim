@@ -21,6 +21,17 @@ import rod.viewport
 import rod.component.camera
 
 type
+    Particle* = ref object
+        node*: Node
+        position*: Vector3
+        rotation*, rotationVelocity*: Vector3 #deg per sec
+        scale*: Vector3
+        lifetime*: float
+        normalizedLifeTime*: float
+        color*: Color
+        velocity*: Vector3
+        randStartScale*: float
+
     ParticleGenerationData* = object
         position*: Vector3
         direction*: Vector3
