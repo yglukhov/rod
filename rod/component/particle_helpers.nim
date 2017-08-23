@@ -21,16 +21,15 @@ import rod.viewport
 import rod.component.camera
 
 type
-    Particle* = ref object
-        node*: Node
+    Particle* = object
         position*: Vector3
         rotation*, rotationVelocity*: Vector3 #deg per sec
         scale*: Vector3
-        lifetime*: float
-        normalizedLifeTime*: float
+        lifetime*: float32
+        normalizedLifeTime*: float32
         color*: Color
         velocity*: Vector3
-        randStartScale*: float
+        randStartScale*: float32
 
     ParticleGenerationData* = object
         position*: Vector3
@@ -70,7 +69,7 @@ type
 method generate*(pgs: PSGenShape): ParticleGenerationData {.base.} = discard
 
 method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.base.} = discard
-method updateParticle*(attr: PSModifier, part: Particle) {.base.} = discard
+method updateParticle*(attr: PSModifier, part: var Particle) {.base.} = discard
 
 # -------------------- cone generator --------------------------
 method init(pgs: ConePSGenShape) =
@@ -254,7 +253,7 @@ method init(attr: PSModifierWave) =
     attr.forceValue = 0.1
     attr.frequence = 1
 
-method updateParticle*(attr: PSModifierWave, part: Particle) =
+method updateParticle*(attr: PSModifierWave, part: var Particle) =
     part.position.y += cos( (part.position.x + attr.node.position.x) / attr.frequence) * attr.forceValue
 
 method deserialize*(attr: PSModifierWave, j: JsonNode, s: Serializer) =
@@ -277,7 +276,7 @@ method init(attr: PSModifierColor) =
     attr.distance = 1
     attr.color = newColor(1.0, 1.0, 1.0, 1.0)
 
-method updateParticle*(attr: PSModifierColor, part: Particle) =
+method updateParticle*(attr: PSModifierColor, part: var Particle) =
     let distance_vec = attr.node.position - part.position
     var distance = distance_vec.length()
     distance = min(distance / attr.distance, 1.0)
@@ -302,7 +301,7 @@ method visitProperties*(attr: PSModifierColor, p: var PropertyVisitor) =
 method init(attr: PSModifierSpiral) =
     attr.force = 100
 
-method updateParticle*(attr: PSModifierSpiral, part: Particle) =
+method updateParticle*(attr: PSModifierSpiral, part: var Particle) =
     var distance_vec = newVector3()
     # distance_vec.x = part.position.x - attr.node.worldPos.x
     # distance_vec.y = part.position.z - attr.node.worldPos.z
@@ -338,7 +337,7 @@ method visitProperties*(attr: PSModifierSpiral, p: var PropertyVisitor) =
 method init(attr: PSModifierRandWind) =
     attr.force = newVector3(1,1,1)
 
-method updateParticle*(attr: PSModifierRandWind, part: Particle) =
+method updateParticle*(attr: PSModifierRandWind, part: var Particle) =
     var force: Vector3
     force.x = random(-attr.force.x .. attr.force.x)
     force.y = random(-attr.force.y .. attr.force.y)
