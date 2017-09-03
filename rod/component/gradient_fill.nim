@@ -11,6 +11,7 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen ]
 
 var effectLinear = newPostEffect("""
 void grad_fill_effect(vec2 startPoint, vec2 diff, vec4 startColor, vec4 endColor) {
@@ -41,6 +42,13 @@ type GradientFill* = ref object of Component
     startColor*: Color
     endColor*: Color
     shape*: RampShape
+
+GradientFill.properties:
+    startPoint
+    endPoint
+    startColor
+    endColor
+    shape
 
 method serialize*(gf: GradientFill, serealizer: Serializer): JsonNode =
     result = newJObject()
@@ -94,5 +102,7 @@ method visitProperties*(gf: GradientFill, p: var PropertyVisitor) =
     p.visitProperty("endPoint", gf.endPoint)
     p.visitProperty("endColor", gf.endColor)
     p.visitProperty("shape", gf.shape)
+
+genSerializationCodeForComponent(GradientFill)
 
 registerComponent(GradientFill, "Effects")

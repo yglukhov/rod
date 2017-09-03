@@ -1,9 +1,5 @@
-import nimx.types
-import nimx.context
-import nimx.image
-import nimx.animation
-import nimx.property_visitor
-import nimx.system_logger
+import nimx / [ types, context, image, animation, property_visitor, system_logger ]
+import nimx / assets / asset_manager
 
 import json, strutils
 
@@ -13,26 +9,33 @@ import rod.ray
 import rod.tools.serializer
 import rod.component
 
-#import image_blur
+import rod / utils / [property_desc, serialization_codegen ]
 
 type Sprite* = ref object of Component
     offset*: Point
     size*: Size
     frameOffsets*: seq[Point]
     images*: seq[Image]
-    mCurrentFrame*: int
-    motionBlurRadius*: float
+    mCurrentFrame*: int16
     segmentsGeometry: seq[float32] # Used for nine-part images
     when not defined(release):
         resourceUrl: string
 
+Sprite.properties:
+    images:
+        serializationKey: "fileNames"
+        combinedWith: frameOffsets
+
+    segmentsGeometry:
+        serializationKey: "segments"
+
 template `currentFrame`*(s: Sprite): int =
-    s.mCurrentFrame
+    int(s.mCurrentFrame)
 
 template `currentFrame=`*(s: Sprite, v: int) =
     # when not defined(release):
     #     assert(v >= 0, s.resourceUrl & " currentFrame negative")
-    s.mCurrentFrame = v
+    s.mCurrentFrame = int16(v)
 
 proc image*(s: Sprite): Image =
     if s.images.len > s.currentFrame:
@@ -92,7 +95,7 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
     a.loopDuration = float(s.images.len) * fps
     a.continueUntilEndOfLoopOnCancel = true
     a.onAnimate = proc(p: float) =
-        s.currentFrame = int(float(s.images.len - 1) * p)
+        s.currentFrame = int16(float(s.images.len - 1) * p)
     s.node.registerAnimation("sprite", a)
 
 method getBBox*(s: Sprite): BBox =
@@ -143,6 +146,12 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     if not v.isNil:
         s.size = newSize(v[0].getFNum(), v[1].getFNum())
 
+proc awake(c: Sprite) =
+    if c.images.len > 1:
+        c.createFrameAnimation()
+
+genSerializationCodeForComponent(Sprite)
+
 method serialize*(c: Sprite, s: Serializer): JsonNode =
     result = newJObject()
     result.add("currentFrame", s.getValue(c.currentFrame))
@@ -153,9 +162,12 @@ method serialize*(c: Sprite, s: Serializer): JsonNode =
     for img in c.images:
         imagesNode.add( s.getValue(s.getRelativeResourcePath(img.filePath())) )
 
+template curFrameAux(t: Sprite): int16 = t.mCurrentFrame
+template `curFrameAux=`(t: Sprite, f: int16) = t.mCurrentFrame = f
+
 method visitProperties*(t: Sprite, p: var PropertyVisitor) =
     p.visitProperty("image", t.image)
-    p.visitProperty("curFrame", t.currentFrame)
+    p.visitProperty("curFrame", t.curFrameAux)
     p.visitProperty("offset", t.offset)
 
 registerComponent(Sprite)

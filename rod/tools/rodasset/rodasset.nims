@@ -1,7 +1,7 @@
 --d:release
 --opt:speed
---stackTrace:off
---lineTrace:off
+--stackTrace:on
+--lineTrace:on
 --d:nimTrMacros
 --checks:on
 --threads:on

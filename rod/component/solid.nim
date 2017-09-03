@@ -9,10 +9,15 @@ import rod.node
 import rod.rod_types
 import rod.component
 import rod.tools.serializer
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type Solid* = ref object of Component
     size*: Size
     color*: Color
+
+Solid.properties:
+    size
+    color
 
 method init*(s: Solid) =
     s.color = whiteColor()
@@ -29,6 +34,8 @@ method deserialize*(s: Solid, j: JsonNode, serializer: Serializer) =
     v = j{"size"}
     if not v.isNil:
         s.size = newSize(v[0].getFNum(), v[1].getFNum())
+
+genSerializationCodeForComponent(Solid)
 
 method draw*(s: Solid) =
     let c = currentContext()

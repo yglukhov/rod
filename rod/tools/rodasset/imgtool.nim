@@ -13,7 +13,7 @@ import nimx.types except Point, Size, Rect
 import nimx.pathutils
 
 import imgtools / [ imgtools, texcompress, spritesheet_packer ]
-import tree_traversal
+import tree_traversal, binformat
 
 type
     ImageOccurenceInfo = object
@@ -40,6 +40,7 @@ type ImgTool* = ref object
     noquant*: seq[string]
     noposterize*: seq[string]
     index*: JsonNode
+    packCompositions*: bool
 
 proc newImgTool*(): ImgTool =
     result.new()
@@ -58,6 +59,7 @@ proc serializedImage(im: ImageOccurence, path: string): JsonNode =
     let h = im.spriteSheet.size.height.float
     result["tex"] = %*[(im.dstBounds.x.float + 0.5) / w, (im.dstBounds.y.float + 0.5) / h, ((im.dstBounds.x + im.dstBounds.width).float - 0.5) / w, ((im.dstBounds.y + im.dstBounds.height).float - 0.5) / h]
     result["size"] = %*[im.srcInfo.rect.width, im.srcInfo.rect.height]
+    result["off"] = %*[im.srcInfo.rect.x, im.srcInfo.rect.y]
 
 proc pathToPVR(path: string): string {.inline.} =
     result = path.changeFileExt("pvr")
@@ -69,6 +71,8 @@ proc adjustImageNode(tool: ImgTool, im: ImageOccurence) =
         ssPath = ssPath.pathToPVR()
 
     let result = im.serializedImage(relativePathToPath(tool.destPath(im.info.compPath).parentDir(), ssPath))
+    if tool.packCompositions:
+        result["orig"] = %relativePathToPath(tool.originalResPath, im.path) #im.path
     doAssert(not im.spriteSheet.isNil)
 
     if im.info.textureKey.isNil:
@@ -157,12 +161,15 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
                     ))
 
 proc createIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
-    let idx = newJObject()
+    let idx = newJArray()
     for im in occurences:
         var ssPath = im.spriteSheet.path.extractFilename()
         if tool.compressToPVR:
             ssPath = ssPath.pathToPVR()
-        idx[relativePathToPath(tool.originalResPath, im.path)] = im.serializedImage(ssPath)
+        let ji = im.serializedImage(ssPath)
+        ji["orig"] = %relativePathToPath(tool.originalResPath, im.path)
+        idx.add(ji)
+#        idx[relativePathToPath(tool.originalResPath, im.path)] = im.serializedImage(ssPath)
     tool.index = idx
 
 proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
@@ -242,7 +249,7 @@ proc run*(tool: ImgTool) =
     else:
         for ss in packer.spriteSheets:
             info "Optimizing ss: ", ss.path
-            spawnX optimizeSpritesheet(ss.path, ss.category)
+            #spawnX optimizeSpritesheet(ss.path, ss.category)
 
     # Readjust sprite nodes
     for o in occurences:
@@ -253,10 +260,8 @@ proc run*(tool: ImgTool) =
     for o in occurences:
         tool.processedImages.incl(o.path)
 
-    let packCompositions = false
-
     # Write all composisions to single file
-    if packCompositions:
+    if tool.packCompositions:
         let allComps = newJObject()
         for i, c in tool.compositions:
             if "aep_name" in c: c.delete("aep_name")
@@ -265,6 +270,7 @@ proc run*(tool: ImgTool) =
                 raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
             resName = resName.substr("res/".len)
             allComps[resName] = c
+            tool.compositionPaths[i] = resName
         var str = ""
         toUgly(str, allComps)
         writeFile(tool.resPath / "comps.jsonpack", str)
@@ -279,6 +285,11 @@ proc run*(tool: ImgTool) =
 
     tool.createIndex(occurences)
 
+    if tool.packCompositions:
+        let b = newBinSerializer()
+        b.writeCompositions(tool.compositions, tool.compositionPaths, tool.resPath / "comps.rodpack", tool.index)
+        echo "Comppack written: ", tool.resPath / "comps.rodpack", " alignment bytes: ", b.totalAlignBytes
+        
     sync() # Wait until spritesheet optimizations complete
 
 proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =

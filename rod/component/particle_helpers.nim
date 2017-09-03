@@ -14,6 +14,7 @@ import rod.quaternion
 import rod.component
 import rod.rod_types
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen ]
 import rod.node
 import rod.material.shader
 import rod.tools.debug_draw
@@ -39,11 +40,11 @@ type
         is2D*: bool
 
     ConePSGenShape* = ref object of PSGenShape
-        radius*: float
-        angle*: float
+        radius*: float32
+        angle*: float32
 
     SpherePSGenShape* = ref object of PSGenShape
-        radius*: float
+        radius*: float32
         isRandPos*: bool
         isRandDir*: bool
 
@@ -54,7 +55,7 @@ type
 
     PSModifierWave* = ref object of PSModifier
         frequence*: float32
-        forceValue*: float
+        forceValue*: float32
 
     PSModifierColor* = ref object of PSModifier
         distance: float32
@@ -65,6 +66,24 @@ type
 
     PSModifierRandWind* = ref object of PSModifier
         force: Vector3
+
+ConePSGenShape.properties:
+    radius
+    angle
+    is2D
+
+SpherePSGenShape.properties:
+    radius
+    isRandPos
+    isRandDir
+    is2D
+
+BoxPSGenShape.properties:
+    dimension
+    is2D
+
+PSModifierRandWind.properties:
+    force
 
 method generate*(pgs: PSGenShape): ParticleGenerationData {.base.} = discard
 
@@ -356,6 +375,10 @@ method serialize*(c: PSModifierRandWind, s: Serializer): JsonNode =
 method visitProperties*(attr: PSModifierRandWind, p: var PropertyVisitor) =
     p.visitProperty("force", attr.force)
 
+genSerializationCodeForComponent(ConePSGenShape)
+genSerializationCodeForComponent(SpherePSGenShape)
+genSerializationCodeForComponent(BoxPSGenShape)
+genSerializationCodeForComponent(PSModifierRandWind)
 
 registerComponent(ConePSGenShape, "ParticleSystem")
 registerComponent(SpherePSGenShape, "ParticleSystem")

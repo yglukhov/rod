@@ -15,6 +15,7 @@ import nimx.portable_gl
 import rod.rod_types
 import rod.node
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen ]
 import rod.component
 import rod.component.sprite
 import rod.component.solid
@@ -74,10 +75,15 @@ type MaskType* = enum
     tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
 
 type Mask* = ref object of Component
-    mMaskType: MaskType
+    maskType*: MaskType
     mMaskNode: Node
-    mMaskSprite: Sprite
+    maskSprite*: Sprite
     mWithRTI: bool
+
+Mask.properties:
+    maskType
+    layerName:
+        phantom: string
 
 proc findComponents*(n: Node, T: typedesc[Component]): auto =
     type TT = T
@@ -95,12 +101,6 @@ template maskNode*(msk: Mask): Node = msk.mMaskNode
 template `maskNode=`*(msk: Mask, val: Node) =
     msk.mMaskNode = val
     trySetupMask(msk)
-
-template maskSprite*(msk: Mask): Sprite = msk.mMaskSprite
-template `maskSprite=`*(msk: Mask, val: Sprite) = msk.mMaskSprite = val
-
-template maskType*(msk: Mask): MaskType = msk.mMaskType
-template `maskType=`*(msk: Mask, val: MaskType) = msk.mMaskType = val
 
 proc setupMaskComponent(msk: Mask) =
     if not msk.maskNode.isNil:
@@ -177,4 +177,13 @@ method visitProperties*(msk: Mask, p: var PropertyVisitor) =
     p.visitProperty("mask type", msk.maskType)
     p.visitProperty("layer name", msk.maskNode)
 
+proc toPhantom(c: Mask, p: var object) =
+    if not c.maskNode.isNil:
+        p.layerName = c.maskNode.name
+
+proc fromPhantom(c: Mask, p: object) =
+    if p.layerName.len != 0:
+        addNodeRef(c.maskNode, p.layerName)
+
+genSerializationCodeForComponent(Mask)
 registerComponent(Mask, "Effects")

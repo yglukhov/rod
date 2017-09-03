@@ -7,6 +7,7 @@ import rod.node
 import rod.component
 import rod.postprocess_context
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen ]
 
 type BlendMode * = enum
     COLOR_ADD = GL_ONE
@@ -15,6 +16,9 @@ type BlendMode * = enum
 
 type VisualModifier* = ref object of Component
     blendMode*: BlendMode
+
+VisualModifier.properties:
+    discard
 
 method init*(vm: VisualModifier) =
     procCall vm.Component.init()
@@ -44,4 +48,5 @@ method serialize*(vm: VisualModifier, s: Serializer): JsonNode=
     result = newJObject()
     result.add("blendMode", %($vm.blendMode).substr(5))
 
+genSerializationCodeForComponent(VisualModifier)
 registerComponent(VisualModifier, "Effects")

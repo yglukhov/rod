@@ -9,6 +9,7 @@ type GraphicsSettings* = ref object
     compressToPVR*: bool
     extrusion*: int
     disablePotAdjustment*: bool
+    packCompositions*: bool
     quantizeExceptions*: string
     posterizeExceptions*: string
 

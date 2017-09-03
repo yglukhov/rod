@@ -10,11 +10,17 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen ]
 
 type Tint* = ref object of Component
     black*: Color
     white*: Color
     amount*: float32
+
+Tint.properties:
+    black
+    white
+    amount
 
 var effect = newPostEffect("""
 void tint_effect(vec4 black, vec4 white, float amount) {
@@ -44,4 +50,5 @@ method visitProperties*(c: Tint, p: var PropertyVisitor) =
     p.visitProperty("white", c.white)
     p.visitProperty("amount", c.amount)
 
+genSerializationCodeForComponent(Tint)
 registerComponent(Tint, "Effects")

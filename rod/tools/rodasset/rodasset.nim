@@ -12,6 +12,7 @@ template settingsWithCmdLine(): Settings =
     s.graphics.compressOutput = not nocompress
     s.graphics.extrusion = extrusion
     s.graphics.disablePotAdjustment = disablePotAdjustment
+    s.graphics.packCompositions = packCompositions
     s.graphics.compressToPVR = compressToPVR
     s.graphics.quantizeExceptions = exceptions & "," & noquant
     s.graphics.posterizeExceptions = noposterize
@@ -19,6 +20,7 @@ template settingsWithCmdLine(): Settings =
 
 proc hash(audio: string = "ogg", downsampleRatio: float = 1.0, nocompress: bool = false,
     compressToPVR: bool = false, extrusion: int = 1, disablePotAdjustment: bool = false,
+    packCompositions: bool = false,
     exceptions: string = "", noposterize: string = "", noquant: string = "",
     path: string) =
     let s = settingsWithCmdLine()
@@ -74,7 +76,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles:
                 else:
                     convertAudio(r, dest, false)
             of ".json":
-                doIndex = true
+                doIndex = not tool.packCompositions
             of ".rab":
                 discard
             else:
@@ -90,7 +92,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles:
 
 proc pack(cache: string = "", exceptions: string = "", noposterize: string = "", noquant: string = "", compressToPVR: bool = false, nocompress: bool = false,
         downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
-        disablePotAdjustment: bool = false, audio: string = "ogg",
+        disablePotAdjustment: bool = false, audio: string = "ogg", packCompositions: bool = false,
         onlyCache: bool = false,
         src, dst: string) =
     addHandler(newConsoleLogger())
@@ -123,6 +125,7 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
         tool.extrusion = extrusion
         tool.disablePotAdjustment = disablePotAdjustment
         tool.packUnreferredImages = true
+        tool.packCompositions = packCompositions
         let startTime = epochTime()
         tool.run()
         echo "Done. Time: ", epochTime() - startTime

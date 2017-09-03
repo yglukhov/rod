@@ -10,9 +10,13 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen ]
 
 type ColorFill* = ref object of Component
     color*: Color
+
+ColorFill.properties:
+    color
 
 var effect = newPostEffect("""
 void color_fill_effect(vec4 color, float dummy) {
@@ -37,5 +41,7 @@ method afterDraw*(c: ColorFill, index: int) =
 
 method visitProperties*(c: ColorFill, p: var PropertyVisitor) =
     p.visitProperty("color", c.color)
+
+genSerializationCodeForComponent(ColorFill)
 
 registerComponent(ColorFill, "Effects")

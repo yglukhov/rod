@@ -1,0 +1,116 @@
+import macros, tables
+import property_desc
+
+
+proc genPhantomTypeSection(typdesc: NimNode): NimNode =
+    let fields = newNimNode(nnkRecList)
+    for p in typdesc.propertyDescs:
+        if p.hasAttr("phantom"):
+            fields.add(newIdentDefs(newIdentNode(p.name), p.attributes["phantom"]))
+    if fields.len > 0:
+        result = newNimNode(nnkTypeSection).add(newNimNode(nnkTypeDef).add(newIdentNode("Phantom"), newEmptyNode(),
+            newNimNode(nnkObjectTy).add(newEmptyNode(), newEmptyNode(), fields)))
+
+iterator serializablePropertyDescs(typdesc: NimNode): PropertyDesc =
+    for p in typdesc.propertyDescs:
+        if not p.hasAttr("noserialize"):
+            yield p
+
+proc serializationKey(p: PropertyDesc): NimNode =
+    if p.hasAttr("serializationKey"):
+        result = copyNimTree(p.attributes["serializationKey"])
+    else:
+        result = newLit(p.name)
+
+proc actualReference(p: PropertyDesc): NimNode =
+    let o = if p.hasAttr("phantom"): newIdentNode("phantom") else: newIdentNode("v")
+    newNimNode(nnkDotExpr).add(o, newIdentNode(p.name))
+
+proc propertyDescWithName(typdesc: NimNode, name: string): PropertyDesc =
+    for p in typdesc.propertyDescs:
+        if p.name == name: return p
+
+    # TODO: The following is a hack. Instead we should get property descs from the typdesc itself
+    result.name = name
+    result.attributes = initTable[string, NimNode]()
+
+proc actualReference(typdesc: NimNode, p: NimNode): NimNode =
+    result = copyNimTree(p)
+    var ident = result
+    while ident.kind == nnkDotExpr:
+        ident = ident[0]
+    ident.expectKind(nnkIdent)
+
+    let pd = typdesc.propertyDescWithName($ident)
+    if result.kind == nnkDotExpr:
+        result[0] = actualReference(pd)
+    else:
+        result = actualReference(pd)
+
+macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
+        serTyp: typed{nkSym}, keyed: static[bool], serialize: static[bool], bin: static[bool]): untyped =
+    let v = newIdentNode("v")
+    let s = newIdentNode("s")
+    let phantomIdent = newIdentNode("phantom")
+
+    let phantomTyp = genPhantomTypeSection(typdesc)
+
+    result = newProc(name, [newEmptyNode(), newIdentDefs(v, typdesc), newIdentDefs(s, serTyp)])
+
+    if not phantomTyp.isNil and phantomTyp.kind != nnkEmpty:
+        result.body.add(phantomTyp)
+        let pv = quote do:
+            var `phantomIdent`: Phantom
+        result.body.add(pv)
+
+        if serialize:
+            result.body.add(newCall("toPhantom", v, phantomIdent))
+
+    for p in typdesc.serializablePropertyDescs:
+        let visitCall = newCall(!"visit", s, actualReference(p))
+        if keyed: visitCall.add(p.serializationKey())
+
+        if bin and p.hasAttr("serializeLen"):
+            visitCall.add(typdesc.actualReference(p.attributes["serializeLen"]))
+
+        if p.hasAttr("combinedWith"):
+            let p1 = typdesc.propertyDescWithName($p.attributes["combinedWith"])
+            visitCall.add(actualReference(p1))
+            if keyed: visitCall.add(p1.serializationKey())
+
+        # if keyed and not serialize and not bin and p.hasAttr("default"):
+        #     visitCall.add(p.attributes["default"])
+
+        result.body.add(visitCall)
+        let echoCall = newCall("echo", newLit($serTyp & " " & p.name & ": "), actualReference(p))
+        result.body.add quote do:
+            when compiles(`echoCall`):
+                `echoCall`
+
+    if not phantomTyp.isNil and phantomTyp.kind != nnkEmpty:
+        if not serialize:
+            result.body.add(newCall("fromPhantom", v, phantomIdent))
+
+    if not serialize:
+        result.body.add quote do:
+            when compiles(awake(`v`)):
+                if not `s`.disableAwake:
+                    awake(`v`)
+
+    echo repr(result)
+
+template genSerializationCodeForComponent*(c: typed) =
+    import rod / utils / [ bin_deserializer, json_deserializer, json_serializer, bin_serializer ]
+
+    genSerializerProc(c, serializeAux, BinSerializer, false, true, true)
+    genSerializerProc(c, deserializeAux, BinDeserializer, false, false, true)
+    genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false)
+
+    method deserialize*(cm: c, b: JsonDeserializer) =
+        deserializeAux(cm, b)
+
+    method serialize*(cm: c, b: BinSerializer) =
+        serializeAux(cm, b)
+
+    method deserialize*(cm: c, b: BinDeserializer) =
+        deserializeAux(cm, b)
