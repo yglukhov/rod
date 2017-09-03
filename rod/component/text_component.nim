@@ -137,9 +137,9 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
         var horAlign = haLeft
         if not v.isNil:
             case v.getStr()
-            of "left": horAlign = haLeft
-            of "center": horAlign = haCenter
-            of "right": horAlign = haRight
+            of "left", "haLeft": horAlign = haLeft
+            of "center", "haCenter": horAlign = haCenter
+            of "right", "haRight": horAlign = haRight
             else: discard
 
         t.mText.horizontalAlignment = horAlign
@@ -148,9 +148,9 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
         var vertAlign = vaTop
         if not v.isNil:
             case v.getStr()
-            of "top": vertAlign = vaTop
-            of "center": vertAlign = vaCenter
-            of "bottom": vertAlign = vaBottom
+            of "top", "vaTop": vertAlign = vaTop
+            of "center", "vaCenter": vertAlign = vaCenter
+            of "bottom", "vaBottom": vertAlign = vaBottom
             else: discard
 
         t.mText.verticalAlignment = vertAlign
@@ -331,19 +331,19 @@ method serialize*(c: Text, s: Serializer): JsonNode =
 
     result.add("bounds", s.getValue([c.mBoundingOffset.x, c.mBoundingOffset.y, c.mText.boundingSize.width, c.mText.boundingSize.height]))
 
-    var horAlign = "left"
+    var horAlign = "haLeft"
     case c.mText.horizontalAlignment
-    of haLeft: horAlign = "left"
-    of haCenter: horAlign = "center"
-    of haRight: horAlign = "right"
+    of haLeft: horAlign = "haLeft"
+    of haCenter: horAlign = "haCenter"
+    of haRight: horAlign = "haRight"
     else: discard
     result.add("justification", s.getValue(horAlign))
 
-    var vertAlign = "top"
+    var vertAlign = "vaTop"
     case c.mText.verticalAlignment
-    of vaTop: vertAlign = "top"
-    of vaCenter: vertAlign = "center"
-    of vaBottom: vertAlign = "bottom"
+    of vaTop: vertAlign = "vaTop"
+    of vaCenter: vertAlign = "vaCenter"
+    of vaBottom: vertAlign = "vaBottom"
     else: discard
     result.add("verticalAlignment", s.getValue(vertAlign))
 
