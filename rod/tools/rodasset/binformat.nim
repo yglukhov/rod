@@ -2,11 +2,10 @@ import json, streams, sequtils, sets, algorithm, tables, strutils, parseutils, o
 import tree_traversal
 
 import nimx.pathutils
-import rod.utils.bin_serializer
-import rod.utils.json_deserializer
-import rod.component.all_components
-import rod.node
-import rod.component
+import ../../utils/[ bin_serializer, json_deserializer ]
+import ../../node
+import ../../component
+import ../../component/all_components
 
 export bin_serializer
 
