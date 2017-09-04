@@ -41,7 +41,9 @@ Text.properties:
 
     bounds(phantom = Rect)
     lineSpacing(phantom = float32)
-    horizontalAlignment(phantom = HorizontalTextAlignment)
+    horizontalAlignment:
+        phantom: HorizontalTextAlignment
+        serializationKey: "justification"
     verticalAlignment(phantom = VerticalAlignment)
     isColorGradient(phantom = bool)
     isStrokeGradient(phantom = bool)
@@ -354,6 +356,10 @@ proc toPhantom(c: Text, p: var object) =
     if fontFace != systemFont().face:
         p.font = fontFace
 
+    let fs = c.fontSize
+    if fs != systemFontSize():
+        p.fontSize = fs
+
     p.isColorGradient = c.isColorGradient
     if p.isColorGradient:
         p.color = c.colorFrom
@@ -393,6 +399,9 @@ proc fromPhantom(c: Text, p: object) =
 
     if font.isNil:
         font = systemFontOfSize(fontSize)
+
+    font.face = p.font # Hack for bin format conversion. Should be fixed somehow?
+
     c.mText.setFontInRange(0, -1, font)
 
     if p.isColorGradient:

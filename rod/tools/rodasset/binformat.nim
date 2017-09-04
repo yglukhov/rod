@@ -227,73 +227,6 @@ type
         vaBottom
 
 
-proc writeTextComponent(b: BinSerializer, j: JsonNode) =
-    b.write(j["text"].str)
-
-    var attrs: set[TextAttributes]
-    if "font" in j: attrs.incl(taFont)
-    if "fontSize" in j: attrs.incl(taFontSize)
-    if j{"isColorGradient"}.getBVal():
-        attrs.incl(taColorGradient)
-    elif "color" in j: attrs.incl(taColor)
-
-    if "shadowColor" in j: attrs.incl(taShadow)
-    if "strokeSize" in j: attrs.incl(taStroke)
-    if j{"isStrokeGradient"}.getBVal(): attrs.incl(taStrokeGradient)
-    if "bounds" in j: attrs.incl(taBounds)
-    if "lineSpacing" in j: attrs.incl(taLineSpacing)
-
-    b.write(cast[int16](attrs))
-
-    if taFont in attrs:
-        b.write(j["font"].str)
-    if taFontSize in attrs:
-        b.write(j["fontSize"].getFNum())
-
-    if taColor in attrs:
-        b.writeColor(j["color"])
-    elif taColorGradient in attrs:
-        b.writeColor(j["colorFrom"])
-        b.writeColor(j["colorTo"])
-
-    if taShadow in attrs:
-        if "shadowOff" in j:
-            b.writeVecf(2, j["shadowOff"])
-        else:
-            b.write(j["shadowX"].getFNum())
-            b.write(j["shadowY"].getFNum())
-
-        b.writeColor(j["shadowColor"])
-        b.write(j{"shadowSpread"}.getFNum())
-        b.write(j{"shadowRadius"}.getFNum())
-
-    if taStroke in attrs:
-        b.write(j["strokeSize"].getFNum())
-        if taStrokeGradient in attrs:
-            b.writeColor(j["strokeColorFrom"])
-            b.writeColor(j["strokeColorTo"])
-        else:
-            b.writeColor(j["strokeColor"])
-
-    if taBounds in attrs:
-        b.writeVecf(4, j["bounds"])
-
-    if taLineSpacing in attrs:
-        b.write(j["lineSpacing"].getFNum())
-
-    let horAling = case j{"justification"}.getStr("left")
-        of "right": haRight
-        of "center": haCenter
-        else: haLeft
-
-    let vertAlign = case j{"verticalAlignment"}.getStr("top")
-        of "center": vaCenter
-        of "bottom": vaBottom
-        else: vaTop
-
-    b.write(int8(horAling))
-    b.write(int8(vertAlign))
-
 proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonNode]) =
     let numBuffers = j["buffers"].len.int16
     b.write(numBuffers)
@@ -375,9 +308,8 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode]) =
             "AELayer", "ColorFill", "GradientFill", "Tint", "CompRef",
             "ColorBalanceHLS", "ChannelLevels", "Mask", "SpherePSGenShape",
             "PSModifierRandWind", "BoxPSGenShape", "ConePSGenShape",
-            "VisualModifier", "Text":
+            "VisualModifier", "Text", "PSHolder":
         b.writeComponents(c, name)
-#    of "Text": b.writeComponents(c, writeTextComponent)
     of "AEComposition":
         b.writeComponents(c) do(j: JsonNode):
             writeAECompositionComponent(b, j, nodes)
