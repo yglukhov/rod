@@ -186,8 +186,6 @@ void main()
 }
 """
 
-var ps_gravity_y_direction = 1.0
-
 type
     ParticleModeEnum* = enum
         BeetwenValue
@@ -212,7 +210,6 @@ type
         particlesVertexBuff: seq[float32]
         indexBufferSize: int
         particles: seq[Particle]
-        newParticles: seq[Particle]
         vertexDesc: VertexDesc
         worldTransform: Matrix4
         shader*: Shader
@@ -304,10 +301,7 @@ proc calculateVertexDesc(ps: ParticleSystem): VertexDesc =
 proc maxParticlesCount(ps: ParticleSystem): int =
     result = int(ceil(ps.birthRate) * ceil(ps.lifetime))
 
-proc createParticle(ps: ParticleSystem, index, count: int, dt: float): Particle =
-    result = Particle.new()
-    result.node = ps.node
-
+proc initParticle(ps: ParticleSystem, result: var Particle, index, count: int, dt: float) =
     var interpolatePos: Vector3
     var interpolateDt: float
     if count > 0:
@@ -358,7 +352,6 @@ proc initSystem(ps: ParticleSystem) =
     ps.indexBuffer = gl.createBuffer()
     ps.fillIBuffer()
 
-    ps.newParticles = newSeq[Particle]()
     ps.particles = newSeq[Particle]( ps.maxParticlesCount() )
 
     if particleShader.isNil:
@@ -500,24 +493,43 @@ proc getValueAtTime[T](s: seq[T], time: float): T =
 
     return val
 
+proc getGravityYDirection(ps: ParticleSystem): float32 {.inline.} =
+    let view = ps.node.sceneView
+    var projMatrix : Matrix4
+    view.camera.getProjectionMatrix(view.bounds, projMatrix)
+    result = abs(projMatrix[5]) / projMatrix[5]
+
+proc numberOfParticlesToGenerate(ps: ParticleSystem, dt: float32): int {.inline.} =
+    # Warning: this is not pure.
+    if (ps.remainingDuration > 0 or ps.isLooped) and ps.isPlayed:
+        ps.remainingDuration -= dt
+        let curTime = epochTime()
+        let perParticleTime = 1.0 / ps.birthRate
+        if curTime - ps.lastBirthTime > perParticleTime:
+            let pCount = int((curTime - ps.lastBirthTime) / perParticleTime)
+            result = pCount
+            ps.lastBirthTime = curTime
+
 proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
-    var newParticlesCount = ps.newParticles.len
+    var particlesToGenerate = ps.numberOfParticlesToGenerate(dt)
+    let newParticlesCount = particlesToGenerate
     ps.count = 0
 
+    var newI = 0
     var v1, v2, v3, v4: int
     let vertexSize = ps.getVertexSize()
 
+    let gravityYDirection = ps.getGravityYDirection()
+
     for i in 0 ..< ps.particles.len:
-        if ps.particles[i].isNil:
-            continue
-
-        # if we have dead particle than we insert new from newParticle array
-        if ps.particles[i].lifetime <= 0.0 and newParticlesCount > 0:
-            newParticlesCount.dec()
-            ps.particles[i] = ps.newParticles[newParticlesCount]
-
-        elif ps.particles[i].lifetime <= 0.0:
-            continue
+        # if we have dead particle than we create a new one
+        if ps.particles[i].lifetime <= 0.0:
+            if particlesToGenerate > 0:
+                dec particlesToGenerate
+                ps.initParticle(ps.particles[i], newI, newParticlesCount, dt)
+                inc newI
+            else:
+                continue
 
         if ps.particlesVertexBuff.len <= (ps.count + 1) * 4 * vertexSize:
             for j in 0 .. 4 * vertexSize:
@@ -539,7 +551,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
 
         ps.particles[i].velocity.x += ps.gravity.x*dt
-        ps.particles[i].velocity.y += ps.gravity.y*dt * ps_gravity_y_direction
+        ps.particles[i].velocity.y += ps.gravity.y*dt * gravityYDirection
         ps.particles[i].velocity.z += ps.gravity.z*dt
         ps.particles[i].position.x += ps.particles[i].velocity.x*dt
         ps.particles[i].position.y += ps.particles[i].velocity.y*dt
@@ -642,13 +654,15 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             return
 
     # if we have new particles
-    for i in 0 .. newParticlesCount - 1:
-        ps.particles.add(ps.newParticles[i])
+    if particlesToGenerate > 0:
+        let oldLen = ps.particles.len
+        let newLen = oldLen + particlesToGenerate
+        ps.particles.setLen(newLen)
+        for i in oldLen ..< newLen:
+            ps.initParticle(ps.particles[i], newI, newParticlesCount, dt)
+            inc newI
 
 proc update(ps: ParticleSystem, dt: float) =
-    let perParticleTime = 1.0 / ps.birthRate
-    let curTime = epochTime()
-
     ps.worldTransform = ps.node.worldTransform()
     ps.lastPos = ps.curPos
     ps.curPos = ps.node.worldPos
@@ -663,23 +677,7 @@ proc update(ps: ParticleSystem, dt: float) =
     if ps.indexBufferSize < ps.maxParticlesCount():
         ps.fillIBuffer()
 
-    if (ps.remainingDuration > 0 or ps.isLooped) and ps.isPlayed:
-        ps.remainingDuration -= dt
-
-        if curTime - ps.lastBirthTime > perParticleTime:
-            let pCount = int((curTime - ps.lastBirthTime) / perParticleTime)
-            for i in 0 ..< pCount:
-                ps.newParticles.add(ps.createParticle(i, pCount, dt))
-
-            ps.lastBirthTime = curTime
-
-    let view = ps.node.sceneView
-    var projMatrix : Matrix4
-    view.camera.getProjectionMatrix(view.bounds, projMatrix)
-    ps_gravity_y_direction = abs(projMatrix[5]) / projMatrix[5]
-
     ps.updateParticlesBuffer(dt)
-    ps.newParticles.setLen(0)
 
 method draw*(ps: ParticleSystem) =
     let dt = getDeltaTime() #ps.currentTime - ps.lastTime

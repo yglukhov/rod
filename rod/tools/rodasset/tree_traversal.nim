@@ -1,13 +1,19 @@
-import json
+import json, lists
+
+proc append[T](lst: var DoublyLinkedList[T], elems: openarray[T]) =
+    for e in elems: lst.append(e)
 
 iterator allNodes*(n: JsonNode): JsonNode =
-    var stack = @[n]
-    while stack.len > 0:
-        let n = stack.pop()
+    var lst = initDoublyLinkedList[JsonNode]() # SinglyLinkedList would be sufficient here, but its api is currently underdeveloped
+    lst.append(n)
+
+    while not lst.head.isNil:
+        let n = lst.head.value
+        lst.remove(lst.head)
         yield n
         let children = n{"children"}
         if not children.isNil:
-            stack.add(children.elems)
+            lst.append(children.elems)
 
 iterator componentNodes*(n: JsonNode): tuple[typ: string, node: JsonNode] =
     let components = n{"components"}

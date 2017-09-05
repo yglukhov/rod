@@ -59,6 +59,11 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int) =
     if not jN.isNil:
         val = jN.getNum().int
 
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int16) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = jN.getNum().int16
+
 proc getDeserialized[T: enum](s: Serializer, j: JsonNode, name: string, val: var T) =
     let jN = j{name}
     if not jN.isNil:
