@@ -374,6 +374,8 @@ proc orderComponents(c: HashSet[string]): seq[string] =
         "Tint",
         "ChannelLevels",
         "ColorFill",
+        "GradientFill",
+        "Mask",
 
         "other", # Everything else
 

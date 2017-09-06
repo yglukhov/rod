@@ -249,7 +249,7 @@ proc run*(tool: ImgTool) =
     else:
         for ss in packer.spriteSheets:
             info "Optimizing ss: ", ss.path
-            #spawnX optimizeSpritesheet(ss.path, ss.category)
+            spawnX optimizeSpritesheet(ss.path, ss.category)
 
     # Readjust sprite nodes
     for o in occurences:
