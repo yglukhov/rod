@@ -1,4 +1,4 @@
-import os, strutils, times, osproc, sets, logging
+import os, strutils, times, osproc, sets
 import imgtool, asset_cache, migrator
 import settings except hash
 import json except hash
@@ -95,7 +95,6 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
         disablePotAdjustment: bool = false, audio: string = "ogg", packCompositions: bool = false,
         onlyCache: bool = false,
         src, dst: string) =
-    addHandler(newConsoleLogger())
     let src = expandTilde(src)
     let dst = expandTilde(dst)
     let cache = getCache(cache)
