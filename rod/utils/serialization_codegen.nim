@@ -70,8 +70,8 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
         let visitCall = newCall(!"visit", s, actualReference(p))
         if keyed: visitCall.add(p.serializationKey())
 
-        if bin and p.hasAttr("serializeLen"):
-            visitCall.add(typdesc.actualReference(p.attributes["serializeLen"]))
+        # if bin and p.hasAttr("serializeLen"):
+        #     visitCall.add(typdesc.actualReference(p.attributes["serializeLen"]))
 
         if p.hasAttr("combinedWith"):
             let p1 = typdesc.propertyDescWithName($p.attributes["combinedWith"])

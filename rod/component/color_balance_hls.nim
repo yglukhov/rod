@@ -27,8 +27,7 @@ ColorBalanceHLS.properties:
     saturation
     lightness
     hlsMin
-    hlsMax:
-        default: 1.0
+    hlsMax
 
 var effect = newPostEffect("""
 float cbhls_effect_Epsilon = 1e-10;

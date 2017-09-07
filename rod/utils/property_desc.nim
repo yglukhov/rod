@@ -63,9 +63,15 @@ proc parsePropertyDescs(properties: NimNode): seq[PropertyDesc] =
             echo "Unexpected property desc kind: ", treeRepr(p)
             assert(false)
 
+proc verifyProperties(pr: seq[PropertyDesc]) =
+    for p in pr:
+        for a in keys(p.attributes):
+            assert(a in ["serializationKey", "noserialize", "phantom", "combinedWith"], "Invalid attribute: " & a)
+
 macro properties*(typdesc: typed{nkSym}, body: untyped): untyped =
     let k = $typdesc
     # if k notin props:
     #     props[k] = @[]
     assert(k notin props)
     props[k] = parsePropertyDescs(body)
+    verifyProperties(props[k])

@@ -32,7 +32,7 @@ AELayer.properties:
     inPoint
     outPoint
     animScale:
-        serializrionKey: "scale"
+        serializationKey: "scale"
     startTime
     duration
 
