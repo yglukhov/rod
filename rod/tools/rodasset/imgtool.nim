@@ -3,7 +3,7 @@ import os, osproc, json, strutils, times, sequtils, tables, sets, logging
 const multithreaded = compileOption("threads")
 
 when multithreaded:
-    import threadpool
+    import threadpool_simple
     template `^^`[T](e: FlowVar[T]): untyped = ^e
 else:
     template sync() = discard
