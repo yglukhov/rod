@@ -15,3 +15,4 @@ requires "https://github.com/yglukhov/imgtools"
 requires "cligen"
 requires "https://github.com/yglukhov/zip" # Until https://github.com/nim-lang/zip/pull/21 is merged
 requires "tempfile"
+requires "https://github.com/yglukhov/threadpools"
