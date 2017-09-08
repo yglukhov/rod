@@ -25,6 +25,7 @@ import rod.viewport
 import rod.ray
 import rod.rod_types
 import rod.tools.serializer
+import rod.utils.bin_deserializer
 import rod.utils.image_serialization
 
 import animation.skeleton
@@ -503,6 +504,9 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
         m.boneIDs = newSeq[Glfloat]()
         s.deserializeValue(j, "vertexWeights", m.vertexWeights)
         s.deserializeValue(j, "boneIDs", m.boneIDs)
+
+method deserialize*(c: MeshComponent, b: BinDeserializer) =
+    c.deserializeFromJson(b)
 
 method serialize*(c: MeshComponent, s: Serializer): JsonNode =
     result = newJObject()

@@ -76,9 +76,9 @@ proc updateDopesheetCurves(v: AnimationEditView) =
 proc addEditedProperty(v: AnimationEditView, name: string) =
     var ep: EditedProperty
     var ap: AnimatedProperty
-    ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, name)
+    ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, nil, -1, name)
     ep.name = name
-    ap.name = name
+    ap.propName = name
     template createCurve(T: typedesc): typed =
         ep.curve = newAnimationCurve[T]()
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
@@ -124,9 +124,9 @@ proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
     if not a.isNil:
         for ap in a.animatedProperties:
             var ep: EditedProperty
-            ep.name = ap.name
+            ep.name = ap.propName
             try:
-                ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.name)
+                ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.nodeName, ap.compIndex, ap.propName)
                 template createCurve(T: typedesc): typed =
                     if ap.sampler of BezierKeyFrameAnimationSampler[T]:
                         ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))

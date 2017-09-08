@@ -14,6 +14,7 @@ import rod.component.particle_helpers
 import rod.component.camera
 import rod.material.shader
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen ]
 
 import nimx.matrixes
 import nimx.animation
@@ -203,7 +204,7 @@ type
     ParticleSystem* = ref object of Component
         animation*: Animation
         count: int32
-        lastBirthTime: float
+        lastBirthTime: float32
 
         vertexBuffer: BufferRef
         indexBuffer: BufferRef
@@ -214,14 +215,14 @@ type
         worldTransform: Matrix4
         shader*: Shader
 
-        birthRate*: float
-        lifetime*: float
+        birthRate*: float32
+        lifetime*: float32
         texture*: Image
         isTextureAnimated*: bool
         frameSize*: Size
-        animColumns*: int
-        framesCount*: int
-        fps*: float
+        animColumns*: int16
+        framesCount*: int16
+        fps*: float32
 
         startColor*, dstColor*: Color
         startScale*, dstScale*: Vector3
@@ -232,8 +233,8 @@ type
         gravity*: Vector3
         airDensity*: float32
 
-        duration*: float
-        remainingDuration: float
+        duration*: float32
+        remainingDuration: float32
         isLooped*: bool
         isPlayed*: bool
         is3dRotation*: bool
@@ -254,6 +255,45 @@ type
 
         isBlendAdd*: bool
         hasDepthTest*: bool
+
+ParticleSystem.properties:
+    duration
+    birthRate
+    lifetime
+    startVelocity
+    randVelocityFrom
+    randVelocityTo
+    startRotation
+    randRotVelocityFrom
+    randRotVelocityTo
+    startScale
+    dstScale
+    randScaleFrom
+    randScaleTo
+    startColor
+    dstColor
+    gravity
+    airDensity
+    texture
+    frameSize:
+        serializationKey: "texSize"
+    animColumns
+    framesCount
+    fps
+    genShapeNode:
+        phantom: string
+    modifierNode:
+        phantom: string
+    scaleMode
+    colorMode
+    scaleSeq
+    colorSeq
+    hasDepthTest
+    isLooped
+    isPlayed
+    is3dRotation
+    isBlendAdd
+    isTextureAnimated
 
 # -------------------- Particle System --------------------------
 proc randomBetween(fromV, toV: float32): float32 =
@@ -384,9 +424,6 @@ proc cleanup*(ps: ParticleSystem) =
     if ps.vertexBuffer != invalidBuffer:
         gl.deleteBuffer(ps.vertexBuffer)
         ps.vertexBuffer = invalidBuffer
-
-proc newParticleSystem(): ParticleSystem =
-    new(result, cleanup)
 
 method init(ps: ParticleSystem) =
     ps.isInited = false
@@ -681,7 +718,6 @@ proc update(ps: ParticleSystem, dt: float) =
 
 method draw*(ps: ParticleSystem) =
     let dt = getDeltaTime() #ps.currentTime - ps.lastTime
-    ps.node.sceneView.setNeedsDisplay()
     let gl = currentContext().gl
 
     if not ps.isInited:
@@ -847,7 +883,17 @@ method deserialize*(ps: ParticleSystem, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "colorSeq", ps.colorSeq)
     s.deserializeValue(j, "hasDepthTest", ps.hasDepthTest)
 
-    # ps.initSystem()
+proc toPhantom(c: ParticleSystem, p: var object) =
+    if not c.genShapeNode.isNil: p.genShapeNode = c.genShapeNode.name
+    if not c.modifierNode.isNil: p.modifierNode = c.modifierNode.name
+
+proc fromPhantom(c: ParticleSystem, p: object) =
+    if not p.genShapeNode.len != 0:
+        addNodeRef(c.genShapeNode, p.genShapeNode)
+    if not p.modifierNode.len != 0:
+        addNodeRef(c.modifierNode, p.modifierNode)
+
+genSerializationCodeForComponent(ParticleSystem)
 
 method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
     result = newJObject()
@@ -969,7 +1015,15 @@ type
 
         # debug data
         isMove*: bool
-        amplitude*, frequency*, distance*, speed*: float
+        amplitude*, frequency*, distance*, speed*: float32
+
+PSHolder.properties:
+    amplitude
+    frequency
+    distance
+    speed
+    played
+    isMove
 
 method init(h: PSHolder) =
     h.played = true
@@ -1034,9 +1088,12 @@ method visitProperties*(h: PSHolder, p: var PropertyVisitor) =
     p.visitProperty("distance", h.distance)
     p.visitProperty("speed", h.speed)
 
+genSerializationCodeForComponent(PSHolder)
 registerComponent(PSHolder, "ParticleSystem")
 
 proc creator(): RootRef =
-    result = newParticleSystem()
+    var p: ParticleSystem
+    p.new(cleanup)
+    return p
 
 registerComponent(ParticleSystem, creator, "ParticleSystem")
