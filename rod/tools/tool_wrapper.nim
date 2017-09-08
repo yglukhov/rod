@@ -19,7 +19,10 @@ proc nimblePath(package: string): string =
 
 proc compileRealBin(bin, toolName, mainNim: string) =
     createDir(bin.parentDir())
-    var args = @[findExe("nim"), "c", "--threads:on", "-d:release", "--stackTrace:on", "--lineTrace:on", "--out:" & bin]
+    var args = @[findExe("nim"), "c", "--threads:on", "-d:release",
+        "--stackTrace:on", "--lineTrace:on",
+        "-d:rodplugin",
+        "--out:" & bin]
     let plug = rodPluginFile()
     if plug.len != 0:
         args.add("-d:rodPluginFile=" & plug)
