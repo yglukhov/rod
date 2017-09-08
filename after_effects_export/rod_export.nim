@@ -524,15 +524,15 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
 
         case textDoc.justification
         of tjLeft:
-            txt["justification"] = %"left"
+            txt["justification"] = %"haLeft"
             if not textRect.isNil:
                 txt["bounds"] = % [textRect.left, textRect.top, boxSize.x, boxSize.y]
         of tjRight:
-            txt["justification"] = %"right"
+            txt["justification"] = %"haRight"
             if not textRect.isNil:
                 txt["bounds"] = % [textRect.left + textRect.width - boxSize.x, textRect.top, boxSize.x, boxSize.y]
         of tjCenter:
-            txt["justification"] = %"center"
+            txt["justification"] = %"haCenter"
             if not textRect.isNil:
                 txt["bounds"] = % [textRect.left + textRect.width / 2.0 - boxSize.x / 2.0, textRect.top, boxSize.x, boxSize.y]
 
