@@ -1,10 +1,14 @@
-import os, strutils, times, osproc, sets, logging
+import os, strutils, times, osproc, sets, logging, macros
 import imgtool, asset_cache, migrator
 import settings except hash
 import json except hash
 import tempfile
 
-
+const rodPluginFile {.strdefine.} = ""
+when rodPluginFile.len != 0:
+    macro doImport(): untyped =
+        newNimNode(nnkImportStmt).add(newLit(rodPluginFile))
+    doImport()
 
 template settingsWithCmdLine(): Settings =
     let s = newSettings()
