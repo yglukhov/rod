@@ -227,23 +227,28 @@ type
 
 
 proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonNode]) =
-    let numBuffers = j["buffers"].len.int16
+    let jbufs = j{"buffers"}
+    var numBuffers = 0'i16
+    if not jbufs.isNil:
+        numBuffers = jbufs.len.int16
+
     b.write(numBuffers)
-    for k, v in j["buffers"]:
-        var nodeName, propName: string
-        var compIdx: int
-        splitPropertyName(k, nodeName, compIdx, propName)
-        b.write(nodeName)
-        b.write(propName)
-        let frameLerp = v{"frameLerp"}.getBVal(true)
-        let len = v["len"].num
-        let cutf = v["cutf"].num
-        b.write(int8(frameLerp))
-        b.write(int16(len))
-        b.write(int16(cutf))
-        let vals = v["values"]
-        b.write(int16(vals.len))
-        b.writeSamplerValues(propName, vals)
+    if jbufs.isNil:
+        for k, v in jbufs:
+            var nodeName, propName: string
+            var compIdx: int
+            splitPropertyName(k, nodeName, compIdx, propName)
+            b.write(nodeName)
+            b.write(propName)
+            let frameLerp = v{"frameLerp"}.getBVal(true)
+            let len = v["len"].num
+            let cutf = v["cutf"].num
+            b.write(int8(frameLerp))
+            b.write(int16(len))
+            b.write(int16(cutf))
+            let vals = v["values"]
+            b.write(int16(vals.len))
+            b.writeSamplerValues(propName, vals)
 
     let numMarkers = j["markers"].len.int16
     b.write(numMarkers)
@@ -253,10 +258,14 @@ proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonN
         b.write(v["duration"].getFNum())
 
 
-    let numLayers = j["layers"].len.int16
+    let jlayers = j{"layers"}
+    var numLayers = 0'i16
+    if not jlayers.isNil:
+        numLayers = jlayers.len.int16
     b.write(numLayers)
-    for la in j["layers"]:
-        b.write(la.str)
+    if not jlayers.isNil:
+        for la in jlayers:
+            b.write(la.str)
 
 proc writeButtonComponent(b: BinSerializer, j: JsonNode) =
     b.writeVecf(4, j["bounds"])
