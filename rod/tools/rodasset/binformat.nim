@@ -233,7 +233,7 @@ proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonN
         numBuffers = jbufs.len.int16
 
     b.write(numBuffers)
-    if jbufs.isNil:
+    if not jbufs.isNil:
         for k, v in jbufs:
             var nodeName, propName: string
             var compIdx: int
