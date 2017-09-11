@@ -14,7 +14,7 @@ import rod.quaternion
 import rod.component
 import rod.rod_types
 import rod.tools.serializer
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 import rod.node
 import rod.material.shader
 import rod.tools.debug_draw

@@ -7,7 +7,7 @@ import rod.node
 import rod.component
 import rod.postprocess_context
 import rod.tools.serializer
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type BlendMode * = enum
     COLOR_ADD = GL_ONE

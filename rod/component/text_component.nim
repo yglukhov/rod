@@ -15,7 +15,7 @@ import rod.viewport
 import rod.tools.serializer
 import rod.tools.debug_draw
 import rod.utils.attributed_text
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 
 export formatted_text
 

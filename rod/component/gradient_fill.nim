@@ -11,7 +11,7 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 
 var effectLinear = newPostEffect("""
 void grad_fill_effect(vec2 startPoint, vec2 diff, vec4 startColor, vec4 endColor) {
