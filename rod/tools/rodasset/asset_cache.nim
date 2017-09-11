@@ -1,6 +1,9 @@
 import securehash, os, osproc, algorithm, strutils, times, hashes
 
 import settings
+import nimx.class_registry
+import rod.component
+import rod.utils.serialization_hash_calculator
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
@@ -35,6 +38,21 @@ proc getFileNameFromMovedGitStatusLine(statusLine: string): string {.inline.} =
     const separator = " -> "
     let idx = statusLine.rfind(separator)
     result = statusLine[idx + separator.len .. ^1]
+
+proc componentsHash(): Hash =
+    var componentNames = newSeq[string]()
+    for c in registeredSubclassesOfType(Component):
+        componentNames.add(c)
+
+    componentNames.sort() do(a, b: string) -> int:
+        cmp(a, b)
+
+    var calc = newSerializationHashCalculator()
+    for n in componentNames:
+        let c = newObjectOfClass(n).Component
+        c.serializationHash(calc)
+
+    result = calc.hash
 
 proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
     result = newStringOfCap(2048)
@@ -86,7 +104,7 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
         result &= $hash(s.graphics)
         result &= ';'
 
-    result &= ";" & $hashVersion
+    result &= ";" & $hashVersion & ";" & $componentsHash()
 
     result = ($secureHash(result)).toLowerAscii()
 
@@ -117,7 +135,7 @@ proc dirHashImplNoGit(path: string, s: Settings): string =
     if hasGraphics:
         hashStr &= $hash(s.graphics) & ";"
 
-    hashStr &= $hashVersion
+    hashStr &= $hashVersion & $componentsHash()
 
     result = ($secureHash(hashStr)).toLowerAscii()
 

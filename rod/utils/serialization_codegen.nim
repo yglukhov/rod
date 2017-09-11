@@ -48,7 +48,8 @@ proc actualReference(typdesc: NimNode, p: NimNode): NimNode =
         result = actualReference(pd)
 
 macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
-        serTyp: typed{nkSym}, keyed: static[bool], serialize: static[bool], bin: static[bool]): untyped =
+        serTyp: typed{nkSym}, keyed: static[bool], serialize: static[bool],
+        bin: static[bool], skipPhantom: static[bool]): untyped =
     let v = newIdentNode("v")
     let s = newIdentNode("s")
     let phantomIdent = newIdentNode("phantom")
@@ -63,7 +64,7 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
             var `phantomIdent`: Phantom
         result.body.add(pv)
 
-        if serialize:
+        if serialize and not skipPhantom:
             result.body.add(newCall("toPhantom", v, phantomIdent))
 
     for p in typdesc.serializablePropertyDescs:
@@ -88,7 +89,7 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
         #         `echoCall`
 
     if not phantomTyp.isNil and phantomTyp.kind != nnkEmpty:
-        if not serialize:
+        if not serialize and not skipPhantom:
             result.body.add(newCall("fromPhantom", v, phantomIdent))
 
     if not serialize:
@@ -97,20 +98,29 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
                 if not `s`.disableAwake:
                     awake(`v`)
 
-    echo repr(result)
+    #echo repr(result)
 
 template genSerializationCodeForComponent*(c: typed) =
-    import rod / utils / [ bin_deserializer, json_deserializer, json_serializer, bin_serializer ]
+    import rod / utils / [ bin_deserializer ]
 
-    genSerializerProc(c, serializeAux, BinSerializer, false, true, true)
-    genSerializerProc(c, deserializeAux, BinDeserializer, false, false, true)
-    genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false)
+    when defined(rodplugin):
+        import rod / utils / [ json_deserializer, json_serializer,
+                bin_serializer, serialization_hash_calculator ]
 
-    method deserialize*(cm: c, b: JsonDeserializer) =
-        deserializeAux(cm, b)
+        genSerializerProc(c, serializeAux, BinSerializer, false, true, true, false)
+        genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
+        genSerializerProc(c, calcSerializationHashAux, SerializationHashCalculator, true, true, false, true)
 
-    method serialize*(cm: c, b: BinSerializer) =
-        serializeAux(cm, b)
+        method deserialize*(cm: c, b: JsonDeserializer) =
+            deserializeAux(cm, b)
+
+        method serialize*(cm: c, b: BinSerializer) =
+            serializeAux(cm, b)
+
+        method serializationHash*(cm: c, b: SerializationHashCalculator) =
+            calcSerializationHashAux(cm, b)
+
+    genSerializerProc(c, deserializeAux, BinDeserializer, false, false, true, false)
 
     method deserialize*(cm: c, b: BinDeserializer) =
         deserializeAux(cm, b)
