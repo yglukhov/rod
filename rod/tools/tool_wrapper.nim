@@ -38,8 +38,7 @@ proc runWrapper*(toolName, pathToToolMainNim: string) =
     let cd = getCurrentDir()
     let projName = splitPath(cd).tail
 
-    let bin = tmp / projName & "_" & toolName
-
+    let bin = tmp / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
     var needsCompile = not fileExists(bin)
     if needsCompile:
         echo "Compiling ", toolName
