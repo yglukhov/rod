@@ -170,7 +170,7 @@ proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string
         if not c.isNil:
             nodeIds.add(int16(n["_id"].num))
             var p = parentDir(path) & "/" & c.str
-            normalizePath(p)
+            normalizePath(p, false)
             components.add(p)
 
     b.write($bicCompRef)
@@ -202,28 +202,6 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode) =
     c.serialize(b)
     n.children = nil # Break cycle to let gc collect it faster
 
-type
-    TextAttributes = enum
-        taFont
-        taFontSize
-        taColor
-        taColorGradient
-        taShadow
-        taStroke
-        taStrokeGradient
-        taBounds
-        taLineSpacing
-
-    HorizontalTextAlignment = enum # Copypaste
-        haLeft
-        haRight
-        haCenter
-        haJustify
-
-    VerticalAlignment = enum # Copypaste
-        vaTop
-        vaCenter
-        vaBottom
 
 
 proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonNode]) =
@@ -508,7 +486,7 @@ proc writeCompositions*(b: BinSerializer, comps: openarray[JsonNode], paths: ope
     b.stringEntries = newSeqOfCap[int32](256)
     b.compsTable = initTable[string, int32]()
     b.images = images
-
+    
     for i, c in comps:
         discard b.newString(paths[i])
         b.align(sizeof(int16))
