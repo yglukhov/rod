@@ -9,7 +9,7 @@ import rod.ray
 import rod.tools.serializer
 import rod.component
 
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type Sprite* = ref object of Component
     offset*: Point

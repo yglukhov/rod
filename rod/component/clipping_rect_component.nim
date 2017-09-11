@@ -6,7 +6,7 @@ import nimx.view
 import nimx.property_visitor
 
 import rod.node, rod.viewport, rod.component, rod.tools.serializer, rod.rod_types
-import rod / utils / [property_desc, bin_deserializer, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 import json
 import opengl
 

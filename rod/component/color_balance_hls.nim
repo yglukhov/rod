@@ -10,7 +10,7 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type ColorBalanceHLS* = ref object of Component
     hue*: float32

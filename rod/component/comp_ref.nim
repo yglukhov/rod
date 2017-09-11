@@ -3,7 +3,7 @@ import json
 import nimx / [ types, matrixes, property_visitor, resource ]
 import rod / [ node, rod_types, component, tools/serializer ]
 import rod.component.sprite
-import rod / utils / [property_desc, bin_deserializer, serialization_codegen ]
+import rod / utils / [property_desc, serialization_codegen ]
 
 type CompRef* = ref object of Component
     size*: Size

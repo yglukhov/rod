@@ -15,7 +15,7 @@ import nimx.portable_gl
 import rod.rod_types
 import rod.node
 import rod.tools.serializer
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 import rod.component
 import rod.component.sprite
 import rod.component.solid

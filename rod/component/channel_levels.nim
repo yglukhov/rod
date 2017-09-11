@@ -11,7 +11,7 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
-import rod / utils / [property_desc, serialization_codegen ]
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type ChannelLevels* = ref object of Component
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: Coord
