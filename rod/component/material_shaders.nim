@@ -260,27 +260,26 @@ uniform vec4 uLightColor7;
 
 #define mipBias -16.0
 
-mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
-    vec3 dp1 = vec3(dFdx(p.x),dFdx(p.y),dFdx(p.z));
-    vec3 dp2 = vec3(dFdy(p.x),dFdy(p.y),dFdy(p.z));
-    vec2 duv1 = vec2(dFdx(uv.x),dFdx(uv.y));
-    vec2 duv2 = vec2(dFdy(uv.x),dFdy(uv.y));
-    #ifdef GL_ES
-        highp vec3 dp2perp = cross( dp2, N );
-        highp vec3 dp1perp = cross( N, dp1 );
-        highp vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-        highp vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
-    #else
-        vec3 dp2perp = cross( dp2, N );
-        vec3 dp1perp = cross( N, dp1 );
-        vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
-        vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
-    #endif
-    float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
-    return mat3( T * invmax, B * invmax, N );
-}
-
 #ifdef WITH_NORMAL_SAMPLER
+    mat3 cotangent_frame( vec3 N, vec3 p, vec2 uv ) {
+        vec3 dp1 = vec3(dFdx(p.x),dFdx(p.y),dFdx(p.z));
+        vec3 dp2 = vec3(dFdy(p.x),dFdy(p.y),dFdy(p.z));
+        vec2 duv1 = vec2(dFdx(uv.x),dFdx(uv.y));
+        vec2 duv2 = vec2(dFdy(uv.x),dFdy(uv.y));
+        #ifdef GL_ES
+            highp vec3 dp2perp = cross( dp2, N );
+            highp vec3 dp1perp = cross( N, dp1 );
+            highp vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+            highp vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+        #else
+            vec3 dp2perp = cross( dp2, N );
+            vec3 dp1perp = cross( N, dp1 );
+            vec3 T = dp2perp * duv1.x + dp1perp * duv2.x;
+            vec3 B = dp2perp * duv1.y + dp1perp * duv2.y;
+        #endif
+        float invmax = inversesqrt( max( dot(T,T), dot(B,B) ) );
+        return mat3( T * invmax, B * invmax, N );
+    }
     #define WITH_NORMALMAP_UNSIGNED
     vec3 perturb_normal( vec3 N, vec3 V, vec2 texcoord ){
         vec3 map = texture2D(normalMapUnit, texcoord, mipBias).xyz * uNormalPercent;
