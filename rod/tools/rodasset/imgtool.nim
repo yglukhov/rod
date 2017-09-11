@@ -1,4 +1,5 @@
 import os, osproc, json, strutils, times, sequtils, tables, sets, logging
+import nimx.pathutils
 
 const multithreaded = compileOption("threads")
 
@@ -240,7 +241,7 @@ proc run*(tool: ImgTool) =
     var occurences = tool.collectImageOccurences()
     tool.setCategories(occurences)
 
-    let packer = newSpriteSheetPacker(tool.resPath / tool.outPrefix)
+    let packer = newSpriteSheetPacker(tool.resPath & "/" & tool.outPrefix)
     packer.pack(occurences)
 
     if tool.compressToPVR:
@@ -273,7 +274,7 @@ proc run*(tool: ImgTool) =
             tool.compositionPaths[i] = resName
         var str = ""
         toUgly(str, allComps)
-        writeFile(tool.resPath / "comps.jsonpack", str)
+        writeFile(tool.resPath & "/" & "comps.jsonpack", str)
     else:
         # Write compositions back to files
         for i, c in tool.compositions:

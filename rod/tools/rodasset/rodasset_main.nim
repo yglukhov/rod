@@ -3,6 +3,7 @@ import imgtool, asset_cache, migrator
 import settings except hash
 import json except hash
 import tempfile
+import nimx.pathutils
 
 const rodPluginFile {.strdefine.} = ""
 when rodPluginFile.len != 0:
@@ -117,7 +118,10 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
         tool.noposterize = @[]
         for f in walkDirRec(src):
             if f.endsWith(".json"):
-                tool.compositionPaths.add(f)
+                var tp = f
+                normalizePath(tp, false)
+                tool.compositionPaths.add(tp)
+                
         for e in split(exceptions, ","): tool.noquant.add(e)
         for e in split(noquant, ","): tool.noquant.add(e)
         for e in split(noposterize, ","): tool.noposterize.add(e)
