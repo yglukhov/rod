@@ -6,7 +6,8 @@ import node
 import rod_types
 import ray
 import rod.tools.serializer
-import rod / utils / [bin_deserializer, json_deserializer, bin_serializer, json_serializer]
+import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
+                json_serializer, serialization_hash_calculator ]
 
 export Component
 
@@ -82,6 +83,7 @@ method deserialize*(c: Component, b: BinDeserializer) {.base.} =
 method deserialize*(c: Component, s: JsonDeserializer) {.base.} = discard
 method serialize*(c: Component, s: BinSerializer) {.base.} = discard
 method serialize*(c: Component, s: JsonSerializer) {.base.} = discard
+method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
 
 type UpdateProcComponent = ref object of Component
     updateProc: proc()
