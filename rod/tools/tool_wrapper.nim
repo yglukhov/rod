@@ -43,7 +43,7 @@ proc runWrapper*(toolName, pathToToolMainNim: string) =
     if needsCompile:
         echo "Compiling ", toolName
         compileRealBin(bin, toolName, pathToToolMainNim)
-    
+
     # Run the tool
     var args = @[bin]
     for i in 1 .. paramCount():
