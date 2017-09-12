@@ -825,7 +825,14 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
                 let compRef = b.readStr()
                 let subComp = newNodeWithResource(compRef)
                 let old = nodes[tmpBuf[i]]
-                old.children = subComp.children
+
+                for c in subComp.children:
+                    c.parent = old
+
+                if old.children.len != 0:
+                    old.children = subComp.children & old.children
+                else:
+                    old.children = subComp.children
                 old.animations = subComp.animations
                 for c in subComp.components: c.node = old
                 if old.components.isNil:
@@ -836,8 +843,6 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
                 #old.rotation = subComp.rotation
                 #old.scale = subComp.scale
                 #old.anchor = subComp.anchor
-                for c in old.children:
-                    c.parent = old
         else:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
