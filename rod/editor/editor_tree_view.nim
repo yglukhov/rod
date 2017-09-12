@@ -144,7 +144,7 @@ method setEditedNode*(v: EditorTreeView, n: Node)=
     var indexPath = newSeq[int]()
     if not n.isNil:
         v.getTreeViewIndexPathForNode(n, indexPath)
-        v.outlineView.expandRow(indexPath)
+        v.outlineView.expandBranch(indexPath[0..^2])
 
     if indexPath.len > 1:
         v.outlineView.selectItemAtIndexPath(indexPath)
