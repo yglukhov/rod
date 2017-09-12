@@ -256,22 +256,13 @@ type
         hasDepthTest*: bool
 
 # -------------------- Particle System --------------------------
-proc randomBetween(fromV, toV: float32): float32 =
+proc randomBetween(fromV, toV: float32): float32 {.inline.} =
     result = random(fromV - toV) + toV
 
 proc randomBetween(fromV, toV: Vector3): Vector3 =
-    result.x = random(fromV.x - toV.x) + toV.x
-    result.y = random(fromV.y - toV.y) + toV.y
-    result.z = random(fromV.z - toV.z) + toV.z
-
-proc getVertexSizeof(ps: ParticleSystem): int =
-    result = (ps.vertexDesc.positionSize +
-        ps.vertexDesc.rotationSize +
-        ps.vertexDesc.scaleSize +
-        ps.vertexDesc.alphaSize +
-        ps.vertexDesc.colorSize +
-        ps.vertexDesc.idSize +
-        ps.vertexDesc.lifeTimeSize) * sizeof(float32)
+    result.x = randomBetween(fromV.x, toV.x)
+    result.y = randomBetween(fromV.y, toV.y)
+    result.z = randomBetween(fromV.z, toV.z)
 
 proc getVertexSize(ps: ParticleSystem): int =
     result = ps.vertexDesc.positionSize +
@@ -281,6 +272,9 @@ proc getVertexSize(ps: ParticleSystem): int =
         ps.vertexDesc.idSize +
         ps.vertexDesc.colorSize +
         ps.vertexDesc.lifeTimeSize
+
+proc getVertexSizeof(ps: ParticleSystem): int {.inline.} =
+    result = ps.getVertexSize() * sizeof(float32)
 
 proc newVertexDesc(posSize, rotSize, scSize, aSize, colorSize, idSize, lifeTimeSize: int32): VertexDesc =
     result.positionSize = posSize
@@ -328,13 +322,14 @@ proc fillIBuffer(ps: ParticleSystem) =
     ps.indexBufferSize = ps.maxParticlesCount() * 6
 
     for i in 0 ..< ps.indexBufferSize:
-        ib.add(GLushort(4*i + 0))
-        ib.add(GLushort(4*i + 1))
-        ib.add(GLushort(4*i + 2))
+        let start = GLushort(4 * i)
+        ib.add(start + 0)
+        ib.add(start + 1)
+        ib.add(start + 2)
 
-        ib.add(GLushort(4*i + 0))
-        ib.add(GLushort(4*i + 2))
-        ib.add(GLushort(4*i + 3))
+        ib.add(start + 0)
+        ib.add(start + 2)
+        ib.add(start + 3)
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ib, gl.STATIC_DRAW)
@@ -519,7 +514,8 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
     var v1, v2, v3, v4: int
     let vertexSize = ps.getVertexSize()
 
-    let gravityYDirection = ps.getGravityYDirection()
+    var gravity = ps.gravity * dt
+    gravity.y *= ps.getGravityYDirection()
 
     for i in 0 ..< ps.particles.len:
         # if we have dead particle than we create a new one
@@ -550,12 +546,8 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             density_vec.normalize()
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
 
-        ps.particles[i].velocity.x += ps.gravity.x*dt
-        ps.particles[i].velocity.y += ps.gravity.y*dt * gravityYDirection
-        ps.particles[i].velocity.z += ps.gravity.z*dt
-        ps.particles[i].position.x += ps.particles[i].velocity.x*dt
-        ps.particles[i].position.y += ps.particles[i].velocity.y*dt
-        ps.particles[i].position.z += ps.particles[i].velocity.z*dt
+        ps.particles[i].velocity += gravity
+        ps.particles[i].position += ps.particles[i].velocity * dt
 
         # rotation
         if ps.is3dRotation:
