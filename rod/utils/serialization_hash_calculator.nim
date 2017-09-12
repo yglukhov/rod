@@ -1,5 +1,6 @@
 import hashes
 import nimx / [ types, image ]
+import rod.quaternion
 
 type SerializationHashCalculator* = ref object
     hash*: Hash
@@ -10,6 +11,7 @@ proc newSerializationHashCalculator*(): SerializationHashCalculator =
 type ValueType = enum
     tyFloat32
     tyInt16
+    tyInt32
     tyEnum
     tyBool
     tyColor
@@ -20,6 +22,7 @@ type ValueType = enum
     tyImage
     tySeq
     tyArray
+    tyQuaternion
 
 proc mix(b: SerializationHashCalculator, t: int) =
     b.hash = b.hash !& t
@@ -39,6 +42,9 @@ proc visit*(b: SerializationHashCalculator, v: float32, key: string) =
 
 proc visit*(b: SerializationHashCalculator, v: int16, key: string) =
     b.mix(tyInt16, key)
+
+proc visit*(b: SerializationHashCalculator, v: int32, key: string) =
+    b.mix(tyInt32, key)
 
 proc visit*[T: enum](b: SerializationHashCalculator, v: T, key: string) =
     b.mix(tyEnum, key)
@@ -78,3 +84,6 @@ proc visit*[I: static[int], T](b: SerializationHashCalculator, v: array[I, T], k
     b.mix(tyArray, key)
     b.mix(I)
     b.mix(333)
+
+proc visit*(b: SerializationHashCalculator, v: Quaternion, key: string) =
+    b.mix(tyQuaternion, key)

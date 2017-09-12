@@ -17,6 +17,8 @@ import rod.node
 import rod.viewport
 import rod.tools.serializer
 
+import rod / utils / [property_desc, serialization_codegen ]
+
 import math
 import opengl
 import json
@@ -293,7 +295,7 @@ type
         color*: Color
 
         numberOfIndexes: GLushort
-        quadsToDraw*: int
+        quadsToDraw*: int32
 
         gravityDirection: Vector3
         gravity*: Vector3
@@ -341,6 +343,30 @@ type
 
         bIsTiled: bool
         tiles: float32
+
+
+Trail.properties:
+    image:
+        serializationKey: "trailImage"
+    matcap:
+        serializationKey: "trailMatcap"
+
+    directRotation #quaternion
+    color #color
+    gravity #vector
+    quadsToDraw #int
+    widthOffset #float
+    heightOffset #float
+    angleThreshold #float
+    imagePercent #float
+    matcapPercent #float
+    tiles #float
+    cutSpeed #float
+    bDepth #bool
+    bStretch #bool
+    bCollapsible #bool
+    isWireframe #bool
+    bIsTiled #bool
 
 template getUniformLocation(gl: GL, t: Trail, name: cstring): UniformLocation =
     inc t.iUniform
@@ -980,4 +1006,5 @@ method visitProperties*(t: Trail, p: var PropertyVisitor) =
 proc creator(): RootRef =
     result = newTrail()
 
+genSerializationCodeForComponent(Trail)
 registerComponent(Trail, creator)

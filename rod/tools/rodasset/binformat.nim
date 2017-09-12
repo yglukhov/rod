@@ -179,13 +179,14 @@ proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string
     for i in 0 ..< nodeIds.len:
         b.write(components[i])
 
-proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode) =
+proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, compPath: string) =
     let n = newNode()
     let c = n.addComponent(className)
     let s = newJsonDeserializer()
     s.node = j
     s.images = b.images
     s.disableAwake = true
+    s.compPath = relativePathToPath(b.assetBundlePath, compPath)
     let oldNodeRefTab = nodeLoadRefTable
     nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
     defer: nodeLoadRefTable = oldNodeRefTab
@@ -201,8 +202,6 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode) =
 
     c.serialize(b)
     n.children = nil # Break cycle to let gc collect it faster
-
-
 
 proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonNode]) =
     let jbufs = j{"buffers"}
@@ -271,11 +270,11 @@ proc writeComponents(b: BinSerializer, nodes: seq[JsonNode], writer: proc(j: Jso
     for n in nodes:
         writer(n)
 
-proc writeComponents(b: BinSerializer, nodes: seq[JsonNode], className: string) =
+proc writeComponents(b: BinSerializer, nodes: seq[JsonNode], className: string, compPath: string) =
     for n in nodes:
-        writeSingleComponent(b, className, n)
+        writeSingleComponent(b, className, n, compPath)
 
-proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode]) =
+proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compPath: string) =
     b.write(name)
 
     var nodeIds = newSeqOfCap[int16](nodes.len)
@@ -294,8 +293,8 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode]) =
             "AELayer", "ColorFill", "GradientFill", "Tint", "CompRef",
             "ColorBalanceHLS", "ChannelLevels", "Mask", "SpherePSGenShape",
             "PSModifierRandWind", "BoxPSGenShape", "ConePSGenShape",
-            "VisualModifier", "Text", "PSHolder":
-        b.writeComponents(c, name)
+            "VisualModifier", "Text", "PSHolder", "Trail":
+        b.writeComponents(c, name, compPath)
     of "AEComposition":
         b.writeComponents(c) do(j: JsonNode):
             writeAECompositionComponent(b, j, nodes)
@@ -413,7 +412,7 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
     var allCompNames = initSet[string]()
     for n in nodes:
         if not isDefault(n, "translation", [0.0, 0, 0]): builtInComponents.incl(bicTranslation)
-        if "rotation" in n: builtInComponents.incl(bicRotation)
+        if not isDefault(n, "rotation", [0.0, 0, 0, 1.0]): builtInComponents.incl(bicRotation)
         if not isDefault(n, "anchor", [0.0, 0, 0]): builtInComponents.incl(bicAnchorPoint)
         if not isDefault(n, "scale", [1.0, 1, 1]): builtInComponents.incl(bicScale)
         if "alpha" in n: builtInComponents.incl(bicAlpha)
@@ -428,7 +427,7 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
     b.write(int16(numComponents))
 
     if bicTranslation in builtInComponents: writeBuiltInComponents[array[3, float32]](b, bicTranslation, "translation", nodes, [0'f32, 0, 0])
-    if bicRotation in builtInComponents: writeBuiltInComponents[array[4, float32]](b, bicRotation, "rotation", nodes)
+    if bicRotation in builtInComponents: writeBuiltInComponents[array[4, float32]](b, bicRotation, "rotation", nodes, [0.0'f32, 0.0, 0.0, 1.0])
     if bicAnchorPoint in builtInComponents: writeBuiltInComponents[array[3, float32]](b, bicAnchorPoint, "anchor", nodes, [0'f32, 0, 0])
     if bicScale in builtInComponents: writeBuiltInComponents[array[3, float32]](b, bicScale, "scale", nodes, [1'f32, 1, 1])
     if bicAlpha in builtInComponents: b.writeAlphaComponents(nodes)
@@ -441,7 +440,7 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
     echo "COMPS: ", orderedComps
 
     for compName in orderedComps:
-        b.writeComponents(compName, nodes)
+        b.writeComponents(compName, nodes, path)
 
     b.writeAnimations(comp)
 
@@ -488,7 +487,7 @@ proc writeCompsTable(b: BinSerializer, paths: openarray[string], s: Stream) =
     for p in spaths:
         s.write(b.revStrTab[p])
 
-proc writeCompositions*(b: BinSerializer, comps: openarray[JsonNode], paths: openarray[string], s: Stream, images: JsonNode) =
+proc writeCompositions(b: BinSerializer, comps: openarray[JsonNode], paths: openarray[string], s: Stream, images: JsonNode) =
     b.strTab = initTable[int16, string]()
     b.revStrTab = initTable[string, int16]()
     b.stream = newStringStream()

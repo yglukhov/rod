@@ -1,11 +1,13 @@
-import json, strutils
+import json, strutils, ospaths, strutils
 
-import nimx / [ image, types ]
+import nimx / [ image, types, pathutils ]
+import rod.quaternion
 
 type JsonDeserializer* = ref object
     node*: JsonNode
     images*: JsonNode
     disableAwake*: bool
+    compPath*: string # Path relative to bundle root
     
 proc newJsonDeserializer*(): JsonDeserializer =
     result.new()
@@ -40,16 +42,18 @@ proc imageDesc(b: JsonDeserializer, path: string): JsonNode =
         if j["orig"].str == path:
             return j
 
-    assert(false, "Image desc not found: " & path)
+    doAssert(false, "Image desc not found: " & path)
             
-proc imagePath(jimage: JsonNode): string =
+proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
     case jimage.kind
-    of JString: result = jimage.str
+    of JString:
+        result = b.compPath.parentDir / jimage.str
+        normalizePath(result, false)
     of JObject: result = jimage["orig"].str
-    else: assert(false)
+    else: doAssert(false)
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode, offset: var Point): Image =
-    let path = j.imagePath
+    var path = b.imagePath(j)
     let desc = b.imageDesc(path)
     let sz = desc["size"]
     let joff = desc{"off"}
@@ -67,6 +71,11 @@ proc visit*(b: JsonDeserializer, v: var int16, key: string) =
     let j = b.node{key}
     if not j.isNil:
         v = int16(j.getNum())
+
+proc visit*(b: JsonDeserializer, v: var int32, key: string) =
+    let j = b.node{key}
+    if not j.isNil:
+        v = int32(j.getNum())
 
 proc visit*[T: enum](b: JsonDeserializer, v: var T, key: string) =
     let j = b.node{key}
@@ -139,3 +148,9 @@ proc visit*[I: static[int], T](b: JsonDeserializer, v: var array[I, T], key: str
     if not j.isNil:
         for i in 0 ..< I:
             get(j[i], v[i])
+
+
+proc visit*(b: JsonDeserializer, v: var Quaternion, key: string) =
+    let j = b.node{key}
+    if not j.isNil:
+        v = newQuaternion(j[0].getFNum(), j[1].getFNum(), j[2].getFNum(), j[3].getFNum())
