@@ -2,7 +2,7 @@ import streams, tables, json
 
 import nimx / [ image, types, assets/asset_manager ]
 import rod.utils.property_desc
-
+import rod.quaternion
 type
     BinDeserializer* = ref object
         strtab: seq[string]
@@ -174,6 +174,9 @@ proc visit*(b: BinDeserializer, v: var float32) {.inline.} =
 proc visit*(b: BinDeserializer, v: var int16) {.inline.} =
     v = b.readInt16()
 
+proc visit*(b: BinDeserializer, v: var int32) {.inline.} =
+    v = b.readInt32()
+
 proc visit*[T: enum](b: BinDeserializer, v: var T) {.inline.} =
     when ord(high(T)) < high(int8):
         v = cast[T](b.readInt8())
@@ -198,6 +201,10 @@ proc visit*(b: BinDeserializer, v: var Point) =
 proc visit*(b: BinDeserializer, v: var Rect) =
     let buf = b.getBuffer(float32, 4)
     v = newRect(buf[0], buf[1], buf[2], buf[3])
+
+proc visit*(b: BinDeserializer, v: var Quaternion) =
+    let buf = b.getBuffer(float32, 4)
+    v = newQuaternion(buf[0], buf[1], buf[2], buf[3])
 
 proc visit*(b: BinDeserializer, v: var string) {.inline.} =
     v = b.readStr()

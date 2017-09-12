@@ -288,6 +288,7 @@ proc run*(tool: ImgTool) =
 
     if tool.packCompositions:
         let b = newBinSerializer()
+        b.assetBundlePath = tool.originalResPath.substr("res/".len)
         b.writeCompositions(tool.compositions, tool.compositionPaths, tool.resPath / "comps.rodpack", tool.index)
         echo "Comppack written: ", tool.resPath / "comps.rodpack", " alignment bytes: ", b.totalAlignBytes
         

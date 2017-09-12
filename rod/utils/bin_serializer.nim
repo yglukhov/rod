@@ -1,5 +1,6 @@
 import tables, streams, json
-import nimx / [image, types]
+import nimx / [image, types ]
+import rod.quaternion
 
 type
     BinSerializer* = ref object
@@ -10,6 +11,7 @@ type
         stringEntries*: seq[int32]
         images*: JsonNode
         totalAlignBytes*: int
+        assetBundlePath*: string
 
 proc newBinSerializer*(): BinSerializer =
     result.new()
@@ -24,6 +26,10 @@ proc align*(b: BinSerializer, sz: int) =
             b.stream.write(0xff'u8)
 
 proc write*(b: BinSerializer, id: int16) {.inline.} =
+    b.align(sizeof(id))
+    b.stream.write(id)
+
+proc write*(b: BinSerializer, id: int32) {.inline.} =
     b.align(sizeof(id))
     b.stream.write(id)
 
@@ -77,6 +83,9 @@ proc visit*(b: BinSerializer, v: float32) {.inline.} =
 proc visit*(b: BinSerializer, v: int16) {.inline.} =
     b.write(v)
 
+proc visit*(b: BinSerializer, v: int32) {.inline.} =
+    b.write(v)
+
 proc visit*[T: enum](b: BinSerializer, v: T) {.inline.} =
     when ord(high(T)) < high(int8):
         b.write(ord(v).int8)
@@ -104,6 +113,12 @@ proc visit*(b: BinSerializer, v: Rect) =
     b.write(v.y)
     b.write(v.width)
     b.write(v.height)
+
+proc visit*(b: BinSerializer, v: Quaternion) =
+    b.write(v.x)
+    b.write(v.y)
+    b.write(v.z)
+    b.write(v.w)
 
 proc visit*(b: BinSerializer, v: string) {.inline.} =
     b.write(v)
