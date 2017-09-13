@@ -296,14 +296,17 @@ proc maxParticlesCount(ps: ParticleSystem): int =
     result = int(ceil(ps.birthRate) * ceil(ps.lifetime))
 
 proc initParticle(ps: ParticleSystem, result: var Particle, index, count: int, dt: float) =
-    var interpolatePos: Vector3
-    var interpolateDt: float
-    if count > 0:
-        let ic = float(index) / float(count)
-        interpolatePos = (ps.curPos - ps.lastPos) * ic
-        interpolateDt = dt * ic
+    if ps.genShape.isNil:
+        result.position = newVector3()
+        result.velocity = newVector3()
+    else:
+        var interpolatePos: Vector3
+        var interpolateDt: float
+        if count > 0:
+            let ic = float(index) / float(count)
+            interpolatePos = (ps.curPos - ps.lastPos) * ic
+            interpolateDt = dt * ic
 
-    if not ps.genShape.isNil:
         let gData = ps.genShape.generate()
         result.position = ps.worldTransform * (gData.position) - interpolatePos
         result.velocity = ps.worldTransform.transformDirection(gData.direction) * (ps.startVelocity + randomBetween(ps.randVelocityFrom, ps.randVelocityTo))
@@ -517,6 +520,8 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
     var gravity = ps.gravity * dt
     gravity.y *= ps.getGravityYDirection()
 
+    let maxParticlesCount = ps.maxParticlesCount
+
     for i in 0 ..< ps.particles.len:
         # if we have dead particle than we create a new one
         if ps.particles[i].lifetime <= 0.0:
@@ -541,7 +546,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         v4 = vertexSize* (4 * ps.count + 3)
 
         # positions
-        if abs(ps.airDensity) > 0.0:
+        if ps.airDensity != 0.0:
             var density_vec = ps.particles[i].velocity
             density_vec.normalize()
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
@@ -642,7 +647,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
 
         ps.count.inc()
 
-        if ps.count > ps.maxParticlesCount():
+        if ps.count > maxParticlesCount:
             return
 
     # if we have new particles
