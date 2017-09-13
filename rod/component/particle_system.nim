@@ -203,7 +203,11 @@ type
     ParticleSystem* = ref object of Component
         animation*: Animation
         count: int32
-        lastBirthTime: float
+
+        # Number of particles that should have been generated on previous frame,
+        # according to its dt. This value is always < 1, but should be considered
+        # for current frame.
+        fractionOfParticlesToGenerate: float32
 
         vertexBuffer: BufferRef
         indexBuffer: BufferRef
@@ -365,7 +369,7 @@ proc initSystem(ps: ParticleSystem) =
     ps.genShapeNode = ps.node
 
     ps.remainingDuration = ps.duration
-    ps.lastBirthTime = epochTime()
+    ps.fractionOfParticlesToGenerate = 0
 
     if not ps.node.isNil:
         ps.lastPos = ps.node.worldPos
@@ -431,7 +435,7 @@ method init(ps: ParticleSystem) =
 proc start*(ps: ParticleSystem) =
     ps.isPlayed = true
 
-    ps.lastBirthTime = epochTime()
+    ps.fractionOfParticlesToGenerate = 0
     ps.remainingDuration = ps.duration
 
     ps.lastPos = ps.node.worldPos
@@ -501,12 +505,9 @@ proc numberOfParticlesToGenerate(ps: ParticleSystem, dt: float32): int {.inline.
     # Warning: this is not pure.
     if (ps.remainingDuration > 0 or ps.isLooped) and ps.isPlayed:
         ps.remainingDuration -= dt
-        let curTime = epochTime()
-        let perParticleTime = 1.0 / ps.birthRate
-        if curTime - ps.lastBirthTime > perParticleTime:
-            let pCount = int((curTime - ps.lastBirthTime) / perParticleTime)
-            result = pCount
-            ps.lastBirthTime = curTime
+        let toGenerate = dt * ps.birthRate + ps.fractionOfParticlesToGenerate
+        result = int(toGenerate)
+        ps.fractionOfParticlesToGenerate = toGenerate - float32(result)
 
 proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
     var particlesToGenerate = ps.numberOfParticlesToGenerate(dt)
@@ -892,7 +893,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     template `isLoopedAux=`(ps: ParticleSystem, f: bool) =
         ps.isLooped = f
         ps.remainingDuration = ps.duration
-        ps.lastBirthTime = epochTime()
+        ps.fractionOfParticlesToGenerate = 0
 
     template isPlayedAux(ps: ParticleSystem): bool = ps.isLooped
     template `isPlayedAux=`(ps: ParticleSystem, f: bool) =
