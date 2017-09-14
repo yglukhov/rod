@@ -68,7 +68,7 @@ proc deserializeFromJson*(c: Component, b: BinDeserializer) =
     try:
         let strLen = b.readInt32()
         var str = newString(strLen)
-        b.read(str)
+        b.readStrNoLen(str)
         let j = parseJson(str)
         let s = Serializer.new()
         s.url = "res://" & b.curCompPath

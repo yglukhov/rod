@@ -50,6 +50,10 @@ proc readStr*(b: BinDeserializer): string {.inline.} =
     if i != -1:
         result = b.getStr(i)
 
+proc readStrNoLen*(b: BinDeserializer, str: var string) {.inline.} =
+    if str.len != 0:
+        discard b.stream.readData(addr str[0], str.len)
+
 proc getPosition*(b: BinDeserializer): int {.inline.} = b.stream.getPosition()
 proc setPosition*(b: BinDeserializer, p: int) {.inline.} = b.stream.setPosition(p)
 
