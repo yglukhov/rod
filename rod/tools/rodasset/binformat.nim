@@ -117,9 +117,8 @@ proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name
 
     echo "comp: ", typ
     b.write($typ)
-    b.write(int16(nodeIds.len))
     b.write(nodeIds)
-    b.write(components)
+    b.writeArrayNoLen(components)
     
 proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name: string, nodes: seq[JsonNode], default: T) =
     var nodeIds = newSeqOfCap[int16](nodes.len)
@@ -135,9 +134,8 @@ proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name
                 components.add(v)
 
     b.write($typ)
-    b.write(int16(nodeIds.len))
     b.write(nodeIds)
-    b.write(components)
+    b.writeArrayNoLen(components)
 
 proc writeAlphaComponents(b: BinSerializer, nodes: seq[JsonNode]) =
     var components = newSeqOfCap[uint8](nodes.len)
@@ -150,7 +148,7 @@ proc writeAlphaComponents(b: BinSerializer, nodes: seq[JsonNode]) =
             components.add(uint8(c.getFNum() * 255))
 
     b.write($bicAlpha)
-    b.write(components)
+    b.writeArrayNoLen(components)
 
 proc writeNameComponents(b: BinSerializer, nodes: seq[JsonNode]) =
     b.write($bicName)
@@ -174,10 +172,8 @@ proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string
             components.add(p)
 
     b.write($bicCompRef)
-    b.write(int16(nodeIds.len))
     b.write(nodeIds)
-    for i in 0 ..< nodeIds.len:
-        b.write(components[i])
+    b.writeArrayNoLen(components)
 
 proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, compPath: string) =
     let n = newNode()
@@ -224,7 +220,6 @@ proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonN
             b.write(int16(len))
             b.write(int16(cutf))
             let vals = v["values"]
-            b.write(int16(vals.len))
             b.writeSamplerValues(propName, vals)
 
     let numMarkers = j["markers"].len.int16
@@ -285,7 +280,6 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
             nodeIds.add(int16(n["_id"].num))
             c.add(s)
 
-    b.write(int16(nodeIds.len))
     b.write(nodeIds)
 
     case name
@@ -293,7 +287,7 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
             "AELayer", "ColorFill", "GradientFill", "Tint", "CompRef",
             "ColorBalanceHLS", "ChannelLevels", "Mask", "SpherePSGenShape",
             "PSModifierRandWind", "BoxPSGenShape", "ConePSGenShape",
-            "VisualModifier", "Text", "PSHolder", "Trail":
+            "VisualModifier", "Text", "PSHolder", "Trail", "TileMap", "TileMapLayer", "ImageMapLayer":
         b.writeComponents(c, name, compPath)
     of "AEComposition":
         b.writeComponents(c) do(j: JsonNode):
@@ -328,7 +322,6 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
         let frameLerp = v{"frameLerp"}.getBVal(true)
         b.write(int8(frameLerp))
         let vals = v["values"]
-        b.write(int16(vals.len))
         b.writeSamplerValues(propName, vals)
 
 proc writeAnimations(b: BinSerializer, comp: JsonNode) =
@@ -404,7 +397,7 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
         childParentRelations[i - 1] = int16(n["_pid"].num)
 
     b.write(int16(nodesCount))
-    b.write(childParentRelations)
+    b.writeArrayNoLen(childParentRelations)
     childParentRelations = nil
 
     var builtInComponents: set[BuiltInComponentType]
@@ -500,6 +493,7 @@ proc writeCompositions(b: BinSerializer, comps: openarray[JsonNode], paths: open
         b.align(sizeof(int16))
         b.compsTable[paths[i]] = int32(b.stream.getPosition())
         b.writeComposition(c, paths[i])
+        
     b.writeStringTable(s)
     s.align(sizeof(int16))
     s.write(int16(comps.len))

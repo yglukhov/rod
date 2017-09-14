@@ -14,14 +14,11 @@ type ValueType = enum
     tyInt32
     tyEnum
     tyBool
-    tyColor
-    tySize
-    tyPoint
-    tyRect
     tyString
     tyImage
     tySeq
     tyArray
+    tyTuple
     tyQuaternion
 
 proc mix(b: SerializationHashCalculator, t: int) =
@@ -33,57 +30,48 @@ proc mix(b: SerializationHashCalculator, t: ValueType) {.inline.} =
 proc mix(b: SerializationHashCalculator, k: string) =
     b.hash = b.hash !& hash(k)
 
-proc mix(b: SerializationHashCalculator, t: ValueType, k: string) =
-    b.mix(t)
+proc mixValueType(b: SerializationHashCalculator, T: typedesc) =
+    when T is int16:
+        b.mix(tyInt16)
+    elif T is int32:
+        b.mix(tyInt32)
+    elif T is float32:
+        b.mix(tyFloat32)
+    elif T is bool:
+        b.mix(tyBool)
+    elif T is string:
+        b.mix(tyString)
+    elif T is Image:
+        b.mix(tyImage)
+    elif T is seq:
+        b.mix(tySeq)
+        var v: T
+        b.mixValueType(type(v[0]))
+    elif T is array:
+        b.mix(tyArray)
+        var v: T
+        b.mixValueType(type(v[0]))
+        b.mix(v.len)
+    elif T is enum:
+        b.mix(tyEnum)
+        b.mix(sizeof(T))
+    elif T is tuple:
+        b.mix(tyTuple)
+        var v: T
+        for k, vv in fieldPairs(v):
+            b.mixValueType(type(vv))
+
+proc mix[T](b: SerializationHashCalculator, v: T, k: string) {.inline.} =
+    b.mixValueType(T)
     b.mix(k)
-
-proc visit*(b: SerializationHashCalculator, v: float32, key: string) =
-    b.mix(tyFloat32, key)
-
-proc visit*(b: SerializationHashCalculator, v: int16, key: string) =
-    b.mix(tyInt16, key)
-
-proc visit*(b: SerializationHashCalculator, v: int32, key: string) =
-    b.mix(tyInt32, key)
-
-proc visit*[T: enum](b: SerializationHashCalculator, v: T, key: string) =
-    b.mix(tyEnum, key)
-    b.mix(sizeof(T))
-
-proc visit*(b: SerializationHashCalculator, v: bool, key: string) =
-    b.mix(tyBool, key)
-
-proc visit*(b: SerializationHashCalculator, v: Color, key: string) =
-    b.mix(tyColor, key)
-
-proc visit*(b: SerializationHashCalculator, v: Size, key: string) =
-    b.mix(tySize, key)
-
-proc visit*(b: SerializationHashCalculator, v: Point, key: string) =
-    b.mix(tyPoint, key)
-
-proc visit*(b: SerializationHashCalculator, v: Rect, key: string) =
-    b.mix(tyRect, key)
-
-proc visit*(b: SerializationHashCalculator, v: string, key: string) {.inline.} =
-    b.mix(tyString, key)
-
-proc visit*(b: SerializationHashCalculator, v: Image, key: string) =
-    b.mix(tyImage, key)
 
 proc visit*(b: SerializationHashCalculator, images: seq[Image], imagesKey: string, frameOffsets: seq[Point], frameOffsetsKey: string) =
     b.mix(tyImage, imagesKey)
     b.mix(tySeq, frameOffsetsKey)
     b.mix(111)
 
-proc visit*[T](b: SerializationHashCalculator, v: seq[T], key: string) =
-    b.mix(tySeq, key)
-    b.mix(222)
-
-proc visit*[I: static[int], T](b: SerializationHashCalculator, v: array[I, T], key: string) =
-    b.mix(tyArray, key)
-    b.mix(I)
-    b.mix(333)
-
 proc visit*(b: SerializationHashCalculator, v: Quaternion, key: string) =
     b.mix(tyQuaternion, key)
+
+proc visit*[T](b: SerializationHashCalculator, v: T, key: string) =
+    b.mix(v, key)

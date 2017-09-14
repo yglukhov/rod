@@ -1,7 +1,7 @@
 import streams, tables, json
 
 import nimx / [ image, types, assets/asset_manager ]
-import rod.utils.property_desc
+import rod / utils / [ property_desc, serialization_helpers ]
 import rod.quaternion
 type
     BinDeserializer* = ref object
@@ -52,12 +52,6 @@ proc readStr*(b: BinDeserializer): string {.inline.} =
 
 proc getPosition*(b: BinDeserializer): int {.inline.} = b.stream.getPosition()
 proc setPosition*(b: BinDeserializer, p: int) {.inline.} = b.stream.setPosition(p)
-
-template alignsize(t: typedesc): int =
-    if sizeof(t) > 4:
-        4
-    else:
-        sizeof(t)
 
 proc getBuffer*(b: BinDeserializer, T: typedesc, len: int): BufferView[T] =
     when T is array:
@@ -122,14 +116,62 @@ proc rewindToComposition*(b: BinDeserializer, name: string) =
             echo "COMP: ", k
         raise
 
-proc read*[T](b: BinDeserializer, data: var openarray[T]) =
-    when T is array:
-        b.align(sizeof(data[0][0]))
-    when T is tuple:
-        b.align(sizeof(data[0][0]))
+proc setLenX[T](s: var seq[T], sz: int) =
+    if s.isNil:
+        s = newSeq[T](sz)
     else:
-        b.align(alignsize(T))
-    discard b.stream.readData(addr data[0], data.len * sizeof(T))
+        s.setLen(sz)
+
+proc read*[T](b: BinDeserializer, data: var T) =
+    when T is array or T is openarray:
+        when isPODType(T):
+            if data.len != 0:
+                b.align(alignsize(type(data[0])))
+                discard b.stream.readData(addr data[0], data.len * sizeof(data[0]))    
+        else:
+            for i in 0 ..< data.len:
+                b.read(data[i])
+
+    elif T is tuple:
+        when isPODType(T):
+            b.align(alignsize(type(data[0])))
+            discard b.stream.readData(addr data, sizeof(data)) 
+        else:
+            for k, v in fieldPairs(data):
+                b.read(v)
+    
+    elif T is seq:
+        let sz = b.readInt16()
+        if sz == 0:
+            data = nil
+        else:
+            data.setLenX(sz)
+            b.read(openarray[type(data[0])](data))
+
+    elif T is string:
+        data = b.readStr()
+
+    elif T is int16 | int32 | float32:
+        b.align(sizeof(data))
+        discard b.stream.readData(addr data, sizeof(T))
+
+    elif T is int8 | uint8:
+        discard b.stream.readData(addr data, sizeof(T))
+
+    elif T is bool:
+        var tb: uint8
+        discard b.stream.readData(addr tb, sizeof(tb))
+        data = tb.bool
+
+    elif T is enum:
+        var v: (when ord(high(T)) < high(int8): int8 else: int16)
+        b.read(v)
+        data = cast[T](v)
+
+    elif T is int | int64:
+        {.error: "int and int64 not supported " .}
+    else:
+        {.error: "Unknown type " .}
 
 proc readUint8*(b: BinDeserializer): uint8 {.inline.} =
     cast[uint8](b.stream.readInt8())
@@ -151,63 +193,12 @@ proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image, frameOffset
         b.getImageInfoForIndex(idx, path, frameOffset)
         im = sharedAssetManager().cachedAsset(Image, path)
 
-proc setLenX[T](s: var seq[T], sz: int) =
-    if s.isNil:
-        s = newSeq[T](sz)
-    else:
-        s.setLen(sz)
-
-proc visit*[T](b: BinDeserializer, v: var openarray[T]) {.inline.} =
+proc visit*[T](b: BinDeserializer, v: var T) {.inline.} =
     b.read(v)
-
-proc visit*[T](b: BinDeserializer, v: var seq[T]) =
-    let sz = b.readInt16()
-    if sz == 0:
-        v = nil
-    else:
-        v.setLenX(sz)
-        b.read(v)
-
-proc visit*(b: BinDeserializer, v: var float32) {.inline.} =
-    v = b.readFloat32()
-
-proc visit*(b: BinDeserializer, v: var int16) {.inline.} =
-    v = b.readInt16()
-
-proc visit*(b: BinDeserializer, v: var int32) {.inline.} =
-    v = b.readInt32()
-
-proc visit*[T: enum](b: BinDeserializer, v: var T) {.inline.} =
-    when ord(high(T)) < high(int8):
-        v = cast[T](b.readInt8())
-    else:
-        v = cast[T](b.readInt16())
-
-proc visit*(b: BinDeserializer, v: var bool) {.inline.} =
-    v = b.readInt8().bool
-
-proc visit*(b: BinDeserializer, c: var Color) =
-    let buf = b.getBuffer(float32, 4)
-    c = newColor(buf[0], buf[1], buf[2], buf[3])
-
-proc visit*(b: BinDeserializer, v: var Size) =
-    v.width = b.readFloat32()
-    v.height = b.readFloat32()
-
-proc visit*(b: BinDeserializer, v: var Point) =
-    v.x = b.readFloat32()
-    v.y = b.readFloat32()
-
-proc visit*(b: BinDeserializer, v: var Rect) =
-    let buf = b.getBuffer(float32, 4)
-    v = newRect(buf[0], buf[1], buf[2], buf[3])
 
 proc visit*(b: BinDeserializer, v: var Quaternion) =
     let buf = b.getBuffer(float32, 4)
     v = newQuaternion(buf[0], buf[1], buf[2], buf[3])
-
-proc visit*(b: BinDeserializer, v: var string) {.inline.} =
-    v = b.readStr()
 
 proc visit*(b: BinDeserializer, v: var Image) =
     let idx = b.readInt16()

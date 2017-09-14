@@ -25,12 +25,13 @@ proc get[T](j: JsonNode, v: var T) {.inline.} =
         v = T(j.num)
     elif T is string:
         v = j.str
-    elif T is Point:
-        v.x = j[0].getFNum()
-        v.y = j[1].getFNum()
-    elif T is Size:
-        v.width = j[0].getFNum()
-        v.height = j[1].getFNum()
+    elif T is Rect:
+        v = newRect(j[0].getFNum(), j[1].getFNum(), j[2].getFNum(), j[3].getFNum())
+    elif T is tuple:
+        var i = 0
+        for k, vv in fieldPairs(v):
+            get(j[i], vv)
+            inc i
     elif T is array:
         for i in 0 ..< v.len:
             get(j[i], v[i])
@@ -61,6 +62,11 @@ proc deserializeImage(b: JsonDeserializer, j: JsonNode, offset: var Point): Imag
         get(joff, offset)
     result = imageWithSize(newSize(sz[0].getFNum(), sz[1].getFNum()))
     result.setFilePath(path)
+
+proc visit*[T: tuple](b: JsonDeserializer, v: var T, key: string) =
+    let j = b.node{key}
+    if not j.isNil:
+        get(j, v)
 
 proc visit*(b: JsonDeserializer, v: var float32, key: string) =
     let j = b.node{key}
@@ -99,21 +105,6 @@ proc visit*(b: JsonDeserializer, v: var Color, key: string) =
         v = newColor(j[0].getFNum(), j[1].getFNum(), j[2].getFNum())
         if j.len > 3:
             v.a = j[3].getFNum()
-
-proc visit*(b: JsonDeserializer, v: var Size, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        get(j, v)
-
-proc visit*(b: JsonDeserializer, v: var Point, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        get(j, v)
-
-proc visit*(b: JsonDeserializer, v: var Rect, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        v = newRect(j[0].getFNum(), j[1].getFNum(), j[2].getFNum(), j[3].getFNum())
 
 proc visit*(b: JsonDeserializer, v: var string, key: string) {.inline.} =
     let j = b.node{key}
