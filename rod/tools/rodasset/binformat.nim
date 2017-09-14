@@ -148,7 +148,7 @@ proc writeFlagsComponents(b: BinSerializer, nodes: seq[JsonNode]) =
         components.add(flags)
 
     b.write($bicFlags)
-    b.write(components)
+    b.writeArrayNoLen(components)
 
 proc writeAlphaComponents(b: BinSerializer, nodes: seq[JsonNode]) =
     var components = newSeqOfCap[uint8](nodes.len)
@@ -433,7 +433,6 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
             allCompNames.incl(typ)
 
     let numComponents = allCompNames.len + builtInComponents.card()
-    echo "numComponents: ", numComponents
     b.write(int16(numComponents))
 
     if bicTranslation in builtInComponents: writeBuiltInComponents[array[3, float32]](b, bicTranslation, "translation", nodes, [0'f32, 0, 0])
@@ -448,7 +447,7 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
     let orderedComps = orderComponents(allCompNames)
 
     echo "COMP: ", path
-    echo "COMPS: ", orderedComps
+    echo "COMPS: ", orderedComps, " + ", builtInComponents, ": ", numComponents
 
     for compName in orderedComps:
         b.writeComponents(compName, nodes, path)

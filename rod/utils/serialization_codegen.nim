@@ -83,10 +83,13 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
         #     visitCall.add(p.attributes["default"])
 
         result.body.add(visitCall)
-        let echoCall = newCall("echo", newLit($serTyp & " " & p.name & ": "), actualReference(p))
-        result.body.add quote do:
-            when compiles(`echoCall`):
-                `echoCall`
+        # let echoPrefix = newLit($serTyp & " " & p.name & ": ")
+        # let echoValue = actualReference(p)
+        # result.body.add quote do:
+        #     when compiles(echo(`echoPrefix`, `echoValue`)):
+        #         echo `echoPrefix`, `echoValue`
+        #     else:
+        #         echo `echoPrefix`, "..."
 
     if not phantomTyp.isNil and phantomTyp.kind != nnkEmpty:
         if not serialize and not skipPhantom:
