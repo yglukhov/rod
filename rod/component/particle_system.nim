@@ -204,7 +204,11 @@ type
     ParticleSystem* = ref object of Component
         animation*: Animation
         count: int32
-        lastBirthTime: float32
+
+        # Number of particles that should have been generated on previous frame,
+        # according to its dt. This value is always < 1, but should be considered
+        # for current frame.
+        fractionOfParticlesToGenerate: float32
 
         vertexBuffer: BufferRef
         indexBuffer: BufferRef
@@ -296,22 +300,13 @@ ParticleSystem.properties:
     isTextureAnimated
 
 # -------------------- Particle System --------------------------
-proc randomBetween(fromV, toV: float32): float32 =
+proc randomBetween(fromV, toV: float32): float32 {.inline.} =
     result = random(fromV - toV) + toV
 
 proc randomBetween(fromV, toV: Vector3): Vector3 =
-    result.x = random(fromV.x - toV.x) + toV.x
-    result.y = random(fromV.y - toV.y) + toV.y
-    result.z = random(fromV.z - toV.z) + toV.z
-
-proc getVertexSizeof(ps: ParticleSystem): int =
-    result = (ps.vertexDesc.positionSize +
-        ps.vertexDesc.rotationSize +
-        ps.vertexDesc.scaleSize +
-        ps.vertexDesc.alphaSize +
-        ps.vertexDesc.colorSize +
-        ps.vertexDesc.idSize +
-        ps.vertexDesc.lifeTimeSize) * sizeof(float32)
+    result.x = randomBetween(fromV.x, toV.x)
+    result.y = randomBetween(fromV.y, toV.y)
+    result.z = randomBetween(fromV.z, toV.z)
 
 proc getVertexSize(ps: ParticleSystem): int =
     result = ps.vertexDesc.positionSize +
@@ -321,6 +316,9 @@ proc getVertexSize(ps: ParticleSystem): int =
         ps.vertexDesc.idSize +
         ps.vertexDesc.colorSize +
         ps.vertexDesc.lifeTimeSize
+
+proc getVertexSizeof(ps: ParticleSystem): int {.inline.} =
+    result = ps.getVertexSize() * sizeof(float32)
 
 proc newVertexDesc(posSize, rotSize, scSize, aSize, colorSize, idSize, lifeTimeSize: int32): VertexDesc =
     result.positionSize = posSize
@@ -342,14 +340,17 @@ proc maxParticlesCount(ps: ParticleSystem): int =
     result = int(ceil(ps.birthRate) * ceil(ps.lifetime))
 
 proc initParticle(ps: ParticleSystem, result: var Particle, index, count: int, dt: float) =
-    var interpolatePos: Vector3
-    var interpolateDt: float
-    if count > 0:
-        let ic = float(index) / float(count)
-        interpolatePos = (ps.curPos - ps.lastPos) * ic
-        interpolateDt = dt * ic
+    if ps.genShape.isNil:
+        result.position = newVector3()
+        result.velocity = newVector3()
+    else:
+        var interpolatePos: Vector3
+        var interpolateDt: float
+        if count > 0:
+            let ic = float(index) / float(count)
+            interpolatePos = (ps.curPos - ps.lastPos) * ic
+            interpolateDt = dt * ic
 
-    if not ps.genShape.isNil:
         let gData = ps.genShape.generate()
         result.position = ps.worldTransform * (gData.position) - interpolatePos
         result.velocity = ps.worldTransform.transformDirection(gData.direction) * (ps.startVelocity + randomBetween(ps.randVelocityFrom, ps.randVelocityTo))
@@ -368,13 +369,14 @@ proc fillIBuffer(ps: ParticleSystem) =
     ps.indexBufferSize = ps.maxParticlesCount() * 6
 
     for i in 0 ..< ps.indexBufferSize:
-        ib.add(GLushort(4*i + 0))
-        ib.add(GLushort(4*i + 1))
-        ib.add(GLushort(4*i + 2))
+        let start = GLushort(4 * i)
+        ib.add(start + 0)
+        ib.add(start + 1)
+        ib.add(start + 2)
 
-        ib.add(GLushort(4*i + 0))
-        ib.add(GLushort(4*i + 2))
-        ib.add(GLushort(4*i + 3))
+        ib.add(start + 0)
+        ib.add(start + 2)
+        ib.add(start + 3)
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ib, gl.STATIC_DRAW)
@@ -407,7 +409,7 @@ proc initSystem(ps: ParticleSystem) =
     ps.genShapeNode = ps.node
 
     ps.remainingDuration = ps.duration
-    ps.lastBirthTime = epochTime()
+    ps.fractionOfParticlesToGenerate = 0
 
     if not ps.node.isNil:
         ps.lastPos = ps.node.worldPos
@@ -470,7 +472,7 @@ method init(ps: ParticleSystem) =
 proc start*(ps: ParticleSystem) =
     ps.isPlayed = true
 
-    ps.lastBirthTime = epochTime()
+    ps.fractionOfParticlesToGenerate = 0
     ps.remainingDuration = ps.duration
 
     ps.lastPos = ps.node.worldPos
@@ -540,12 +542,9 @@ proc numberOfParticlesToGenerate(ps: ParticleSystem, dt: float32): int {.inline.
     # Warning: this is not pure.
     if (ps.remainingDuration > 0 or ps.isLooped) and ps.isPlayed:
         ps.remainingDuration -= dt
-        let curTime = epochTime()
-        let perParticleTime = 1.0 / ps.birthRate
-        if curTime - ps.lastBirthTime > perParticleTime:
-            let pCount = int((curTime - ps.lastBirthTime) / perParticleTime)
-            result = pCount
-            ps.lastBirthTime = curTime
+        let toGenerate = dt * ps.birthRate + ps.fractionOfParticlesToGenerate
+        result = int(toGenerate)
+        ps.fractionOfParticlesToGenerate = toGenerate - float32(result)
 
 proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
     var particlesToGenerate = ps.numberOfParticlesToGenerate(dt)
@@ -556,7 +555,10 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
     var v1, v2, v3, v4: int
     let vertexSize = ps.getVertexSize()
 
-    let gravityYDirection = ps.getGravityYDirection()
+    var gravity = ps.gravity * dt
+    gravity.y *= ps.getGravityYDirection()
+
+    let maxParticlesCount = ps.maxParticlesCount
 
     for i in 0 ..< ps.particles.len:
         # if we have dead particle than we create a new one
@@ -582,17 +584,13 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         v4 = vertexSize* (4 * ps.count + 3)
 
         # positions
-        if abs(ps.airDensity) > 0.0:
+        if ps.airDensity != 0.0:
             var density_vec = ps.particles[i].velocity
             density_vec.normalize()
             ps.particles[i].velocity -= density_vec * ps.airDensity * dt
 
-        ps.particles[i].velocity.x += ps.gravity.x*dt
-        ps.particles[i].velocity.y += ps.gravity.y*dt * gravityYDirection
-        ps.particles[i].velocity.z += ps.gravity.z*dt
-        ps.particles[i].position.x += ps.particles[i].velocity.x*dt
-        ps.particles[i].position.y += ps.particles[i].velocity.y*dt
-        ps.particles[i].position.z += ps.particles[i].velocity.z*dt
+        ps.particles[i].velocity += gravity
+        ps.particles[i].position += ps.particles[i].velocity * dt
 
         # rotation
         if ps.is3dRotation:
@@ -687,7 +685,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
 
         ps.count.inc()
 
-        if ps.count > ps.maxParticlesCount():
+        if ps.count > maxParticlesCount:
             return
 
     # if we have new particles
@@ -941,7 +939,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
     template `isLoopedAux=`(ps: ParticleSystem, f: bool) =
         ps.isLooped = f
         ps.remainingDuration = ps.duration
-        ps.lastBirthTime = epochTime()
+        ps.fractionOfParticlesToGenerate = 0
 
     template isPlayedAux(ps: ParticleSystem): bool = ps.isLooped
     template `isPlayedAux=`(ps: ParticleSystem, f: bool) =

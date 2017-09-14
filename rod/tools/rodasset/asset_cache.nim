@@ -7,7 +7,7 @@ import rod.utils.serialization_hash_calculator
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
-const hashVersion = 6
+const hashVersion = 7
 
 const audioFileExtensions = [".wav", ".ogg", ".mp3"]
 

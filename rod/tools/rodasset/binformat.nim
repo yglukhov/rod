@@ -137,6 +137,19 @@ proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name
     b.write(nodeIds)
     b.writeArrayNoLen(components)
 
+proc writeFlagsComponents(b: BinSerializer, nodes: seq[JsonNode]) =
+    var components = newSeqOfCap[uint8](nodes.len)
+
+    for n in nodes:
+        var flags: uint8 = 0
+        for flag in NodeFlags:
+            let val = n{$flag}.getBVal(true).uint8
+            flags = flags or (val shl flag.uint8)
+        components.add(flags)
+
+    b.write($bicFlags)
+    b.write(components)
+
 proc writeAlphaComponents(b: BinSerializer, nodes: seq[JsonNode]) =
     var components = newSeqOfCap[uint8](nodes.len)
 
@@ -411,6 +424,10 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
         if "alpha" in n: builtInComponents.incl(bicAlpha)
         if "name" in n: builtInComponents.incl(bicName)
         if "compositionRef" in n: builtInComponents.incl(bicCompRef)
+        for flag in NodeFlags:
+            if $flag in n:
+                builtInComponents.incl(bicFlags)
+                break
 
         for typ, c in n.componentNodes:
             allCompNames.incl(typ)
@@ -424,6 +441,7 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
     if bicAnchorPoint in builtInComponents: writeBuiltInComponents[array[3, float32]](b, bicAnchorPoint, "anchor", nodes, [0'f32, 0, 0])
     if bicScale in builtInComponents: writeBuiltInComponents[array[3, float32]](b, bicScale, "scale", nodes, [1'f32, 1, 1])
     if bicAlpha in builtInComponents: b.writeAlphaComponents(nodes)
+    if bicFlags in builtInComponents: b.writeFlagsComponents(nodes)
     if bicName in builtInComponents: b.writeNameComponents(nodes)
     if bicCompRef in builtInComponents: b.writeCompRefComponents(nodes, path)
 
