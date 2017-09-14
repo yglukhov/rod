@@ -144,7 +144,7 @@ proc writeFlagsComponents(b: BinSerializer, nodes: seq[JsonNode]) =
 
     for n in nodes:
         var flags: uint8 = 0
-        for flag in ComponentFlags:
+        for flag in NodeFlags:
             let val = n{$flag}.getBVal(true).uint8
             flags = flags or (val shl flag.uint8)
         components.add(flags)
