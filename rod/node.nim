@@ -795,34 +795,38 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
         let name = b.readStr()
         case name
         of $bicAlpha:
+            let alphas = b.getBuffer(uint8, nodesCount)
             for i in 0 ..< nodesCount:
-                nodes[i].alpha = float32(b.readUInt8()) / 255
+                nodes[i].alpha = float32(alphas[i]) / 255
         of $bicFlags:
+            let flags = b.getBuffer(uint8, nodesCount)
             for i in 0 ..< nodesCount:
-                let flags = b.readUInt8()
-                nodes[i].isEnabled = (flags and (1.uint8 shl NodeFlags.enabled.uint8)) != 0
-                nodes[i].affectsChildren = (flags and (1.uint8 shl NodeFlags.affectsChildren.uint8)) != 0
+                nodes[i].isEnabled = (flags[i] and (1.uint8 shl NodeFlags.enabled.uint8)) != 0
+                nodes[i].affectsChildren = (flags[i] and (1.uint8 shl NodeFlags.affectsChildren.uint8)) != 0
         of $bicAnchorPoint:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
+            let anchorPoints = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                b.read(nodes[tmpBuf[i]].mAnchorPoint)
+                nodes[tmpBuf[i]].mAnchorPoint = anchorPoints[i]
         of $bicTranslation:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
+            let translations = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                b.read(nodes[tmpBuf[i]].mTranslation)
-                
+                nodes[tmpBuf[i]].mTranslation = translations[i]
         of $bicScale:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
+            let scales = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                b.read(nodes[tmpBuf[i]].mScale)
+                nodes[tmpBuf[i]].mScale = scales[i]
         of $bicRotation:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
+            let rotations = b.getBuffer(Quaternion, count)
             for i in 0 ..< count:
-                b.read(array[4, float32](nodes[tmpBuf[i]].mRotation))
+                nodes[tmpBuf[i]].mRotation = rotations[i]
         of $bicName:
             for i in 0 ..< nodesCount:
                 nodes[i].name = b.readStr()
