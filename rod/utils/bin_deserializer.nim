@@ -216,3 +216,8 @@ proc visit*(b: BinDeserializer, images: var seq[Image], frameOffsets: var seq[Po
     let buf = b.getBuffer(int16, sz)
     for i in 0 ..< sz:
         b.getImageForIndex(buf[i], images[i], frameOffsets[i])
+
+proc `@`*[T](b: BufferView[T]): seq[T] =
+    result = newSeqOfCap[T](b.len)
+    for i in 0 ..< b.len:
+        result.add(b[i])
