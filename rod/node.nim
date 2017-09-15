@@ -628,13 +628,15 @@ proc binDeserializerForPath(path: string): BinDeserializer =
         return rab.binDeserializer
 
 proc newNodeWithResource*(path: string): Node =
-    echo "newNodeWithResource: ", path
     let bd = binDeserializerForPath(path)
     if not bd.isNil:
-        echo "Using bin deser for ", path
-        return newNode(bd, path)
+        try:
+            return newNode(bd, path)
+        except:
+            echo "Error: could not deserialize ", path
+            raise
     else:
-        echo "bd is nil"
+        echo "No BinDeserializer for ", path
 
     var done = false
     result = newNodeWithUrl("res://" & path) do():

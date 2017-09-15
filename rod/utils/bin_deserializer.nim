@@ -75,13 +75,13 @@ proc getBuffer*(b: BinDeserializer, T: typedesc, len: int): BufferView[T] =
 
 proc init(b: BinDeserializer) =
     var strtabLen = b.readInt16()
-    echo "strtabLen: ", strtabLen
+    # echo "strtabLen: ", strtabLen
     b.strtab = newSeq[string](strtabLen)
     for i in 0 ..< strtabLen:
         let strLen = b.readInt16()
         # echo "len:", strLen
         b.strtab[i] = b.stream.readStr(strLen)
-        echo "str ", i, ": ", b.strtab[i]
+        # echo "str ", i, ": ", b.strtab[i]
         shallow(b.strtab[i])
 
     b.compsTable = initTable[string, int32]()
@@ -90,7 +90,7 @@ proc init(b: BinDeserializer) =
         let offsets = b.getBuffer(int32, compsLen)
         let names = b.getBuffer(int16, compsLen)
 
-        echo "numComps: ", compsLen
+        # echo "numComps: ", compsLen
         b.align(4)
         let compsStartOffset = b.stream.getPosition().int32# + compsLen * 8
 
@@ -112,13 +112,13 @@ proc hasComposition*(b: BinDeserializer, name: string): bool {.inline.} =
     name in b.compsTable
 
 proc rewindToComposition*(b: BinDeserializer, name: string) =
-    try:
-        b.stream.setPosition(b.compsTable[name])
-    except:
-        echo "COULD NOT REWIND TO COMP: ", name
+    let pos = b.compsTable.getOrDefault(name)
+    if pos == 0:
         for k in b.compsTable.keys:
             echo "COMP: ", k
-        raise
+        raise newException(Exception, "Could not rewind to " & name)
+
+    b.stream.setPosition(pos)
 
 proc setLenX[T](s: var seq[T], sz: int) =
     if s.isNil:

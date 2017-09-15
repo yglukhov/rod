@@ -266,7 +266,6 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
     result.b = b # Used for holding the sampler buffers alive.
 
     let propsCount = b.readInt16()
-    echo "propsCount: ", propsCount
     result.animatedProperties = newSeq[AnimatedProperty](propsCount)
     shallow(result.animatedProperties)
 
@@ -274,7 +273,6 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
         result.loopDuration = b.readFloat32()
         result.numberOfLoops = b.readInt16()
 
-    # echo "propsCount: ", propsCount
     for i in 0 ..< propsCount:
         # TODO: Handle animScale
         let nodeName = b.readStr()
