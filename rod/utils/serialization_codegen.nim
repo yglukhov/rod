@@ -112,10 +112,14 @@ template genSerializationCodeForComponent*(c: typed) =
 
         genSerializerProc(c, serializeAux, BinSerializer, false, true, true, false)
         genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
+        genSerializerProc(c, serializeAux, JsonSerializer, true, true, false, false)
         genSerializerProc(c, calcSerializationHashAux, SerializationHashCalculator, true, true, false, true)
 
         method deserialize*(cm: c, b: JsonDeserializer) =
             deserializeAux(cm, b)
+
+        method serialize*(cm: c, b: JsonSerializer) =
+            serializeAux(cm, b)
 
         method serialize*(cm: c, b: BinSerializer) =
             serializeAux(cm, b)

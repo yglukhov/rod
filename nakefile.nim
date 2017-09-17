@@ -5,6 +5,7 @@ beforeBuild = proc(b: Builder) =
     #b.disableClosureCompiler = true
     b.mainFile = "editor/rodedit"
     b.originalResourcePath = "editor/res"
+    b.additionalNimFlags.add("-d:rodplugin")
 
 proc filterExceptions(name: string): bool =
     let exc = @["main", "nakefile", "rodedit", "rodasset"]

@@ -44,7 +44,7 @@ proc imageDesc(b: JsonDeserializer, path: string): JsonNode =
             return j
 
     doAssert(false, "Image desc not found: " & path)
-            
+
 proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
     case jimage.kind
     of JString:
