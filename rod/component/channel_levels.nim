@@ -11,11 +11,24 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type ChannelLevels* = ref object of Component
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: Coord
     inWhiteV*, inBlackV*, inGammaV*, outWhiteV*, outBlackV*: Vector3
     active: bool
+
+ChannelLevels.properties:
+    inWhite
+    inBlack
+    inGamma
+    outWhite
+    outBlack
+    inWhiteV
+    inBlackV
+    inGammaV
+    outWhiteV
+    outBlackV
 
 var levelsPostEffect = newPostEffect("""
 vec3 colorPow(vec3 i, vec3 p) {
@@ -143,4 +156,5 @@ method visitProperties*(c: ChannelLevels, p: var PropertyVisitor) =
     p.visitProperty("greenOutBlack", c.outBlackV[1], {pfAnimatable})
     p.visitProperty("blueOutBlack", c.outBlackV[2], {pfAnimatable})
 
+genSerializationCodeForComponent(ChannelLevels)
 registerComponent(ChannelLevels, "Effects")

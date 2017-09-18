@@ -4,29 +4,37 @@ import json, strutils, tables, times
 
 import rod/[ rod_types, node, component, viewport ]
 import rod.tools.serializer
+import rod / utils / [property_desc, serialization_codegen, bin_deserializer ]
 import rod.animation.property_animation
 
 const aeAllCompositionAnimation = "aeAllCompositionAnimation"
 
 type AEMarker* = object
-    start*: float
-    duration*: float
+    start*: float32
+    duration*: float32
     name*: string
 
 type AELayer* = ref object of Component
-    inPoint*: float
-    outPoint*: float
-    animScale*: float
-    startTime*: float
-    duration*: float
+    inPoint*: float32
+    outPoint*: float32
+    animScale*: float32
+    startTime*: float32
+    duration*: float32
 
 type AEComposition* = ref object of Component
     layers*: seq[AELayer]
     markers*: seq[AEMarker]
-    duration*: float
-    animScale*: float
+    duration*: float32
     buffers: JsonNode
     allCompAnim: Animation
+
+AELayer.properties:
+    inPoint
+    outPoint
+    animScale:
+        serializationKey: "scale"
+    startTime
+    duration
 
 proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     let pStart = m.start / c.duration
@@ -143,6 +151,34 @@ method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
         for m in c.markers:
             c.node.animations[m.name] = c.setCompositionMarker(m)
 
+method deserialize*(c: AEComposition, b: BinDeserializer) =
+    c.allCompAnim = newPropertyAnimation(c.node, b, true)
+
+    let numMarkers = b.readInt16()
+    c.markers = newSeq[AEMarker](numMarkers)
+
+    for i in 0 ..< numMarkers:
+        c.markers[i].name = b.readStr()
+        c.markers[i].start = b.readFloat32()
+        c.markers[i].duration = b.readFloat32()
+        if c.markers[i].name == aeAllCompositionAnimation:
+            c.duration = c.markers[i].duration
+
+    let numLayers = b.readInt16()
+    c.layers = @[]
+    for i in 0 ..< numLayers:
+        let layerName = b.readStr()
+        let ch = c.node.findNode(layerName)
+        if not ch.isNil:
+            let ael = ch.componentIfAvailable(AELayer)
+            if not ael.isNil:
+                c.layers.add(ael)
+        else:
+            echo "AEComposition : ", layerName, " not found in ", c.node.name, " !!!"
+
+    for m in c.markers:
+        c.node.registerAnimation(m.name, c.setCompositionMarker(m))
+
 method serialize*(c: AEComposition, s: Serializer): JsonNode=
     result = newJObject()
     result.add("buffers", c.buffers)
@@ -180,6 +216,8 @@ method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "scale", c.animScale)
     serealizer.deserializeValue(j, "startTime", c.startTime)
     serealizer.deserializeValue(j, "duration", c.duration)
+
+genSerializationCodeForComponent(AELayer)
 
 method serialize*(c: AELayer, s: Serializer): JsonNode=
     result = newJObject()

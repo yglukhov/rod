@@ -3,10 +3,15 @@ import json
 import nimx / [ types, matrixes, property_visitor, resource ]
 import rod / [ node, rod_types, component, tools/serializer ]
 import rod.component.sprite
+import rod / utils / [property_desc, serialization_codegen ]
 
 type CompRef* = ref object of Component
     size*: Size
     path: string
+
+CompRef.properties:
+    size
+    path
 
 proc setSize(n: Node, sz: Size) =
     for c in n.components:
@@ -16,18 +21,19 @@ proc setSize(n: Node, sz: Size) =
     for c in n.children:
         c.setSize(sz)
 
+proc awake(c: CompRef) =
+    let n = newNodeWithResource(c.path & ".json")
+    n.setSize(c.size)
+    c.node.addChild(n)
+
 method deserialize*(s: CompRef, j: JsonNode, serializer: Serializer) =
     let v = j{"size"}
     if not v.isNil:
         s.size = newSize(v[0].getFNum(), v[1].getFNum())
     s.path = j["path"].str
+    s.awake()
 
-    pushParentResource("")
-    let n = newNodeWithResource(s.path & ".json")
-    popParentResource()
-    n.setSize(s.size)
-
-    s.node.addChild(n)
+genSerializationCodeForComponent(CompRef)
 
 method getBBox*(s: CompRef): BBox =
     result.minPoint = newVector3(0.0, 0.0, 0.01)

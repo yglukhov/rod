@@ -1,16 +1,13 @@
-import typetraits
-import tables, sequtils
-import json
+import typetraits, tables, sequtils, json
 
-import nimx.types
-import nimx.property_visitor
-import nimx.matrixes
-import nimx.class_registry
+import nimx / [ types, property_visitor, matrixes, class_registry ]
 
 import node
 import rod_types
 import ray
 import rod.tools.serializer
+import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
+                json_serializer, serialization_hash_calculator ]
 
 export Component
 
@@ -65,6 +62,28 @@ method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} = discard
 method serialize*(c: Component, s: Serializer): JsonNode {.base.} = discard
 method getBBox*(c: Component): BBox {.base.} = discard
+
+proc deserializeFromJson*(c: Component, b: BinDeserializer) =
+    # Temporary hacky way to fall back to json deserialization when binary is not implemented
+    try:
+        let strLen = b.readInt32()
+        var str = newString(strLen)
+        b.readStrNoLen(str)
+        let j = parseJson(str)
+        let s = Serializer.new()
+        s.url = "res://" & b.curCompPath
+        c.deserialize(j, s)
+    except:
+        echo "error deserializing ", c.className
+        raise
+
+method deserialize*(c: Component, b: BinDeserializer) {.base.} =
+    c.deserializeFromJson(b)
+
+method deserialize*(c: Component, s: JsonDeserializer) {.base.} = discard
+method serialize*(c: Component, s: BinSerializer) {.base.} = discard
+method serialize*(c: Component, s: JsonSerializer) {.base.} = discard
+method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
 
 type UpdateProcComponent = ref object of Component
     updateProc: proc()

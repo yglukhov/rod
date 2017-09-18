@@ -9,6 +9,7 @@ import nimx.property_visitor
 import rod.rod_types
 import rod.node
 import rod.tools.serializer
+import rod / utils / [ property_desc, serialization_codegen ]
 import rod.component
 import rod.viewport
 
@@ -40,8 +41,14 @@ type Blink* = ref object of Component
     light: Image
     currLightPos: float
     remainingTime: float
-    period: float
-    speed: float
+    period: float32
+    speed: float32
+
+Blink.properties:
+    mask
+    light
+    period
+    speed
 
 method init(b: Blink) =
     b.speed = 1.0
@@ -87,6 +94,8 @@ method deserialize*(b: Blink, j: JsonNode, serealizer: Serializer) =
 
     serealizer.deserializeValue(j, "speed", b.speed)
     serealizer.deserializeValue(j, "period", b.period)
+
+genSerializationCodeForComponent(Blink)
 
 method serialize*(c: Blink, serealizer: Serializer): JsonNode =
     result = newJObject()

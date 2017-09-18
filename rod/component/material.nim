@@ -810,7 +810,7 @@ proc createShader(m: Material) =
     let gl = c.gl
 
     if not shadersCache.contains(m.shaderMacroFlags):
-        var commonShaderDefines = when defined(windows): "#version 100" & "\n" else: ""
+        var commonShaderDefines = ""
         for mcrs in m.shaderMacroFlags:
             commonShaderDefines &= """#define """ & $mcrs & "\n"
 

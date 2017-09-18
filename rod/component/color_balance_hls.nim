@@ -10,6 +10,7 @@ import rod.node
 import rod.viewport
 import rod.component
 import rod.tools.serializer
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type ColorBalanceHLS* = ref object of Component
     hue*: float32
@@ -20,6 +21,13 @@ type ColorBalanceHLS* = ref object of Component
     enabled: bool
 
 # This effect is borrowed from https://github.com/greggman/hsva-unity  /  HSL version
+
+ColorBalanceHLS.properties:
+    hue
+    saturation
+    lightness
+    hlsMin
+    hlsMax
 
 var effect = newPostEffect("""
 float cbhls_effect_Epsilon = 1e-10;
@@ -96,4 +104,5 @@ method visitProperties*(c: ColorBalanceHLS, p: var PropertyVisitor) =
     p.visitProperty("hlsMin", c.hlsMin)
     p.visitProperty("hlsMax", c.hlsMax)
 
+genSerializationCodeForComponent(ColorBalanceHLS)
 registerComponent(ColorBalanceHLS, "Effects")

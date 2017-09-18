@@ -15,18 +15,38 @@ import rod.viewport
 import rod.tools.serializer
 import rod.tools.debug_draw
 import rod.utils.attributed_text
+import rod / utils / [ property_desc, serialization_codegen ]
 
 export formatted_text
 
-type TextJustification* = enum
-    tjLeft
-    tjCenter
-    tjRight
+type
+    Text* = ref object of Component
+        mText*: FormattedText
+        mBoundingOffset: Point
 
-type Text* = ref object of Component
-    mText*: FormattedText
-    mBoundingOffset: Point
-    fontFace*: string
+Text.properties:
+    text(phantom = string)
+    font(phantom = string)
+    fontSize(phantom = float32)
+    color(phantom = Color)
+    color2(phantom = Color)
+    shadowOff(phantom = Size)
+    shadowColor(phantom = Color)
+    shadowSpread(phantom = float32)
+    shadowRadius(phantom = float32)
+
+    strokeSize(phantom = float32)
+    strokeColor(phantom = Color)
+    strokeColor2(phantom = Color)
+
+    bounds(phantom = Rect)
+    lineSpacing(phantom = float32)
+    horizontalAlignment:
+        phantom: HorizontalTextAlignment
+        serializationKey: "justification"
+    verticalAlignment(phantom = VerticalAlignment)
+    isColorGradient(phantom = bool)
+    isStrokeGradient(phantom = bool)
 
 method init*(t: Text) =
     procCall t.Component.init()
@@ -67,10 +87,10 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
         v = j{"font"}
         var font: Font
         if not v.isNil:
-            t.fontFace = v.getStr()
-            font = newFontWithFace(t.fontFace, fontSize)
+            let fontFace = v.getStr()
+            font = newFontWithFace(fontFace, fontSize)
             if font.isNil:
-                echo "font = ", t.fontFace, "  doesn't load, system font will be used"
+                echo "font = ", fontFace, "  doesn't load, system font will be used"
                 font = systemFontOfSize(fontSize)
         elif font_size > 0:
             font = systemFontOfSize(fontSize)
@@ -178,6 +198,12 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 proc color*(c: Text): Color = c.mText.colorOfRuneAtPos(0).color1
 proc `color=`*(c: Text, v: Color) = c.mText.setTextColorInRange(0, -1, v)
 
+proc shadowOffset*(c: Text): Size = c.mText.shadowOfRuneAtPos(0).offset
+proc `shadowOffset=`*(c: Text, v: Size) =
+    var s = c.mText.shadowOfRuneAtPos(0)
+    s.offset = v
+    c.mText.setShadowInRange(0, -1, s.color, s.offset, s.radius, s.spread)
+
 proc shadowX*(c: Text): float32 = c.mText.shadowOfRuneAtPos(0).offset.width
 proc shadowY*(c: Text): float32 = c.mText.shadowOfRuneAtPos(0).offset.height
 
@@ -211,17 +237,12 @@ proc `shadowSpread=`*(c: Text, spread: float32) =
 
 proc font*(c: Text): Font = c.mText.fontOfRuneAtPos(0)
 proc `font=`*(c: Text, v: Font) =
-    c.fontFace = v.face
     c.mText.setFontInRange(0, -1, v)
 
 proc fontSize*(c: Text): float32 = c.mText.fontOfRuneAtPos(0).size
 proc `fontSize=`*(c: Text, v: float32) =
-    var font: Font
-    if c.fontFace.isNil:
-        font = systemFontOfSize(v)
-    else:
-        font = newFontWithFace(c.fontFace, v)
-    c.mText.setFontInRange(0, -1, font)
+    let f = c.font
+    c.mText.setFontInRange(0, -1, newFontWithFace(f.face, v))
 
 proc trackingAmount*(c: Text): float32 = c.mText.trackingOfRuneAtPos(0)
 proc `trackingAmount=`*(c: Text, v: float32) = c.mText.setTrackingInRange(0, -1, v)
@@ -297,8 +318,9 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     result.add("lineSpacing", s.getValue(c.lineSpacing))
     result.add("fontSize", s.getValue(c.font.size))
 
-    if not c.fontFace.isNil:
-        result.add("font", s.getValue(c.fontFace))
+    let fontFace = c.font().face
+    if fontFace != systemFont().face:
+        result.add("font", s.getValue(fontFace))
     result.add("strokeSize", s.getValue(c.strokeSize))
     result.add("strokeColor", s.getValue(c.strokeColor))
 
@@ -326,6 +348,156 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     of vaBottom: vertAlign = "vaBottom"
     else: discard
     result.add("verticalAlignment", s.getValue(vertAlign))
+
+proc toPhantom(c: Text, p: var object) =
+    p.text = c.mText.text
+
+    let fontFace = c.font().face
+    if fontFace != systemFont().face:
+        p.font = fontFace
+
+    let fs = c.fontSize
+    if fs != systemFontSize():
+        p.fontSize = fs
+
+    p.isColorGradient = c.isColorGradient
+    if p.isColorGradient:
+        p.color = c.colorFrom
+        p.color2 = c.colorTo
+    else:
+        p.color = c.color
+
+    p.shadowOff = c.shadowOffset
+    p.shadowColor = c.shadowColor
+    p.shadowSpread = c.shadowSpread
+    p.shadowRadius = c.shadowRadius
+
+    p.strokeSize = c.strokeSize
+    p.isStrokeGradient = c.isStrokeGradient
+    if p.isStrokeGradient:
+        p.strokeColor = c.strokeColorFrom
+        p.strokeColor2 = c.strokeColorTo
+    else:
+        p.strokeColor = c.strokeColor
+
+    p.bounds.origin = c.mBoundingOffset
+    p.bounds.size = c.mText.boundingSize
+
+    p.lineSpacing = c.lineSpacing
+    p.horizontalAlignment = c.mText.horizontalAlignment
+    p.verticalAlignment = c.mText.verticalAlignment
+
+proc fromPhantom(c: Text, p: object) =
+    c.mText.text = p.text
+
+    var fontSize = p.fontSize
+    if fontSize == 0: fontSize = systemFontSize()
+
+    var font: Font
+    if p.font.len != 0:
+        font = newFontWithFace(p.font, fontSize)
+
+    if font.isNil:
+        font = systemFontOfSize(fontSize)
+
+    font.face = p.font # Hack for bin format conversion. Should be fixed somehow?
+
+    c.mText.setFontInRange(0, -1, font)
+
+    if p.isColorGradient:
+        c.mText.setTextColorInRange(0, -1, p.color, p.color2)
+    else:
+        c.mText.setTextColorInRange(0, -1, p.color)
+
+    if p.shadowColor.a > 0 or p.shadowRadius > 0 or p.shadowSpread > 0:
+        c.mText.setShadowInRange(0, -1, p.shadowColor, p.shadowOff, p.shadowRadius, p.shadowSpread)
+
+    if p.strokeSize > 0:
+        if p.isStrokeGradient:
+            c.mText.setStrokeInRange(0, -1, p.strokeColor, p.strokeColor2, p.strokeSize)
+        else:
+            c.mText.setStrokeInRange(0, -1, p.strokeColor, p.strokeSize)
+
+    if p.bounds != zeroRect:
+        let attr = newPoint(font.getCharComponent(c.text, GlyphMetricsComponent.compX), font.getCharComponent(c.text, GlyphMetricsComponent.compY))
+        c.mBoundingOffset = newPoint(p.bounds.x - attr.x * font.scale, p.bounds.y - attr.y * font.scale)
+        c.mText.boundingSize = p.bounds.size
+
+    c.mText.lineSpacing = p.lineSpacing
+
+    c.mText.horizontalAlignment = p.horizontalAlignment
+    c.mText.verticalAlignment = p.verticalAlignment
+
+genSerializationCodeForComponent(Text)
+
+# method deserialize*(c: Text, b: BinDeserializer) =
+#     c.mText.text = b.readStr()
+
+#     let attrs = cast[set[TextAttributes]](b.readInt16())
+
+#     var fontFace: string
+#     if taFont in attrs:
+#         fontFace = b.readStr()
+
+#     var fontSize: float32
+#     if taFontSize in attrs:
+#         fontSize = b.readFloat32()
+#     else:
+#         fontSize = systemFontSize()
+
+#     var font: Font
+#     if fontFace.len == 0:
+#         font = systemFontOfSize(fontSize)
+#     if font.isNil:
+#         font = newFontWithFace(fontFace, fontSize)
+#     c.mText.setFontInRange(0, -1, font)
+
+#     var buf: BufferView[float32]
+
+#     if taColor in attrs:
+#         buf = b.getBuffer(float32, 4)
+#         c.mText.setTextColorInRange(0, -1, newColor(buf[0], buf[1], buf[2], buf[3]))
+#     elif taColorGradient in attrs:
+#         buf = b.getBuffer(float32, 4)
+#         let startColor = newColor(buf[0], buf[1], buf[2], buf[3])
+#         buf = b.getBuffer(float32, 4)
+#         let endColor = newColor(buf[0], buf[1], buf[2], buf[3])
+#         c.mText.setTextColorInRange(0, -1, startColor, endColor)
+
+#     if taShadow in attrs:
+#         let shadowOff = newSize(b.readFloat32(), b.readFloat32())
+#         buf = b.getBuffer(float32, 4)
+#         let color = newColor(buf[0], buf[1], buf[2], buf[3])
+#         let spread = b.readFloat32()
+#         let radius = b.readFloat32()
+#         c.mText.setShadowInRange(0, -1, color, shadowOff, radius, spread)
+
+#     if taStroke in attrs:
+#         let size = b.readFloat32()
+#         buf = b.getBuffer(float32, 4)
+#         let startColor = newColor(buf[0], buf[1], buf[2], buf[3])
+#         if taStrokeGradient in attrs:
+#             buf = b.getBuffer(float32, 4)
+#             let endColor = newColor(buf[0], buf[1], buf[2], buf[3])
+#             c.mText.setStrokeInRange(0, -1, startColor, endColor, size)
+#         else:
+#             c.mText.setStrokeInRange(0, -1, startColor, size)
+
+#     if taBounds in attrs:
+#         buf = b.getBuffer(float32, 4)
+#         let bounds = newRect(buf[0], buf[1], buf[2], buf[3])
+#         let attr = newPoint(font.getCharComponent(c.text, GlyphMetricsComponent.compX), font.getCharComponent(c.text, GlyphMetricsComponent.compY))
+#         c.mBoundingOffset = newPoint(bounds.x - attr.x * font.scale, bounds.y - attr.y * font.scale)
+#         c.mText.boundingSize = bounds.size
+
+#     if taLineSpacing in attrs:
+#         c.mText.lineSpacing = b.readFloat32()
+
+#     c.mText.horizontalAlignment = HorizontalTextAlignment(b.readUint8())
+#     c.mText.verticalAlignment = VerticalAlignment(b.readUint8())
+
+#     c.mText.processAttributedText()
+
 
 proc shadowMultiplier(t: Text): Size =
     let sv = newVector3(1, 1)
@@ -369,8 +541,7 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("fontSize", t.fontSize)
     p.visitProperty("font", t.font)
     p.visitProperty("color", t.color)
-    p.visitProperty("shadowX", t.shadowX)
-    p.visitProperty("shadowY", t.shadowY)
+    p.visitProperty("shadowOff", t.shadowOffset)
     p.visitProperty("shadowRadius", t.shadowRadius)
     p.visitProperty("shadowSpread", t.shadowSpread)
     p.visitProperty("shadowColor", t.shadowColor)

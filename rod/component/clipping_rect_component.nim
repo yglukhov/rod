@@ -6,6 +6,7 @@ import nimx.view
 import nimx.property_visitor
 
 import rod.node, rod.viewport, rod.component, rod.tools.serializer, rod.rod_types
+import rod / utils / [ property_desc, serialization_codegen ]
 import json
 import opengl
 
@@ -13,6 +14,10 @@ const clippingRectWithScissors = true
 
 type ClippingRectComponent* = ref object of Component
     clippingRect*: Rect
+
+ClippingRectComponent.properties:
+    clippingRect:
+        serializationKey: "rect"
 
 when not clippingRectWithScissors:
     var clippingRectPostEffect = newPostEffect("""
@@ -102,6 +107,6 @@ method serialize*(c: ClippingRectComponent, s: Serializer): JsonNode =
 method deserialize*(c: ClippingRectComponent, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "rect", c.clippingRect)
 
+genSerializationCodeForComponent(ClippingRectComponent)
+
 registerComponent(ClippingRectComponent)
-
-

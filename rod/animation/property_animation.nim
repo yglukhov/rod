@@ -5,19 +5,21 @@ import nimx.property_visitor
 
 import variant
 import rod.node, rod.component, rod.animation.animation_sampler, rod.quaternion
+import rod.utils.bin_deserializer
 
 export animation
 
 type
     AnimatedProperty* = ref object
-        name*: string
+        nodeName*, propName*: string
+        compIndex*: int
         sampler*: AbstractAnimationSampler
         scale*: float
         progressSetter*: proc(p: float)
 
-
     PropertyAnimation* = ref object of Animation
         animatedProperties*: seq[AnimatedProperty]
+        b: BinDeserializer # Used for holding the sampler buffers alive.
 
 template elementFromJson(t: typedesc[Quaternion], jelem: JsonNode): Quaternion = Quaternion(newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum()))
 template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFNum()
@@ -26,6 +28,7 @@ template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVe
 template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
 template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum(1))
 template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
+template elementFromJson(t: typedesc[int16], jelem: JsonNode): int16 = jelem.getNum().int16
 template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBVal()
 
 proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) =
@@ -87,6 +90,10 @@ proc newValueSampler[T](j: JsonNode, lerpBetweenFrames: bool, originalLen, cutFr
         inc i
     result = newArrayAnimationSampler(vals, lerpBetweenFrames, originalLen, cutFront)
 
+proc newValueSampler[T](b: BinDeserializer, numValues: int16, lerpBetweenFrames: bool, originalLen, cutFront: int): AbstractAnimationSampler {.inline.} =
+    let buf = b.getBuffer(T, numValues)
+    result = newBufferAnimationSampler[T, BufferView[T]](buf, lerpBetweenFrames, originalLen, cutFront)
+
 template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): typed =
     ## This lists all animatable types
     case t:
@@ -97,6 +104,7 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): t
     of clause(Quaternion): action(Quaternion)
     of clause(Color): action(Color)
     of clause(int): action(int)
+    of clause(int16): action(int16)
     of clause(bool): action(bool)
     else:
         raise newException(Exception, "Unknown type id")
@@ -104,6 +112,16 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): t
 proc newValueSampler(t: TypeId, j: JsonNode, lerpBetweenFrames: bool): AbstractAnimationSampler =
     template makeSampler(T: typedesc) =
         result = newValueSampler[T](j, lerpBetweenFrames, -1, -1)
+    switchAnimatableTypeId(t, getTypeId, makeSampler)
+
+proc newValueSampler(t: TypeId, b: BinDeserializer, numValues: int16, lerpBetweenFrames: bool): AbstractAnimationSampler =
+    template makeSampler(T: typedesc) =
+        result = newValueSampler[T](b, numValues, lerpBetweenFrames, -1, -1)
+    switchAnimatableTypeId(t, getTypeId, makeSampler)
+
+proc newValueSampler(t: TypeId, b: BinDeserializer, numValues: int16, lerpBetweenFrames: bool, originalLen, cutFront: int): AbstractAnimationSampler =
+    template makeSampler(T: typedesc) =
+        result = newValueSampler[T](b, numValues, lerpBetweenFrames, originalLen, cutFront)
     switchAnimatableTypeId(t, getTypeId, makeSampler)
 
 proc newValueSampler(t: TypeId, j:JsonNode, lerpBetweenFrames: bool, originalLen, cutFront: int): AbstractAnimationSampler=
@@ -167,10 +185,7 @@ proc findAnimatableProperty(n: Node, compIndex: int, propName: string): Variant 
         if not n.components.isNil and n.components.len > compIndex:
             n.components[compIndex].visitProperties(visitor)
 
-proc findAnimatablePropertyForSubtree*(n: Node, propName: string): Variant =
-    var nodeName, rawPropName: string
-    var compIndex: int
-    splitPropertyName(propName, nodeName, compIndex, rawPropName)
+proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int, rawPropName: string): Variant =
     var animatedNode = n
     if not nodeName.isNil:
         animatedNode = n.findNode(nodeName)
@@ -182,7 +197,7 @@ proc findAnimatablePropertyForSubtree*(n: Node, propName: string): Variant =
     else:
         result = findAnimatableProperty(animatedNode, compIndex, rawPropName)
     if result.isEmpty:
-        raise newException(Exception, "Animated property not found: " & propName)
+        raise newException(Exception, "Animated property not found: " & nodeName & "." & $compIndex & "." & rawPropName)
 
 proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: float) =
     template makeSetter(T: typedesc) =
@@ -209,9 +224,16 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
 
         var ap: AnimatedProperty
         ap.new()
-        ap.name = k
+
+        var nodeName, rawPropName: string
+        var compIndex: int
+        splitPropertyName(k, nodeName, compIndex, rawPropName)
+
+        ap.nodeName = nodeName
+        ap.propName = rawPropName
+        ap.compIndex = compIndex
         ap.scale = animScale
-        let sng = findAnimatablePropertyForSubtree(n, k)
+        let sng = findAnimatablePropertyForSubtree(n, nodeName, compIndex, rawPropName)
         var t: TypeId
         try:
             t = typeIdForSetterAndGetter(sng)
@@ -238,9 +260,76 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
         for ap in res.animatedProperties:
             ap.progressSetter(p * ap.scale)
 
+proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyAnimation =
+    result.new()
+    result.init()
+    result.b = b # Used for holding the sampler buffers alive.
+
+    let propsCount = b.readInt16()
+    result.animatedProperties = newSeq[AnimatedProperty](propsCount)
+    shallow(result.animatedProperties)
+
+    if not aeComp:
+        result.loopDuration = b.readFloat32()
+        result.numberOfLoops = b.readInt16()
+
+    for i in 0 ..< propsCount:
+        # TODO: Handle animScale
+        let nodeName = b.readStr()
+        let propName = b.readStr()
+
+        var ap: AnimatedProperty
+        ap.new()
+        ap.nodeName = nodeName
+        ap.propName = propName
+        # echo "k: ", nodeName, ".", propName
+        ap.compIndex = -1
+        ap.scale = 1.0
+        let sng = findAnimatablePropertyForSubtree(n, nodeName, -1, propName)
+        var t: TypeId
+        try:
+            t = typeIdForSetterAndGetter(sng)
+        except:
+            logi "Wrong type of animated property ", nodeName, ".", propName
+            raise
+
+        let frameLerp = bool(b.readUint8())
+
+        var cutf = -1
+        var olen = -1
+
+        if aeComp:
+            olen = b.readInt16()
+            cutf = b.readInt16()
+
+        let numValues = b.readInt16()
+
+        # if "keys" in jp:
+        #     ap.sampler = newKeyframeSampler(t, jp["keys"])
+        # elif "cutf" in jp:
+        #     let lerp = jp{"frameLerp"}.getBVal(true)
+        #     let olen = jp{"len"}.getNum(-1).int
+        #     let cutf = jp{"cutf"}.getNum(-1).int
+        #     ap.sampler = newValueSampler(t, jp["values"], lerp, olen, cutf)
+        # else:
+
+        if aeComp:
+            ap.sampler = newValueSampler(t, b, numValues, frameLerp, olen, cutf)
+        else:
+            ap.sampler = newValueSampler(t, b, numValues, frameLerp)
+
+        ap.progressSetter = makeProgressSetter(sng, ap.sampler)
+
+        result.animatedProperties[i] = ap
+
+    let res = result
+    result.onAnimate = proc(p: float) =
+        for ap in res.animatedProperties:
+            ap.progressSetter(p * ap.scale)
+
 proc attachToNode*(pa: PropertyAnimation, n: Node) =
     for ap in pa.animatedProperties:
-        let sng = findAnimatablePropertyForSubtree(n, ap.name)
+        let sng = findAnimatablePropertyForSubtree(n, ap.nodeName, ap.compIndex, ap.propName)
         ap.progressSetter = makeProgressSetter(sng, ap.sampler)
 
     pa.onAnimate = proc(p: float) =

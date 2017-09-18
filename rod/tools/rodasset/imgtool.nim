@@ -1,4 +1,5 @@
 import os, osproc, json, strutils, times, sequtils, tables, sets, logging
+import nimx.pathutils
 
 const multithreaded = compileOption("threads")
 
@@ -13,7 +14,7 @@ import nimx.types except Point, Size, Rect
 import nimx.pathutils
 
 import imgtools / [ imgtools, texcompress, spritesheet_packer ]
-import tree_traversal
+import tree_traversal, binformat
 
 type
     ImageOccurenceInfo = object
@@ -40,6 +41,7 @@ type ImgTool* = ref object
     noquant*: seq[string]
     noposterize*: seq[string]
     index*: JsonNode
+    packCompositions*: bool
 
 proc newImgTool*(): ImgTool =
     result.new()
@@ -58,6 +60,7 @@ proc serializedImage(im: ImageOccurence, path: string): JsonNode =
     let h = im.spriteSheet.size.height.float
     result["tex"] = %*[(im.dstBounds.x.float + 0.5) / w, (im.dstBounds.y.float + 0.5) / h, ((im.dstBounds.x + im.dstBounds.width).float - 0.5) / w, ((im.dstBounds.y + im.dstBounds.height).float - 0.5) / h]
     result["size"] = %*[im.srcInfo.rect.width, im.srcInfo.rect.height]
+    result["off"] = %*[im.srcInfo.rect.x, im.srcInfo.rect.y]
 
 proc pathToPVR(path: string): string {.inline.} =
     result = path.changeFileExt("pvr")
@@ -69,6 +72,8 @@ proc adjustImageNode(tool: ImgTool, im: ImageOccurence) =
         ssPath = ssPath.pathToPVR()
 
     let result = im.serializedImage(relativePathToPath(tool.destPath(im.info.compPath).parentDir(), ssPath))
+    if tool.packCompositions:
+        result["orig"] = %relativePathToPath(tool.originalResPath, im.path) #im.path
     doAssert(not im.spriteSheet.isNil)
 
     if im.info.textureKey.isNil:
@@ -94,6 +99,21 @@ proc absImagePath(compPath, imageRelPath: string): string =
     result = compPath.parentDir / imageRelPath
     result.normalizePath()
 
+proc checkCompositionRefs(c: JsonNode, compPath, originalResPath: string) =
+    var missingRefs = newSeq[string]()
+    for n in c.allNodes:
+        let jcr = n{"compositionRef"}
+        if not jcr.isNil:
+            let cr = jcr.str
+            let acr = absImagePath(compPath, cr)
+            if not fileExists(acr):
+                missingRefs.add(acr)
+    if missingRefs.len != 0:
+        echo "Missing compositionRefs in ", compPath, ":"
+        for m in missingRefs:
+            echo m
+        raise newException(Exception, "Missing compositions")
+
 proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
     result = @[]
     shallow(result)
@@ -102,6 +122,8 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
 
     for i, c in tool.compositions:
         let compPath = tool.compositionPaths[i]
+
+        checkCompositionRefs(c, compPath, tool.originalResPath)
 
         template addOccurence(relPath: string, ioinfo: ImageOccurenceInfo, alphaCrop: bool = false) =
             let ap = absImagePath(compPath, relPath)
@@ -157,12 +179,15 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
                     ))
 
 proc createIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
-    let idx = newJObject()
+    let idx = newJArray()
     for im in occurences:
         var ssPath = im.spriteSheet.path.extractFilename()
         if tool.compressToPVR:
             ssPath = ssPath.pathToPVR()
-        idx[relativePathToPath(tool.originalResPath, im.path)] = im.serializedImage(ssPath)
+        let ji = im.serializedImage(ssPath)
+        ji["orig"] = %relativePathToPath(tool.originalResPath, im.path)
+        idx.add(ji)
+#        idx[relativePathToPath(tool.originalResPath, im.path)] = im.serializedImage(ssPath)
     tool.index = idx
 
 proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
@@ -233,7 +258,7 @@ proc run*(tool: ImgTool) =
     var occurences = tool.collectImageOccurences()
     tool.setCategories(occurences)
 
-    let packer = newSpriteSheetPacker(tool.resPath / tool.outPrefix)
+    let packer = newSpriteSheetPacker(tool.resPath & "/" & tool.outPrefix)
     packer.pack(occurences)
 
     if tool.compressToPVR:
@@ -253,21 +278,20 @@ proc run*(tool: ImgTool) =
     for o in occurences:
         tool.processedImages.incl(o.path)
 
-    let packCompositions = false
-
     # Write all composisions to single file
-    if packCompositions:
-        let allComps = newJObject()
+    if tool.packCompositions:
+        # let allComps = newJObject()
         for i, c in tool.compositions:
-            if "aep_name" in c: c.delete("aep_name")
+            # if "aep_name" in c: c.delete("aep_name")
             var resName = tool.compositionPaths[i]
             if not resName.startsWith("res/"):
-                raise newException(Exception, "WRONG COMPOSITION PATH: " & resName)
+                raise newException(Exception, "Wrong composition path: " & resName)
             resName = resName.substr("res/".len)
-            allComps[resName] = c
-        var str = ""
-        toUgly(str, allComps)
-        writeFile(tool.resPath / "comps.jsonpack", str)
+            # allComps[resName] = c
+            tool.compositionPaths[i] = resName
+        # var str = ""
+        # toUgly(str, allComps)
+        # writeFile(tool.resPath & "/" & "comps.jsonpack", str)
     else:
         # Write compositions back to files
         for i, c in tool.compositions:
@@ -278,6 +302,12 @@ proc run*(tool: ImgTool) =
             writeFile(dstPath, str)
 
     tool.createIndex(occurences)
+
+    if tool.packCompositions:
+        let b = newBinSerializer()
+        b.assetBundlePath = tool.originalResPath.substr("res/".len)
+        b.writeCompositions(tool.compositions, tool.compositionPaths, tool.resPath / "comps.rodpack", tool.index)
+        echo "Comppack written: ", tool.resPath / "comps.rodpack", " alignment bytes: ", b.totalAlignBytes
 
     sync() # Wait until spritesheet optimizations complete
 

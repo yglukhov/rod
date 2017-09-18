@@ -4,18 +4,29 @@ import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager,
 import nimx / [ image, types ]
 import variant
 
+import os, streams
+
+import rod.utils.bin_deserializer
+
 type AssetBundle* = ref object of nab.AssetBundle
     path*: string
     mBaseUrl: string
     hash*: string
     index*: JsonNode
-    spriteSheets*: Table[string, seq[string]] # Map spritesheet path to all image paths in it
+    spriteSheets*: Table[string, seq[JsonNode]] # Map spritesheet path to all image entries
+    binDeserializer*: BinDeserializer
 
 method allAssets(ab: AssetBundle): seq[string] =
     result = @[]
     for k in ab.spriteSheets.keys: result.add(k)
     let files = ab.index{"files"}
     for f in files: result.add(f.str)
+
+proc hasAsset*(ab: AssetBundle, path: string): bool =
+    if not ab.binDeserializer.isNil:
+        if ab.binDeserializer.hasComposition(path): return true
+
+    # TODO: Everything else
 
 proc realUrlForPath(ab: AssetBundle, path: string): string =
     ab.mBaseUrl / path
@@ -27,18 +38,54 @@ method urlForPath*(ab: AssetBundle, path: string): string =
         result = ab.realUrlForPath(path)
 
 proc init(ab: AssetBundle, handler: proc()) {.inline.} =
+    # echo "INIT AB: ", ab.mBaseUrl
+    let rpPath = ab.mBaseUrl["file://".len .. ^1] / "comps.rodpack"
+    # echo "RPPATH: ", rpPath
+    var indexComplete = false
+    var compsComplete = false
+
+    proc onComplete() =
+        if not ab.binDeserializer.isNil:
+            ab.binDeserializer.images = ab.index["packedImages"]
+        handler()
+
+    openStreamForUrl(ab.mBaseUrl / "comps.rodpack") do(s: Stream, err: string):
+        if not s.isNil:
+            var ss = s
+            if not (s of StringStream):
+                let str = s.readAll()
+                s.close()
+                ss = newStringStream(str)
+            echo "Create bindeser: ", ab.mBaseUrl
+            ab.binDeserializer = newBinDeserializer(ss)
+            ab.binDeserializer.basePath = ab.path
+
+        compsComplete = true
+        if indexComplete and compsComplete: onComplete()
+
     loadJsonFromURL(ab.realUrlForPath("index.rodpack")) do(j: JsonNode):
         ab.index = j
-        ab.spriteSheets = initTable[string, seq[string]]()
+        ab.spriteSheets = initTable[string, seq[JsonNode]]()
         let packedImages = ab.index["packedImages"]
         if not packedImages.isNil:
-            for k, v in packedImages:
-                let fn = v["file"].str
-                if fn in ab.spriteSheets:
-                    ab.spriteSheets[fn].add(k)
-                else:
-                    ab.spriteSheets[fn] = @[k]
-        handler()
+            if packedImages.kind == JArray:
+                for v in packedImages:
+                    let fn = v["file"].str
+                    if fn in ab.spriteSheets:
+                        ab.spriteSheets[fn].add(v)
+                    else:
+                        ab.spriteSheets[fn] = @[v]
+            else:
+                for k, v in packedImages:
+                    v["orig"] = %k
+                    let fn = v["file"].str
+                    if fn in ab.spriteSheets:
+                        ab.spriteSheets[fn].add(v)
+                    else:
+                        ab.spriteSheets[fn] = @[v]
+
+        indexComplete = true
+        if indexComplete and compsComplete: onComplete()
 
 when defined(js) or defined(emscripten):
     import nimx.pathutils
@@ -202,7 +249,7 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
         if abd.isDownloaded:
             handler(nil)
         else:
-            when not defined(js) and not defined(emscripten) and not defined(windows):
+            when not defined(js) and not defined(emscripten) and not defined(windows) and not defined(rodplugin):
                 assert(not getURLForAssetBundle.isNil)
                 let url = getURLForAssetBundle(abd.hash)
                 var ctx: DownloadCtx
@@ -262,10 +309,8 @@ registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tg
         let ssUrl = rab.realUrlForPath(path)
         # echo "ssUrl: ", ssUrl
         loadAsset(ssUrl, path, cache) do():
-            let packedImages = rab.index["packedImages"]
             let i = cache[path].get(Image)
-            for sub in rab.spriteSheets[path]:
-                let j = packedImages[sub]
+            for j in rab.spriteSheets[path]:
                 let jt = j["tex"]
                 let texCoords = [
                     jt[0].getFNum().float32,
@@ -275,7 +320,7 @@ registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tg
                 ]
                 let js = j["size"]
                 let sz = newSize(js[0].getFNum(), js[1].getFNum())
-                let imagePath = rab.path & '/' & sub
+                let imagePath = rab.path & '/' & j["orig"].str
                 let si: Image = i.subimageWithTexCoords(sz, texCoords)
                 si.setFilePath(imagePath)
                 am.cacheAsset(imagePath, si)

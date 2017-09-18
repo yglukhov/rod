@@ -19,6 +19,8 @@ import nimx.assets.asset_loading
 import quaternion
 import ray
 import rod.tools.serializer
+import rod.utils.bin_deserializer
+import rod.asset_bundle
 
 import rod_types
 export Node
@@ -344,10 +346,10 @@ proc findNode*(n: Node, name: string): Node =
         n.name == name
 
 type
-    NodeRefResolveProc = proc(nodeValue: Node)
+    NodeRefResolveProc* = proc(nodeValue: Node)
     NodeRefTable = TableRef[string, seq[NodeRefResolveProc]]
 
-var nodeLoadRefTable: NodeRefTable
+var nodeLoadRefTable*: NodeRefTable
 
 template addNodeRef*(refNode: var Node, name: string) =
     assert(not nodeLoadRefTable.isNil)
@@ -615,7 +617,27 @@ proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
     result = newNode()
     result.loadComposition(url, onComplete)
 
+proc newNode*(b: BinDeserializer, compName: string): Node
+
+proc binDeserializerForPath(path: string): BinDeserializer =
+    let am = sharedAssetManager()
+    let ab = am.assetBundleForPath(path)
+    var rab: AssetBundle
+    if not ab.isNil: rab = AssetBundle(ab)
+    if not rab.isNil:
+        return rab.binDeserializer
+
 proc newNodeWithResource*(path: string): Node =
+    let bd = binDeserializerForPath(path)
+    if not bd.isNil:
+        try:
+            return newNode(bd, path)
+        except:
+            echo "Error: could not deserialize ", path
+            raise
+    else:
+        echo "No BinDeserializer for ", path
+
     var done = false
     result = newNodeWithUrl("res://" & path) do():
         done = true
@@ -733,3 +755,124 @@ proc recursiveChildrenCount*(n: Node): int =
     result = n.children.len
     for c in n.children:
         result += c.recursiveChildrenCount
+
+type
+    BuiltInComponentType* = enum # This is a copypaste from binformat. TODO: Remove
+        bicAlpha = "A"
+        bicFlags = "f"
+        bicAnchorPoint = "a"
+        bicCompRef = "c"
+        bicName = "n"
+        bicRotation = "r"
+        bicScale = "s"
+        bicTranslation = "t"
+    NodeFlags* {.pure.} = enum
+        enabled, affectsChildren
+
+proc newNode*(b: BinDeserializer, compName: string): Node =
+    let oldPos = b.getPosition()
+    let oldPath = b.curCompPath
+    b.curCompPath = compName
+
+    let oldNodeRefTab = nodeLoadRefTable
+    nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
+    defer: nodeLoadRefTable = oldNodeRefTab
+
+    b.rewindToComposition(compName)
+    let nodesCount = b.readInt16()
+    var nodes = newSeq[Node](nodesCount)
+    for i in 0 ..< nodesCount: nodes[i] = newNode()
+
+    var tmpBuf = b.getBuffer(int16, nodesCount - 1)
+
+    # Read child-parent relations
+    for i in 1 ..< nodesCount:
+        let ch = nodes[i]
+        let p = nodes[tmpBuf[i - 1]]
+        p.children.add(ch)
+        ch.parent = p
+
+    let compsCount = b.readInt16()
+    for i in 0 ..< compsCount:
+        let name = b.readStr()
+        case name
+        of $bicAlpha:
+            let alphas = b.getBuffer(uint8, nodesCount)
+            for i in 0 ..< nodesCount:
+                nodes[i].alpha = float32(alphas[i]) / 255
+        of $bicFlags:
+            let flags = b.getBuffer(uint8, nodesCount)
+            for i in 0 ..< nodesCount:
+                nodes[i].isEnabled = (flags[i] and (1.uint8 shl NodeFlags.enabled.uint8)) != 0
+                nodes[i].affectsChildren = (flags[i] and (1.uint8 shl NodeFlags.affectsChildren.uint8)) != 0
+        of $bicAnchorPoint:
+            let count = b.readInt16()
+            tmpBuf = b.getBuffer(int16, count)
+            let anchorPoints = b.getBuffer(Vector3, count)
+            for i in 0 ..< count:
+                nodes[tmpBuf[i]].mAnchorPoint = anchorPoints[i]
+        of $bicTranslation:
+            let count = b.readInt16()
+            tmpBuf = b.getBuffer(int16, count)
+            let translations = b.getBuffer(Vector3, count)
+            for i in 0 ..< count:
+                nodes[tmpBuf[i]].mTranslation = translations[i]
+        of $bicScale:
+            let count = b.readInt16()
+            tmpBuf = b.getBuffer(int16, count)
+            let scales = b.getBuffer(Vector3, count)
+            for i in 0 ..< count:
+                nodes[tmpBuf[i]].mScale = scales[i]
+        of $bicRotation:
+            let count = b.readInt16()
+            tmpBuf = b.getBuffer(int16, count)
+            let rotations = b.getBuffer(Quaternion, count)
+            for i in 0 ..< count:
+                nodes[tmpBuf[i]].mRotation = rotations[i]
+        of $bicName:
+            for i in 0 ..< nodesCount:
+                nodes[i].name = b.readStr()
+        of $bicCompRef:
+            let count = b.readInt16()
+            tmpBuf = b.getBuffer(int16, count)
+            for i in 0 ..< count:
+                let compRef = b.readStr()
+                let subComp = newNodeWithResource(compRef)
+                let old = nodes[tmpBuf[i]]
+
+                for c in subComp.children:
+                    c.parent = old
+
+                if old.children.len != 0:
+                    old.children = subComp.children & old.children
+                else:
+                    old.children = subComp.children
+                old.animations = subComp.animations
+                for c in subComp.components: c.node = old
+                if old.components.isNil:
+                    old.components = subComp.components
+                else:
+                    old.components.add(subComp.components)
+                #old.translation = subComp.translation
+                #old.rotation = subComp.rotation
+                #old.scale = subComp.scale
+                #old.anchor = subComp.anchor
+        else:
+            let count = b.readInt16()
+            tmpBuf = b.getBuffer(int16, count)
+            for i in 0 ..< count:
+                let comp = nodes[tmpBuf[i]].addComponent(name)
+                comp.deserialize(b)
+
+    result = nodes[0]
+
+    let animationsCount = b.readInt16()
+    if animationsCount > 0:
+        result.animations = newTable[string, Animation]()
+        for i in 0 ..< animationsCount:
+            let name = b.readStr()
+            result.animations[name] = newPropertyAnimation(result, b, false)
+
+    result.resolveNodeRefs()
+    b.setPosition(oldPos)
+    b.curCompPath = oldPath
