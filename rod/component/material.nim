@@ -764,17 +764,12 @@ proc setupLightAttributes(m: Material, v: SceneView) =
                 m.shaderMacroFlags.excl(ShaderMacro(int(WITH_LIGHT_0) + m.currentLightSourcesCount))
 
         if lightsCount == 0:
-            m.shaderMacroFlags.excl(WITH_LIGHT_POSITION)
-            m.shaderMacroFlags.excl(WITH_LIGHT_AMBIENT)
-            m.shaderMacroFlags.excl(WITH_LIGHT_DIFFUSE)
-            m.shaderMacroFlags.excl(WITH_LIGHT_SPECULAR)
-            m.shaderMacroFlags.excl(WITH_LIGHT_PRECOMPUTED_ATTENUATION)
-            m.shaderMacroFlags.excl(WITH_LIGHT_DYNAMIC_ATTENUATION)
+            m.shaderMacroFlags.excl({WITH_LIGHT_POSITION, WITH_LIGHT_POSITION,
+                WITH_LIGHT_AMBIENT, WITH_LIGHT_DIFFUSE, WITH_LIGHT_SPECULAR,
+                WITH_LIGHT_PRECOMPUTED_ATTENUATION, WITH_LIGHT_DYNAMIC_ATTENUATION})
         else:
-            m.shaderMacroFlags.incl(WITH_LIGHT_POSITION)
-            m.shaderMacroFlags.incl(WITH_LIGHT_AMBIENT)
-            m.shaderMacroFlags.incl(WITH_LIGHT_DIFFUSE)
-            m.shaderMacroFlags.incl(WITH_LIGHT_SPECULAR)
+            m.shaderMacroFlags.incl({WITH_LIGHT_POSITION, WITH_LIGHT_AMBIENT,
+                WITH_LIGHT_DIFFUSE, WITH_LIGHT_SPECULAR})
 
             for ls in values v.lightSources:
                 if ls.lightAttenuationInited:
