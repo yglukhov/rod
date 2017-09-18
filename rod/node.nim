@@ -551,7 +551,39 @@ proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc()
     n.resolveNodeRefs()
     serializer.finish()
 
+proc binDeserializerForPath(path: string): BinDeserializer =
+    let am = sharedAssetManager()
+    let ab = am.assetBundleForPath(path)
+    var rab: AssetBundle
+    if not ab.isNil: rab = AssetBundle(ab)
+    if not rab.isNil:
+        return rab.binDeserializer
+
+proc newNode*(b: BinDeserializer, compName: string): Node
+
 proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
+    const prefix = "res://"
+    if url.startsWith(prefix):
+        let path = url.substr(prefix.len)
+        let bd = binDeserializerForPath(path)
+        if not bd.isNil:
+            try:
+                let theNode = newNode(bd, path)
+                n[] = theNode[]
+                for c in n.children:
+                    c.parent = n
+                for c in n.components:
+                    c.node = n
+
+                if not onComplete.isNil:
+                    onComplete()
+                return
+            except:
+                echo "Error: could not deserialize ", path
+                raise
+        else:
+            echo "No BinDeserializer for ", path
+
     loadAsset(url) do(j: JsonNode, err: string):
         assert err.isNil, err
 
@@ -616,16 +648,6 @@ proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
 proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
     result = newNode()
     result.loadComposition(url, onComplete)
-
-proc newNode*(b: BinDeserializer, compName: string): Node
-
-proc binDeserializerForPath(path: string): BinDeserializer =
-    let am = sharedAssetManager()
-    let ab = am.assetBundleForPath(path)
-    var rab: AssetBundle
-    if not ab.isNil: rab = AssetBundle(ab)
-    if not rab.isNil:
-        return rab.binDeserializer
 
 proc newNodeWithResource*(path: string): Node =
     let bd = binDeserializerForPath(path)
