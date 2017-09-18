@@ -252,13 +252,6 @@ proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonN
         for la in jlayers:
             b.write(la.str)
 
-proc writeButtonComponent(b: BinSerializer, j: JsonNode) =
-    b.writeVecf(4, j["bounds"])
-
-proc writeIconComponent(b: BinSerializer, j: JsonNode) =
-    b.write(j["iconComposition"].str)
-    b.write(j["iconName"].str)
-
 proc writeUnknownComponent(b: BinSerializer, j: JsonNode) =
     # echo j
     let name = j["_c"]
@@ -300,13 +293,12 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
             "AELayer", "ColorFill", "GradientFill", "Tint", "CompRef",
             "ColorBalanceHLS", "ChannelLevels", "Mask", "SpherePSGenShape",
             "PSModifierRandWind", "BoxPSGenShape", "ConePSGenShape",
-            "VisualModifier", "Text", "PSHolder", "Trail", "TileMap", "TileMapLayer", "ImageMapLayer":
+            "VisualModifier", "Text", "PSHolder", "Trail", "TileMap", "TileMapLayer",
+            "ImageMapLayer", "ButtonComponent", "IconComponent":
         b.writeComponents(c, name, compPath)
     of "AEComposition":
         b.writeComponents(c) do(j: JsonNode):
             writeAECompositionComponent(b, j, nodes)
-    of "ButtonComponent": b.writeComponents(c, writeButtonComponent)
-    of "IconComponent": b.writeComponents(c, writeIconComponent)
     else:
         echo "WARNING: Unknown component: ", name
         b.writeComponents(c, writeUnknownComponent)
