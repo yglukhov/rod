@@ -24,13 +24,11 @@ import rod.viewport
 
 const comonPrefix = """
 (sampler2D mask_img, vec4 mask_img_coords, vec4 mask_bounds, mat4 mvp_inv, float msk_alpha) {
-
-    vec2 mskVpos = vec4(mvp_inv * vec4(gl_FragCoord.x, gl_FragCoord.y, 0.0, 1.0)).xy;
+    vec4 pos = mvp_inv * vec4(gl_FragCoord.xyz, 1.0);
+    vec2 mskVpos = pos.xy / pos.w;
     vec2 destuv = ( mskVpos - mask_bounds.xy ) / mask_bounds.zw;
     vec2 uv = mask_img_coords.xy + (mask_img_coords.zw - mask_img_coords.xy) * destuv;
-
     vec4 mask_color = texture2D(mask_img, uv);
-
     float rect_alpha = 1.0;
     if (uv.x < mask_img_coords.x || uv.x > mask_img_coords.z || uv.y < mask_img_coords.y || uv.y > mask_img_coords.w) {
         rect_alpha = 0.0;
@@ -136,8 +134,6 @@ template inv(m: Matrix4): Matrix4 =
         res.loadIdentity()
     res
 
-const clipMat: Matrix4 = [0.5.Coord,0,0,0,0,0.5,0,0,0,0,1.0,0,0.5,0.5,0,1.0]
-
 method beforeDraw*(msk: Mask, index: int): bool =
     if not msk.maskSprite.isNil and not msk.maskSprite.image.isNil and msk.maskType != tmNone:
 
@@ -150,7 +146,10 @@ method beforeDraw*(msk: Mask, index: int): bool =
         let tex = getTextureQuad(msk.maskSprite.image, currentContext().gl, theQuad)
         let maskImgCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
         let maskBounds = newRect(msk.maskSprite.getOffset(), msk.maskSprite.image.size)
-        var trInv = (clipMat * vp.viewProjMatrix * msk.maskSprite.node.worldTransform()).inv()
+
+        var trInv = (vp.viewProjMatrix * msk.maskSprite.node.worldTransform()).inv()
+        trInv.scale(newVector3(2.0,2.0,2.0))
+        trInv.translate(newVector3(-0.5, -0.5, -0.5))
         let glvp = currentContext().gl.getViewport()
         trInv.scale(newVector3(1.0/(glvp[2] - glvp[0]).float, 1.0/(glvp[3] - glvp[1]).float, 1.0))
 
