@@ -1,6 +1,6 @@
 import macros, tables
 import property_desc
-
+import nimx.class_registry
 
 proc genPhantomTypeSection(typdesc: NimNode): NimNode =
     let fields = newNimNode(nnkRecList)
@@ -101,7 +101,7 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
                 if not `s`.disableAwake:
                     awake(`v`)
 
-    #echo repr(result)
+    # echo repr(result)
 
 template genSerializationCodeForComponent*(c: typed) =
     import rod / utils / [ bin_deserializer ]
@@ -109,7 +109,8 @@ template genSerializationCodeForComponent*(c: typed) =
     when defined(rodplugin):
         import rod / utils / [ json_deserializer, json_serializer,
                 bin_serializer, serialization_hash_calculator ]
-
+        
+        bind className
         genSerializerProc(c, serializeAux, BinSerializer, false, true, true, false)
         genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
         genSerializerProc(c, serializeAux, JsonSerializer, true, true, false, false)
@@ -119,6 +120,7 @@ template genSerializationCodeForComponent*(c: typed) =
             deserializeAux(cm, b)
 
         method serialize*(cm: c, b: JsonSerializer) =
+            b.visit(className(cm), "_c")
             serializeAux(cm, b)
 
         method serialize*(cm: c, b: BinSerializer) =

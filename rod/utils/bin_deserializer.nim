@@ -126,6 +126,40 @@ proc setLenX[T](s: var seq[T], sz: int) =
     else:
         s.setLen(sz)
 
+proc readUint8*(b: BinDeserializer): uint8 {.inline.} =
+    cast[uint8](b.stream.readInt8())
+
+proc readInt8*(b: BinDeserializer): int8 {.inline.} =
+    b.stream.readInt8()
+
+proc getImageInfoForIndex(b: BinDeserializer, idx: int16, path: var string, frameOffset: var Point) =
+    let j = b.images[idx]
+    path = b.basePath & "/" & j["orig"].str
+    let joff = j{"off"}
+    if not joff.isNil:
+        frameOffset.x = joff[0].getFNum()
+        frameOffset.y = joff[1].getFNum()
+
+proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image) =
+    if idx == -2:
+        var asset = b.readStr()
+        var bundle = b.readStr()
+        im = sharedAssetManager().cachedAsset(Image, bundle & '/' & asset)
+        
+    elif idx != -1:
+        var path: string
+        var p: Point
+        b.getImageInfoForIndex(idx, path, p)
+        im = sharedAssetManager().cachedAsset(Image, path)
+
+proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image, frameOffset: var Point) =
+    assert(idx != -2, "Trata")
+        
+    if idx != -1:
+        var path: string
+        b.getImageInfoForIndex(idx, path, frameOffset)
+        im = sharedAssetManager().cachedAsset(Image, path)
+
 proc read*[T](b: BinDeserializer, data: var T) =
     when T is array or T is openarray:
         when isPODType(T):
@@ -167,6 +201,11 @@ proc read*[T](b: BinDeserializer, data: var T) =
         discard b.stream.readData(addr tb, sizeof(tb))
         data = tb.bool
 
+    elif T is Image:
+        let idx = b.readInt16()
+            
+        b.getImageForIndex(idx, data)
+
     elif T is enum:
         var v: (when ord(high(T)) < high(int8): int8 else: int16)
         b.read(v)
@@ -177,25 +216,6 @@ proc read*[T](b: BinDeserializer, data: var T) =
     else:
         {.error: "Unknown type " .}
 
-proc readUint8*(b: BinDeserializer): uint8 {.inline.} =
-    cast[uint8](b.stream.readInt8())
-
-proc readInt8*(b: BinDeserializer): int8 {.inline.} =
-    b.stream.readInt8()
-
-proc getImageInfoForIndex(b: BinDeserializer, idx: int16, path: var string, frameOffset: var Point) =
-    let j = b.images[idx]
-    path = b.basePath & "/" & j["orig"].str
-    let joff = j{"off"}
-    if not joff.isNil:
-        frameOffset.x = joff[0].getFNum()
-        frameOffset.y = joff[1].getFNum()
-
-proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image, frameOffset: var Point) =
-    if idx != -1:
-        var path: string
-        b.getImageInfoForIndex(idx, path, frameOffset)
-        im = sharedAssetManager().cachedAsset(Image, path)
 
 proc visit*[T](b: BinDeserializer, v: var T) {.inline.} =
     b.read(v)
@@ -206,8 +226,7 @@ proc visit*(b: BinDeserializer, v: var Quaternion) =
 
 proc visit*(b: BinDeserializer, v: var Image) =
     let idx = b.readInt16()
-    var p: Point
-    b.getImageForIndex(idx, v, p)
+    b.getImageForIndex(idx, v)
 
 proc visit*(b: BinDeserializer, images: var seq[Image], frameOffsets: var seq[Point]) =
     let sz = b.readInt16()
