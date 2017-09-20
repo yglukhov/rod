@@ -42,6 +42,9 @@ proc get[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
         for i in 0 ..< v.len:
             b.get(j[i], v[i])
 
+    elif T is enum:
+        v = parseEnum[T](j.str)
+        
     elif T is seq:
         v.setLenX(j.len)
         for i in 0 ..< j.len:
