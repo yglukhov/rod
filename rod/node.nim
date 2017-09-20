@@ -714,24 +714,26 @@ proc serialize*(n: Node, s: JsonSerializer) =
     s.visit(n.affectsChildren, "affectsChildren")
     s.visit(n.enabled, "enabled")
 
-    if not n.components.isNil and n.components.len > 0:
-        var jn = s.node
-        jn["components"] = newJArray()
+    if n.components.len > 0:
+        let jn = s.node
+        let jcomps = newJArray()
+        jn["components"] = jcomps
         for c in n.components:
             s.node = newJObject()
             c.serialize(s)
-            jn["components"].add(s.node)
+            jcomps.add(s.node)
         s.node = jn
 
-    if not n.children.isNil and n.children.len > 0:
-        var jn = s.node
-        jn["children"] = newJArray()
+    if n.children.len > 0:
+        let jn = s.node
+        let jchildren = newJArray()
+        jn["children"] = jchildren
         for child in n.children:
             s.node = newJObject()
             child.serialize(s)
-            jn["children"].add(s.node)
+            jchildren.add(s.node)
         s.node = jn
-    
+
 proc getDepth*(n: Node): int =
     result = 0
 
