@@ -53,8 +53,9 @@ proc init(ab: AssetBundle, handler: proc()) {.inline.} =
         if not s.isNil:
             var ss = s
             if not (s of StringStream):
-                let str = s.readAll()
+                var str = s.readAll()
                 s.close()
+                shallow(str)
                 ss = newStringStream(str)
             echo "Create bindeser: ", ab.mBaseUrl
             ab.binDeserializer = newBinDeserializer(ss)
