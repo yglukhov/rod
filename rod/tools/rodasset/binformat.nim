@@ -372,6 +372,7 @@ proc orderComponents(c: HashSet[string]): seq[string] =
         "other", # Everything else
 
         "CompRef",
+        "TileMap",
         "AEComposition" # Should be the last one
     ]
 

@@ -19,7 +19,7 @@ import nimx.assets.asset_loading
 import quaternion
 import ray
 import rod.tools.serializer
-import rod.utils.bin_deserializer
+import rod / utils / [ bin_deserializer, json_serializer ]
 import rod.asset_bundle
 
 import rod_types
@@ -681,6 +681,35 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
         for child in n.children:
             childsNode.add(child.serialize(s))
 
+proc serialize*(n: Node, s: JsonSerializer) =
+    s.visit(n.name, "name")
+    s.visit(n.position, "translation")
+    s.visit(n.scale, "scale")
+    s.visit(n.rotation, "rotation")
+    s.visit(n.anchor, "anchor")
+    s.visit(n.alpha, "alpha")
+    s.visit(n.layer, "layer")
+    s.visit(n.affectsChildren, "affectsChildren")
+    s.visit(n.enabled, "enabled")
+
+    if not n.components.isNil and n.components.len > 0:
+        var jn = s.node
+        jn["components"] = newJArray()
+        for c in n.components:
+            s.node = newJObject()
+            c.serialize(s)
+            jn["components"].add(s.node)
+        s.node = jn
+
+    if not n.children.isNil and n.children.len > 0:
+        var jn = s.node
+        jn["children"] = newJArray()
+        for child in n.children:
+            s.node = newJObject()
+            child.serialize(s)
+            jn["children"].add(s.node)
+        s.node = jn
+    
 proc getDepth*(n: Node): int =
     result = 0
 
