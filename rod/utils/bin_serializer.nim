@@ -53,7 +53,7 @@ proc writeArrayNoLen*[T](b: BinSerializer, data: openarray[T]) =
         for i in 0 ..< data.len:
             b.write(data[i])
 
-proc getNeighbourImageIndex(b: BinSerializer, p2: string):tuple[asset:string, bundle:string]=
+proc getNeighbourImageBundlePath(b: BinSerializer, p2: string):tuple[asset:string, bundle:string]=
     var curDir = getCurrentDir() / "res"
     var path = curDir / b.assetBundlePath / p2
 
@@ -126,7 +126,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
 
             if idx == b.images.len:
                 b.write(int16(-2))
-                var (asset, bundle) = b.getNeighbourImageIndex(path)
+                var (asset, bundle) = b.getNeighbourImageBundlePath(path)
                 b.write(asset)
                 b.write(bundle)
             else:
