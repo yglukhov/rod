@@ -186,8 +186,14 @@ proc isDownloadable*(abd: AssetBundleDescriptor): bool {.inline.} =
     else:
         abd.isExternal
 
-proc cacheDir(): string =
-    "/tmp/rodappcache"
+when defined(android):
+    import android.extras.pathutils
+
+proc cacheDir(): string {.inline.} =
+    when defined(android):
+        appFilesDir()
+    else:
+        "/tmp/rodappcache"
 
 when not defined(js) and not defined(emscripten) and not defined(windows):
     import os, threadpool, httpclient, net
