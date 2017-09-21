@@ -130,7 +130,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
                 b.write(asset)
                 b.write(bundle)
             else:
-                b.write(idx.int32)
+                b.write(idx.int16)
 
     elif T is int | int64:
         {.error: "int and int64 not supported " .}
