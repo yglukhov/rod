@@ -153,7 +153,7 @@ proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image) =
         im = sharedAssetManager().cachedAsset(Image, path)
 
 proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image, frameOffset: var Point) =
-    assert(idx != -2, "Trata")
+    assert(idx != -2, "Internal error")
         
     if idx != -1:
         var path: string
