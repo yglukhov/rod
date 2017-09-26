@@ -164,7 +164,6 @@ proc pack(cache: string = "", platform: string = "",
                 packSingleAssetBundle(s, cache, onlyCache, src & "/" & path, dst & "/" & path)
 
 proc ls(debug: bool = false, androidExternal: bool = false, resDir: string) =
-    let prefixLen = resDir.len + 1
     for path, ab in assetBundles(resDir, true):
         var shouldList = false
         if androidExternal:
@@ -173,8 +172,7 @@ proc ls(debug: bool = false, androidExternal: bool = false, resDir: string) =
         elif debug or not ab.debugOnly:
             shouldList = true
 
-        if shouldList:
-            echo path.parentDir()[prefixLen .. ^1]
+        if shouldList: echo path
 
 proc jsonmap(platform: string = "", downsampleRatio: float = 1.0,
         compressToPVR: bool = false, resDir: string, output: string) =
