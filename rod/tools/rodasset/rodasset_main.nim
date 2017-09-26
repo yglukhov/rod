@@ -11,25 +11,18 @@ when rodPluginFile.len != 0:
         newNimNode(nnkImportStmt).add(newLit(rodPluginFile))
     doImport()
 
-template settingsWithCmdLine(): Settings =
-    let s = newSettings()
-    s.audio.extension = audio
-    s.graphics.downsampleRatio = downsampleRatio
-    s.graphics.compressOutput = not nocompress
-    s.graphics.extrusion = extrusion
-    s.graphics.disablePotAdjustment = disablePotAdjustment
-    s.graphics.packCompositions = packCompositions
+template updateSettingsWithCmdLine() =
+    s.graphics.downsampleRatio *= downsampleRatio
     s.graphics.compressToPVR = compressToPVR
-    s.graphics.quantizeExceptions = exceptions & "," & noquant
-    s.graphics.posterizeExceptions = noposterize
-    s
+    if platform in ["js", "emscripten"]:
+        s.audio.extension = "mp3"
+    else:
+        s.audio.extension = "ogg"
 
-proc hash(audio: string = "ogg", downsampleRatio: float = 1.0, nocompress: bool = false,
-    compressToPVR: bool = false, extrusion: int = 1, disablePotAdjustment: bool = false,
-    packCompositions: bool = false,
-    exceptions: string = "", noposterize: string = "", noquant: string = "",
-    path: string) =
-    let s = settingsWithCmdLine()
+proc hash(platform: string = "", downsampleRatio: float = 1.0,
+        compressToPVR: bool = false, path: string) =
+    let s = parseConfig(path / "config.rab")
+    updateSettingsWithCmdLine()
     echo dirHash(path, s)
 
 var gAudioConvTool = ""
@@ -96,51 +89,39 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles:
                     createDir(d.parentDir())
                     copyFile(r, d)
 
-proc pack(cache: string = "", exceptions: string = "", noposterize: string = "", noquant: string = "", compressToPVR: bool = false, nocompress: bool = false,
-        downsampleRatio: float = 1.0, extrusion: int = 1, createIndex: bool = false,
-        disablePotAdjustment: bool = false, audio: string = "ogg", packCompositions: bool = false,
-        onlyCache: bool = false,
-        src, dst: string) =
-    addHandler(newConsoleLogger())
-    let src = expandTilde(src)
-    let dst = expandTilde(dst)
-    let cache = getCache(cache)
-    let s = settingsWithCmdLine()
+proc packSingleAssetBundle(s: Settings, cache: string, onlyCache: bool, src, dst: string) =
     let h = dirHash(src, s)
     createDir(cache)
     let c = cache / h
-    echo "rodasset Cache: ", c
+    info "cache: ", c, " for asset bundle: ", src
     if not dirExists(c):
         let tmpCacheDir = mkdtemp(h, "_tmp")
         var tool = newImgTool()
 
-        tool.noquant = @[]
-        tool.noposterize = @[]
         for f in walkDirRec(src):
             if f.endsWith(".json"):
                 var tp = f
                 normalizePath(tp, false)
                 tool.compositionPaths.add(tp)
-                
-        for e in split(exceptions, ","): tool.noquant.add(e)
-        for e in split(noquant, ","): tool.noquant.add(e)
-        for e in split(noposterize, ","): tool.noposterize.add(e)
+
+        tool.noquant = s.graphics.quantizeExceptions
+        tool.noposterize = s.graphics.posterizeExceptions
         tool.originalResPath = src
         tool.resPath = tmpCacheDir
         tool.outPrefix = "p"
-        tool.compressOutput = not nocompress
-        tool.compressToPVR = compressToPVR
-        tool.downsampleRatio = downsampleRatio
-        tool.extrusion = extrusion
-        tool.disablePotAdjustment = disablePotAdjustment
+        tool.compressOutput = s.graphics.compressOutput
+        tool.compressToPVR = s.graphics.compressToPVR
+        tool.downsampleRatio = s.graphics.downsampleRatio
+        tool.extrusion = s.graphics.extrusion
+        tool.disablePotAdjustment = s.graphics.disablePotAdjustment
         tool.packUnreferredImages = true
-        tool.packCompositions = packCompositions
+        tool.packCompositions = s.graphics.packCompositions
         let startTime = epochTime()
         tool.run()
         echo "Done. Time: ", epochTime() - startTime
 
         var copiedFiles = newSeq[string]()
-        copyRemainingAssets(tool, src, tmpCacheDir, audio, copiedFiles)
+        copyRemainingAssets(tool, src, tmpCacheDir, s.audio.extension, copiedFiles)
 
         let index = %{
             "packedImages": tool.index,
@@ -156,6 +137,54 @@ proc pack(cache: string = "", exceptions: string = "", noposterize: string = "",
     if not onlyCache:
         copyResourcesFromCache(c, h, dst)
 
+iterator assetBundles(resDir: string, fastParse: bool = false): tuple[path: string, ab: Settings] =
+    let prefixLen = resDir.len + 1
+    for path in walkDirRec(resDir):
+        if path.endsWith("config.rab"):
+            yield (path.parentDir()[prefixLen .. ^1], parseConfig(path, fastParse))
+
+proc pack(cache: string = "", platform: string = "",
+        downsampleRatio: float = 1.0, compressToPVR: bool = false,
+        onlyCache: bool = false,
+        debug: bool = false,
+        src, dst: string) =
+    #addHandler(newConsoleLogger()) # Disable logger for now, because nimx provides its own. This will likely be changed.
+    let src = expandTilde(src)
+    let dst = expandTilde(dst)
+    let cache = getCache(cache)
+    let rabFile = src / "config.rab"
+    if fileExists(rabFile):
+        let s = parseConfig(rabFile)
+        updateSettingsWithCmdLine()
+        packSingleAssetBundle(s, cache, onlyCache, src, dst)
+    else:
+        for path, s in assetBundles(src):
+            if debug or not s.debugOnly:
+                updateSettingsWithCmdLine()
+                packSingleAssetBundle(s, cache, onlyCache, src & "/" & path, dst & "/" & path)
+
+proc ls(debug: bool = false, androidExternal: bool = false, resDir: string) =
+    let prefixLen = resDir.len + 1
+    for path, ab in assetBundles(resDir, true):
+        var shouldList = false
+        if androidExternal:
+            if ab.androidExternal:
+                shouldList = true
+        elif debug or not ab.debugOnly:
+            shouldList = true
+
+        if shouldList:
+            echo path.parentDir()[prefixLen .. ^1]
+
+proc jsonmap(platform: string = "", downsampleRatio: float = 1.0,
+        compressToPVR: bool = false, resDir: string, output: string) =
+    var j = newJObject()
+    for path, s in assetBundles(resDir, true):
+        updateSettingsWithCmdLine()
+        j[path] = %dirHash(resDir / path, s)
+    createDir(output.parentDir())
+    writeFile(output, $j)
+
 when isMainModule:
     import cligen
-    dispatchMulti([hash], [pack], [upgradeAssetBundle])
+    dispatchMulti([hash], [pack], [upgradeAssetBundle], [ls], [jsonmap])
