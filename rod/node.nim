@@ -19,7 +19,7 @@ import nimx.assets.asset_loading
 import quaternion
 import ray
 import rod.tools.serializer
-import rod.utils.bin_deserializer
+import rod / utils / [ bin_deserializer, json_serializer ]
 import rod.asset_bundle
 
 import rod_types
@@ -153,6 +153,14 @@ proc addComponent*(n: Node, name: string): Component =
 proc addComponent*(n: Node, T: typedesc): T =
     type TT = T
     result = n.addComponent(T.name).TT
+
+proc insertComponent*(n: Node, c: Component, index: int)
+proc addComponent*(n: Node, T: typedesc, index: int): T =
+    type TT = T
+    result = createComponent(T.name).TT
+    result.node = n
+
+    n.insertComponent(result, index)
 
 proc getComponent*(n: Node, name: string): Component =
     if n.components.isNil:
@@ -702,6 +710,37 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
         result.add("children", childsNode)
         for child in n.children:
             childsNode.add(child.serialize(s))
+
+proc serialize*(n: Node, s: JsonSerializer) =
+    s.visit(n.name, "name")
+    s.visit(n.position, "translation")
+    s.visit(n.scale, "scale")
+    s.visit(n.rotation, "rotation")
+    s.visit(n.anchor, "anchor")
+    s.visit(n.alpha, "alpha")
+    s.visit(n.layer, "layer")
+    s.visit(n.affectsChildren, "affectsChildren")
+    s.visit(n.enabled, "enabled")
+
+    if n.components.len > 0:
+        let jn = s.node
+        let jcomps = newJArray()
+        jn["components"] = jcomps
+        for c in n.components:
+            s.node = newJObject()
+            c.serialize(s)
+            jcomps.add(s.node)
+        s.node = jn
+
+    if n.children.len > 0:
+        let jn = s.node
+        let jchildren = newJArray()
+        jn["children"] = jchildren
+        for child in n.children:
+            s.node = newJObject()
+            child.serialize(s)
+            jchildren.add(s.node)
+        s.node = jn
 
 proc getDepth*(n: Node): int =
     result = 0

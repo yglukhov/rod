@@ -1,5 +1,5 @@
-import tables, streams, json
-import nimx / [image, types ]
+import tables, streams, json, ospaths, os, strutils
+import nimx / [image, types, pathutils ]
 import rod.quaternion
 import serialization_helpers
 
@@ -26,13 +26,6 @@ proc align*(b: BinSerializer, sz: int) =
         for i in 0 ..< (sz - m):
             b.stream.write(0xff'u8)
 
-proc imageIndex*(b: BinSerializer, path: string): int16 =
-    for j in b.images:
-        if j["orig"].str == path:
-            return
-        inc result
-    raise newException(Exception, "Image not found in index: " & path)
-
 proc newString*(b: BinSerializer, s: string): int16 =
     if s in b.revStrTab:
         result = b.revStrTab[s]
@@ -41,8 +34,9 @@ proc newString*(b: BinSerializer, s: string): int16 =
         b.strTab[result] = s
         b.revStrTab[s] = result
 
+
 type Serializable = 
-    array | openarray | tuple | seq | string | int8 | int16 | int32 | bool | enum | uint8
+    array | openarray | tuple | seq | string | int8 | int16 | int32 | bool | enum | uint8 | Image
 
 proc write*(b: BinSerializer, data: float32) =
     b.align(sizeof(data))
@@ -58,6 +52,24 @@ proc writeArrayNoLen*[T](b: BinSerializer, data: openarray[T]) =
     else:
         for i in 0 ..< data.len:
             b.write(data[i])
+
+proc getNeighbourImageBundlePath(b: BinSerializer, p2: string):tuple[asset:string, bundle:string]=
+    var curDir = getCurrentDir() / "res"
+    var path = curDir / b.assetBundlePath / p2
+
+    normalizePath(path, false)
+    var dir = path.splitFile().dir
+
+    for p in parentDirs(dir):
+        if p == curDir: break
+
+        if fileExists(p / "config.rab"):
+            var p3 = path.substr(p.len + 1)
+            path = p.subStr(curDir.len + 1)
+            
+            return (asset:p3, bundle: path)
+
+    raise newException(Exception, "Neighbour assetbundle not found for " & p2 )
 
 proc write*[T: Serializable](b: BinSerializer, data: T) =
     when T is array:
@@ -100,6 +112,26 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
         var v = (when ord(high(T)) < high(int8): int8 else: int16)data
         b.write(v)
 
+    elif T is Image:
+        if data.isNil:
+            b.write(int16(-1))
+        else:
+            var idx = 0
+            let path = filePath(data)
+
+            for j in b.images:
+                if j["orig"].str == path:
+                    break
+                inc idx
+
+            if idx == b.images.len:
+                b.write(int16(-2))
+                var (asset, bundle) = b.getNeighbourImageBundlePath(path)
+                b.write(asset)
+                b.write(bundle)
+            else:
+                b.write(idx.int16)
+
     elif T is int | int64:
         {.error: "int and int64 not supported " .}
     else:
@@ -117,14 +149,8 @@ proc visit*(b: BinSerializer, v: Quaternion) =
     b.write(v.z)
     b.write(v.w)
 
-proc visit*(b: BinSerializer, v: Image) =
-    if v.isNil:
-        b.write(int16(-1))
-    else:
-        b.write(b.imageIndex(v.filePath))
-
 proc visit*(b: BinSerializer, images: seq[Image], frameOffsets: seq[Point]) =
     let sz = images.len
     b.write(sz.int16)
     for i in 0 ..< sz:
-        b.write(b.imageIndex(images[i].filePath()))
+        b.write(images[i])

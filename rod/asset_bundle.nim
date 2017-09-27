@@ -1,4 +1,4 @@
-import strutils, ospaths, json, tables
+import strutils, ospaths, json, tables, logging
 import nimx.assets.abstract_asset_bundle as nab
 import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager, asset_cache ]
 import nimx / [ image, types ]
@@ -53,8 +53,9 @@ proc init(ab: AssetBundle, handler: proc()) {.inline.} =
         if not s.isNil:
             var ss = s
             if not (s of StringStream):
-                let str = s.readAll()
+                var str = s.readAll()
                 s.close()
+                shallow(str)
                 ss = newStringStream(str)
             echo "Create bindeser: ", ab.mBaseUrl
             ab.binDeserializer = newBinDeserializer(ss)
@@ -109,10 +110,10 @@ else:
         FileAssetBundle* = ref object of AssetBundle
         NativeAssetBundle* = ref object of AssetBundle
 
-    proc newFileAssetBundle(path: string): FileAssetBundle =
+    proc newFileAssetBundle(abPath, fileURL: string): FileAssetBundle =
         result.new()
-        result.path = path
-        result.mBaseUrl = path
+        result.path = abPath
+        result.mBaseUrl = fileURL
 
     proc newNativeAssetBundle(path: string): NativeAssetBundle =
         result.new()
@@ -138,7 +139,10 @@ type AssetBundleDescriptor* = object
     resources*: seq[string]
 
 proc isConfigRabExternal(configRab: string): bool {.compileTime.} =
-    configRab.find("external true") != -1
+    when defined(android):
+        configRab.find("androidExternal true") != -1
+    else:
+        false
 
 proc isConfigRabDebugOnly(configRab: string): bool {.compileTime.} =
     configRab.find("debugOnly true") != -1
@@ -182,13 +186,19 @@ proc isDownloadable*(abd: AssetBundleDescriptor): bool {.inline.} =
     else:
         abd.isExternal
 
-proc cacheDir(): string =
-    "/tmp/rodappcache"
+when defined(android):
+    import android.extras.pathutils
+
+proc cacheDir(): string {.inline.} =
+    when defined(android):
+        appFilesDir()
+    else:
+        "/tmp/rodappcache"
 
 when not defined(js) and not defined(emscripten) and not defined(windows):
     import os, threadpool, httpclient, net
     import nimx.perform_on_main_thread
-    import zip.zipfiles
+    import untar
 
     type DownloadCtx = ref object
         handler: proc(err: string)
@@ -202,12 +212,11 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         else:
             ctx.handler("Could not download or extract")
 
-    proc extractZip(zipFileName, destFolder: string): bool =
-        var z: ZipArchive
-        if not z.open(zipFileName):
-            return
-        z.extractAll(destFolder)
-        z.close()
+    proc extractGz(zipFileName, destFolder: string): bool =
+        var file = newTarFile(zipFileName)
+        file.extract(destFolder)
+        file.close()
+        removeFile(zipFileName)
         result = true
 
     proc downloadAndUnzip(url, destPath: string, ctx: pointer) =
@@ -221,14 +230,14 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             else:
                 let client = newHttpClient(sslContext = nil)
 
-            let zipFilePath = destPath & ".zip"
+            let zipFilePath = destPath & ".gz"
 
             client.downloadFile(url, zipFilePath)
             client.close()
             when defined(ssl):
                 sslCtx.destroyContext()
 
-            cast[DownloadCtx](ctx).success = extractZip(zipFilePath, destPath)
+            cast[DownloadCtx](ctx).success = extractGz(zipFilePath, destPath)
         except:
             discard
         finally:
@@ -250,8 +259,8 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
             handler(nil)
         else:
             when not defined(js) and not defined(emscripten) and not defined(windows) and not defined(rodplugin):
-                assert(not getURLForAssetBundle.isNil)
-                let url = getURLForAssetBundle(abd.hash)
+                #assert(not getURLForAssetBundle.isNil)
+                let url = "" #getURLForAssetBundle(abd.hash)
                 var ctx: DownloadCtx
                 ctx.new()
                 ctx.handler = handler
@@ -267,7 +276,7 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
         result = newWebAssetBundle(abd.path, abd.hash)
     else:
         if abd.isExternal:
-            result = newFileAssetBundle(abd.downloadedAssetsDir)
+            result = newFileAssetBundle(abd.path, "file://" & abd.downloadedAssetsDir)
         else:
             when defined(android):
                 result = newAndroidAssetBundle(abd.path)
@@ -276,9 +285,12 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
 
 proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) =
     abd.downloadAssetBundle() do(err: string):
-        let ab = newAssetBundle(abd)
-        ab.init() do():
-            handler(abd.path, ab)
+        if err.isNil:
+            let ab = newAssetBundle(abd)
+            ab.init() do():
+                handler(abd.path, ab)
+        else:
+            warn "Asset bundle error for ", abd.hash, ": " , err
 
 proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle])) =
     var mountPaths = newSeq[string](abds.len)
