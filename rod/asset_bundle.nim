@@ -158,7 +158,7 @@ proc getEnvCt(k: string): string {.compileTime.} =
     if result == "": result = nil
 
 proc assetBundleDescriptor*(path: static[string]): AssetBundleDescriptor {.compileTime.} =
-    const rabFilePath = path / "config.rab"
+    const rabFilePath = path & "/config.rab"
 
     const configRab = staticRead(rabFilePath)
     const debugOnly = isConfigRabDebugOnly(configRab)
@@ -171,7 +171,7 @@ proc assetBundleDescriptor*(path: static[string]): AssetBundleDescriptor {.compi
 
         when isExternal:
             let prefix = getEnvCt("NIMX_RES_PATH") / path
-            let abHash = staticRead(prefix / ".hash")
+            let abHash = staticRead(prefix & "/.hash")
             result.hash = abHash
         else:
             result.hash = ""
