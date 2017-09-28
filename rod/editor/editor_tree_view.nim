@@ -59,8 +59,8 @@ method init*(v: EditorTreeView, r: Rect)=
         except:
             return false
 
-        let filter = v.filterField.text
-        let lowName = n.name
+        let filter = v.filterField.text.toLowerAscii()
+        let lowName = n.name.toLowerAscii()
         if filter == lowName or filter in lowName:
             return true
 
