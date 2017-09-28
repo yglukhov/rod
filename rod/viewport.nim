@@ -332,9 +332,6 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
 
 import component.ui_component, algorithm
 
-proc isNodeEnabledInTree(n: Node): bool =
-    return n.enabled and (n.parent.isNil or n.parent.isNodeEnabledInTree())
-
 method name*(v: SceneView): string =
     result = "SceneView"
 
@@ -344,7 +341,7 @@ proc getUiComponentsIntersectingWithRay(v: SceneView, r: Ray): seq[UIComponentIn
     result = @[]
     for c in v.uiComponents:
         var inter : Vector3
-        if c.enabled and c.node.isNodeEnabledInTree and c.intersectsWithUINode(r, inter):
+        if c.enabled and c.node.isEnabledInTree and c.intersectsWithUINode(r, inter):
             result.add((inter, c))
 
     template dist(a, b): auto = (a - b).length

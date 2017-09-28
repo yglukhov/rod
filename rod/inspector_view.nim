@@ -30,12 +30,29 @@ type InspectorView* = ref object of EditorTabView
     propView: LinearLayout
     scView: ScrollView
     currNode: Node
+    autoUpdate: bool
 
 method init*(i: InspectorView, r: Rect) =
     procCall i.View.init(r)
     i.resizingMask = "wh"
 
-    i.propView = newVerticalLayout(newRect(0, 0, i.bounds.width, 20))
+    let autoVisitView = newView(newRect(0.0, 0.0, i.bounds.width, 20.0))
+    autoVisitView.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+    autoVisitView.backgroundColor = newColor(0.0, 0.0, 0.0, 0.25)
+
+    let lbl = newLabel(newRect(0.0, 2.0, 75.0, 15.0))
+    lbl.text = "Auto visit:"
+    lbl.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
+    autoVisitView.addSubview(lbl)
+
+    var boxBtn = newCheckbox(newRect(i.bounds.width - 17.5, 2.5, 15.0, 15.0))
+    boxBtn.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
+    boxBtn.onAction do():
+        i.autoUpdate = boxBtn.boolValue
+
+    autoVisitView.addSubview(boxBtn)
+    
+    i.propView = newVerticalLayout(newRect(0, 20, i.bounds.width, 20))
     i.propView.resizingMask = "wb"
     i.propView.topMargin = 5
     i.propView.bottomMargin = 5
@@ -45,8 +62,10 @@ method init*(i: InspectorView, r: Rect) =
     i.scView = newScrollView(i.propView)
     i.scView.horizontalScrollBar = nil
     i.scView.resizingMask = "wh"
-    i.scView.setFrame(i.bounds)
+    i.scView.setFrame(newRect(0.0, 20.0, i.bounds.width, i.bounds.height - 20.0))
     i.addSubview(i.scView)
+
+    i.addSubView(autoVisitView)
 
 proc createComponentsView(inspector: InspectorView, n: Node)
 
@@ -59,7 +78,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
 
     let scrollBar = i.scView.verticalScrollBar()
     let oldPos = scrollBar.value()
-
+    
     while i.propView.subviews.len() > 0:
         i.propView.subviews[0].removeFromSuperview()
 
@@ -68,7 +87,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         proc changeInspectorView() =
             i.inspectedNode = n
 
-        var expView= newExpandingView(newRect(0, 0, 328, 20.0))
+        var expView= newExpandingView(newRect(0, 20, 328, 20.0))
         expView.title = "Node"
         expView.expand()
 
@@ -79,6 +98,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
             let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView)
+            propView.autoresizingMask = {afFlexibleWidth}
             let propHolder = newView(propView.frame)
             propHolder.addSubview(propView)
             expView.addContent(propHolder)
@@ -116,10 +136,10 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                     #     n.insertComponent(component, compPos - 1)
                     #     n.components.delete(compPos + 1)
                     #     i.inspectedNode = n
-
+                
                 v.visitProperties(visitor)
                 i.propView.addSubview(expView)
-
+            
         let newComponentButtn = Button.new(newRect(0, 30, 0, 20))
         newComponentButtn.title = "New component"
         newComponentButtn.onAction do():
@@ -148,7 +168,7 @@ proc createComponentButtons(inspector: InspectorView, components_list: seq[strin
         result = menu
 
 proc createComponentsView(inspector: InspectorView, n: Node) =
-    let stackView = newStackView(newRect(0, 0, componentsViewSize.width, 400))
+    let stackView = newStackView(newRect(0, 20, componentsViewSize.width, 400))
     var isFirst = true
     for key, value in componentGroupsTable:
         let expView = newExpandingView(newRect(0, 0, componentsViewSize.width, 20.0), true)
@@ -174,5 +194,9 @@ method tabSize*(v: InspectorView, bounds: Rect): Size=
 
 method tabAnchor*(v: InspectorView): EditorTabAnchor =
     result = etaRight
+
+method update*(v: InspectorView)=
+    if v.autoUpdate:
+        v.inspectedNode = v.currNode
 
 registerEditorTab("Inspector", InspectorView)
