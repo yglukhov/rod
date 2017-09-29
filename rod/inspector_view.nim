@@ -41,7 +41,7 @@ method init*(i: InspectorView, r: Rect) =
     autoVisitView.backgroundColor = newColor(0.0, 0.0, 0.0, 0.25)
 
     let lbl = newLabel(newRect(0.0, 2.0, 75.0, 15.0))
-    lbl.text = "Auto visit:"
+    lbl.text = "Auto update:"
     lbl.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
     autoVisitView.addSubview(lbl)
 
