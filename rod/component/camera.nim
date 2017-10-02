@@ -10,7 +10,6 @@ import rod.component
 import rod.rod_types
 import rod.viewport
 import rod.node
-import rod.tools.serializer
 import rod / utils / [ property_desc, serialization_codegen ]
 
 export CameraProjection
