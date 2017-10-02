@@ -1,7 +1,7 @@
 import json, streams, sequtils, sets, algorithm, tables, strutils, parseutils, ospaths
 import tree_traversal
 
-import nimx.pathutils
+import nimx / [ pathutils, class_registry ]
 import ../../utils/[ bin_serializer, json_deserializer ]
 import ../../node
 import ../../component
@@ -287,18 +287,12 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
             c.add(s)
 
     b.write(nodeIds)
-
-    case name
-    of "Sprite", "Solid", "Blink", "ParticleSystem", "ClippingRectComponent",
-            "AELayer", "ColorFill", "GradientFill", "Tint", "CompRef",
-            "ColorBalanceHLS", "ChannelLevels", "Mask", "SpherePSGenShape",
-            "PSModifierRandWind", "BoxPSGenShape", "ConePSGenShape",
-            "VisualModifier", "Text", "PSHolder", "Trail", "TileMap", "TileMapLayer",
-            "ImageMapLayer", "ButtonComponent", "IconComponent":
-        b.writeComponents(c, name, compPath)
-    of "AEComposition":
-        b.writeComponents(c) do(j: JsonNode):
-            writeAECompositionComponent(b, j, nodes)
+    if isClassRegistered(name) and newObjectOfClass(name).Component.supportsNewSerialization():
+        if name == "AEComposition":
+            b.writeComponents(c) do(j: JsonNode):
+                writeAECompositionComponent(b, j, nodes)
+        else:
+            b.writeComponents(c, name, compPath)
     else:
         echo "WARNING: Unknown component: ", name
         b.writeComponents(c, writeUnknownComponent)
