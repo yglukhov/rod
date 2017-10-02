@@ -287,7 +287,7 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
             c.add(s)
 
     b.write(nodeIds)
-    if newObjectOfClass(name).Component.supportsNewSerialization():
+    if isClassRegistered(name) and newObjectOfClass(name).Component.supportsNewSerialization():
         if name == "AEComposition":
             b.writeComponents(c) do(j: JsonNode):
                 writeAECompositionComponent(b, j, nodes)
