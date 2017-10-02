@@ -129,6 +129,8 @@ template genSerializationCodeForComponent*(c: typed) =
         method serializationHash*(cm: c, b: SerializationHashCalculator) =
             calcSerializationHashAux(cm, b)
 
+    method supportsNewSerialization*(cm: c): bool = true
+
     genSerializerProc(c, deserializeAux, BinDeserializer, false, false, true, false)
 
     method deserialize*(cm: c, b: BinDeserializer) =

@@ -12,9 +12,13 @@ import rod.component.mesh_component
 import rod.component.material
 import rod.vertex_data_info
 import rod.tools.serializer
+import rod / utils / [ property_desc, serialization_codegen ]
 
 type CubeComponent* = ref object of MeshComponent
     size: Vector3
+
+CubeComponent.properties:
+    size
 
 proc fillVertexBuffers(vertCoords, texCoords, normals: var seq[float32], size: Vector3) =
     #front
@@ -193,4 +197,5 @@ method visitProperties*(c: CubeComponent, p: var PropertyVisitor) =
     p.visitProperty("size", c.sizeAux)
     procCall c.MeshComponent.visitProperties(p)
 
+genSerializationCodeForComponent(CubeComponent)
 registerComponent(CubeComponent, "Primitives")

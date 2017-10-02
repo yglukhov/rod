@@ -74,14 +74,12 @@ type
     Viewport* {.deprecated.} = SceneView
 
     CameraProjection* = enum
-        cpOrtho, # Auto
-        cpPerspective, # Auto
-        cpManual
+        cpOrtho,
+        cpPerspective
 
     Camera* = ref object of Component
         projectionMode*: CameraProjection
         zNear*, zFar*, fov*: Coord
-        mManualGetProjectionMatrix*: proc(viewportBounds: Rect, mat: var Matrix4)
         viewportSize*: Size
 
     UIComponent* = ref object of Component
