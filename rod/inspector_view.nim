@@ -40,9 +40,9 @@ method init*(i: InspectorView, r: Rect) =
     autoVisitView.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     autoVisitView.backgroundColor = newColor(0.0, 0.0, 0.0, 0.25)
 
-    let lbl = newLabel(newRect(0.0, 2.0, 75.0, 15.0))
+    let lbl = newLabel(newRect(0.0, 2.0, i.bounds.width - 20.0, 15.0))
     lbl.text = "Auto update:"
-    lbl.autoresizingMask = {afFlexibleMinX, afFlexibleMaxY}
+    lbl.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     autoVisitView.addSubview(lbl)
 
     var boxBtn = newCheckbox(newRect(i.bounds.width - 17.5, 2.5, 15.0, 15.0))
@@ -51,7 +51,7 @@ method init*(i: InspectorView, r: Rect) =
         i.autoUpdate = boxBtn.boolValue
 
     autoVisitView.addSubview(boxBtn)
-    
+
     i.propView = newVerticalLayout(newRect(0, 20, i.bounds.width, 20))
     i.propView.resizingMask = "wb"
     i.propView.topMargin = 5
@@ -78,7 +78,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
 
     let scrollBar = i.scView.verticalScrollBar()
     let oldPos = scrollBar.value()
-    
+
     while i.propView.subviews.len() > 0:
         i.propView.subviews[0].removeFromSuperview()
 
@@ -136,10 +136,10 @@ proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
                     #     n.insertComponent(component, compPos - 1)
                     #     n.components.delete(compPos + 1)
                     #     i.inspectedNode = n
-                
+
                 v.visitProperties(visitor)
                 i.propView.addSubview(expView)
-            
+
         let newComponentButtn = Button.new(newRect(0, 30, 0, 20))
         newComponentButtn.title = "New component"
         newComponentButtn.onAction do():
