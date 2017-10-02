@@ -1,5 +1,5 @@
 import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
-    scroll_view, button, event]
+    scroll_view, button, event, formatted_text]
 
 import rod.edit_view
 import variant, strutils, tables
@@ -10,10 +10,9 @@ type EditorTreeView* = ref object of EditorTabView
     filterField: TextField
 
 proc onTreeChanged(v: EditorTreeView)=
-    v.outlineView.reloadData()
-    v.editor.sceneTreeDidChange()
     v.filterField.text = ""
     v.filterField.sendAction()
+    v.editor.sceneTreeDidChange()
 
 method init*(v: EditorTreeView, r: Rect)=
     procCall v.View.init(r)
@@ -50,7 +49,7 @@ method init*(v: EditorTreeView, r: Rect)=
         result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
 
     outlineView.setDisplayFilter do(item: Variant)-> bool:
-        if v.filterField.text.len == 0: 
+        if v.filterField.text.len == 0:
             return true
 
         var n: Node
@@ -73,6 +72,13 @@ method init*(v: EditorTreeView, r: Rect)=
             textField.textColor = newGrayColor(0.0)
 
         textField.text = if n.name.isNil: "(node)" else: n.name
+
+        if v.filterField.text.len() > 0:
+            let lowerFilter= v.filterField.text.toLowerAscii()
+            let lowerField = textField.text.toLowerAscii()
+            let start = lowerField.find(lowerFilter)
+            if start > -1:
+                textField.formattedText.setTextColorInRange(start, start + lowerFilter.len, newColor(0.9, 0.9, 0.9, 1.0))
 
     outlineView.onSelectionChanged = proc() =
         let ip = outlineView.selectedIndexPath
