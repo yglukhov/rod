@@ -85,6 +85,17 @@ BoxPSGenShape.properties:
 PSModifierRandWind.properties:
     force
 
+PSModifierWave.properties:
+    frequence
+    forceValue
+
+PSModifierColor.properties:
+    distance
+    color
+
+PSModifierSpiral.properties:
+    force
+
 method generate*(pgs: PSGenShape): ParticleGenerationData {.base.} = discard
 
 method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.base.} = discard
@@ -379,6 +390,9 @@ genSerializationCodeForComponent(ConePSGenShape)
 genSerializationCodeForComponent(SpherePSGenShape)
 genSerializationCodeForComponent(BoxPSGenShape)
 genSerializationCodeForComponent(PSModifierRandWind)
+genSerializationCodeForComponent(PSModifierWave)
+genSerializationCodeForComponent(PSModifierColor)
+genSerializationCodeForComponent(PSModifierSpiral)
 
 registerComponent(ConePSGenShape, "ParticleSystem")
 registerComponent(SpherePSGenShape, "ParticleSystem")

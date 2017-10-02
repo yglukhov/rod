@@ -10,9 +10,18 @@ import rod.component
 import rod.rod_types
 import rod.viewport
 import rod.node
+import rod.tools.serializer
+import rod / utils / [ property_desc, serialization_codegen ]
 
 export CameraProjection
 export Camera
+
+Camera.properties:
+    projectionMode
+    zNear
+    zFar
+    fov
+    viewportSize
 
 method init*(c: Camera) =
     c.projectionMode = cpPerspective
@@ -76,14 +85,6 @@ proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D)
 
         mat.frustum(nLeft, nRight, -nBottom, -nTop, c.zNear, c.zFar)
 
-    of cpManual:
-        doAssert(not c.mManualGetProjectionMatrix.isNil)
-        c.mManualGetProjectionMatrix(viewportBounds, mat)
-
-proc `manualGetProjectionMatrix=`*(c: Camera, p: proc(viewportBounds: Rect, mat: var Transform3D)) =
-    c.mManualGetProjectionMatrix = p
-    c.projectionMode = cpManual
-
 method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("zNear", c.zNear)
     p.visitProperty("zFar", c.zFar)
@@ -91,4 +92,5 @@ method visitProperties*(c: Camera, p: var PropertyVisitor) =
     p.visitProperty("vp size", c.viewportSize)
     p.visitProperty("projMode", c.projectionMode)
 
+genSerializationCodeForComponent(Camera)
 registerComponent(Camera)

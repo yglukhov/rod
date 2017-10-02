@@ -45,12 +45,7 @@ proc startApplication() =
     camera.projectionMode = cpOrtho
     cameraNode.positionZ = 1
 
-    camera.manualGetProjectionMatrix = proc(bounds: Rect, mat: var Matrix4) =
-        let logicalWidth = bounds.width
-        mat.ortho(0, bounds.width, bounds.height, 0, camera.zNear, camera.zFar)
-
     mainWindow.addSubview(editView)
-
     mainWindow.addAnimation(c.animationNamed("anim1"))
 
 when defined js:
