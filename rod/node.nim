@@ -26,7 +26,7 @@ import rod_types
 export Node
 
 proc sceneView*(n: Node): SceneView = n.mSceneView
-proc getGlobalAlpha*(n: Node): float
+proc getGlobalAlpha*(n: Node): float32
 proc worldTransform*(n: Node): Matrix4
 
 import rod.component
@@ -538,10 +538,21 @@ proc registerAnimation*(n: Node, name: string, a: Animation) =
         n.animations = newTable[string, Animation]()
     n.animations[name] = a
 
-proc getGlobalAlpha*(n: Node): float =
-    result = n.alpha
-    if not n.parent.isNil:
-        result = result * n.parent.getGlobalAlpha()
+proc getGlobalAlpha*(n: Node): float32 =
+    var p = n
+    result = 1
+
+    while not p.isNil:
+        result *= p.alpha
+        p = p.parent
+
+proc isEnabledInTree*(n: Node): bool =
+    var p = n
+    while not p.isNil:
+        if not p.enabled: return false
+        p = p.parent
+    return true
+    # return n.enabled and (n.parent.isNil or n.parent.isNodeEnabledInTree())
 
 # Serialization
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
@@ -689,7 +700,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("layer", s.getValue(n.layer))
     result.add("affectsChildren", s.getValue(n.affectsChildren))
     result.add("enabled", s.getValue(n.enabled))
-
+    
     if not n.components.isNil and n.components.len > 0:
         var componentsNode = newJArray()
         result.add("components", componentsNode)

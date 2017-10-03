@@ -76,6 +76,8 @@ type
 method setEditedNode*(v: EditorTabView, n: Node)=
     discard
 
+method update*(v: EditorTabView) = discard
+
 method tabSize*(v: EditorTabView, bounds: Rect): Size=
     result = bounds.size
 
@@ -561,6 +563,9 @@ proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Ed
         currentContext().gl.clearDepthStencil()
         editor.gizmo.updateGizmo()
         editor.gizmo.gizmoNode.drawNode(true, nil)
+
+        for etv in editor.workspaceView.tabs:
+            etv.update()
 
     return editor
 
