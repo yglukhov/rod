@@ -1,5 +1,5 @@
 import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
-    scroll_view, button, event, formatted_text]
+    scroll_view, button, event, formatted_text, font]
 
 import rod.edit_view
 import variant, strutils, tables
@@ -8,15 +8,24 @@ import rod / [node, rod_types]
 type EditorTreeView* = ref object of EditorTabView
     outlineView: OutlineView
     filterField: TextField
+    renameField: TextField
 
 proc onTreeChanged(v: EditorTreeView)=
-    v.filterField.text = ""
     v.filterField.sendAction()
     v.editor.sceneTreeDidChange()
 
+proc nodeFromSelectedOutlinePath(v: EditorTreeView): Node=
+    var sip = v.outlineView.selectedIndexPath
+    result = v.rootNode
+    if sip.len == 0:
+        sip.add(0)
+    else:
+        result = v.outlineView.itemAtIndexPath(sip).get(Node3D)
+
+
 method init*(v: EditorTreeView, r: Rect)=
     procCall v.View.init(r)
-
+    
     v.filterField = newTextField(newRect(0.0, 0.0, r.width, 20.0))
     v.filterField.autoresizingMask = {afFlexibleWidth}
     v.filterField.continuous = true
@@ -24,6 +33,10 @@ method init*(v: EditorTreeView, r: Rect)=
         v.outlineView.reloadData()
 
     v.addSubview(v.filterField)
+    
+    v.renameField = newTextField(newRect(0.0, 0.0, r.width, 30.0))
+    v.renameField.autoresizingMask = {afFlexibleWidth}
+    
 
     let outlineView = OutlineView.new(newRect(0.0, 25.0, r.width, r.height - 20))
     v.outlineView = outlineView
@@ -46,7 +59,12 @@ method init*(v: EditorTreeView, r: Rect)=
             return newVariant(item.get(Node3D).children[indexPath[^1]])
 
     outlineView.createCell = proc(): TableViewCell =
-        result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
+        var lbl = newLabel(newRect(0, 0, 100, 20))
+        result = newTableViewCell(lbl)
+        result.autoresizingMask = {afFlexibleWidth}
+        var btn = newCheckbox(newRect(80.0, 0.0, 20.0, 20.0))
+        btn.autoResizingMask = {afFlexibleMinX}
+        result.addSubview(btn)
 
     outlineView.setDisplayFilter do(item: Variant)-> bool:
         if v.filterField.text.len == 0:
@@ -66,12 +84,19 @@ method init*(v: EditorTreeView, r: Rect)=
     outlineView.configureCell = proc (cell: TableViewCell, indexPath: openarray[int]) =
         let n = outlineView.itemAtIndexPath(indexPath).get(Node3D)
         let textField = TextField(cell.subviews[0])
+
+        var btn = Button(cell.subviews[1])
+        btn.value = n.enabled.int8
         if not n.isEnabledInTree():
             textField.textColor = newColor(0.3, 0.3, 0.3, 1.0)
         else:
             textField.textColor = newGrayColor(0.0)
 
         textField.text = if n.name.isNil: "(node)" else: n.name
+        
+        btn.onAction do():
+            n.enabled = not n.enabled
+            v.onTreeChanged()
 
         if v.filterField.text.len() > 0:
             let lowerFilter= v.filterField.text.toLowerAscii()
@@ -81,6 +106,9 @@ method init*(v: EditorTreeView, r: Rect)=
                 textField.formattedText.setTextColorInRange(start, start + lowerFilter.len, newColor(0.9, 0.9, 0.9, 1.0))
 
     outlineView.onSelectionChanged = proc() =
+        if not v.renameField.superview.isNil:
+            v.renameField.removeFromSuperview()
+
         let ip = outlineView.selectedIndexPath
         let n = if ip.len > 0:
                 outlineView.itemAtIndexPath(ip).get(Node3D)
@@ -149,6 +177,45 @@ method init*(v: EditorTreeView, r: Rect)=
             v.onTreeChanged()
 
     v.addSubview(deleteNodeButton)
+
+method onKeyDown*(v: EditorTreeView, e: var Event): bool =
+    if e.keyCode == VirtualKey.Return:
+        let n = v.nodeFromSelectedOutlinePath()
+
+        if v.renameField.superview.isNil:
+            if v.outlineView.selectedIndexPath.len > 0 and v.outlineView.isFirstResponder():
+                var cell = v.outlineView.cellAtIndexPath(v.outlineView.selectedIndexPath)
+                v.renameField.text = n.name
+                v.renameField.setFrame(newRect(newPoint(15.0, cell.frame.y), cell.frame.size))
+                v.outlineView.superview.addSubview(v.renameField)
+                discard v.window.makeFirstResponder(v.renameField)
+            else:
+                discard v.window.makeFirstResponder(v.outlineView)    
+        else:
+            if not v.renameField.superview.isNil and v.renameField.isFirstResponder():
+                n.name = v.renameField.text
+                v.renameField.removeFromSuperview()
+
+            discard v.window.makeFirstResponder(v.outlineView)
+
+        result = true
+
+    elif e.keyCode == VirtualKey.Escape:
+        v.filterField.text = ""
+        v.filterField.sendAction()
+        if not v.renameField.superview.isNil:
+            v.renameField.removeFromSuperview()
+
+        discard v.outlineView.makeFirstResponder()
+        result = true
+
+    elif e.keyCode == VirtualKey.F and e.modifiers.anyOsModifier():
+        discard v.filterField.makeFirstResponder()
+        result = true
+    elif e.keyCode == VirtualKey.N and e.modifiers.anyOsModifier():
+        let n = v.nodeFromSelectedOutlinePath()
+        discard n.newChild("New Node")
+        
 
 proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var seq[int]) =
     # running up and calculate the path to the node in the tree
