@@ -14,6 +14,8 @@ proc onTreeChanged(v: EditorTreeView)=
     v.filterField.sendAction()
     v.editor.sceneTreeDidChange()
 
+proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var seq[int])
+
 proc nodeFromSelectedOutlinePath(v: EditorTreeView): Node=
     var sip = v.outlineView.selectedIndexPath
     result = v.rootNode
@@ -141,6 +143,11 @@ method init*(v: EditorTreeView, r: Rect)=
 
     let outlineScrollView = newScrollView(outlineView)
     outlineScrollView.resizingMask = "wh"
+    outlineScrollView.onScroll do():
+        if not v.renameField.superview.isNil:
+            v.renameField.removeFromSuperview()
+            discard v.outlineView.makeFirstResponder()
+
     v.addSubview(outlineScrollView)
 
     let createNodeButton = Button.new(newRect(2, v.bounds.height - 20, 20, 20))
@@ -212,10 +219,32 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
     elif e.keyCode == VirtualKey.F and e.modifiers.anyOsModifier():
         discard v.filterField.makeFirstResponder()
         result = true
+
+    elif e.keyCode == VirtualKey.H and e.modifiers.anyOsModifier():
+        let n = v.nodeFromSelectedOutlinePath()
+        n.enabled = not n.enabled
+        v.onTreeChanged()
+        result = true
+
     elif e.keyCode == VirtualKey.N and e.modifiers.anyOsModifier():
         let n = v.nodeFromSelectedOutlinePath()
+        var sip = v.outlineView.selectedIndexPath
+        v.outlineView.expandRow(sip)
         discard n.newChild("New Node")
+        if not e.modifiers.anyShift():
+            sip.add(n.children.len - 1)
+            v.onTreeChanged()
+            v.outlineView.selectItemAtIndexPath(sip)
+
+    elif e.keyCode == VirtualKey.Delete:
+        if v.renameField.isFirstResponder() or v.filterField.isFirstResponder(): return false
+        let n = v.nodeFromSelectedOutlinePath()
         
+        n.removeFromParent()
+        v.onTreeChanged()
+        v.editor.selectedNode = nil
+
+        result = true
 
 proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var seq[int]) =
     # running up and calculate the path to the node in the tree
