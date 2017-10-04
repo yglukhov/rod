@@ -1,21 +1,31 @@
 import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
-    scroll_view, button, event]
+    scroll_view, button, event, formatted_text]
 
 import rod.edit_view
-import variant
+import variant, strutils, tables
 import rod / [node, rod_types]
 
 type EditorTreeView* = ref object of EditorTabView
     outlineView: OutlineView
+    filterField: TextField
 
 proc onTreeChanged(v: EditorTreeView)=
-    v.outlineView.reloadData()
+    v.filterField.text = ""
+    v.filterField.sendAction()
     v.editor.sceneTreeDidChange()
 
 method init*(v: EditorTreeView, r: Rect)=
     procCall v.View.init(r)
 
-    let outlineView = OutlineView.new(newRect(0, 0, r.width, r.height - 20))
+    v.filterField = newTextField(newRect(0.0, 0.0, r.width, 20.0))
+    v.filterField.autoresizingMask = {afFlexibleWidth}
+    v.filterField.continuous = true
+    v.filterField.onAction do():
+        v.outlineView.reloadData()
+
+    v.addSubview(v.filterField)
+
+    let outlineView = OutlineView.new(newRect(0.0, 25.0, r.width, r.height - 20))
     v.outlineView = outlineView
 
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleMaxX }
@@ -38,14 +48,37 @@ method init*(v: EditorTreeView, r: Rect)=
     outlineView.createCell = proc(): TableViewCell =
         result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
 
+    outlineView.setDisplayFilter do(item: Variant)-> bool:
+        if v.filterField.text.len == 0:
+            return true
+
+        var n: Node
+        try:
+            n = item.get(Node)
+        except:
+            return false
+
+        let filter = v.filterField.text.toLowerAscii()
+        let lowName = n.name.toLowerAscii()
+        if filter == lowName or filter in lowName:
+            return true
+
     outlineView.configureCell = proc (cell: TableViewCell, indexPath: openarray[int]) =
         let n = outlineView.itemAtIndexPath(indexPath).get(Node3D)
         let textField = TextField(cell.subviews[0])
-        if not cell.selected:
-            textField.textColor = newGrayColor(0.9)
+        if not n.isEnabledInTree():
+            textField.textColor = newColor(0.3, 0.3, 0.3, 1.0)
         else:
             textField.textColor = newGrayColor(0.0)
-        textField.text = if n.name.isNil: "(nil)" else: n.name
+
+        textField.text = if n.name.isNil: "(node)" else: n.name
+
+        if v.filterField.text.len() > 0:
+            let lowerFilter= v.filterField.text.toLowerAscii()
+            let lowerField = textField.text.toLowerAscii()
+            let start = lowerField.find(lowerFilter)
+            if start > -1:
+                textField.formattedText.setTextColorInRange(start, start + lowerFilter.len, newColor(0.9, 0.9, 0.9, 1.0))
 
     outlineView.onSelectionChanged = proc() =
         let ip = outlineView.selectedIndexPath
@@ -117,16 +150,6 @@ method init*(v: EditorTreeView, r: Rect)=
 
     v.addSubview(deleteNodeButton)
 
-    let refreshButton = Button.new(newRect(46, v.bounds.height - 20, 60, 20))
-    refreshButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
-    refreshButton.title = "Refresh"
-    refreshButton.onAction do():
-
-        v.onTreeChanged()
-
-    v.addSubview(refreshButton)
-
-
 proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var seq[int]) =
     # running up and calculate the path to the node in the tree
     let parent = n.parent
@@ -160,5 +183,14 @@ method tabSize*(v: EditorTreeView, bounds: Rect): Size=
 
 method tabAnchor*(v: EditorTreeView): EditorTabAnchor =
     result = etaLeft
+
+var frames = 0
+const framesPerUpdate = 15
+
+method update*(v: EditorTreeView)=
+    inc frames
+    if frames > framesPerUpdate:
+        v.outlineView.reloadData()
+        frames = 0
 
 registerEditorTab("Tree", EditorTreeView)

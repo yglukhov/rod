@@ -200,6 +200,8 @@ method componentNodeWasAddedToSceneView*(c: AEComposition) =
     if c.allCompAnim.isNil:
         c.allCompAnim = newPropertyAnimation(c.node, c.buffers)
 
+method supportsNewSerialization*(c: AEComposition): bool = true
+
 method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     var ll = t.layers.len
     var ml = t.markers.len
@@ -218,6 +220,8 @@ method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "duration", c.duration)
 
 genSerializationCodeForComponent(AELayer)
+
+
 
 method serialize*(c: AELayer, s: Serializer): JsonNode=
     result = newJObject()

@@ -13,10 +13,14 @@ import rod.component.mesh_component
 import rod.component.material
 import rod.vertex_data_info
 import rod.tools.serializer
-
+import rod / utils / [ property_desc, serialization_codegen ]
 type SphereComponent* = ref object of MeshComponent
-    radius: float
-    segments: int
+    radius: float32
+    segments: int32
+
+SphereComponent.properties:
+    radius
+    segments
 
 proc fillBuffers(c: SphereComponent, vertCoords, texCoords, normals: var seq[float32], indices: var seq[GLushort]) =
     let segments = c.segments
@@ -141,13 +145,14 @@ method visitProperties*(c: SphereComponent, p: var PropertyVisitor) =
         cc.radius = v
         cc.generateMesh()
 
-    template segmentsAux(cc: SphereComponent): int = c.segments
-    template `segmentsAux=`(cc: SphereComponent, v: int) =
+    template segmentsAux(cc: SphereComponent): int32 = c.segments
+    template `segmentsAux=`(cc: SphereComponent, v: int32) =
         cc.segments = v
         cc.generateMesh()
 
     p.visitProperty("radius", c.radiusAux)
     p.visitProperty("segments", c.segmentsAux)
     procCall c.MeshComponent.visitProperties(p)
-
+    
+genSerializationCodeForComponent(SphereComponent)
 registerComponent(SphereComponent, "Primitives")

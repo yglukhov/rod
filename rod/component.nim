@@ -23,7 +23,7 @@ proc registerComponentGroup(group, component: string) =
     var g = componentGroupsTable.getOrDefault(validatedGroup)
     if g.isNil:
         g = newSeq[string]()
-
+    
     g.add(component)
     componentGroupsTable[validatedGroup] = g
 
@@ -39,6 +39,8 @@ template registerComponent*(T: typedesc, group: string = nil ) =
 template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: string = nil ) =
     registerClass(T, creator)
     registerComponentGroup(group, typetraits.name(T))
+
+method supportsNewSerialization*(cm: Component): bool {.base.} = false #todo: remove after migration to new serialization will be done
 
 proc createComponent*(name: string): Component =
     if isClassRegistered(name) == false:
