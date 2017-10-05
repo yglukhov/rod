@@ -238,12 +238,19 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
 
     elif e.keyCode == VirtualKey.Delete:
         if v.renameField.isFirstResponder() or v.filterField.isFirstResponder(): return false
+        var sip = v.outlineView.selectedIndexPath
+        if sip[^1] > 0:
+            sip[^1].dec
+        elif sip.len > 1:
+            sip = sip[0..^2]
+    
         let n = v.nodeFromSelectedOutlinePath()
         
         n.removeFromParent()
+        v.outlineView.selectItemAtIndexPath(sip)
         v.onTreeChanged()
         v.editor.selectedNode = nil
-
+        
         result = true
 
 proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var seq[int]) =
