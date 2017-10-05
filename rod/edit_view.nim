@@ -447,12 +447,6 @@ proc onKeyDown(editor: Editor, e: var Event): bool =
             if not editor.mSelectedNode.isNil:
                 editor.mSelectedNode.addChild(n)
                 editor.sceneTreeDidChange()
-    of kcDelete:
-        let n = editor.mSelectedNode
-        if not n.isNil:
-            n.removeFromParent()
-            editor.mSelectedNode = nil
-            editor.sceneTreeDidChange()
 
     else: result = false
 
