@@ -3,33 +3,29 @@ import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
     context]
 
 import rod.edit_view
+import editor_asset_icon_view, editor_asset_container_view
 import variant, strutils, tables
 import rod / [node, rod_types]
-import os
-
-type PathNode = ref object
-    children: seq[PathNode]
-    name: string
-    fullPath: string
-    hasContent: bool
-    outLinePath: seq[int]
+import os, algorithm, sequtils
 
 type EditorAssetsView* = ref object of EditorTabView
-    contentView: CollectionView
+    contentView: AssetContainerView
     fileSystemView: OutlineView
     resourceRoot: PathNode
     mCurrentPathNode: PathNode
+    cachedResources: Table[string, FilePreview]
 
 proc getProjectDir():string = getAppDir() & "/../../" # exit from build/{platform}
 
 proc `currentPathNode=`(v: EditorAssetsView, node: PathNode)=
     v.mCurrentPathNode = node
-    v.contentView.updateLayout()
+    v.contentView.reload()
 
 proc reloadFileSystem(v: EditorAssetsView)=
     v.resourceRoot = new(PathNode)
     v.resourceRoot.name = "res://"
     v.resourceRoot.fullPath = getProjectDir()
+    v.cachedResources = initTable[string, FilePreview]()
 
     var curPathNodes = @[v.resourceRoot]
     var totalNodes = 0
@@ -38,14 +34,24 @@ proc reloadFileSystem(v: EditorAssetsView)=
         for curPathNode in curPathNodes:
             var children = newSeq[PathNode]()
             for kind, path in walkDir(curPathNode.fullPath):
+                let sp = splitFile(path)
+                if sp.name.len > 0 and sp.name[0] == '.': continue
+
                 var pathNode = new(PathNode)
                 pathNode.hasContent = kind == pcDir or kind == pcLinkToDir
                 pathNode.fullPath = path
-                pathNode.name = splitFile(path).name
+                pathNode.name = sp.name
                 children.add(pathNode)
                 inc totalNodes
                 if kind != pcFile and kind != pcLinkToFile:
                     dirs.add(pathNode)
+
+            children.sort do(a,b: PathNode) -> int:
+                result = (b.hasContent.int - a.hasContent.int)
+                if result == 0:
+                    result = cmp(splitFile(a.fullPath).ext, splitFile(b.fullPath).ext)
+                if result == 0:
+                    result = cmp(a.name, b.name)
 
             curPathNode.children = children
             curPathNode.hasContent = children.len > 0
@@ -61,7 +67,7 @@ method init*(v: EditorAssetsView, r: Rect)=
     horLayout.userResizeable = true
     horLayout.resizingMask= "wh"
     horLayout.padding = 4.0
-    
+
     v.addSubview(horLayout)
 
     v.reloadFileSystem()
@@ -70,7 +76,7 @@ method init*(v: EditorAssetsView, r: Rect)=
     var fsScroll = newScrollView(v.fileSystemView)
     fsScroll.resizingMask="wh"
     horLayout.addSubview(fsScroll)
-    
+
     block setupFileSystemView:
         v.fileSystemView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
             if indexPath.len == 0:
@@ -97,7 +103,7 @@ method init*(v: EditorAssetsView, r: Rect)=
             let textField = TextField(cell.subviews[0])
             textField.textColor = blackColor()
             textField.text = n.name
-        
+
         v.fileSystemView.setDisplayFilter do(item: Variant)-> bool:
             var n: PathNode
             try:
@@ -105,8 +111,12 @@ method init*(v: EditorAssetsView, r: Rect)=
             except:
                 return true
             return n.hasContent
-        
+
         v.fileSystemView.onSelectionChanged = proc() =
+            # if v.cachedResources.len > 1000:
+            v.cachedResources.clear()
+            # GC_fullCollect()
+
             let ip = v.fileSystemView.selectedIndexPath
             let n = if ip.len > 0:
                     v.fileSystemView.itemAtIndexPath(ip).get(PathNode)
@@ -114,10 +124,11 @@ method init*(v: EditorAssetsView, r: Rect)=
                     nil
 
             v.currentPathNode = n
-            
-        v.fileSystemView.reloadData()                
 
-    v.contentView = newCollectionView(newRect(0.0, 0.0, v.bounds.width - 300.0, v.bounds.height), newSize(150, 150), LayoutDirection.TopDown)
+        v.fileSystemView.reloadData()
+
+    v.contentView = newAssetContainerView(newRect(0.0, 0.0, v.bounds.width - 300.0, v.bounds.height))
+
     horLayout.addSubview(v.contentView)
 
     block setupContentView:
@@ -127,34 +138,49 @@ method init*(v: EditorAssetsView, r: Rect)=
 
         v.contentView.viewForItem = proc(i: int): View =
             let n = v.mCurrentPathNode.children[i]
-            let spFile = splitFile(n.fullPath)
-
             var size = v.contentView.itemSize
 
+            var filePreview = v.cachedResources.getOrDefault(n.fullPath)
+            if filePreview.isNil:
+                filePreview = createFilePreview(n, newRect(0.0, 0.0, size.width, size.height))
+                v.cachedResources[n.fullPath] = filePreview
+
             if n.hasContent:
-                var openContentBtn = newButton(newRect(0.0, 0.0, size.width, size.height))
-                openContentBtn.onAction do():
+                filePreview.onDoubleClicked = proc() =
                     v.fileSystemView.selectItemAtIndexPath(n.outLinePath)
-                result = openContentBtn
-                # result.backgroundColor = newColor(0.2, 0.2, 0.2, 0.4)
-            # elif spFile.ext == ".png":
-            #     var img = imageWithContentsOfFile(n.fullPath)
-            #     var imgView = newImagePreview(newRect(0.0, 0.0, size.width, size.height), img)
-            #     result = imgView
-            else:
-                result = newView(newRect(0.0, 0.0, size.width, size.height))        
-                result.backgroundColor = newColor(0.2, 0.2, 0.2, 0.4)
 
-            var nameLbl = newLabel(newRect(0.0, size.height - 20.0, size.width, 20.0))
-            nameLbl.formattedText.horizontalAlignment = haCenter
-            nameLbl.text = n.name & spFile.ext
-            result.addSubview(nameLbl)
+            result = filePreview
 
-            
-            
-        v.contentView.itemSize = newSize(150.0, 100.0)
-        v.contentView.layoutWidth = 0
-        v.contentView.offset = 5.0
+        v.contentView.onItemSelected = proc(i: int)=
+            let n = v.mCurrentPathNode.children[i]
+            var fileView = v.contentView.subviews[i].FilePreview
+            fileView.select()
+
+        v.contentView.onItemDeselected = proc(i: int)=
+            var fileView = v.contentView.subviews[i].FilePreview
+            fileView.deselect()
+
+        v.contentView.onItemDoubleClick = proc(i: int)=
+            let n = v.mCurrentPathNode.children[i]
+            var fileView = v.contentView.subviews[i].FilePreview
+            fileView.doubleClicked()
+
+        v.contentView.onItemsDelete = proc(selectedItems: seq[int])=
+            v.cachedResources.clear()
+            var path = v.mCurrentPathNode.outLinePath
+            for item in selectedItems:
+                let n = v.mCurrentPathNode.children[item]
+                discard tryRemoveFile(n.fullPath)
+
+            v.reloadFileSystem()
+            v.fileSystemView.reloadData()
+            v.fileSystemView.selectItemAtIndexPath(path)
+
+        v.contentView.onBackspace = proc()=
+            var path = v.mCurrentPathNode.outLinePath
+            if path.len > 1:
+                path = path[0..^2]
+                v.fileSystemView.selectItemAtIndexPath(path)
 
     v.currentPathNode=v.resourceRoot
     horLayout.setDividerPosition(300.0, 0)
@@ -164,7 +190,6 @@ method tabSize*(v: EditorAssetsView, bounds: Rect): Size=
 
 method tabAnchor*(v: EditorAssetsView): EditorTabAnchor =
     result = etaBottom
-
 
 registerEditorTab("Assets", EditorAssetsView)
 
