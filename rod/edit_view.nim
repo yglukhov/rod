@@ -166,7 +166,7 @@ proc sceneTreeDidChange*(e: Editor) =
 
 when loadingAndSavingAvailable:
     import os
-    proc saveNode(editor: Editor, selectedNode: Node3D) =
+    proc saveNode(editor: Editor, selectedNode: Node) =
         let path = callDialogFileSave("Save Json")
         if not path.isNil:
             var s = Serializer.new()
@@ -528,7 +528,7 @@ proc createEventCatchingView(e: Editor) =
     e.eventCatchingView.keyDownDelegate = proc(evt: var Event): bool =
         e.onKeyDown(evt)
 
-proc startEditingNodeInView*(n: Node3D, v: View, startFromGame: bool = true): Editor =
+proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Editor =
     let editor = Editor.new()
     editor.rootNode = n
     editor.sceneView = n.sceneView
