@@ -7,6 +7,7 @@ import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
+import nimx.pasteboard.pasteboard_item
 
 import rod_types, node
 import rod.scene_composition
