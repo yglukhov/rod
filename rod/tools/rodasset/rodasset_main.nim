@@ -14,7 +14,7 @@ when rodPluginFile.len != 0:
 template updateSettingsWithCmdLine() =
     s.graphics.downsampleRatio *= downsampleRatio
     s.graphics.compressToPVR = compressToPVR
-    if platform in ["js", "emscripten"]:
+    if platform in ["js", "emscripten", "wasm"]:
         s.audio.extension = "mp3"
     else:
         s.audio.extension = "ogg"
