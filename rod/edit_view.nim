@@ -3,7 +3,8 @@ import math, algorithm, strutils, tables, json, logging
 import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
                 outline_view, toolbar, color_picker, scroll_view, clip_view,
                 text_field, table_view_cell, gesture_detector, menu,
-                key_commands, linear_layout, view_event_handling_new ]
+                key_commands, linear_layout, view_event_handling_new,
+                mini_profiler ]
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
@@ -129,7 +130,7 @@ proc `selectedNode=`*(e: Editor, n: Node) =
             discard e.mSelectedNode.component(NodeSelector)
 
         for etv in e.workspaceView.tabs:
-            etv.setEditedNode(n)
+            etv.setEditedNode(e.mSelectedNode)
 
         e.gizmo.editedNode = e.mSelectedNode
 
@@ -368,6 +369,8 @@ proc createViewMenu(e: Editor) =
             - "3D":
                 let cam = e.currentCamera()
                 if not cam.isNil: cam.projectionMode = cpPerspective
+            - "Profiler":
+                sharedProfiler().enabled = not sharedProfiler().enabled
 
         e.addToolbarMenu(m)
 
@@ -426,7 +429,7 @@ proc createCloseEditorButton(e: Editor) =
 proc onKeyDown(editor: Editor, e: var Event): bool =
     editor.cameraController.onKeyDown(e)
     let cmd = commandFromEvent(e)
-    result = true
+    result = false
     case commandFromEvent(e):
     of kcCopy, kcCut:
         let n = editor.mSelectedNode
@@ -438,6 +441,7 @@ proc onKeyDown(editor: Editor, e: var Event): bool =
             if cmd == kcCut:
                 n.removeFromParent()
                 editor.sceneTreeDidChange()
+            result = true
     of kcPaste:
         let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
         if not pbi.isNil:
@@ -447,7 +451,7 @@ proc onKeyDown(editor: Editor, e: var Event): bool =
             if not editor.mSelectedNode.isNil:
                 editor.mSelectedNode.addChild(n)
                 editor.sceneTreeDidChange()
-
+            result = true
     else: result = false
 
 proc onKeyUp(editor: Editor, e: var Event): bool =
@@ -546,11 +550,11 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
     editor.createGameInputToggle()
     editor.createCameraSelector()
     editor.createChangeBackgroundColorButton()
+
     if startFromGame:
         editor.createCloseEditorButton()
 
     editor.createWorkspaceLayout()
-
     editor.gizmo = newGizmoAxis()
     editor.gizmo.gizmoNode.nodeWasAddedToSceneView(editor.sceneView)
     editor.sceneView.afterDrawProc = proc() =
