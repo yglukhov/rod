@@ -113,14 +113,6 @@ method update*(c: UpdateProcComponent) =
 method draw*(c: DrawProcComponent) =
     c.drawProc()
 
-type OverlayComponent* = ref object of Component
-
-method componentNodeWasAddedToSceneView*(c: OverlayComponent) =
-    inc c.node.sceneView.numberOfNodesWithBackComposition
-
-method componentNodeWillBeRemovedFromSceneView*(c: OverlayComponent) =
-    dec c.node.sceneView.numberOfNodesWithBackComposition
-
 method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
     let bbox = c.getBBox()
     if bbox.isEmpty:
