@@ -18,7 +18,6 @@ import component.camera
 import rod.material.shader
 
 import ray
-export Viewport
 export SceneView
 
 const GridVertexShader = """
@@ -53,9 +52,9 @@ proc getDeltaTime*(): float =
 proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
 
-template rootNode*(v: SceneView): Node2D = v.mRootNode
+template rootNode*(v: SceneView): Node = v.mRootNode
 
-proc `rootNode=`*(v: SceneView, n: Node2D) =
+proc `rootNode=`*(v: SceneView, n: Node) =
     if not v.mRootNode.isNil:
         v.mRootNode.nodeWillBeRemovedFromSceneView()
     v.mRootNode = n
@@ -64,7 +63,7 @@ proc `rootNode=`*(v: SceneView, n: Node2D) =
 
 proc camera*(v: SceneView): Camera =
     if v.mCamera.isNil:
-        let nodeWithCamera = v.rootNode.findNode(proc (n: Node2D): bool = not n.componentIfAvailable(Camera).isNil)
+        let nodeWithCamera = v.rootNode.findNode(proc (n: Node): bool = not n.componentIfAvailable(Camera).isNil)
         if not nodeWithCamera.isNil:
             v.mCamera = nodeWithCamera.componentIfAvailable(Camera)
     result = v.mCamera
