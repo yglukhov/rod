@@ -207,15 +207,15 @@ method init*(v: EditorAssetsView, r: Rect)=
             if drag_data.len > 0 and drag_kind.len > 0:
                 var dpi = newPasteboardItem(drag_kind, drag_data)
                 var img: Image = nil
-                if items.len > 0:
-                    if items.len == 1:
-                        var cv = v.contentView.subviews[items[0]]
-                        img = v.contentView.subviews[items[0]].screenShot()
-                    else:
-                        var views = newSeq[View]()
-                        for i in items:
-                            views.add(v.contentView.subviews[i])
-                        img = screenShot(views)
+                # if items.len > 0:
+                if items.len == 1:
+                    var cv = v.contentView.subviews[items[0]]
+                    img = v.contentView.subviews[items[0]].screenShot()
+                    # else:
+                    #     var views = newSeq[View]()
+                    #     for i in items:
+                    #         views.add(v.contentView.subviews[i])
+                    #     img = screenShot(views)
                 startDrag(dpi, img)
 
     v.currentPathNode=v.resourceRoot
