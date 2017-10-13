@@ -59,11 +59,6 @@ type
         mRootNode*: Node
         animationRunner*: AnimationRunner
         deltaTimeAnimation*: Animation
-        numberOfNodesWithBackComposition*: int
-        numberOfNodesWithBackCompositionInCurrentFrame*: int
-        mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
-        mScreenFrameBuffer*: FramebufferRef
-        tempFramebuffers*: seq[SelfContainedImage]
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]
         postprocessContext*: PostprocessContext
