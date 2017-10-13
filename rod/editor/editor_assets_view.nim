@@ -1,6 +1,6 @@
 import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
     scroll_view, button, event, linear_layout, collection_view, formatted_text, image,
-    context]
+    context, drag_and_drop, pasteboard / pasteboard_item, view_render_to_image ]
 
 import rod.edit_view
 import editor_asset_icon_view, editor_asset_container_view
@@ -181,6 +181,42 @@ method init*(v: EditorAssetsView, r: Rect)=
             if path.len > 1:
                 path = path[0..^2]
                 v.fileSystemView.selectItemAtIndexPath(path)
+
+        v.contentView.onItemsDragStart = proc(items: seq[int])=
+            var drag_data = ""
+            var drag_kind = ""
+
+            for i in items:
+                let n = v.mCurrentPathNode.children[i]
+                var fileView = v.contentView.subviews[i].FilePreview
+                var pbk = ""
+
+                if fileView.kind == akComposition:
+                    pbk = rodPbComposition
+                elif fileView.kind == akImage:
+                    pbk = rodPbSprite
+
+                if pbk.len > 0:
+                    if drag_kind.len > 0:
+                        drag_kind = rodPbFiles
+                        drag_data &= ":" & fileView.path
+                    else:
+                        drag_kind = pbk
+                        drag_data = fileView.path
+
+            if drag_data.len > 0 and drag_kind.len > 0:
+                var dpi = newPasteboardItem(drag_kind, drag_data)
+                var img: Image = nil
+                # if items.len > 0:
+                if items.len == 1:
+                    var cv = v.contentView.subviews[items[0]]
+                    img = v.contentView.subviews[items[0]].screenShot()
+                    # else:
+                    #     var views = newSeq[View]()
+                    #     for i in items:
+                    #         views.add(v.contentView.subviews[i])
+                    #     img = screenShot(views)
+                startDrag(dpi, img)
 
     v.currentPathNode=v.resourceRoot
     horLayout.setDividerPosition(300.0, 0)
