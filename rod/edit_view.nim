@@ -4,15 +4,17 @@ import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
                 outline_view, toolbar, color_picker, scroll_view, clip_view,
                 text_field, table_view_cell, gesture_detector, menu,
                 key_commands, linear_layout, view_event_handling_new,
-                mini_profiler ]
+                mini_profiler, drag_and_drop, image ]
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
+import nimx.assets.asset_loading
 
 import rod_types, node
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
+import rod.component.sprite
 import rod.editor_camera_controller
 import rod.editor.gizmo_axis
 import tools.serializer
@@ -36,6 +38,10 @@ const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
 when loadingAndSavingAvailable:
     import native_dialogs
 
+const rodPbComposition* = "rod.composition"
+const rodPbSprite* = "rod.sprite"
+const rodPbFiles* = "rod.files"
+
 type
     EditorTabAnchor* = enum
         etaLeft
@@ -58,6 +64,8 @@ type
         cameraSelector: PopupButton
         gizmo: GizmoAxis
 
+    EditorDropDelegate* = ref object of DragDestinationDelegate
+
     WorkspaceView = ref object of View
         editor: Editor
         tabs: seq[EditorTabView]
@@ -70,6 +78,7 @@ type
         keyUpDelegate*: proc(event: var Event): bool
         mouseScrrollDelegate*: proc(event: var Event)
         allowGameInput: bool
+        editor*: Editor
 
     EventCatchingListener = ref object of BaseScrollListener
         view: EventCatchingView
@@ -120,6 +129,50 @@ method onScrollProgress*(ecl: EventCatchingListener, dx, dy : float32, e : var E
 
 method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
     procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
+
+
+method onDragEnter*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
+    if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:
+        target.backgroundColor.a = 0.5
+
+method onDragExit*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
+    if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:
+        target.backgroundColor.a = 0.0
+
+method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
+    target.backgroundColor.a = 0.0
+    case i.kind:
+    of rodPbComposition:
+        var n = try: newNodeWithURL("file://" & i.data) except: nil
+        if not n.isNil:
+            if target of EventCatchingView:
+                var editor = (target.EventCatchingView).editor
+                if editor.mSelectedNode.isNil:
+                    editor.rootNode.addChild(n)
+                else:
+                    editor.mSelectedNode.addChild(n)
+
+                discard target.makeFirstResponder()
+        else:
+            warn "Can't deserialize ", i.data
+
+    of rodPbSprite:
+        loadAsset[Image]("file://" & i.data) do(image: Image, err: string):
+            if image.isNil:
+                warn "Can't load image from ", i.data
+                return
+
+            var n = newNode(i.data)
+            n.component(Sprite).image = image
+
+            if target of EventCatchingView:
+                var editor = (target.EventCatchingView).editor
+                if editor.mSelectedNode.isNil:
+                    editor.rootNode.addChild(n)
+                else:
+                    editor.mSelectedNode.addChild(n)
+    else:
+        discard
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -215,7 +268,6 @@ proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
                 if abs(x.distance - y.distance) < 0.00001:
                     result = getTreeDistance(x.node, y.node) )
 
-        echo "cast ", castResult[0].node.name
         result = castResult[0].node
 
 proc onTouchDown*(editor: Editor, e: var Event) =
@@ -424,6 +476,7 @@ proc endEditing*(e: Editor) =
 
 proc createCloseEditorButton(e: Editor) =
     e.newToolbarButton("x").onAction do():
+        e.sceneView.dragDestination = nil
         e.endEditing()
 
 proc onKeyDown(editor: Editor, e: var Event): bool =
@@ -511,10 +564,12 @@ method onTouchEv*(v: EventCatchingView, e: var Event): bool =
 
 proc createEventCatchingView(e: Editor) =
     e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
+    e.eventCatchingView.dragDestination = new(EditorDropDelegate)
     e.eventCatchingView.resizingMask = "wh"
     #e.eventCatchingView.backgroundColor = newColor(1, 0, 0)
     let eventListener = e.eventCatchingView.newEventCatchingListener()
     e.eventCatchingView.addGestureDetector(newScrollGestureDetector(eventListener))
+    e.eventCatchingView.editor = e
 
     eventListener.tapDownDelegate = proc(evt: var Event) =
         e.onTouchDown(evt)

@@ -18,13 +18,14 @@ type AssetKind* = enum
     akImage
     akSound
     akText
+    akComposition
 
 var filesExtensions = newTable[string, AssetKind]()
 
 filesExtensions[".png"] = akImage
 filesExtensions[".jpg"] = akImage
 filesExtensions[".txt"] = akText
-filesExtensions[".json"] = akText
+filesExtensions[".json"] = akComposition
 filesExtensions[".mp3"] = akSound
 filesExtensions[".ogg"] = akSound
 
@@ -40,7 +41,7 @@ type FilePreview* = ref object of View
     selectionView: View
     onDoubleClicked*: proc()
 
-    case kind: AssetKind
+    case kind*: AssetKind
     of akSound:
         sound*: string
     of akText:
@@ -109,6 +110,10 @@ proc createFilePreview*(p: PathNode, r: Rect): FilePreview =
         res.icon = newView(newRect(iconPos, iconSize))
         res.icon.backgroundColor = newColor(0.5, 0.4, 0.6, 1.0)
 
+    of akComposition:
+        res.icon = newView(newRect(iconPos, iconSize))
+        res.icon.backgroundColor = newColor(0.5, 0.8, 0.6, 1.0)
+
     else:
         res.icon = newView(newRect(iconPos, iconSize))
         res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
@@ -141,8 +146,7 @@ proc doubleClicked*(v: FilePreview)=
                 var imgpreview = newImagePreview(newRect(0.0, 0.0, 0.0, 0.0), i)
                 imgpreview.popupAtPoint(v.window, v.frame.origin)
         else:
-            echo "double clicked ", v.kind
-
+            echo "double clicked ", v.kind, " path ", v.path
 
 proc select*(v: FilePreview)=
     discard
