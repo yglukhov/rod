@@ -56,7 +56,16 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
 
     let phantomTyp = genPhantomTypeSection(typdesc)
 
-    result = newProc(name, [newEmptyNode(), newIdentDefs(v, typdesc), newIdentDefs(s, serTyp)])
+    var paramTyp = typdesc
+
+    let impl = getImpl(typdesc.symbol)
+
+    # echo treeRepr(getImpl(typdesc.symbol))
+
+    if not serialize and impl.kind == nnkTypeDef and impl.len >= 3 and impl[2].kind != nnkRefTy:
+        paramTyp = newNimNode(nnkVarTy).add(paramTyp)
+
+    result = newProc(name, [newEmptyNode(), newIdentDefs(v, paramTyp), newIdentDefs(s, serTyp)])
 
     if not phantomTyp.isNil and phantomTyp.kind != nnkEmpty:
         result.body.add(phantomTyp)
@@ -109,7 +118,7 @@ template genSerializationCodeForComponent*(c: typed) =
     when defined(rodplugin):
         import rod / utils / [ json_deserializer, json_serializer,
                 bin_serializer, serialization_hash_calculator ]
-        
+
         bind className
         genSerializerProc(c, serializeAux, BinSerializer, false, true, true, false)
         genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
@@ -135,3 +144,21 @@ template genSerializationCodeForComponent*(c: typed) =
 
     method deserialize*(cm: c, b: BinDeserializer) =
         deserializeAux(cm, b)
+
+template genJsonSerializationrFor*(c: typed) =
+    import rod / utils / [ json_deserializer, json_serializer, serialization_hash_calculator ]
+
+    genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
+    genSerializerProc(c, serializeAux, JsonSerializer, true, true, false, false)
+
+    proc toJson*(cm: c): JsonNode=
+        var b = newJsonSerializer()
+        serializeAux(cm, b)
+        result = b.node
+
+    proc `to c`*(jn: JsonNode): c =
+        var b = newJsonDeserializer()
+        b.node = jn
+        when c is ref:
+            result.new()
+        deserializeAux(result, b)

@@ -9,7 +9,9 @@ proc newJsonSerializer*(): JsonSerializer =
     result.node = newJObject()
 
 proc write[T](data: T): JsonNode =
-    when T is tuple:
+    when T is Rect:
+        result = %[data.x, data.y, data.width, data.height]
+    elif T is tuple:
         result = newJArray()
         for k, v in fieldPairs(data):
             result.add(write(v))
@@ -25,18 +27,18 @@ proc write[T](data: T): JsonNode =
     else:
         result = %data
 
-proc visit*(b: JsonSerializer, r: Rect, key: string) =
-    b.node[key] =  %[r.x, r.y, r.width, r.height]
+# proc visit*(b: JsonSerializer, r: Rect, key: string) =
+#     b.node[key] = write(r)
 
-proc visit*(b: JsonSerializer, s: Size, key: string) =
-    b.node[key] =  %[s.width, s.height]
+# proc visit*(b: JsonSerializer, s: Size, key: string) =
+#     b.node[key] = write(s)
 
-proc visit*(b: JsonSerializer, p: Point, key: string) =
-    b.node[key] =  %[p.x, p.y]
+# proc visit*(b: JsonSerializer, p: Point, key: string) =
+#     b.node[key] = write(p)
 
-proc visit*(b: JsonSerializer, c: Color, key: string) =
-    b.node[key] =  %[c.r, c.g, c.b, c.a]
-    
+# proc visit*(b: JsonSerializer, c: Color, key: string) =
+#     b.node[key] = write(c)
+
 proc visit*(b: JsonSerializer, v: Image, key: string) =
     if not v.isNil:
         b.node[key] = %filePath(v)
