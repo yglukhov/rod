@@ -259,8 +259,8 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
             handler(nil)
         else:
             when not defined(js) and not defined(emscripten) and not defined(windows) and not defined(rodplugin):
-                #assert(not getURLForAssetBundle.isNil)
-                let url = "" #getURLForAssetBundle(abd.hash)
+                assert(not getURLForAssetBundle.isNil)
+                let url = getURLForAssetBundle(abd.hash)
                 var ctx: DownloadCtx
                 ctx.new()
                 ctx.handler = handler
