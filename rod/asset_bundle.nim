@@ -187,11 +187,13 @@ proc isDownloadable*(abd: AssetBundleDescriptor): bool {.inline.} =
         abd.isExternal
 
 when defined(android):
+    import nimx.utils.android
+    import android.content.context
     import android.extras.pathutils
 
 proc cacheDir(): string {.inline.} =
     when defined(android):
-        appFilesDir()
+        mainActivity().getExternalCacheDir().getAbsolutePath()
     else:
         "/tmp/rodappcache"
 
@@ -214,7 +216,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
 
     proc extractGz(zipFileName, destFolder: string): bool =
         var file = newTarFile(zipFileName)
-        file.extract(destFolder)
+        file.extract(destFolder, tempDir = destFolder / "tmp")
         file.close()
         removeFile(zipFileName)
         result = true
@@ -231,6 +233,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
                 let client = newHttpClient(sslContext = nil)
 
             let zipFilePath = destPath & ".gz"
+            discard tryRemoveFile(zipFilePath)
 
             client.downloadFile(url, zipFilePath)
             client.close()
@@ -259,8 +262,8 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
             handler(nil)
         else:
             when not defined(js) and not defined(emscripten) and not defined(windows) and not defined(rodplugin):
-                #assert(not getURLForAssetBundle.isNil)
-                let url = "" #getURLForAssetBundle(abd.hash)
+                assert(not getURLForAssetBundle.isNil)
+                let url = getURLForAssetBundle(abd.hash)
                 var ctx: DownloadCtx
                 ctx.new()
                 ctx.handler = handler
