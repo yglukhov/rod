@@ -28,7 +28,7 @@ proc newAssetContainerView*(r: Rect): AssetContainerView=
     result = new(AssetContainerView)
     result.backgroundColor = whiteColor()
     result.layoutDirection = LayoutDirection.TopDown
-    result.itemSize = newSize(100.0, 100.0)
+    result.itemSize = newSize(128.0, 128.0)
     result.layoutWidth = 0
     result.offset = 35.0
     result.init(r)

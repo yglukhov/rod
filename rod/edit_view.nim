@@ -4,7 +4,8 @@ import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
                 outline_view, toolbar, color_picker, scroll_view, clip_view,
                 text_field, table_view_cell, gesture_detector, menu,
                 key_commands, linear_layout, view_event_handling_new,
-                mini_profiler, drag_and_drop, image, notification_center ]
+                mini_profiler, drag_and_drop, image, notification_center,
+                animation, window ]
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
@@ -63,23 +64,13 @@ type
         currentProject*: EditorProject
         compositionEditors*: seq[EditorTabView]
         mCurrentComposition: CompositionDocument
-
         rootNode*: Node
         sceneView*: SceneView
         window*: Window
         mSelectedNode: Node
-
         startFromGame*: bool
-    # todo: move out
         workspaceView: WorkspaceView
-        # eventCatchingView*: EventCatchingView
-
-    # tod: move out
-        # cameraController*: EditorCameraController
         cameraSelector: PopupButton
-        # gizmo: GizmoAxis
-
-    # EditorDropDelegate* = ref object of DragDestinationDelegate
 
     WorkspaceView* = ref object of View
         editor*: Editor
@@ -88,16 +79,6 @@ type
         anchors*: array[4, TabView]
         horizontalLayout*: LinearLayout
         verticalLayout*: LinearLayout
-
-    # EventCatchingView* = ref object of View
-    #     keyDownDelegate*: proc(event: var Event): bool
-    #     keyUpDelegate*: proc(event: var Event): bool
-    #     mouseScrrollDelegate*: proc(event: var Event)
-    #     allowGameInput: bool
-    #     editor*: Editor
-
-    # EventCatchingListener = ref object of BaseScrollListener
-    #     view: EventCatchingView
 
 method setEditedNode*(v: EditorTabView, n: Node) {.base.}=
     discard
@@ -121,77 +102,6 @@ method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base
 
 proc newTabView(e: Editor): TabView
 
-# method acceptsFirstResponder(v: EventCatchingView): bool = true
-
-# method onKeyUp(v: EventCatchingView, e : var Event): bool =
-#     if not v.keyUpDelegate.isNil:
-#         result = v.keyUpDelegate(e)
-
-# method onKeyDown(v: EventCatchingView, e : var Event): bool =
-#     if not v.keyDownDelegate.isNil:
-#         result = v.keyDownDelegate(e)
-
-# method onScroll*(v: EventCatchingView, e: var Event): bool =
-#     result = true
-#     if not v.mouseScrrollDelegate.isNil:
-#         v.mouseScrrollDelegate(e)
-
-# proc newEventCatchingListener(v: EventCatchingView): EventCatchingListener =
-#     result.new
-#     result.view = v
-
-# method onTapDown*(ecl: EventCatchingListener, e : var Event) =
-#     procCall ecl.BaseScrollListener.onTapDown(e)
-
-# method onScrollProgress*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
-#     procCall ecl.BaseScrollListener.onScrollProgress(dx, dy, e)
-
-# method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
-#     procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
-
-# method onDragEnter*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
-#     if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:
-#         target.backgroundColor.a = 0.5
-
-# method onDragExit*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
-#     if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:
-#         target.backgroundColor.a = 0.0
-
-# method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
-#     target.backgroundColor.a = 0.0
-#     case i.kind:
-#     of rodPbComposition:
-#         var n = try: newNodeWithURL("file://" & i.data) except: nil
-#         if not n.isNil:
-#             if target of EventCatchingView:
-#                 var editor = (target.EventCatchingView).editor
-#                 if editor.mSelectedNode.isNil:
-#                     editor.rootNode.addChild(n)
-#                 else:
-#                     editor.mSelectedNode.addChild(n)
-
-#                 discard target.makeFirstResponder()
-#         else:
-#             warn "Can't deserialize ", i.data
-
-#     of rodPbSprite:
-#         loadAsset[Image]("file://" & i.data) do(image: Image, err: string):
-#             if image.isNil:
-#                 warn "Can't load image from ", i.data
-#                 return
-
-#             var n = newNode(i.data)
-#             n.component(Sprite).image = image
-
-#             if target of EventCatchingView:
-#                 var editor = (target.EventCatchingView).editor
-#                 if editor.mSelectedNode.isNil:
-#                     editor.rootNode.addChild(n)
-#                 else:
-#                     editor.mSelectedNode.addChild(n)
-#     else:
-#         discard
-
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
         if not e.mSelectedNode.isNil and e.mSelectedNode.componentIfAvailable(LightSource).isNil:
@@ -211,12 +121,14 @@ proc `selectedNode=`*(e: Editor, n: Node) =
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 
+proc onCompositionChanged*(e: Editor, c: CompositionDocument)=
+    for etv in e.workspaceView.tabs:
+        etv.onCompositionChanged(c)
+
 proc `currentComposition=`*(e: Editor, c: CompositionDocument)=
     if e.mCurrentComposition != c:
         e.mCurrentComposition = c
-
-        for etv in e.workspaceView.tabs:
-            etv.onCompositionChanged(c)
+        e.onCompositionChanged(c)
 
 template currentComposition*(e: Editor): CompositionDocument = e.mCurrentComposition
 
@@ -286,50 +198,6 @@ when loadingAndSavingAvailable:
 
 proc selectNode*(editor: Editor, node: Node) =
     editor.selectedNode = node
-
-# proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
-#     let r = editor.sceneView.rayWithScreenCoords(coords)
-#     var castResult = newSeq[RayCastInfo]()
-#     node.rayCast(r, castResult)
-
-#     if castResult.len > 0:
-#         castResult.sort( proc (x, y: RayCastInfo): int =
-#             result = int(x.node.layer < y.node.layer)
-#             if x.node.layer == y.node.layer:
-#                 result = int(x.distance > y.distance)
-#                 if abs(x.distance - y.distance) < 0.00001:
-#                     result = getTreeDistance(x.node, y.node) )
-
-#         result = castResult[0].node
-
-# proc onTouchDown*(editor: Editor, e: var Event) =
-#     #TODO Hack to sync node tree and treeView
-#     for t in editor.workspaceView.tabs:
-#         t.onEditorTouchDown(e)
-
-#     if e.keyCode != VirtualKey.MouseButtonPrimary:
-#         return
-
-#     var castedNode = editor.rayCastFirstNode(editor.gizmo.gizmoNode, e.localPosition)
-#     if not castedNode.isNil:
-#         editor.gizmo.startTransform(castedNode, e.localPosition)
-#         return
-
-#     castedNode = editor.rayCastFirstNode(editor.rootNode, e.localPosition)
-#     if not castedNode.isNil:
-#         editor.selectNode(castedNode)
-
-# proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
-#     if editor.selectedNode.isNil:
-#         return
-
-#     editor.gizmo.proccesTransform(e.localPosition)
-
-# proc onTouchUp*(editor: Editor, e: var Event) =
-#     if editor.selectedNode.isNil:
-#         return
-
-#     editor.gizmo.stopTransform()
 
 proc currentCamera*(e: Editor): Camera =
     if e.cameraSelector.selectedIndex >= 0:
@@ -607,9 +475,7 @@ proc endEditing*(e: Editor) =
         if not nodeSelector.isNil:
             e.selectedNode.removeComponent(NodeSelector)
 
-    # e.gizmo.gizmoNode.nodeWillBeRemovedFromSceneView()
     e.sceneView.afterDrawProc = nil
-    # e.gizmo = nil
     e.sceneView.removeFromSuperview()
     e.sceneView.setFrame(e.workspaceView.frame)
 
@@ -619,10 +485,11 @@ proc endEditing*(e: Editor) =
 
     e.sceneView.editing = false
 
-proc createCloseEditorButton(e: Editor) =
+proc createCloseEditorButton(e: Editor, cb: proc()) =
     e.newToolbarButton("x").onAction do():
         e.sceneView.dragDestination = nil
         e.endEditing()
+        cb()
 
 #todo: replace this with copyNode, pasteNode, cutNode
 # proc onKeyDown(editor: Editor, e: var Event): bool =
@@ -659,38 +526,6 @@ proc createCloseEditorButton(e: Editor) =
 #     if e.keyCode == VirtualKey.F:
 #         editor.cameraController.setToNode(editor.selectedNode)
 
-
-#todo: CHECK THIS!!
-
-# method onKeyDown(v: WorkspaceView, e: var Event): bool = v.editor.onKeyDown(e)
-# method onKeyUp(v: WorkspaceView, e: var Event): bool = v.editor.onKeyUp(e)
-
-# proc onEditorTabSelected(e: Editor, tb: TabView, index: int)=
-#     echo "onEditorTabSelected ", index
-#     if tb.selectedView of EditorTabView:
-#         echo "tab of EditorTabView"
-#         var tab = tb.selectedView.EditorTabView
-#         for i, c in e.editedCompositions:
-#             if c.owner == tab:
-#                 echo "composition owner ", tab.name, " compindex ", i
-#                 e.mCurrentComposition = c
-#                 for t in e.workspaceView.tabs:
-#                     t.onCompositionChanged(c)
-#                 break
-
-        # var tab = tb.selectedView.EditorTabView
-        # if tab.isSceneEditingTab():
-        # tb.setTabTitle(index, "current_tab")
-
-            # echo "tab is scene editing"
-            # for t in e.workspaceView.tabs:
-            #     if not t.isSceneEditingTab:
-            #         t.rootNode = tab.rootNode
-            #         # t.setEditedNode(tab.rootNode)
-
-            # e.selectedNode = tab.rootNode
-            # e.sceneTreeDidChange()
-
 proc newTabView(e: Editor): TabView =
     result = TabView.new(newRect(0, 0, 100, 100))
     result.dockingTabs = true
@@ -704,10 +539,6 @@ proc createWorkspaceLayout(e: Editor) =
     v.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
 
     let s = e.newTabView()
-    # s.dockingTabs = false # todo: do something with this
-
-    # let sceneClipView = ClipView.new(zeroRect)
-    # s.addTab("Scene", sceneClipView)
 
     v.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
     v.toolbar.userResizeable = false
@@ -726,13 +557,6 @@ proc createWorkspaceLayout(e: Editor) =
     v.addSubview(v.verticalLayout)
     v.anchors[etaCenter.int] = s
 
-    # e.sceneView.setFrame(sceneClipView.bounds)
-    # sceneClipView.addSubview(e.sceneView)
-
-    #todo: fix this!!!
-    # e.eventCatchingView.setFrame(sceneClipView.bounds)
-    # sceneClipView.addSubview(e.eventCatchingView)
-
     when loadingAndSavingAvailable:
         e.createProjectMenu()
 
@@ -748,8 +572,6 @@ proc createWorkspaceLayout(e: Editor) =
             var anchor = compTab.tabAnchor()
             e.workspaceView.anchors[anchor.int].addTab(e.rootNode.name, compTab)
 
-        # e.sceneView.setFrame(sceneClipView.bounds)
-        # e.sceneView = e.rootNode.sceneView
     else:
         var compTab = e.createCompositionEditor()
         if not compTab.isNil:
@@ -776,38 +598,6 @@ proc createWorkspaceLayout(e: Editor) =
     e.createGameInputToggle()
     # e.createCameraSelector() #todo: fix this!
     e.createChangeBackgroundColorButton()
-        # discard e.createSceneEditorTab()
-
-    # e.sceneView.editing = true
-
-# method onTouchEv*(v: EventCatchingView, e: var Event): bool =
-#     if not v.allowGameInput:
-#         result = procCall v.View.onTouchEv(e)
-
-# proc createEventCatchingView(e: Editor) =
-#     e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
-#     e.eventCatchingView.dragDestination = new(EditorDropDelegate)
-#     e.eventCatchingView.resizingMask = "wh"
-#     let eventListener = e.eventCatchingView.newEventCatchingListener()
-#     e.eventCatchingView.addGestureDetector(newScrollGestureDetector(eventListener))
-#     e.eventCatchingView.editor = e
-
-#     eventListener.tapDownDelegate = proc(evt: var Event) =
-#         e.onTouchDown(evt)
-#         e.cameraController.onTapDown(evt)
-#     eventListener.scrollProgressDelegate = proc(dx, dy: float32, evt: var Event) =
-#         e.onScroll(dx, dy, evt)
-#         e.cameraController.onScrollProgress(dx, dy, evt)
-#     eventListener.tapUpDelegate = proc(dx, dy: float32, evt: var Event) =
-#         e.onTouchUp(evt)
-#         e.cameraController.onTapUp(dx, dy, evt)
-#     e.eventCatchingView.mouseScrrollDelegate = proc(evt: var Event) =
-#         e.cameraController.onMouseScrroll(evt)
-#     e.eventCatchingView.keyUpDelegate = proc(evt: var Event): bool =
-#         e.onKeyUp(evt)
-#     e.eventCatchingView.keyDownDelegate = proc(evt: var Event): bool =
-#         e.onKeyDown(evt)
-
 
 proc onFirstResponderChanged(e: Editor, fr: View)=
     for t in e.compositionEditors:
@@ -820,19 +610,8 @@ proc onFirstResponderChanged(e: Editor, fr: View)=
 proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     result.new()
 
-    # var editorScene = new(SceneView)
-    # editorScene.init(w.bounds)
-    # editorScene.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    # editorScene.rootNode = newNode("root")
-    # let cameraNode = editorScene.rootNode.newChild("camera")
-    # discard cameraNode.component(Camera)
-    # cameraNode.positionZ = 100
-
-    # w.addSubview(editorScene)
-
     var editor = result
     editor.window = w
-    # editor.sceneView = editorScene
     editor.currentProject = p
     editor.compositionEditors = @[]
     editor.startFromGame = false
@@ -841,41 +620,35 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     sharedNotificationCenter().addObserver(NimxFristResponderChangedInWindow, editor) do(args: Variant):
         editor.onFirstResponderChanged(args.get(View))
 
-    #todo: fix this!
-    # editor.cameraController = newEditorCameraController(editor.sceneView)
-
-    # editorScene.afterDrawProc = proc() =
-    #     currentContext().gl.clearDepthStencil()
-
-    # for etv in editor.workspaceView.tabs:
-    #     etv.update()
-
     w.setNeedsDisplay()
+    var updateAnimation = newAnimation()
+    updateAnimation.onAnimate = proc(p: float)=
+        for t in editor.workspaceView.tabs:
+            t.update()
+        for t in editor.compositionEditors:
+            t.update()
+    w.addAnimation(updateAnimation)
 
 proc startEditingNodeInView*(editor: Editor, n: Node, v: View, startFromGame: bool = true)=
     editor.rootNode = n
     editor.window = v.window
     editor.sceneView = n.sceneView
     editor.sceneView.editing = true
-    # Create widgets and stuff
-    # editor.createEventCatchingView()
 
     editor.startFromGame = startFromGame
     editor.createWorkspaceLayout()
-    # editor.cameraController = newEditorCameraController(editor.sceneView)
+
+    var updateAnimation = newAnimation()
+    updateAnimation.onAnimate = proc(p: float)=
+        for t in editor.workspaceView.tabs:
+            t.update()
+        for t in editor.compositionEditors:
+            t.update()
+    editor.window.addAnimation(updateAnimation)
 
     if startFromGame:
-        editor.createCloseEditorButton()
-
-    # editor.gizmo = newGizmoAxis()
-    # editor.gizmo.gizmoNode.nodeWasAddedToSceneView(editor.sceneView)
-    # editor.sceneView.afterDrawProc = proc() =
-    #     currentContext().gl.clearDepthStencil()
-        # editor.gizmo.updateGizmo()
-        # editor.gizmo.gizmoNode.drawNode(true, nil)
-
-    for etv in editor.workspaceView.tabs:
-        etv.update()
+        editor.createCloseEditorButton() do():
+            updateAnimation.cancel()
 
 proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Editor =
     result.new()

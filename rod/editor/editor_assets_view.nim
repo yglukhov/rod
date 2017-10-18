@@ -2,11 +2,10 @@ import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
     scroll_view, button, event, linear_layout, collection_view, formatted_text, image,
     context, drag_and_drop, pasteboard / pasteboard_item, view_render_to_image ]
 
-import rod.edit_view
 import editor_asset_icon_view, editor_asset_container_view
 import variant, strutils, tables
-import rod / [node, rod_types]
-import os, algorithm, sequtils
+import rod / [node, rod_types, edit_view]
+import os, algorithm, sequtils, times, hashes
 
 type EditorAssetsView* = ref object of EditorTabView
     contentView: AssetContainerView
@@ -14,19 +13,21 @@ type EditorAssetsView* = ref object of EditorTabView
     resourceRoot: PathNode
     mCurrentPathNode: PathNode
     cachedResources: Table[string, FilePreview]
+    lastFSReload: float
+    lastFSHash: string
 
 proc `currentPathNode=`(v: EditorAssetsView, node: PathNode)=
     v.mCurrentPathNode = node
     v.contentView.reload()
 
-proc reloadFileSystem(v: EditorAssetsView)=
-    v.resourceRoot = new(PathNode)
-    v.resourceRoot.name = "res://"
-    v.resourceRoot.fullPath = v.editor.currentProject.path
-    v.cachedResources = initTable[string, FilePreview]()
+proc buildResourceTree(path: string, hashstr: var string): PathNode=
+    result = new(PathNode)
+    result.name = "res://"
+    result.fullPath = path
 
-    var curPathNodes = @[v.resourceRoot]
+    var curPathNodes = @[result]
     var totalNodes = 0
+    hashstr = ""
     while true:
         var dirs = newSeq[PathNode]()
         for curPathNode in curPathNodes:
@@ -40,6 +41,7 @@ proc reloadFileSystem(v: EditorAssetsView)=
                 pathNode.fullPath = path
                 pathNode.name = sp.name
                 children.add(pathNode)
+                hashstr &= $hash(path)
                 inc totalNodes
                 if kind != pcFile and kind != pcLinkToFile:
                     dirs.add(pathNode)
@@ -56,7 +58,13 @@ proc reloadFileSystem(v: EditorAssetsView)=
         curPathNodes = dirs
 
         if curPathNodes.len == 0: break
-    echo "reloadFileSystem total pathNodes: ", totalNodes
+
+    hashstr &= $hash(totalNodes)
+
+proc reloadFileSystem(v: EditorAssetsView)=
+    v.resourceRoot = buildResourceTree(v.editor.currentProject.path, v.lastFSHash)
+    v.cachedResources = initTable[string, FilePreview]()
+    v.lastFSReload = epochTime()
 
 method init*(v: EditorAssetsView, r: Rect)=
     procCall v.View.init(r)
@@ -224,6 +232,44 @@ method tabSize*(v: EditorAssetsView, bounds: Rect): Size=
 
 method tabAnchor*(v: EditorAssetsView): EditorTabAnchor =
     result = etaBottom
+
+method update*(v: EditorAssetsView)=
+    let ct = epochTime()
+    if ct - v.lastFSReload > 1.0:
+        v.lastFSReload = ct
+        var hashstr = ""
+        var tmpRoot = buildResourceTree(v.editor.currentProject.path, hashstr)
+        if hashstr != v.lastFSHash:
+            var prevRoot = v.resourceRoot
+            var curPath = v.mCurrentPathNode.outLinePath
+            var curNode = tmpRoot
+            for i, op in curPath:
+                if i == 0: continue
+                if op < curNode.children.len:
+                    var nchild = curNode.children[op]
+                    var ochild = prevRoot.children[op]
+                    if nchild.name == ochild.name:
+                        prevRoot = ochild
+                        curNode = nchild
+                        continue
+
+                for ch in curNode.children:
+                    if ch.name == prevRoot.children[op].name:
+                        curNode = ch
+                        prevRoot = prevRoot.children[op]
+                        break
+
+            v.lastFSHash = hashstr
+            v.resourceRoot = tmpRoot
+            v.cachedResources.clear()
+            v.currentPathNode=curNode
+            v.fileSystemView.reloadData()
+
+            var path = v.mCurrentPathNode.outLinePath
+            if path.len > 1:
+                path = path[0..^1]
+                v.fileSystemView.selectItemAtIndexPath(path)
+
 
 registerEditorTab("Assets", EditorAssetsView)
 
