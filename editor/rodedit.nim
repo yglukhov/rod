@@ -23,6 +23,9 @@ import nimx.image
 import nimx.window
 import nimx.autotest
 
+when loadingAndSavingAvailable:
+    import rod.editor.editor_open_project_view
+
 const isMobile = defined(ios) or defined(android)
 
 type EditView = ref object of SceneView
@@ -36,36 +39,49 @@ proc runAutoTestsIfNeeded() =
     when defined(runAutoTests):
         startRegisteredTests()
 
+proc switchToEditView(w: Window, proj: EditorProject)=
+    # let editView = EditView.new(w.bounds)
+
+    # editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    # editView.rootNode = newNode("(root)")
+    # let cameraNode = editView.rootNode.newChild("camera")
+    # discard cameraNode.component(Camera)
+    # cameraNode.positionZ = 100
+
+    # let light = editView.rootNode.newChild("point_light")
+    # light.position = newVector3(-100,100,100)
+    # let lightSource = light.component(LightSource)
+    # lightSource.setDefaultLightSource()
+
+    # w.addSubview(editView)
+
+    var editor = w.startEditorForProject(proj)
+    # editor.startEditingNodeInView(nil, w, false)
+
 proc startApplication() =
     when isMobile or defined(js):
         var mainWindow = newFullscreenWindow()
     else:
         var mainWindow = newWindow(newRect(40, 40, 1200, 600))
+    when loadingAndSavingAvailable:
+        let settings = getEditorSettings()
+        if settings.lastProject.len > 0:
+            var proj = getProjectAtPath(settings.lastProject)
+            mainWindow.title = "Project " & proj.name
+            mainWindow.switchToEditView(proj)
+        else:
+            var openProjView = new(EditorOpenProjectView)
+            openProjView.init(mainWindow.bounds)
+            mainWindow.addSubView(openProjView)
 
-    mainWindow.title = "Rod"
-
-    let editView = EditView.new(mainWindow.bounds)
-    editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    editView.rootNode = newNode("(root)")
-    let cameraNode = editView.rootNode.newChild("camera")
-    discard cameraNode.component(Camera)
-    cameraNode.positionZ = 100
-
-    let light = editView.rootNode.newChild("point_light")
-    light.position = newVector3(-100,100,100)
-    let lightSource = light.component(LightSource)
-    lightSource.setDefaultLightSource()
-
-    mainWindow.addSubview(editView)
-    discard startEditingNodeInView(editView.rootNode, editView, false)
-    # loadSceneAsync "collada/balloons_test.dae", proc(n: Node) =
-    #     editView.rootNode.addChild(n)
-
-    #     mainWindow.addSubview(editView)
-
-    #     registerAnimation(n, editView)
-
-    #     discard startEditingNodeInView(editView.rootNode, editView)
+            openProjView.onOpen = proc(p: EditorProject) =
+                openProjView.removeFromSuperview()
+                mainWindow.title = "Project " & p.name
+                mainWindow.switchToEditView(p)
+    else:
+        var proj: EditorProject
+        mainWindow.title = "Rod"
+        mainWindow.switchToEditView(proj)
 
     runAutoTestsIfNeeded()
 

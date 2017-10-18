@@ -15,8 +15,6 @@ type EditorAssetsView* = ref object of EditorTabView
     mCurrentPathNode: PathNode
     cachedResources: Table[string, FilePreview]
 
-proc getProjectDir():string = getAppDir() & "/../../" # exit from build/{platform}
-
 proc `currentPathNode=`(v: EditorAssetsView, node: PathNode)=
     v.mCurrentPathNode = node
     v.contentView.reload()
@@ -24,7 +22,7 @@ proc `currentPathNode=`(v: EditorAssetsView, node: PathNode)=
 proc reloadFileSystem(v: EditorAssetsView)=
     v.resourceRoot = new(PathNode)
     v.resourceRoot.name = "res://"
-    v.resourceRoot.fullPath = getProjectDir()
+    v.resourceRoot.fullPath = v.editor.currentProject.path
     v.cachedResources = initTable[string, FilePreview]()
 
     var curPathNodes = @[v.resourceRoot]
