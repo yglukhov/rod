@@ -391,19 +391,27 @@ proc createCompositionEditor*(e: Editor, c: CompositionDocument = nil): EditorTa
 
 proc createSceneMenu(e: Editor) =
     when loadingAndSavingAvailable:
-        let m = makeMenu("Scene"):
-            - "New":
-                var sceneEdit = e.createCompositionEditor()
-                if not sceneEdit.isNil:
-                    var anchor = sceneEdit.tabAnchor()
-                    e.workspaceView.anchors[anchor.int].addTab("new composition", sceneEdit)
-
-            - "Load":
-                e.loadNode()
-            - "Save":
-                if not e.selectedNode.isNil:
-                    e.saveNode(e.selectedNode)
-        e.addToolbarMenu(m)
+        if e.startFromGame:
+            let m = makeMenu("Scene"):
+                - "Load":
+                    e.loadNode()
+                - "Save":
+                    if not e.selectedNode.isNil:
+                        e.saveNode(e.selectedNode)
+            e.addToolbarMenu(m)
+        else:
+            let m = makeMenu("Scene"):
+                - "New":
+                    var sceneEdit = e.createCompositionEditor()
+                    if not sceneEdit.isNil:
+                        var anchor = sceneEdit.tabAnchor()
+                        e.workspaceView.anchors[anchor.int].addTab("new composition", sceneEdit)
+                - "Load":
+                    e.loadNode()
+                - "Save":
+                    if not e.selectedNode.isNil:
+                        e.saveNode(e.selectedNode)
+            e.addToolbarMenu(m)
 
 proc toggleEditTab(e: Editor, tab:EditViewEntry): proc() =
     result = proc()=
@@ -770,11 +778,11 @@ proc createWorkspaceLayout(e: Editor) =
                     e.toggleEditTab(rt)()
                     break
 
+
     e.createSceneMenu()
     e.createViewMenu()
     e.createTabView()
     e.createGameInputToggle()
-    # e.createCameraSelector() #todo: fix this!
     e.createChangeBackgroundColorButton()
         # discard e.createSceneEditorTab()
 
