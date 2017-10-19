@@ -512,9 +512,9 @@ method getBBox*(t: Text): BBox =
             of haLeft, haJustify:
                 discard
             of haCenter:
-                offsetLeft += -width / 2
+                offsetLeft -= width / 2
             of haRight:
-                offsetLeft += -width
+                offsetLeft -= width
     else:
         if t.mText.truncationBehavior != tbNone or t.mText.boundingSize.height > height:
             height = t.mText.boundingSize.height
