@@ -154,11 +154,14 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     of rodPbComposition:
         var n = try: newNodeWithURL("file://" & i.data) except: nil
         if not n.isNil:
-            var editor = target.EditorSceneView
-            if editor.selectedNode.isNil:
-                editor.rootNode.addChild(n)
+            var editorScene = target.EditorSceneView
+            if editorScene.selectedNode.isNil:
+                editorScene.rootNode.addChild(n)
             else:
-                editor.selectedNode.addChild(n)
+                editorScene.selectedNode.addChild(n)
+
+            editorScene.composition.selectedNode = n
+            editorScene.editor.onCompositionChanged(editorScene.composition)
 
             discard target.makeFirstResponder()
         else:
@@ -173,11 +176,15 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
             var n = newNode(i.data)
             n.component(Sprite).image = image
 
-            var editor = target.EditorSceneView
-            if editor.selectedNode.isNil:
-                editor.rootNode.addChild(n)
+            var editorScene = target.EditorSceneView
+            if editorScene.selectedNode.isNil:
+                editorScene.rootNode.addChild(n)
             else:
-                editor.selectedNode.addChild(n)
+                editorScene.selectedNode.addChild(n)
+
+            editorScene.composition.selectedNode = n
+            editorScene.editor.onCompositionChanged(editorScene.composition)
+            # editorScene.editor.selectedNode = n
     else:
         discard
 
