@@ -8,6 +8,7 @@ import nimx.portable_gl
 import nimx.formatted_text
 import nimx.private.font.font_data
 
+import rod.rod_types
 import rod.node
 import rod.component
 import rod.component.camera
@@ -498,6 +499,33 @@ genSerializationCodeForComponent(Text)
 
 #     c.mText.processAttributedText()
 
+method getBBox*(t: Text): BBox =
+    var height = t.mText.totalHeight()
+    var width = t.mText.totalWidth()
+    var offsetTop = t.mText.topOffset() + t.mBoundingOffset.y
+    var offsetLeft = t.mBoundingOffset.x
+
+    if t.mText.boundingSize.width == 0:
+        offsetTop -= t.mText.lineBaseline(0)
+
+        case t.mText.horizontalAlignment:
+            of haLeft, haJustify:
+                discard
+            of haCenter:
+                offsetLeft += -width / 2
+            of haRight:
+                offsetLeft += -width
+    else:
+        if t.mText.truncationBehavior != tbNone or t.mText.boundingSize.height > height:
+            height = t.mText.boundingSize.height
+
+        if t.mText.truncationBehavior != tbNone or t.mText.boundingSize.width > width:
+            width = t.mText.boundingSize.width
+        else:
+            offsetLeft -= (width - t.mText.boundingSize.width) / 2
+                
+    result.maxPoint = newVector3(width + offsetLeft, height + offsetTop, 0.01)
+    result.minPoint = newVector3(offsetLeft, offsetTop, 0.0)
 
 proc shadowMultiplier(t: Text): Size =
     let sv = newVector3(1, 1)
