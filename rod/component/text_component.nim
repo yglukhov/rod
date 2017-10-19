@@ -525,7 +525,13 @@ method getBBox*(t: Text): BBox =
             if t.mText.boundingSize.width > width:
                 width = t.mText.boundingSize.width
             else:
-                offsetLeft -= (width - t.mText.boundingSize.width) / 2
+                case t.mText.horizontalAlignment:
+                    of haLeft, haJustify:
+                        discard
+                    of haCenter:
+                        offsetLeft -= (width - t.mText.boundingSize.width) / 2
+                    of haRight:
+                        offsetLeft -= width - t.mText.boundingSize.width
                 
     result.maxPoint = newVector3(width + offsetLeft, height + offsetTop, 0.01)
     result.minPoint = newVector3(offsetLeft, offsetTop, 0.0)
