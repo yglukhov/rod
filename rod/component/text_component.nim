@@ -518,11 +518,14 @@ method getBBox*(t: Text): BBox =
     else:
         if t.mText.truncationBehavior != tbNone or t.mText.boundingSize.height > height:
             height = t.mText.boundingSize.height
-
-        if t.mText.truncationBehavior != tbNone or t.mText.boundingSize.width > width:
+        
+        if t.mText.truncationBehavior != tbNone:
             width = t.mText.boundingSize.width
         else:
-            offsetLeft -= (width - t.mText.boundingSize.width) / 2
+            if t.mText.boundingSize.width > width:
+                width = t.mText.boundingSize.width
+            else:
+                offsetLeft -= (width - t.mText.boundingSize.width) / 2
                 
     result.maxPoint = newVector3(width + offsetLeft, height + offsetTop, 0.01)
     result.minPoint = newVector3(offsetLeft, offsetTop, 0.0)
