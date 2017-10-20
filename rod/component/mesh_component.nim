@@ -395,6 +395,33 @@ method rayCast*(ns: MeshComponent, r: Ray, distance: var float32): bool =
 
     result = procCall ns.Component.rayCast(r, distance)
 
+proc createVertexData*(m: MeshComponent, stride, size: int32, vertCoords, texCoords, normals, tangents: seq[float32]): seq[GLfloat] =
+    result = newSeq[GLfloat](size)
+    for i in 0 ..< int32(vertCoords.len / 3):
+        var offset = 0
+        result[stride * i + 0] = vertCoords[3*i + 0]
+        result[stride * i + 1] = vertCoords[3*i + 1]
+        result[stride * i + 2] = vertCoords[3*i + 2]
+        m.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
+        offset += 3
+
+        if texCoords.len != 0:
+            result[stride * i + offset + 0] = texCoords[2*i + 0]
+            result[stride * i + offset + 1] = texCoords[2*i + 1]
+            offset += 2
+
+        if normals.len != 0:
+            result[stride * i + offset + 0] = normals[3*i + 0]
+            result[stride * i + offset + 1] = normals[3*i + 1]
+            result[stride * i + offset + 2] = normals[3*i + 2]
+            offset += 3
+
+        if tangents.len != 0:
+            result[stride * i + offset + 0] = tangents[3*i + 0]
+            result[stride * i + offset + 1] = tangents[3*i + 1]
+            result[stride * i + offset + 2] = tangents[3*i + 2]
+            offset += 3
+
 method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
@@ -464,31 +491,7 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
 
     let stride = int32( m.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = newSeq[GLfloat](size)
-    for i in 0 ..< int32(vertCoords.len / 3):
-        var offset = 0
-        vertexData[stride * i + 0] = vertCoords[3*i + 0]
-        vertexData[stride * i + 1] = vertCoords[3*i + 1]
-        vertexData[stride * i + 2] = vertCoords[3*i + 2]
-        m.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
-        offset += 3
-
-        if texCoords.len != 0:
-            vertexData[stride * i + offset + 0] = texCoords[2*i + 0]
-            vertexData[stride * i + offset + 1] = texCoords[2*i + 1]
-            offset += 2
-
-        if normals.len != 0:
-            vertexData[stride * i + offset + 0] = normals[3*i + 0]
-            vertexData[stride * i + offset + 1] = normals[3*i + 1]
-            vertexData[stride * i + offset + 2] = normals[3*i + 2]
-            offset += 3
-
-        if tangents.len != 0:
-            vertexData[stride * i + offset + 0] = tangents[3*i + 0]
-            vertexData[stride * i + offset + 1] = tangents[3*i + 1]
-            vertexData[stride * i + offset + 2] = tangents[3*i + 2]
-            offset += 3
+    var vertexData = m.createVertexData(stride, size, vertCoords, texCoords, normals, tangents)
 
     m.createVBO(indices, vertexData)
 

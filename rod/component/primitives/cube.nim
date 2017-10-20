@@ -150,26 +150,7 @@ proc generateMesh(c: CubeComponent) =
 
     let stride = int32( mesh.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = newSeq[GLfloat](size)
-    for i in 0 ..< int32(vertCoords.len / 3):
-        var offset = 0
-        vertexData[stride * i + 0] = vertCoords[3*i + 0]
-        vertexData[stride * i + 1] = vertCoords[3*i + 1]
-        vertexData[stride * i + 2] = vertCoords[3*i + 2]
-        mesh.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
-        offset += 3
-
-        if texCoords.len != 0:
-            vertexData[stride * i + offset + 0] = texCoords[2*i + 0]
-            vertexData[stride * i + offset + 1] = texCoords[2*i + 1]
-            offset += 2
-
-        if normals.len != 0:
-            vertexData[stride * i + offset + 0] = normals[3*i + 0]
-            vertexData[stride * i + offset + 1] = normals[3*i + 1]
-            vertexData[stride * i + offset + 2] = normals[3*i + 2]
-            offset += 3
-
+    var vertexData = c.createVertexData(stride, size, vertCoords, texCoords, normals, nil)
     mesh.createVBO(indices, vertexData)
 
     mesh.material.ambient = newColor(1.0, 1.0, 1.0, 0.2)
