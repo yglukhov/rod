@@ -156,67 +156,6 @@ proc updateCameraSelector(e: Editor) = discard #todo: fix this!
     # e.cameraSelector.items = items
     # e.cameraSelector.selectedIndex = selectedIndex
 
-proc sceneTreeDidChange*(e: Editor) =
-    e.updateCameraSelector()
-
-    for t in e.workspaceView.tabs:
-        t.onSceneChanged()
-
-when loadingAndSavingAvailable:
-    import os
-    proc saveNode(editor: Editor, selectedNode: Node) =
-        let path = callDialogFileSave("Save Json")
-        if not path.isNil:
-            var s = Serializer.new()
-            var sData = selectedNode.serialize(s)
-            s.save(sData, path)
-
-    proc loadNode(editor: Editor) =
-        let path = callDialogFileOpen("Load Json or DAE")
-        if not path.isNil:
-            try:
-                if path.endsWith(".dae"):
-                    var p = if not editor.selectedNode.isNil: editor.selectedNode
-                            else: editor.rootNode
-
-                    loadSceneAsync path, proc(n: Node) =
-                        p.addChild(n)
-                        editor.selectedNode = n
-
-                elif path.endsWith(".json"):
-                    let ln = newNodeWithURL("file://" & path)
-                    if not editor.selectedNode.isNil:
-                        editor.selectedNode.addChild(ln)
-                    else:
-                        editor.rootNode.addChild(ln)
-
-                editor.sceneTreeDidChange()
-            except:
-                error "ERROR:: Resource at path doesn't load ", path
-                error "Exception caught: ", getCurrentExceptionMsg()
-                error "stack trace: ", getCurrentException().getStackTrace()
-
-proc selectNode*(editor: Editor, node: Node) =
-    editor.selectedNode = node
-
-proc currentCamera*(e: Editor): Camera =
-    if e.cameraSelector.selectedIndex >= 0:
-        let n = e.rootNode.findNode(e.cameraSelector.selectedItem)
-        if not n.isNil:
-            result = n.componentIfAvailable(Camera)
-
-proc newToolbarButton(e: Editor, title: string): Button =
-    let f = systemFont()
-    let width = f.sizeOfString(title).width
-    result = Button.new(newRect(0, 0, width + 20, 20))
-    result.title = title
-    e.workspaceView.toolbar.addSubview(result)
-
-proc addToolbarMenu(e: Editor, item: MenuItem) =
-    let b = e.newToolbarButton(item.title)
-    b.onAction() do():
-        item.popupAtPoint(b, newPoint(0, 25))
-
 proc createCompositionEditor*(e: Editor, c: CompositionDocument = nil): EditorTabView=
     var rt: EditViewEntry
     var found = false
@@ -256,6 +195,99 @@ proc createCompositionEditor*(e: Editor, c: CompositionDocument = nil): EditorTa
     e.compositionEditors.add(tabView)
 
     result = tabView
+
+proc sceneTreeDidChange*(e: Editor) =
+    e.updateCameraSelector()
+
+    for t in e.workspaceView.tabs:
+        t.onSceneChanged()
+
+proc saveComposition*(e: Editor, c: CompositionDocument)
+
+when loadingAndSavingAvailable:
+    import os
+
+    proc saveComposition*(e: Editor, c: CompositionDocument)=
+        if c.path.len == 0:
+            c.path = callDialogFileSave("Save composition")
+
+        if c.path.len > 0:
+            var s = Serializer.new()
+            var data = c.rootNode.serialize(s)
+            echo "data to save ", data.pretty()
+
+        # e.saveNode(c.rootNode)
+        echo "try save composition ", c.path
+
+    proc openComposition*(e: Editor, p: string)=
+        try:
+            var n = newNodeWithUrl("file://" & p)
+            var c = new(CompositionDocument)
+            c.path = p
+            c.rootNode = n
+            var tbv = e.createCompositionEditor(c)
+            if not tbv.isNil:
+                var anchor = tbv.tabAnchor()
+                e.workspaceView.anchors[anchor.int].addTab(splitFile(p).name, tbv)
+        except:
+            warn "Can't load composition at ", p
+
+    proc saveNode(editor: Editor, selectedNode: Node) =
+        let path = callDialogFileSave("Save Json")
+        if not path.isNil:
+            var s = Serializer.new()
+            var sData = selectedNode.serialize(s)
+            s.save(sData, path)
+
+    proc loadNode(editor: Editor) =
+        let path = callDialogFileOpen("Load Json or DAE")
+        if not path.isNil:
+            try:
+                if path.endsWith(".dae"):
+                    var p = if not editor.selectedNode.isNil: editor.selectedNode
+                            else: editor.rootNode
+
+                    loadSceneAsync path, proc(n: Node) =
+                        p.addChild(n)
+                        editor.selectedNode = n
+
+                elif path.endsWith(".json"):
+                    let ln = newNodeWithURL("file://" & path)
+                    if not editor.selectedNode.isNil:
+                        editor.selectedNode.addChild(ln)
+                    else:
+                        editor.rootNode.addChild(ln)
+
+                editor.sceneTreeDidChange()
+            except:
+                error "ERROR:: Resource at path doesn't load ", path
+                error "Exception caught: ", getCurrentExceptionMsg()
+                error "stack trace: ", getCurrentException().getStackTrace()
+
+else:
+    proc saveComposition*(e: Editor, c: CompositionDocument)= discard
+    proc openComposition*(e: Editor, p: string) = discard
+
+proc selectNode*(editor: Editor, node: Node) =
+    editor.selectedNode = node
+
+proc currentCamera*(e: Editor): Camera =
+    if e.cameraSelector.selectedIndex >= 0:
+        let n = e.rootNode.findNode(e.cameraSelector.selectedItem)
+        if not n.isNil:
+            result = n.componentIfAvailable(Camera)
+
+proc newToolbarButton(e: Editor, title: string): Button =
+    let f = systemFont()
+    let width = f.sizeOfString(title).width
+    result = Button.new(newRect(0, 0, width + 20, 20))
+    result.title = title
+    e.workspaceView.toolbar.addSubview(result)
+
+proc addToolbarMenu(e: Editor, item: MenuItem) =
+    let b = e.newToolbarButton(item.title)
+    b.onAction() do():
+        item.popupAtPoint(b, newPoint(0, 25))
 
 proc createSceneMenu(e: Editor) =
     when loadingAndSavingAvailable:
@@ -413,35 +445,35 @@ proc createViewMenu(e: Editor) =
         e.addToolbarMenu(m)
 
 proc createWorkspaceLayout(e: Editor)
+when loadingAndSavingAvailable:
+    proc createProjectMenu(e: Editor) =
+        let m = makeMenu("Project"):
+            - "Open":
+                var openProj = new(EditorOpenProjectView)
+                openProj.init(e.workspaceView.bounds)
+                e.workspaceView.addSubview(openProj)
 
-proc createProjectMenu(e: Editor) =
-    let m = makeMenu("Project"):
-        - "Open":
-            var openProj = new(EditorOpenProjectView)
-            openProj.init(e.workspaceView.bounds)
-            e.workspaceView.addSubview(openProj)
+                openProj.onOpen = proc(p: EditorProject)=
+                    openProj.removeFromSuperview()
+                    e.currentProject = p
+                    e.workspaceView.removeFromSuperview()
+                    e.createWorkspaceLayout()
 
-            openProj.onOpen = proc(p: EditorProject)=
-                openProj.removeFromSuperview()
-                e.currentProject = p
-                e.workspaceView.removeFromSuperview()
-                e.createWorkspaceLayout()
+                    echo "try open project ", p
 
-                echo "try open project ", p
+                openProj.onClose = proc()=
+                    openProj.removeFromSuperview()
 
-            openProj.onClose = proc()=
-                openProj.removeFromSuperview()
+            - "Save":
+                if e.currentProject.path.len == 0:
+                    echo "not saved project"
 
-        - "Save":
-            if e.currentProject.path.len == 0:
-                echo "not saved project"
+                e.currentProject.tabs = @[]
+                for t in e.workspaceView.tabs:
+                    e.currentProject.tabs.add((name:t.name, frame: zeroRect))
+                e.currentProject.saveProject()
 
-            e.currentProject.tabs = @[]
-            for t in e.workspaceView.tabs:
-                e.currentProject.tabs.add((name:t.name, frame: zeroRect))
-            e.currentProject.saveProject()
-
-    e.addToolbarMenu(m)
+        e.addToolbarMenu(m)
 
 proc createGameInputToggle(e: Editor) =
     let toggle = e.newToolbarButton("Game Input")
@@ -492,6 +524,7 @@ proc endEditing*(e: Editor) =
         rootEditorView.replaceSubview(e.workspaceView, e.sceneView)
 
     e.sceneView.editing = false
+    discard e.sceneView.makeFirstResponder()
 
 proc createCloseEditorButton(e: Editor, cb: proc()) =
     e.newToolbarButton("x").onAction do():

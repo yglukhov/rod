@@ -23,6 +23,7 @@ type AssetContainerView* = ref object of CollectionView
     onItemsDelete*: proc(item:seq[int])
     onBackspace*: proc()
     onItemsDragStart*: proc(item: seq[int])
+    mIsCompact: bool
 
 proc newAssetContainerView*(r: Rect): AssetContainerView=
     result = new(AssetContainerView)
@@ -38,6 +39,17 @@ proc newAssetContainerView*(r: Rect): AssetContainerView=
 proc reload*(v: AssetContainerView)=
     v.selectedItems.setLen(0)
     v.updateLayout()
+
+proc setCompact*(v: AssetContainerView, val: bool)=
+    if v.mIsCompact != val:
+        v.mIsCompact = val
+        if not val:
+            v.itemSize = newSize(128.0, 128.0)
+        else:
+            v.itemSize = newSize(256.0, 32.0)
+        v.reload()
+
+template isCompact*(v: AssetContainerView): bool = v.mIsCompact
 
 method onTouchEv*(v: AssetContainerView, e: var Event): bool =
     discard procCall v.View.onTouchEv(e)

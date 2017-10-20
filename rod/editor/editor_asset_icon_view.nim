@@ -40,6 +40,7 @@ type FilePreview* = ref object of View
     icon*: View
     selectionView: View
     onDoubleClicked*: proc()
+    isCompact*: bool
 
     case kind*: AssetKind
     of akSound:
@@ -76,10 +77,11 @@ method draw*(v: ImageIconView, r: Rect)=
             var orig = newPoint(r.x + (r.width - v.image.size.width) * 0.5, r.y + (r.height - v.image.size.height) * 0.5)
             c.drawImage(v.image, newRect(orig, v.image.size))
 
-proc createFilePreview*(p: PathNode, r: Rect): FilePreview =
+proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
     result.new()
     result.init(r)
     result.path = p.fullPath
+    result.isCompact = compact
 
     let sp = result.path.splitFile()
     if p.hasContent:
@@ -89,8 +91,11 @@ proc createFilePreview*(p: PathNode, r: Rect): FilePreview =
 
     const icoset = 25.0
 
-    let iconSize = newSize(min(r.width, r.height) - icoset, min(r.width, r.height) - icoset)
-    let iconPos = newPoint(icoset * 0.5, 0.0)
+    var iconSize = newSize(min(r.width, r.height) - icoset, min(r.width, r.height) - icoset)
+    var iconPos = newPoint(icoset * 0.5, 0.0)
+    if compact:
+        iconPos.x = 0.0
+        iconSize = newSize(r.height, r.height)
 
     let res = result
     case res.kind:
@@ -117,20 +122,34 @@ proc createFilePreview*(p: PathNode, r: Rect): FilePreview =
     else:
         res.icon = newView(newRect(iconPos, iconSize))
         res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
-        var extField = newLabel(newRect(0.0, iconSize.height * 0.5 - 10.0, iconSize.width, 20.0))
+        var extField = newLabel(newRect(0.0, 0.0, iconSize.width, iconSize.height))
         extField.formattedText.horizontalAlignment = haCenter
-        extField.text = "<" & sp.ext[1..^1] & ">"
+        extField.formattedText.verticalAlignment = vaCenter
+        extField.formattedText.truncationBehavior = tbCut
+        extField.text = sp.ext[1..^1]
+        extField.formattedText.boundingSize = extField.bounds.size
 
         res.icon.addSubview(extField)
 
     res.addSubview(res.icon)
+    var textFrame = newRect(0.0, r.size.height - 20.0, r.size.width, 20.0)
+    var valig = vaTop
+    var holig = haCenter
+    if res.isCompact:
+        textFrame.origin.y = 0.0
+        textFrame.origin.x = iconSize.width
+        textFrame.size.height = r.size.height
+        textFrame.size.width = r.size.width - textFrame.origin.x
+        valig = vaCenter
+        holig = haLeft
 
-    res.nameField = newLabel(newRect(0.0, r.size.height - 20.0, r.size.width, 20.0))
-    # res.nameField.backgroundColor = newColor(0.0, 0.2, 0.3, 0.3)
-    res.nameField.formattedText.horizontalAlignment = haCenter
-    res.nameField.formattedText.verticalAlignment = vaTop
+    res.nameField = newLabel(textFrame)
+    if res.isCompact:
+        res.nameField.backgroundColor = newColor(0.0, 0.2, 0.3, 0.3)
+    res.nameField.formattedText.horizontalAlignment = holig
+    res.nameField.formattedText.verticalAlignment = valig
     res.nameField.formattedText.truncationBehavior = tbEllipsis
-    res.nameField.formattedText.boundingSize = newSize(r.size.width - 40.0, 20.0)
+    res.nameField.formattedText.boundingSize = newSize(textFrame.size.width, textFrame.size.height)
     res.nameField.text = sp.name & sp.ext
 
     res.addSubview(res.nameField)

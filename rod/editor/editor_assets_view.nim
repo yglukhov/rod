@@ -1,6 +1,7 @@
 import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
     scroll_view, button, event, linear_layout, collection_view, formatted_text, image,
-    context, drag_and_drop, pasteboard / pasteboard_item, view_render_to_image ]
+    context, drag_and_drop, pasteboard / pasteboard_item, view_render_to_image,
+    segmented_control ]
 
 import editor_asset_icon_view, editor_asset_container_view
 import variant, strutils, tables
@@ -69,7 +70,7 @@ proc reloadFileSystem(v: EditorAssetsView)=
 method init*(v: EditorAssetsView, r: Rect)=
     procCall v.View.init(r)
 
-    var horLayout = newHorizontalLayout(newRect(0.0, 0.0, v.bounds.width, v.bounds.height))
+    var horLayout = newHorizontalLayout(newRect(0.0, 0.0, v.bounds.width, v.bounds.height - 20.0))
     horLayout.userResizeable = true
     horLayout.resizingMask= "wh"
     horLayout.padding = 4.0
@@ -78,7 +79,7 @@ method init*(v: EditorAssetsView, r: Rect)=
 
     v.reloadFileSystem()
 
-    v.fileSystemView = OutlineView.new(newRect(0.0, 0.0, 300.0, v.bounds.height))
+    v.fileSystemView = OutlineView.new(newRect(0.0, 0.0, 100.0, v.bounds.height))
     var fsScroll = newScrollView(v.fileSystemView)
     fsScroll.resizingMask="wh"
     horLayout.addSubview(fsScroll)
@@ -119,9 +120,7 @@ method init*(v: EditorAssetsView, r: Rect)=
             return n.hasContent
 
         v.fileSystemView.onSelectionChanged = proc() =
-            # if v.cachedResources.len > 1000:
             v.cachedResources.clear()
-            # GC_fullCollect()
 
             let ip = v.fileSystemView.selectedIndexPath
             let n = if ip.len > 0:
@@ -133,13 +132,30 @@ method init*(v: EditorAssetsView, r: Rect)=
 
         v.fileSystemView.reloadData()
 
-    v.contentView = newAssetContainerView(newRect(0.0, 0.0, v.bounds.width - 300.0, v.bounds.height))
-
+    v.contentView = newAssetContainerView(newRect(0.0, 0.0, v.bounds.width - 300.0, v.bounds.height - 20.0))
+    v.contentView.setCompact(false)
     horLayout.addSubview(v.contentView)
+
+    var bottomMenu = newView(newRect(0, v.bounds.height - 20.0, v.bounds.width, 20))
+    bottomMenu.autoresizingMask = { afFlexibleWidth, afFlexibleMinY }
+    v.addSubview(bottomMenu)
+
+    var segm = SegmentedControl.new(newRect(bottomMenu.bounds.width - 150.0, 0.0, 150, 20.0))
+    segm.segments = @["compact", "normal"]
+    segm.autoresizingMask = { afFlexibleMinX, afFlexibleHeight }
+    segm.selectedSegment = 1
+    bottomMenu.addSubview(segm)
+    segm.onAction do():
+        v.cachedResources.clear()
+        v.contentView.setCompact segm.selectedSegment == 0
+
+    var curPath = newLabel(newRect(0,0,bottomMenu.bounds.width-segm.bounds.width, 20.0))
+    bottomMenu.addSubview(curPath)
 
     block setupContentView:
         v.contentView.numberOfItems = proc(): int =
             if not v.mCurrentPathNode.isNil and not v.mCurrentPathNode.children.isNil:
+                curPath.text = v.mCurrentPathNode.fullPath #todo: normalize path here
                 return v.mCurrentPathNode.children.len
 
         v.contentView.viewForItem = proc(i: int): View =
@@ -148,12 +164,15 @@ method init*(v: EditorAssetsView, r: Rect)=
 
             var filePreview = v.cachedResources.getOrDefault(n.fullPath)
             if filePreview.isNil:
-                filePreview = createFilePreview(n, newRect(0.0, 0.0, size.width, size.height))
+                filePreview = createFilePreview(n, newRect(0.0, 0.0, size.width, size.height), v.contentView.isCompact)
                 v.cachedResources[n.fullPath] = filePreview
 
             if n.hasContent:
                 filePreview.onDoubleClicked = proc() =
                     v.fileSystemView.selectItemAtIndexPath(n.outLinePath)
+            elif filePreview.kind == akComposition:
+                filePreview.onDoubleClicked = proc() =
+                    v.editor.openComposition(n.fullPath)
 
             result = filePreview
 
@@ -235,7 +254,7 @@ method tabAnchor*(v: EditorAssetsView): EditorTabAnchor =
 
 method update*(v: EditorAssetsView)=
     let ct = epochTime()
-    if ct - v.lastFSReload > 1.0:
+    if ct - v.lastFSReload > 15.0:
         v.lastFSReload = ct
         var hashstr = ""
         var tmpRoot = buildResourceTree(v.editor.currentProject.path, hashstr)

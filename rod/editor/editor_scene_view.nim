@@ -44,6 +44,10 @@ method onKeyUp*(v: EditorSceneView, e: var Event): bool =
     v.cameraController.onKeyUp(e)
     if e.keyCode == VirtualKey.F:
         v.cameraController.setToNode(v.composition.selectedNode)
+        result = true
+    elif e.keyCode == VirtualKey.S and e.modifiers.anyCtrl():
+        v.editor.saveComposition(v.composition)
+        result = true
 
 
 method onScroll*(v: EditorSceneView, e: var Event): bool=
