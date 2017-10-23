@@ -2,7 +2,7 @@ import nimx / [ types, view, event, view_event_handling, view_event_handling_new
     gesture_detector, drag_and_drop, pasteboard/pasteboard, assets/asset_loading, image,
     matrixes, clip_view, context, portable_gl ]
 
-import rod / editor / gizmo_axis
+import rod / editor / [gizmo, gizmo_move]
 import rod / [node, rod_types, edit_view, component, viewport, ray]
 import rod / component / [ sprite, light, camera ]
 
@@ -14,26 +14,11 @@ type
     EditorDropDelegate* = ref object of DragDestinationDelegate
 
     EditorSceneView* = ref object of EditorTabView
-        gizmo: GizmoAxis
+        gizmo: Gizmo
         selectedNode: Node
         sceneView: SceneView
         cameraController: EditorCameraController
         startPoint: Point
-
-proc rayCastFirstNode(v: EditorSceneView, node: Node, coords: Point): Node =
-    let r = v.sceneView.rayWithScreenCoords(coords)
-    var castResult = newSeq[RayCastInfo]()
-    node.rayCast(r, castResult)
-
-    if castResult.len > 0:
-        castResult.sort( proc (x, y: RayCastInfo): int =
-            result = int(x.node.layer < y.node.layer)
-            if x.node.layer == y.node.layer:
-                result = int(x.distance > y.distance)
-                if abs(x.distance - y.distance) < 0.00001:
-                    result = getTreeDistance(x.node, y.node) )
-
-        result = castResult[0].node
 
 method onKeyDown*(v: EditorSceneView, e: var Event): bool =
     result = procCall v.View.onKeyDown(e)
@@ -55,24 +40,22 @@ method onScroll*(v: EditorSceneView, e: var Event): bool=
     return true
 
 proc castGizmo(v: EditorSceneView, e: var Event ): Node =
-    result = v.rayCastFirstNode(v.gizmo.gizmoNode, e.localPosition)
+    result = v.sceneView.rayCastFirstNode(v.gizmo.gizmoNode, e.localPosition)
 
 proc tryRayCast(v: EditorSceneView, e: var Event): Node=
-    result = v.rayCastFirstNode(v.rootNode, e.localPosition)
+    result = v.sceneView.rayCastFirstNode(v.rootNode, e.localPosition)
 
 method onTouchEv*(v: EditorSceneView, e: var Event): bool =
     result = procCall v.View.onTouchEv(e)
+    let gizmoTouch = v.gizmo.onTouchEv(e)
     case e.buttonState:
     of bsUp:
-        v.gizmo.stopTransform()
         v.cameraController.onTapUp(0.0,0.0,e)
     of bsDown:
         v.startPoint = e.localPosition
         if e.keyCode != VirtualKey.MouseButtonPrimary: return true
-        let gizmoNode = v.castGizmo(e)
-        if not gizmoNode.isNil:
-            v.gizmo.startTransform(gizmoNode, e.localPosition)
-        else:
+
+        if not gizmoTouch:
             var castedNode = v.tryRayCast(e)
             if not castedNode.isNil:
                 v.editor.selectedNode = castedNode
@@ -82,7 +65,6 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
         v.cameraController.onTapDown(e)
 
     of bsUnknown:
-        v.gizmo.proccesTransform(e.localPosition)
         var dx = v.startPoint.x - e.localPosition.x
         var dy = v.startPoint.y - e.localPosition.y
         v.cameraController.onScrollProgress(dx, dy, e)
@@ -90,7 +72,7 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
 
 proc updateGizmo(v: EditorSceneView)=
     if v.gizmo.isNil:
-        v.gizmo = newGizmoAxis()
+        v.gizmo = newMoveGizmo()
         v.gizmo.gizmoNode.nodeWasAddedToSceneView(v.sceneView)
     v.gizmo.updateGizmo()
     v.gizmo.gizmoNode.drawNode(true, nil)

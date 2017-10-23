@@ -258,7 +258,7 @@ proc pasteNode*(e: Editor, n: Node = nil)=
 proc onFirstResponderChanged(e: Editor, fr: View)=
     for t in e.workspaceView.compositionEditors:
         if fr.isDescendantOf(t):
-            echo " Compositioneditor become frist responder " ,t.name
+            # echo " Compositioneditor become frist responder " ,t.name
             e.currentComposition = t.composition
             e.sceneView = t.rootNode.sceneView # todo: fix this
             break
