@@ -156,6 +156,9 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     target.backgroundColor.a = 0.0
     case i.kind:
     of rodPbComposition:
+        # var editorScene = target.EditorSceneView
+        # editorScene.editor.openComposition(i.data)
+
         var n = try: newNodeWithURL("file://" & i.data) except: nil
         if not n.isNil:
             var editorScene = target.EditorSceneView
