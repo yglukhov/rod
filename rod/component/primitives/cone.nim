@@ -16,27 +16,27 @@ import rod.tools.serializer
 import rod / utils / [ property_desc, serialization_codegen ]
 
 type ConeComponent* = ref object of MeshComponent
-    radius1: float32
-    radius2: float32
-    height: float32
-    segments: int32
+    mRadius1: float32
+    mRadius2: float32
+    mHeight: float32
+    mSegments: int32
 
 ConeComponent.properties:
-    radius1
-    radius2
-    height
-    segments
+    mRadius1
+    mRadius2
+    mHeight
+    mSegments
 
 proc fillBuffers(c: ConeComponent, vertCoords, texCoords, normals: var seq[float32], indices: var seq[GLushort]) =
-    let angle_step = 2.0 * PI.float32 / c.segments.float32
+    let angle_step = 2.0 * PI.float32 / c.mSegments.float32
     var angle = 0.0
     var v0, v1, v2, v3: Vector3
     var index_offset = 0
 
     # cone body
     while angle <= 2 * PI + angle_step:
-        v0 = newVector(c.radius1 * cos(angle).float32, 0.0,    c.radius1 * sin(angle))
-        v1 = newVector(c.radius2 * cos(angle).float32, c.height, c.radius2 * sin(angle))
+        v0 = newVector(c.mRadius1 * cos(angle).float32, 0.0,    c.mRadius1 * sin(angle))
+        v1 = newVector(c.mRadius2 * cos(angle).float32, c.mHeight, c.mRadius2 * sin(angle))
         vertCoords.add(v0)
         vertCoords.add(v1)
 
@@ -48,7 +48,7 @@ proc fillBuffers(c: ConeComponent, vertCoords, texCoords, normals: var seq[float
 
         angle += angle_step
 
-    for i in 0 ..< c.segments:
+    for i in 0 ..< c.mSegments:
         indices.add([(2*i + 0).GLushort, (2*i + 1).GLushort, (2*i + 2).GLushort])
         indices.add([(2*i + 3).GLushort, (2*i + 2).GLushort, (2*i + 1).GLushort])
 
@@ -61,40 +61,44 @@ proc fillBuffers(c: ConeComponent, vertCoords, texCoords, normals: var seq[float
     normals.add([0.0.float32, -1.0, 0.0])
     angle = 0.0
 
-    for i in 0 .. c.segments:
-        vertCoords.add([c.radius1 * cos(angle).float32, 0.0, c.radius1 * sin(angle)])
+    for i in 0 .. c.mSegments:
+        vertCoords.add([c.mRadius1 * cos(angle).float32, 0.0, c.mRadius1 * sin(angle)])
         texCoords.add([0.0.float32, 0.0])
         normals.add([0.0.float32, -1.0, 0.0])
         angle += angle_step
 
-        if i < c.segments:
+        if i < c.mSegments:
             indices.add([index_offset.GLushort, (i + index_offset + 1).GLushort, (i + index_offset + 2).GLushort])
 
     index_offset = int(vertCoords.len() / 3)
 
     # cap top
     # central vertex
-    vertCoords.add([0.0.float32, c.height, 0.0])
+    vertCoords.add([0.0.float32, c.mHeight, 0.0])
     texCoords.add([0.0.float32, 0.0])
     normals.add([0.0.float32, 1.0, 0.0])
     angle = 0.0
 
-    for i in 0 .. c.segments:
-        vertCoords.add([c.radius2 * cos(angle).float32, c.height, c.radius2 * sin(angle)])
+    for i in 0 .. c.mSegments:
+        vertCoords.add([c.mRadius2 * cos(angle).float32, c.mHeight, c.mRadius2 * sin(angle)])
         texCoords.add([0.0.float32, 0.0])
         normals.add([0.0.float32, 1.0, 0.0])
         angle += angle_step
 
-        if i < c.segments:
+        if i < c.mSegments:
             indices.add([index_offset.GLushort, (i + index_offset + 2).GLushort, (i + index_offset + 1).GLushort])
 
 
 method init*(c: ConeComponent) =
     procCall c.MeshComponent.init()
-    c.radius1 = 1.0
-    c.radius2 = 1.0
-    c.height = 4.0
-    c.segments = 4
+    c.mRadius1 = 1.0
+    c.mRadius2 = 1.0
+    c.mHeight = 4.0
+    c.mSegments = 12
+
+    c.material.ambient = newColor(1.0, 1.0, 1.0, 0.2)
+    c.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
+
 
 proc generateMesh*(c: ConeComponent) =
     let mesh = c
@@ -116,8 +120,25 @@ proc generateMesh*(c: ConeComponent) =
 
     mesh.createVBO(indices, vertexData)
 
-    mesh.material.ambient = newColor(1.0, 1.0, 1.0, 0.2)
-    mesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
+template radius1*(cc: ConeComponent): float = c.mRadius1
+template `radius1=`*(cc: ConeComponent, v: float) =
+    cc.mRadius1 = v
+    cc.generateMesh()
+
+template radius2*(cc: ConeComponent): float = c.mRadius2
+template `radius2=`*(cc: ConeComponent, v: float) =
+    cc.mRadius2 = v
+    cc.generateMesh()
+
+template height*(cc: ConeComponent): float = c.mHeight
+template `height=`*(cc: ConeComponent, v: float) =
+    cc.mHeight = v
+    cc.generateMesh()
+
+template segments*(cc: ConeComponent): int = c.mSegments.int
+template `segments=`*(cc: ConeComponent, v: int) =
+    cc.mSegments = v.int32
+    cc.generateMesh()
 
 method componentNodeWasAddedToSceneView*(c: ConeComponent) =
     c.generateMesh()
@@ -139,30 +160,10 @@ method serialize*(c: ConeComponent, s: Serializer): JsonNode =
     result.add("segments", s.getValue(c.segments))
 
 method visitProperties*(c: ConeComponent, p: var PropertyVisitor) =
-    template radiusAux1(cc: ConeComponent): float = c.radius1
-    template `radiusAux1=`(cc: ConeComponent, v: float) =
-        cc.radius1 = v
-        cc.generateMesh()
-
-    template radiusAux2(cc: ConeComponent): float = c.radius2
-    template `radiusAux2=`(cc: ConeComponent, v: float) =
-        cc.radius2 = v
-        cc.generateMesh()
-
-    template heightAux(cc: ConeComponent): float = c.height
-    template `heightAux=`(cc: ConeComponent, v: float) =
-        cc.height = v
-        cc.generateMesh()
-
-    template segmentsAux(cc: ConeComponent): int = c.segments.int
-    template `segmentsAux=`(cc: ConeComponent, v: int) =
-        cc.segments = v.int32
-        cc.generateMesh()
-
-    p.visitProperty("radius1", c.radiusAux1)
-    p.visitProperty("radius2", c.radiusAux2)
-    p.visitProperty("height", c.heightAux)
-    p.visitProperty("segments", c.segmentsAux)
+    p.visitProperty("radius1", c.radius1)
+    p.visitProperty("radius2", c.radius2)
+    p.visitProperty("height", c.height)
+    p.visitProperty("segments", c.segments)
     procCall c.MeshComponent.visitProperties(p)
 
 genSerializationCodeForComponent(ConeComponent)

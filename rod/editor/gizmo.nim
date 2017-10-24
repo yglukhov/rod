@@ -18,11 +18,14 @@ type Gizmo* = ref object of RootObj
     gizmoNode*: Node
     axisMask*: Vector3
     mEditedNode*: Node
+    mPrevCastedAxis: Node
 
 method updateGizmo*(g: Gizmo) {.base.} = discard
 method startTransform*(g: Gizmo, selectedGizmo: Node, position: Point) {.base.} = discard
 method proccesTransform*(g: Gizmo, position: Point) {.base.} = discard
 method stopTransform*(g: Gizmo) = discard
+method onMouseIn*(g: Gizmo, castedNode: Node) = discard
+method onMouseOut*(g: Gizmo, castedNode: Node) = discard
 
 proc newGizmo*(): Gizmo =
     result = new(Gizmo)
@@ -55,3 +58,16 @@ proc onTouchEv*(g: Gizmo, e: var Event): bool =
 
     of bsUnknown:
         g.proccesTransform(e.localPosition)
+
+proc onMouseOver*(g: Gizmo, e: var Event) =
+    if g.isNil or g.gizmoNode.sceneView.isNil: return
+
+    let castedGizmo = g.gizmoNode.sceneView.rayCastFirstNode(g.gizmoNode, e.localPosition)
+
+    if castedGizmo != g.mPrevCastedAxis:
+        if not g.mPrevCastedAxis.isNil:
+            g.onMouseOut(g.mPrevCastedAxis)
+        if not castedGizmo.isNil:
+            g.onMouseIn(castedGizmo)
+
+    g.mPrevCastedAxis = castedGizmo
