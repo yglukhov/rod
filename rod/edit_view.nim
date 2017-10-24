@@ -102,6 +102,12 @@ proc sceneTreeDidChange*(e: Editor) =
 proc saveComposition*(e: Editor, c: CompositionDocument)
 
 when loadingAndSavingAvailable:
+
+    proc currentProjectPath*(e: Editor): string=
+        result = e.currentProject.path
+        if result.len == 0 or e.startFromGame:
+            result = getAppDir() & "/../.."
+
     proc saveComposition*(e: Editor, c: CompositionDocument)=
         if c.path.len == 0:
             c.path = callDialogFileSave("Save composition")
@@ -116,6 +122,9 @@ when loadingAndSavingAvailable:
 
     proc openComposition*(e: Editor, p: string)=
         try:
+            if e.startFromGame:
+                return
+
             var n = newNodeWithUrl("file://" & p)
             var c:CompositionDocument
 

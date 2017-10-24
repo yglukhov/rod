@@ -9,6 +9,8 @@ import nimx.pasteboard.pasteboard_item
 import nimx.view_render_to_image
 import os
 
+export collection_view
+
 const selectionColor = newColor(0.0, 0.0, 0.5, 0.2)
 
 type AssetContainerView* = ref object of CollectionView
@@ -105,7 +107,7 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
             v.selectedItems.setLen(0)
 
         for i, subv in v.subviews:
-            if subv.isNil: continue
+            if subv.isNil: break
             if hasSelectionRect and subv.frame.intersect(v.selectionRect):
                 subv.backgroundColor = selectionColor
                 selected.add(i)

@@ -36,6 +36,7 @@ type ImageIconView* = ref object of View
 
 type FilePreview* = ref object of View
     path*: string
+    # pathNode*: PathNode
     nameField*: TextField
     icon*: View
     selectionView: View
@@ -81,6 +82,7 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
     result.new()
     result.init(r)
     result.path = p.fullPath
+    # result.pathNode = p
     result.isCompact = compact
 
     let sp = result.path.splitFile()
