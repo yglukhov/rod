@@ -17,7 +17,6 @@ import rod.component.camera
 import rod.component.sprite
 import rod.node
 import rod.viewport
-import rod.editor.gizmos.move_axis
 import opengl
 
 const vertexShader = """

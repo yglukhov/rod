@@ -11,7 +11,6 @@ import nimx.event
 import rod.component.camera
 import rod.node
 import rod.viewport
-import rod.editor.gizmos.move_axis
 
 
 type Gizmo* = ref object of RootObj
@@ -30,7 +29,6 @@ method onMouseOut*(g: Gizmo, castedNode: Node) = discard
 proc newGizmo*(): Gizmo =
     result = new(Gizmo)
     result.gizmoNode = newNode()
-    result.gizmoNode.loadComposition( getMoveAxisJson() )
     result.gizmoNode.alpha = 0.0
 
     result.updateGizmo()
