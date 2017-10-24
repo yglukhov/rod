@@ -34,16 +34,18 @@ method onKeyUp*(v: EditorSceneView, e: var Event): bool =
         v.editor.saveComposition(v.composition)
         result = true
 
-
 method onScroll*(v: EditorSceneView, e: var Event): bool=
-    v.cameraController.onMouseScrroll(e)
-    return true
+    if not v.editor.sceneInput:
+        v.cameraController.onMouseScrroll(e)
+        return true
 
 proc castGizmo(v: EditorSceneView, e: var Event ): Node =
     result = v.sceneView.rayCastFirstNode(v.gizmo.gizmoNode, e.localPosition)
 
 proc tryRayCast(v: EditorSceneView, e: var Event): Node=
     result = v.sceneView.rayCastFirstNode(v.rootNode, e.localPosition)
+
+method onInterceptTouchEv*(v: EditorSceneView, e: var Event): bool  = not v.editor.sceneInput
 
 method onTouchEv*(v: EditorSceneView, e: var Event): bool =
     result = procCall v.View.onTouchEv(e)
@@ -68,7 +70,9 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
         var dx = v.startPoint.x - e.localPosition.x
         var dy = v.startPoint.y - e.localPosition.y
         v.cameraController.onScrollProgress(dx, dy, e)
+
     return v.makeFirstResponder()
+
 
 proc updateGizmo(v: EditorSceneView)=
     if v.gizmo.isNil:
@@ -123,8 +127,6 @@ method update*(v: EditorSceneView) = discard
 method setEditedNode*(v: EditorSceneView, n: Node)=
     v.selectedNode = n
     v.gizmo.editedNode = v.selectedNode
-
-method acceptsFirstResponder(v: EditorSceneView): bool = true
 
 method onDragEnter*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:

@@ -84,7 +84,7 @@ method getBBox*(b: Blink): BBox =
     let img = b.mask
     if not img.isNil:
         result.maxPoint = newVector3(0, 0, 0.0)
-        result.minPoint = newVector3(img.size.width, img.size.height, 0.01)
+        result.minPoint = newVector3(img.size.width, img.size.height, 0.0)
 
 method deserialize*(b: Blink, j: JsonNode, serealizer: Serializer) =
     deserializeImage(j{"mask"}, serealizer) do(img: Image, err: string):

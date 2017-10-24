@@ -49,6 +49,14 @@ proc `selectedNode=`*(e: Editor, n: Node) =
 
         for etv in e.workspaceView.tabs:
             etv.setEditedNode(e.mSelectedNode)
+        if not e.startFromGame:
+            for stv in e.workspaceView.compositionEditors:
+                if stv.composition == e.mCurrentComposition:
+                    stv.setEditedNode(e.mSelectedNode)
+                    break
+        else:
+            for stv in e.workspaceView.compositionEditors:
+                stv.setEditedNode(e.mSelectedNode)
 
 proc onCompositionChanged*(e: Editor, c: CompositionDocument)=
     for etv in e.workspaceView.tabs:

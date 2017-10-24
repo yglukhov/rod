@@ -381,6 +381,7 @@ proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
     w.createSceneMenu()
     w.createViewMenu()
     w.createTabView()
-    # w.createGameInputToggle()
+    w.newToolbarButton("GameInput").onAction do():
+        w.editor.sceneInput = not w.editor.sceneInput
     w.createChangeBackgroundColorButton()
     result = w

@@ -42,6 +42,7 @@ type
         owner*: EditorTabView
 
     Editor* = ref object
+        sceneInput*: bool
         currentProject*: EditorProject
         mCurrentComposition*: CompositionDocument
         rootNode*: Node

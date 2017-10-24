@@ -230,14 +230,14 @@ proc rayCastFirstNode*(v: SceneView, node: Node, coords: Point): Node =
     node.rayCast(r, castResult)
 
     if castResult.len > 0:
-        castResult.sort( proc (x, y: RayCastInfo): int =
-            result = int(x.node.layer < y.node.layer)
-            if x.node.layer == y.node.layer:
-                result = int(x.distance > y.distance)
-                if abs(x.distance - y.distance) < 0.00001:
-                    result = getTreeDistance(x.node, y.node) )
+        castResult.sort do(x, y: RayCastInfo) -> int:
+            result = -cmp(x.distance, y.distance)
 
-        result = castResult[0].node
+        # for i in countdown(castResult.len - 1, 0):
+        #     if castResult[i].node.isEnabledInTree:
+        #         return castResult[i].node
+
+        result = castResult[^1].node
 
 import opengl
 

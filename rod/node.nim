@@ -28,6 +28,7 @@ export Node
 proc sceneView*(n: Node): SceneView = n.mSceneView
 proc getGlobalAlpha*(n: Node): float32
 proc worldTransform*(n: Node): Matrix4
+proc isEnabledInTree*(n: Node): bool
 
 import rod.component
 
@@ -700,7 +701,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("layer", s.getValue(n.layer))
     result.add("affectsChildren", s.getValue(n.affectsChildren))
     result.add("enabled", s.getValue(n.enabled))
-    
+
     if not n.components.isNil and n.components.len > 0:
         var componentsNode = newJArray()
         result.add("components", componentsNode)
@@ -791,7 +792,6 @@ proc getTreeDistance*(x, y: Node): int =
         else:
             return 1
 
-    #assert(px != py)
     var cx, cy : Node
     while px != py:
         cx = px
@@ -805,7 +805,6 @@ proc getTreeDistance*(x, y: Node): int =
     let iy = px.children.find(cy)
 
     result = iy - ix
-
 
 proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
     if not n.components.isNil:

@@ -36,7 +36,7 @@ method deserialize*(s: CompRef, j: JsonNode, serializer: Serializer) =
 genSerializationCodeForComponent(CompRef)
 
 method getBBox*(s: CompRef): BBox =
-    result.minPoint = newVector3(0.0, 0.0, 0.01)
+    result.minPoint = newVector3(0.0, 0.0, 0.0)
     result.maxPoint = newVector3(s.size.width, s.size.height, 0.0)
 
 method visitProperties*(c: CompRef, p: var PropertyVisitor) =
