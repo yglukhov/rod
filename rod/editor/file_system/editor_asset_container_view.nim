@@ -55,7 +55,6 @@ template isCompact*(v: AssetContainerView): bool = v.mIsCompact
 
 method onTouchEv*(v: AssetContainerView, e: var Event): bool =
     discard procCall v.View.onTouchEv(e)
-
     if e.buttonState == bsDown:
         v.dragStarted = false
         v.selectionRect = zeroRect
@@ -121,6 +120,7 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
                     doubleClick = true
                     v.selectedItems.setLen(0)
                     subv.backgroundColor = clearColor()
+                    break
                 else:
                     subv.backgroundColor = selectionColor
                     selected.add(i)
