@@ -30,7 +30,7 @@ export editor_tab_registry
 import variant
 
 when loadingAndSavingAvailable:
-    import native_dialogs
+    import file_dialog.dialog
     import rod.editor.editor_open_project_view
     import os
 
@@ -110,12 +110,18 @@ when loadingAndSavingAvailable:
 
     proc saveComposition*(e: Editor, c: CompositionDocument)=
         if c.path.len == 0:
-            c.path = callDialogFileSave("Save composition")
+            var di: DialogInfo
+            di.folder = e.currentProject.path
+            di.extension = "json"
+            di.kind = dkSaveFile
+            di.filters = @[(name:"Json", ext:"*.json")]
+            di.title = "Save composition"
+
+            c.path = di.show()
 
         if c.path.len > 0:
             var s = Serializer.new()
             var data = c.rootNode.serialize(s)
-            echo "data to save ", data.pretty()
             writeFile(c.path, $data)
 
         echo "try save composition ", c.path
@@ -148,14 +154,25 @@ when loadingAndSavingAvailable:
             warn "Can't load composition at ", p
 
     proc saveNode(editor: Editor, selectedNode: Node) =
-        let path = callDialogFileSave("Save Json")
+        var di: DialogInfo
+        di.folder = editor.currentProject.path
+        di.extension = "json"
+        di.kind = dkSaveFile
+        di.filters = @[(name:"Json", ext:"*.json")]
+        di.title = "Save composition"
+        let path = di.show()
         if not path.isNil:
             var s = Serializer.new()
             var sData = selectedNode.serialize(s)
             s.save(sData, path)
 
     proc loadNode(editor: Editor) =
-        let path = callDialogFileOpen("Load Json or DAE")
+        var di: DialogInfo
+        di.folder = editor.currentProject.path
+        di.kind = dkOpenFile
+        di.filters = @[(name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
+        di.title = "Load composition or dae"
+        let path = di.show()
         if not path.isNil:
             try:
                 if path.endsWith(".dae"):

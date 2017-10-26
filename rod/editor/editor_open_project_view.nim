@@ -2,7 +2,7 @@ import nimx / [ view, types, button, scroll_view, text_field, stack_view, animat
     view_event_handling_new, event ]
 
 import editor_project_settings
-import native_dialogs
+import file_dialog.dialog
 
 export editor_project_settings
 
@@ -57,9 +57,10 @@ proc createProjectView(r: Rect, proj: EditorProject, newProj: bool, onProjAction
     chDBtn.title = "Open"
     chDBtn.backgroundColor = grayColor()
     chDBtn.onAction do():
-        var path = callDialogFolderSelect("Create rod project")
-        if path.len > 0:
-            projPath.text = path
+        var di: DialogInfo
+        di.kind = dkSelectFolder
+        di.title = "Choose project root directory"
+        projPath.text = di.show()
 
     if newProj:
         projPath.addSubview(chDBtn)

@@ -14,7 +14,7 @@ type EditorAssetsView* = ref object of EditorTabView
 method init*(v: EditorAssetsView, r: Rect)=
     procCall v.View.init(r)
 
-    v.fileSystemView = createFileSystemView(v.editor.currentProjectPath(), newRect(0.0, 0.0, v.bounds.width, v.bounds.height - 20.0))
+    v.fileSystemView = createProjectFSView(v.editor.currentProjectPath(), newRect(0.0, 0.0, v.bounds.width, v.bounds.height - 20.0))
     v.fileSystemView.resizingMask="wh"
     v.addSubview(v.fileSystemView)
 

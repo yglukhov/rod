@@ -5,9 +5,10 @@ import nimx.event
 import nimx.view_event_handling_new
 
 
-type PathNode* = ref object
+type PathNode* = ref object of RootObj
     children*: seq[PathNode]
     name*: string
+    contentHash*: string
     fullPath*: string
     hasContent*: bool
     outLinePath*: seq[int]
@@ -169,22 +170,41 @@ proc doubleClicked*(v: FilePreview)=
         else:
             echo "double clicked ", v.kind, " path ", v.path
 
+proc rename*(v: FilePreview, cb:proc(name: string))=
+    if not v.selectionView.isNil:
+        discard v.window.makeFirstResponder(v.selectionView)
+        let tf = v.selectionView.TextField
+        let col = tf.backgroundColor
+        tf.editable = true
+        tf.onAction do():
+            if tf.text.len > 0:
+                tf.editable=false
+                tf.backgroundColor = col
+                tf.onAction(nil)
+                if tf.text != v.nameField.text:
+                    cb(tf.text)
+
 proc select*(v: FilePreview)=
-    discard
-    # var textSize = sizeOfString()
-    # let sp = splitFile(v.path)
+    if not v.selectionView.isNil:
+        v.selectionView.removeFromSuperview()
+        v.selectionView = nil
 
-    # var fullName = newLabel(newRect(0.0, v.bounds.height - 20.0, v.bounds.width, 20.0))
-    # fullName.text = sp.name & sp.ext
+    let sp = splitFile(v.path)
+    var orig = v.nameField.frame.origin
+    let width = max(v.nameField.formattedText.totalWidth() + 15.0, v.nameField.bounds.width)
+    let height = max(v.nameField.formattedText.totalHeight() + 15.0, v.nameField.bounds.height)
+    orig = newPoint(orig.x, orig.y)
+    if not v.isCompact:
+        orig.x -= width * 0.5
 
-    # let size = fullName.textSize
-    # fullName.setFrame(newRect(newPoint(-(size.width - v.bounds.width)*0.5, v.bounds.height - 20.0), size))
+    var fullName = newLabel(newRect(orig, newSize(width, height)))
+    fullName.backgroundColor = newColor(0.7, 0.7, 1.0, 1.0)
+    fullName.text = sp.name & sp.ext
 
-    # fullName.backgroundColor = newColor(1.0, 1.0, 1.0, 1.0)
-
-    # v.addSubview(fullName)
-    # v.selectionView = fullName
+    v.addSubview(fullName)
+    v.selectionView = fullName
 
 proc deselect*(v: FilePreview)=
     if not v.selectionView.isNil:
         v.selectionView.removeFromSuperview()
+        v.selectionView = nil

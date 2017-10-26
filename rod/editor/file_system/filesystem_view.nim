@@ -1,5 +1,5 @@
 import nimx / [view, types, outline_view, linear_layout,
-    scroll_view, table_view_cell, text_field, button]
+    scroll_view, table_view_cell, text_field, button, timer]
 import editor_asset_icon_view, editor_asset_container_view
 import os, algorithm, sequtils, hashes, times, tables
 import variant
@@ -9,13 +9,20 @@ export editor_asset_container_view
 
 type FileSystemView* = ref object of View
     rootPath*: string
+    rootName*: string
+
     contentView*: AssetContainerView
     fileSystemTree*: OutlineView
+
     resourceRoot*: PathNode
     mCurrentPathNode*: PathNode
+
     cachedResources*: Table[string, FilePreview]
+
     lastFSReload*: float
     lastFSHash*: string
+
+    mFilter: proc(pathEntry: tuple[kind: PathComponent, path: string]):bool
     mOnDragStart: proc(items: seq[FilePreview])
     mOnDoubleClicked: proc(item: FilePreview)
     mOnPathChanged: proc(np: string)
@@ -26,6 +33,13 @@ proc `currentPath=`(v: FileSystemView, val:string)=
         v.mCurrentPath = val
         if not v.mOnPathChanged.isNil:
             v.mOnPathChanged(v.mCurrentPath)
+
+proc reloadFileSystem(v: FileSystemView)
+proc onFilter*(v: FileSystemView, cb: proc(pathEntry: tuple[kind: PathComponent, path: string]): bool)=
+    v.mFilter = cb
+    v.reloadFileSystem()
+    v.fileSystemTree.reloadData()
+    v.contentView.reload()
 
 proc onDragStart*(v: FileSystemView, cb: proc(items: seq[FilePreview]))=
     v.mOnDragStart = cb
@@ -40,66 +54,107 @@ proc `currentPathNode=`(v: FileSystemView, node: PathNode)=
     v.mCurrentPathNode = node
     v.contentView.reload()
 
-proc buildResourceTree(path: string, hashstr: var string): PathNode=
+proc directoryContent(v: FileSystemView, path: string, hashstr: var string): PathNode=
     result = new(PathNode)
-    result.name = "res://"
+    result.name = splitFile(path).name
     result.fullPath = path
+    result.children = @[]
 
-    var curPathNodes = @[result]
-    var totalNodes = 0
     hashstr = ""
-    while true:
-        var dirs = newSeq[PathNode]()
-        for curPathNode in curPathNodes:
-            var children = newSeq[PathNode]()
-            for kind, path in walkDir(curPathNode.fullPath):
-                let sp = splitFile(path)
-                if sp.name.len > 0 and sp.name[0] == '.': continue
 
-                var pathNode = new(PathNode)
-                pathNode.hasContent = kind == pcDir or kind == pcLinkToDir
-                pathNode.fullPath = path
-                pathNode.name = sp.name
-                children.add(pathNode)
-                hashstr &= $hash(path)
-                inc totalNodes
-                if kind != pcFile and kind != pcLinkToFile:
-                    dirs.add(pathNode)
+    for kind, path in walkDir(path):
+        let sp = splitFile(path)
 
-            children.sort do(a,b: PathNode) -> int:
-                result = (b.hasContent.int - a.hasContent.int)
-                if result == 0:
-                    result = cmp(splitFile(a.fullPath).ext, splitFile(b.fullPath).ext)
-                if result == 0:
-                    result = cmp(a.name, b.name)
+        if sp.name.len > 0 and sp.name[0] == '.':
+            continue
 
-            curPathNode.children = children
-            curPathNode.hasContent = children.len > 0
-        curPathNodes = dirs
+        if not v.mFilter.isNil and not v.mFilter((kind: kind, path: path)):
+            continue
 
-        if curPathNodes.len == 0: break
+        var pathNode = new(PathNode)
+        pathNode.hasContent = kind == pcDir or kind == pcLinkToDir
+        pathNode.fullPath = path
+        pathNode.name = sp.name
+        pathNode.children = @[]
+        result.children.add(pathNode)
+        hashstr &= $hash(path)
 
-    hashstr &= $hash(totalNodes)
+    result.children.sort do(a,b: PathNode) -> int:
+        result = (b.hasContent.int - a.hasContent.int)
+        if result == 0:
+            result = cmp(splitFile(a.fullPath).ext, splitFile(b.fullPath).ext)
+        if result == 0:
+            result = cmp(a.name, b.name)
+
+    result.contentHash = hashstr
+
+proc buildResourceTree(v: FileSystemView, hashstr: var string): PathNode {.deprecated.} =
+    discard
+    # result = new(PathNode)
+    # result.name = v.rootName
+    # result.fullPath = v.rootPath
+
+    # var curPathNodes = @[result]
+    # var totalNodes = 0
+    # hashstr = ""
+    # while true:
+    #     var dirs = newSeq[PathNode]()
+    #     for curPathNode in curPathNodes:
+    #         var children = newSeq[PathNode]()
+    #         for kind, path in walkDir(curPathNode.fullPath):
+    #             let sp = splitFile(path)
+    #             if sp.name.len > 0 and sp.name[0] == '.': continue
+
+    #             var pathNode = new(PathNode)
+    #             pathNode.hasContent = kind == pcDir or kind == pcLinkToDir
+    #             pathNode.fullPath = path
+    #             pathNode.name = sp.name
+    #             pathNode.children = @[]
+    #             children.add(pathNode)
+    #             hashstr &= $hash(path)
+    #             inc totalNodes
+    #             if kind != pcFile and kind != pcLinkToFile:
+    #                 dirs.add(pathNode)
+
+    #         children.sort do(a,b: PathNode) -> int:
+    #             result = (b.hasContent.int - a.hasContent.int)
+    #             if result == 0:
+    #                 result = cmp(splitFile(a.fullPath).ext, splitFile(b.fullPath).ext)
+    #             if result == 0:
+    #                 result = cmp(a.name, b.name)
+
+    #         curPathNode.children = children
+    #         curPathNode.hasContent = children.len > 0
+    #     curPathNodes = dirs
+
+    #     if curPathNodes.len == 0: break
+
+    # hashstr &= $hash(totalNodes)
 
 proc reloadFileSystem(v: FileSystemView)=
-    v.resourceRoot = buildResourceTree(v.rootPath, v.lastFSHash)
+    v.resourceRoot = v.directoryContent(v.rootPath, v.lastFSHash)
     v.cachedResources = initTable[string, FilePreview]()
     v.lastFSReload = epochTime()
 
+proc createDir*(v: FileSystemView)=
+    createDir(v.mCurrentPath & "/new directory")
+
 method init*(v: FileSystemView, r: Rect)=
     procCall v.View.init(r)
+
     var horLayout = newHorizontalLayout(newRect(0.0, 0.0, v.bounds.width, v.bounds.height))
     horLayout.userResizeable = true
     horLayout.resizingMask= "wh"
     horLayout.padding = 4.0
     v.mCurrentPath = ""
+    v.currentPath = v.rootPath
     v.addSubview(horLayout)
 
     v.reloadFileSystem()
 
     v.fileSystemTree = OutlineView.new(newRect(0.0, 0.0, 100.0, v.bounds.height))
     var fsScroll = newScrollView(v.fileSystemTree)
-    fsScroll.resizingMask="wh"
+    fsScroll.autoresizingMask={afFlexibleMinX, afFlexibleHeight}
     horLayout.addSubview(fsScroll)
 
     block setupfileSystemTree:
@@ -121,7 +176,7 @@ method init*(v: FileSystemView, r: Rect)=
                 return newVariant(n)
 
         v.fileSystemTree.createCell = proc(): TableViewCell =
-            result = newTableViewCell(newLabel(newRect(0, 0, 300, 20)))
+            result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
 
         v.fileSystemTree.configureCell = proc(cell: TableViewCell, indexPath: openarray[int]) =
             let n = v.fileSystemTree.itemAtIndexPath(indexPath).get(PathNode)
@@ -140,13 +195,19 @@ method init*(v: FileSystemView, r: Rect)=
         v.fileSystemTree.onSelectionChanged = proc() =
             v.cachedResources.clear()
             let ip = v.fileSystemTree.selectedIndexPath
-
             let n = if ip.len > 0:
                     v.fileSystemTree.itemAtIndexPath(ip).get(PathNode)
                 else:
                     nil
 
-            echo "onSelectionChanged ", ip, " isnil ", n.isNil
+            if not n.isNil:
+                var hash = ""
+                var newn = v.directoryContent(n.fullPath, hash)
+                if n.contentHash != hash:
+                    n.contentHash = hash
+                    n.children = newn.children
+                    v.fileSystemTree.reloadData()
+
             v.currentPathNode = n
 
         v.fileSystemTree.reloadData()
@@ -157,7 +218,6 @@ method init*(v: FileSystemView, r: Rect)=
     v.contentView.numberOfItems = proc(): int =
         if not v.mCurrentPathNode.isNil and not v.mCurrentPathNode.children.isNil:
             v.currentPath = v.mCurrentPathNode.fullPath
-            # curPath.text = v.mCurrentPathNode.fullPath #todo: normalize path here
             return v.mCurrentPathNode.children.len
 
     v.contentView.viewForItem = proc(i: int): View =
@@ -178,24 +238,21 @@ method init*(v: FileSystemView, r: Rect)=
                 if not v.mOnDoubleClicked.isNil:
                     v.mOnDoubleClicked(filePreview)
 
-        # elif filePreview.kind == akComposition:
-        #     filePreview.onDoubleClicked = proc() =
-        #         v.editor.openComposition(n.fullPath)
-
         result = filePreview
-        # echo "end viewfor item ", i
 
-    v.contentView.onItemSelected = proc(i: int)=
-        var fileView = v.contentView.subviews[i].FilePreview
-        fileView.select()
+    # v.contentView.onItemSelected = proc(i: int)=
+    #     var fileView = v.contentView.subviews[i].FilePreview
+    #     fileView.select()
 
-    v.contentView.onItemDeselected = proc(i: int)=
-        var fileView = v.contentView.subviews[i].FilePreview
-        fileView.deselect()
+    # v.contentView.onItemDeselected = proc(i: int)=
+    #     if i >= 0 and i < v.contentView.subviews.len:
+    #         var fileView = v.contentView.subviews[i].FilePreview
+    #         fileView.deselect()
 
     v.contentView.onItemDoubleClick = proc(i: int)=
-        var fileView = v.contentView.subviews[i].FilePreview
-        echo "i dbc ", i,  " fp ", fileView.path
+        let idx = i
+        # setTimeout(0.1) do():
+        var fileView = v.contentView.subviews[idx].FilePreview
         fileView.doubleClicked()
 
     v.contentView.onItemsDelete = proc(selectedItems: seq[int])=
@@ -227,22 +284,38 @@ method init*(v: FileSystemView, r: Rect)=
         if not v.mOnDragStart.isNil:
             v.mOnDragStart(fileViews)
 
+    v.contentView.onItemRenamed = proc(item: int)=
+        var fileView = v.contentView.subviews[item].FilePreview
+        fileView.rename() do(name: string):
+            echo "renamed ", fileView.path, " to ", name
+            setTimeout(0.1) do():
+                discard v.window.makeFirstResponder(v.contentView)
+            # discard v.contentView.makeFirstResponder()
+
     v.currentPathNode=v.resourceRoot
     horLayout.setDividerPosition(300.0, 0)
 
-proc createFileSystemView*(rootPath: string, r: Rect):FileSystemView=
+proc createProjectFSView*(rootPath: string, r: Rect):FileSystemView=
     result.new()
     result.rootPath = rootPath
+    result.rootName = "res://"
+    result.init(r)
+
+proc createFSView*(rootPath: string, r: Rect):FileSystemView=
+    result.new()
+    result.rootPath = rootPath
+    result.rootName = "root"
     result.init(r)
 
 proc reloadIfNeeded*(v: FileSystemView)=
+    if true: return # todo: refactor this
+
     let ct = epochTime()
     if ct - v.lastFSReload > 15.0:
         v.lastFSReload = ct
         var hashstr = ""
-        var tmpRoot = buildResourceTree(v.rootPath, hashstr)
+        var tmpRoot = v.buildResourceTree(hashstr)
         if hashstr != v.lastFSHash:
-            echo "reload"
             var prevRoot = v.resourceRoot
             var curPath = v.mCurrentPathNode.outLinePath
             var curNode = tmpRoot

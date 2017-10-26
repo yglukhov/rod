@@ -8,7 +8,6 @@ import rod / [ rod_types, node ]
 import rod / editor / [ editor_types, editor_tab_registry ]
 
 when loadingAndSavingAvailable:
-    import native_dialogs
     import rod.editor.editor_open_project_view
     import os
 

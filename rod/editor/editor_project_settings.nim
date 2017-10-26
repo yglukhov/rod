@@ -47,7 +47,7 @@ proc getEditorSettings*(): EditorSettings=
     if "settings" in sharedPreferences():
         var jn = sharedPreferences()["settings"]
         result = jn.toEditorSettings()
-    echo "Load editor settings: ", result
+    # echo "Load editor settings: ", result
 
 proc save*(es: EditorSettings)=
     sharedPreferences()["settings"] = es.toJson()
