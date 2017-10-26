@@ -45,6 +45,9 @@ proc castGizmo(v: EditorSceneView, e: var Event ): Node =
 proc tryRayCast(v: EditorSceneView, e: var Event): Node=
     result = v.sceneView.rayCastFirstNode(v.rootNode, e.localPosition)
 
+method onMouseOver*(v: EditorSceneView, e: var Event) =
+    v.gizmo.onMouseOver(e)
+
 method onInterceptTouchEv*(v: EditorSceneView, e: var Event): bool  = not v.editor.sceneInput
 
 method onTouchEv*(v: EditorSceneView, e: var Event): bool =
@@ -56,6 +59,8 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
         v.cameraController.onTapUp(0.0,0.0,e)
     of bsDown:
         v.startPoint = e.localPosition
+        v.cameraController.onTapDown(e)
+
         if e.keyCode != VirtualKey.MouseButtonPrimary: return true
 
         if not gizmoTouch:
@@ -65,11 +70,9 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
             else:
                 v.editor.selectedNode = nil
 
-        v.cameraController.onTapDown(e)
-
     of bsUnknown:
-        var dx = v.startPoint.x - e.localPosition.x
-        var dy = v.startPoint.y - e.localPosition.y
+        var dx = e.localPosition.x - v.startPoint.x
+        var dy = e.localPosition.y - v.startPoint.y
         v.cameraController.onScrollProgress(dx, dy, e)
 
     return v.makeFirstResponder()
@@ -116,6 +119,8 @@ method init*(v: EditorSceneView, r: Rect)=
         v.updateGizmo()
 
     v.addSubview(clipView)
+
+    v.trackMouseOver(true)
 
 method tabSize*(v: EditorSceneView, bounds: Rect): Size=
     result = newSize(bounds.width, 250.0)
