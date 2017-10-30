@@ -139,7 +139,6 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
                     var dc = newSeq[int]()
 
                     for i, subv in v.subviews:
-                        printRepr = true
                         echo "subv nil ", subv.isNil, " ", v.isNil
                         if subv.frame.contains(v.selectionOrigin):
                             if i in v.selectedItems and not v.onItemDoubleClick.isNil:
@@ -153,7 +152,6 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
 
                         elif i in v.selectedItems:
                             v.deselectItem(i)
-                        printRepr = false
 
                     for i in dc:
                         v.deselectItem(i)

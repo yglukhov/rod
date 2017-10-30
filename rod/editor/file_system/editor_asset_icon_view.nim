@@ -3,7 +3,8 @@ import nimx.assets.asset_loading
 import tables, os, streams
 import nimx.event
 import nimx.view_event_handling_new
-
+when not defined(android) and not defined(ios) and not defined(emscripten):
+    import file_dialog.file_info
 
 type PathNode* = ref object of RootObj
     children*: seq[PathNode]
@@ -25,10 +26,10 @@ var filesExtensions = newTable[string, AssetKind]()
 
 filesExtensions[".png"] = akImage
 filesExtensions[".jpg"] = akImage
-filesExtensions[".txt"] = akText
-filesExtensions[".json"] = akComposition
-filesExtensions[".mp3"] = akSound
-filesExtensions[".ogg"] = akSound
+# filesExtensions[".txt"] = akText
+# filesExtensions[".json"] = akComposition
+# filesExtensions[".mp3"] = akSound
+# filesExtensions[".ogg"] = akSound
 
 type ImageIconView* = ref object of View
     image: Image
@@ -115,24 +116,41 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
         res.icon = imgView
 
     of akContainer:
-        res.icon = newView(newRect(iconPos, iconSize))
-        res.icon.backgroundColor = newColor(0.5, 0.4, 0.6, 1.0)
+        # res.icon = newView(newRect(iconPos, iconSize))
+        # res.icon.backgroundColor = newColor(0.5, 0.4, 0.6, 1.0)
+
+        let img_data = iconBitmapForFile(p.fullPath, 128, 128)
+        let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
+
+        let imgView = new(ImageIconView)
+        imgView.init(newRect(iconPos, iconSize))
+        imgView.makeThumb = true
+        imgView.image = img
+        res.icon = imgView
 
     of akComposition:
         res.icon = newView(newRect(iconPos, iconSize))
         res.icon.backgroundColor = newColor(0.5, 0.8, 0.6, 1.0)
 
     else:
-        res.icon = newView(newRect(iconPos, iconSize))
-        res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
-        var extField = newLabel(newRect(0.0, 0.0, iconSize.width, iconSize.height))
-        extField.formattedText.horizontalAlignment = haCenter
-        extField.formattedText.verticalAlignment = vaCenter
-        extField.formattedText.truncationBehavior = tbCut
-        extField.text = sp.ext[1..^1]
-        extField.formattedText.boundingSize = extField.bounds.size
+        # res.icon = newView(newRect(iconPos, iconSize))
+        # res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
+        # var extField = newLabel(newRect(0.0, 0.0, iconSize.width, iconSize.height))
+        # extField.formattedText.horizontalAlignment = haCenter
+        # extField.formattedText.verticalAlignment = vaCenter
+        # extField.formattedText.truncationBehavior = tbCut
+        # extField.text = sp.ext[1..^1]
+        # extField.formattedText.boundingSize = extField.bounds.size
 
-        res.icon.addSubview(extField)
+        # res.icon.addSubview(extField)
+        let img_data = iconBitmapForFile(p.fullPath, 128, 128)
+        let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
+
+        let imgView = new(ImageIconView)
+        imgView.init(newRect(iconPos, iconSize))
+        imgView.makeThumb = true
+        imgView.image = img
+        res.icon = imgView
 
     res.addSubview(res.icon)
     var textFrame = newRect(0.0, r.size.height - 20.0, r.size.width, 20.0)
