@@ -15,9 +15,9 @@ import variant
 
 export view
 
-import node
-import component
-import rod_types
+import rod.node
+import rod.component
+import rod.rod_types
 
 import rod.property_editors.propedit_registry
 import rod.property_editors.standard_editors
@@ -198,5 +198,9 @@ method tabAnchor*(v: InspectorView): EditorTabAnchor =
 method update*(v: InspectorView)=
     if v.autoUpdate:
         v.inspectedNode = v.currNode
+
+method onCompositionChanged*(v: InspectorView, comp: CompositionDocument) =
+    # v.inspectedNode = comp.rootNode
+    v.setEditedNode(comp.selectedNode)
 
 registerEditorTab("Inspector", InspectorView)

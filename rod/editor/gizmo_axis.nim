@@ -17,6 +17,8 @@ type GizmoAxis* = ref object
     gizmoNode*: Node
     moveAxis: Vector3
     mEditedNode*: Node
+    screenPoint: Vector3
+    offset: Vector3
 
 proc updateGizmo*(ns: GizmoAxis) =
     if ns.mEditedNode.isNil:
@@ -45,8 +47,6 @@ proc newGizmoAxis*(): GizmoAxis =
 
     result.updateGizmo()
 
-
-var screenPoint, offset: Vector3
 proc startTransform*(ga: GizmoAxis, selectedGizmo: Node, position: Point) =
     if selectedGizmo.name.contains("gizmo_axis_x"):
         ga.moveAxis = newVector3(1.0, 0.0, 0.0)
@@ -55,24 +55,22 @@ proc startTransform*(ga: GizmoAxis, selectedGizmo: Node, position: Point) =
     elif selectedGizmo.name.contains("gizmo_axis_z"):
         ga.moveAxis = newVector3(0.0, 0.0, 1.0)
 
-    screenPoint = ga.gizmoNode.sceneView.worldToScreenPoint(ga.gizmoNode.worldPos)
-    offset = ga.gizmoNode.worldPos - ga.gizmoNode.sceneView.screenToWorldPoint(newVector3(position.x, position.y, screenPoint.z))
+    ga.screenPoint = ga.gizmoNode.sceneView.worldToScreenPoint(ga.gizmoNode.worldPos)
+    ga.offset = ga.gizmoNode.worldPos - ga.gizmoNode.sceneView.screenToWorldPoint(newVector3(position.x, position.y, ga.screenPoint.z))
 
 proc proccesTransform*(ns: GizmoAxis, position: Point) =
     if ns.mEditedNode.isNil:
         return
 
-    let curScreenPoint = newVector3(position.x, position.y, screenPoint.z)
+    let curScreenPoint = newVector3(position.x, position.y, ns.screenPoint.z)
     var curPosition: Vector3
-    curPosition = ns.mEditedNode.sceneView.screenToWorldPoint(curScreenPoint) + offset
+    curPosition = ns.mEditedNode.sceneView.screenToWorldPoint(curScreenPoint) + ns.offset
     curPosition = curPosition - ns.gizmoNode.worldPos
     ns.gizmoNode.position = ns.gizmoNode.worldPos + curPosition * ns.moveAxis
-
     if not ns.mEditedNode.parent.isNil:
         ns.mEditedNode.position = ns.mEditedNode.parent.worldToLocal(ns.gizmoNode.position)
     else:
         ns.mEditedNode.position = ns.gizmoNode.position
-
 
 proc stopTransform*(ns: GizmoAxis) =
     ns.moveAxis = newVector3(0.0, 0.0, 0.0)
