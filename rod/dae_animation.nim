@@ -51,7 +51,7 @@ proc createProgressSetterWithPropSetter[T](setter: proc(v: T), parsedValues: seq
         let m = i mod 1.0
         setter(interpolate(propValues[index], propValues[index + 1], m))
 
-proc createProgressSetter[T](propName: string, node: Node3D, parsedValues: seq[T]): AnimProcSetter =
+proc createProgressSetter[T](propName: string, node: Node, parsedValues: seq[T]): AnimProcSetter =
     let ap = node.findAnimatableProperty(propName)
     if ap.isEmpty:
         raise newException(Exception, "Property " & propName & " not found in node " & node.name)
@@ -65,7 +65,7 @@ proc createProgressSetter[T](propName: string, node: Node3D, parsedValues: seq[T
     else:
         raise newException(Exception, "Wrong type for property " & rawPropName & " of node " & animatedNode.name)
 
-proc animationAttach(node: Node3D, anim: ColladaAnimation, duration: var float32): seq[AnimProcSetter] =
+proc animationAttach(node: Node, anim: ColladaAnimation, duration: var float32): seq[AnimProcSetter] =
     ## Attach single animation to node
     ## General Animation object preperation
     case anim.channel.kind
@@ -125,7 +125,7 @@ proc animationAttach(node: Node3D, anim: ColladaAnimation, duration: var float32
             createProgressSetter("scale", node, parsedScales)
         ]
 
-proc animationWithCollada*(root: Node3D, anim: ColladaAnimation): Animation =
+proc animationWithCollada*(root: Node, anim: ColladaAnimation): Animation =
     ## Attach animation to node
     result = newAnimation()
 

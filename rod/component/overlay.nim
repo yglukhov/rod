@@ -6,7 +6,7 @@ import nimx.matrixes
 import rod.node
 import rod.component
 
-type Overlay* = ref object of OverlayComponent
+type Overlay* = ref object of Component
 
 var overlayPostEffect = newPostEffect("""
 

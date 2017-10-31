@@ -458,7 +458,7 @@ proc loadColladaFromStream(s: Stream): ColladaScene =
     s.close()
 
 # --------------- TODO ------
-proc loadSceneAsync*(resourcePath: string, handler: proc(n: Node3D)) =
+proc loadSceneAsync*(resourcePath: string, handler: proc(n: Node)) =
     sharedAssetManager().getAssetAtPath(resourcePath) do(colladaScene: ColladaScene, err: string):
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene, resourcePath)
         for anim in colladaScene.animations:

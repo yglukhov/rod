@@ -12,13 +12,13 @@ import quaternion
 const maxLightsCount* = 8
 
 type
-    Node3D* = ref object
+    Node* = ref object
         mTranslation*: Vector3
         mRotation*: Quaternion
         mScale*: Vector3
         components*: seq[Component]
-        children*: seq[Node3D]
-        mParent*: Node3D
+        children*: seq[Node]
+        mParent*: Node
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
@@ -31,9 +31,8 @@ type
         mAnchorPoint*: Vector3
         affectsChildren*: bool # Should posteffects affect only this node or its children as well
 
-    Node2D* = Node3D
-
-    Node* = Node3D
+    Node2D* {.deprecated.} = Node
+    Node3D* {.deprecated.} = Node
 
     BBox* = object
         minPoint*: Vector3
@@ -44,7 +43,7 @@ type
         max*: Vector3
 
     Component* = ref object of RootRef
-        node*: Node3D
+        node*: Node
 
     PostprocessContext* = ref object
         shader*: ProgramRef
@@ -57,21 +56,14 @@ type
         viewMatrixCached*: Matrix4
         viewProjMatrix*: Matrix4
         mCamera*: Camera
-        mRootNode*: Node3D
+        mRootNode*: Node
         animationRunner*: AnimationRunner
         deltaTimeAnimation*: Animation
-        numberOfNodesWithBackComposition*: int
-        numberOfNodesWithBackCompositionInCurrentFrame*: int
-        mActiveFrameBuffer*, mBackupFrameBuffer*: SelfContainedImage
-        mScreenFrameBuffer*: FramebufferRef
-        tempFramebuffers*: seq[SelfContainedImage]
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]
         postprocessContext*: PostprocessContext
         editing*: bool
         afterDrawProc*: proc() # PRIVATE DO NOT USE!!!
-
-    Viewport* {.deprecated.} = SceneView
 
     CameraProjection* = enum
         cpOrtho,

@@ -14,7 +14,7 @@ proc onTreeChanged(v: EditorTreeView)=
     v.filterField.sendAction()
     v.editor.sceneTreeDidChange()
 
-proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var seq[int])
+proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node, indexPath: var seq[int])
 
 proc nodeFromSelectedOutlinePath(v: EditorTreeView): Node=
     var sip = v.outlineView.selectedIndexPath
@@ -22,7 +22,7 @@ proc nodeFromSelectedOutlinePath(v: EditorTreeView): Node=
     if sip.len == 0:
         sip.add(0)
     else:
-        result = v.outlineView.itemAtIndexPath(sip).get(Node3D)
+        result = v.outlineView.itemAtIndexPath(sip).get(Node)
 
 
 method init*(v: EditorTreeView, r: Rect)=
@@ -48,7 +48,7 @@ method init*(v: EditorTreeView, r: Rect)=
         if indexPath.len == 0:
             return 1
         else:
-            let n = item.get(Node3D)
+            let n = item.get(Node)
             if n.children.isNil:
                 return 0
             else:
@@ -58,7 +58,7 @@ method init*(v: EditorTreeView, r: Rect)=
         if indexPath.len == 1:
             return newVariant(v.rootNode)
         else:
-            return newVariant(item.get(Node3D).children[indexPath[^1]])
+            return newVariant(item.get(Node).children[indexPath[^1]])
 
     outlineView.createCell = proc(): TableViewCell =
         var lbl = newLabel(newRect(0, 0, 100, 20))
@@ -84,7 +84,7 @@ method init*(v: EditorTreeView, r: Rect)=
             return true
 
     outlineView.configureCell = proc (cell: TableViewCell, indexPath: openarray[int]) =
-        let n = outlineView.itemAtIndexPath(indexPath).get(Node3D)
+        let n = outlineView.itemAtIndexPath(indexPath).get(Node)
         let textField = TextField(cell.subviews[0])
 
         var btn = Button(cell.subviews[1])
@@ -113,17 +113,17 @@ method init*(v: EditorTreeView, r: Rect)=
 
         let ip = outlineView.selectedIndexPath
         let n = if ip.len > 0:
-                outlineView.itemAtIndexPath(ip).get(Node3D)
+                outlineView.itemAtIndexPath(ip).get(Node)
             else:
                 nil
 
         v.editor.selectedNode = n
 
     outlineView.onDragAndDrop = proc(fromIp, toIp: openarray[int]) =
-        let f = outlineView.itemAtIndexPath(fromIp).get(Node3D)
+        let f = outlineView.itemAtIndexPath(fromIp).get(Node)
         var tos = @toIp
         tos.setLen(tos.len - 1)
-        let t = outlineView.itemAtIndexPath(tos).get(Node3D)
+        let t = outlineView.itemAtIndexPath(tos).get(Node)
         let toIndex = toIp[^1]
         if f.parent == t:
             let cIndex = t.children.find(f)
@@ -159,7 +159,7 @@ method init*(v: EditorTreeView, r: Rect)=
         if sip.len == 0:
             sip.add(0)
         else:
-            n = outlineView.itemAtIndexPath(sip).get(Node3D)
+            n = outlineView.itemAtIndexPath(sip).get(Node)
 
         outlineView.expandRow(sip)
         discard n.newChild("New Node")
@@ -175,7 +175,7 @@ method init*(v: EditorTreeView, r: Rect)=
     deleteNodeButton.title = "-"
     deleteNodeButton.onAction do():
         if outlineView.selectedIndexPath.len != 0:
-            let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node3D)
+            let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node)
             n.removeFromParent()
             var sip = outlineView.selectedIndexPath
             sip.delete(sip.len-1)
@@ -253,7 +253,7 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
         
         result = true
 
-proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node3D, indexPath: var seq[int]) =
+proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node, indexPath: var seq[int]) =
     # running up and calculate the path to the node in the tree
     let parent = n.parent
     if not parent.isNil:

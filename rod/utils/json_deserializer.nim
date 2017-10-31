@@ -18,7 +18,7 @@ proc setLenX[T](s: var seq[T], sz: int) =
     else:
         s.setLen(sz)
 
-proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image 
+proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image
 
 proc get[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
     when T is float | float32 | float64:
@@ -26,7 +26,7 @@ proc get[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
     elif T is int | int32 | int64 | int16:
         v = T(j.num)
     elif T is string:
-        v = j.str
+        v = if j.kind == JNull: nil else: j.str
     elif T is Rect:
         v = newRect(j[0].getFNum(), j[1].getFNum(), j[2].getFNum(), j[3].getFNum())
     elif T is tuple:
@@ -44,7 +44,7 @@ proc get[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
 
     elif T is enum:
         v = parseEnum[T](j.str)
-        
+
     elif T is seq:
         v.setLenX(j.len)
         for i in 0 ..< j.len:
