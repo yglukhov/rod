@@ -8,6 +8,7 @@ import rod / utils / [property_desc, serialization_codegen ]
 type CompRef* = ref object of Component
     size*: Size
     path: string
+    refNode: Node
 
 CompRef.properties:
     size
@@ -25,6 +26,11 @@ proc awake(c: CompRef) =
     let n = newNodeWithResource(c.path & ".json")
     n.setSize(c.size)
     c.node.addChild(n)
+    c.refNode = n
+
+proc setSize*(c: CompRef, s: Size)=
+    if not c.refNode.isNil:
+        c.refNode.setSize(s)
 
 method deserialize*(s: CompRef, j: JsonNode, serializer: Serializer) =
     let v = j{"size"}
@@ -41,6 +47,7 @@ method getBBox*(s: CompRef): BBox =
 
 method visitProperties*(c: CompRef, p: var PropertyVisitor) =
     p.visitProperty("size", c.size)
+    c.setSize(c.size)
 
 method serialize*(c: CompRef, s: Serializer): JsonNode =
     result = newJObject()

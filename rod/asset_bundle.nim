@@ -204,15 +204,16 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
 
     type DownloadCtx = ref object
         handler: proc(err: string)
-        success: bool
+        errorMsg: cstring
 
     proc onDownloadComplete(ctx: pointer) {.cdecl.} =
         let ctx = cast[DownloadCtx](ctx)
         GC_unref(ctx)
-        if ctx.success:
+        if ctx.errorMsg.isNil:
             ctx.handler(nil)
         else:
-            ctx.handler("Could not download or extract")
+            ctx.handler("Could not download or extract: " & $ctx.errorMsg)
+            deallocShared(ctx.errorMsg)
 
     proc extractGz(zipFileName, destFolder: string): bool =
         var file = newTarFile(zipFileName)
@@ -240,9 +241,13 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             when defined(ssl):
                 sslCtx.destroyContext()
 
-            cast[DownloadCtx](ctx).success = extractGz(zipFilePath, destPath)
+            if not extractGz(zipFilePath, destPath):
+                raise newException(Exception, "Could not extract")
         except:
-            discard
+            var errorMsg = "Error downloading " & url & " to " & destPath & ": " & getCurrentExceptionMsg()
+            let cerrorMsg = cast[cstring](allocShared(errorMsg.len + 1))
+            copyMem(cerrorMsg, addr errorMsg[0], errorMsg.len + 1)
+            cast[DownloadCtx](ctx).errorMsg = cerrorMsg
         finally:
             performOnMainThread(onDownloadComplete, ctx)
 
@@ -293,7 +298,7 @@ proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: strin
             ab.init() do():
                 handler(abd.path, ab)
         else:
-            warn "Asset bundle error for ", abd.hash, ": " , err
+            warn "Asset bundle error for ", abd.hash, " (", abd.path, "): " , err
 
 proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle])) =
     var mountPaths = newSeq[string](abds.len)
