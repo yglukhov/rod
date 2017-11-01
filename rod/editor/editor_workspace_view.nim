@@ -45,36 +45,6 @@ proc addToolbarMenu*(w: WorkspaceView, item: MenuItem) =
     let b = w.newToolbarButton(item.title)
     b.onAction() do():
         item.popupAtPoint(b, newPoint(0, 25))
-
-proc createSceneMenu(w: WorkspaceView) =
-    when loadingAndSavingAvailable:
-        if w.editor.startFromGame:
-            let m = makeMenu("Scene"):
-                - "Load":
-                    # if not
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeLoad)
-                    # e.loadNode()
-                - "Save":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeSave)
-                    # if not e.selectedNode.isNil:
-                    #     e.saveNode(e.selectedNode)
-            w.addToolbarMenu(m)
-        else:
-            let m = makeMenu("Scene"):
-                - "New":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionNew)
-                    # var sceneEdit = e.createCompositionEditor()
-                    # if not sceneEdit.isNil:
-                    #     e.workspaceView.addTab(sceneEdit)
-                - "Load":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeLoad)
-                    # e.loadNode()
-                - "Save":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeSave)
-                    # if not e.selectedNode.isNil:
-                    #     e.saveNode(e.selectedNode)
-            w.addToolbarMenu(m)
-
 # proc getTabViews(tv: View): seq[TabView] =
 #     result = @[]
 #     if tv of TabView:
@@ -319,6 +289,33 @@ proc createTabView(w: WorkspaceView)=
     for m in toolBarMenus:
         w.addToolbarMenu(m)
 
+proc createSceneMenu(w: WorkspaceView) =
+    when loadingAndSavingAvailable:
+        if w.editor.startFromGame:
+            let m = makeMenu("Scene"):
+                - "Load":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeLoad)
+
+                - "Save":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeSave)
+
+            w.addToolbarMenu(m)
+        else:
+            let m = makeMenu("Scene"):
+                - "New":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionNew)
+                    var sceneEdit = w.createCompositionEditor()
+                    if not sceneEdit.isNil:
+                        w.addTab(sceneEdit)
+                - "Load":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionOpen)
+                    # e.loadNode()
+                - "Save":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionSave)
+                    # if not e.selectedNode.isNil:
+                    #     e.saveNode(e.selectedNode)
+            w.addToolbarMenu(m)
+
 proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
     let w = WorkspaceView.new(window.bounds)
     w.editor = editor
@@ -357,7 +354,7 @@ proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
         var compTab = w.createCompositionEditor(comp)
         if not compTab.isNil:
             w.addTab(compTab)
-
+        w.editor.mCurrentComposition = comp
     else:
         var compTab = w.createCompositionEditor()
         if not compTab.isNil:
@@ -365,6 +362,7 @@ proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
             w.editor.rootNode = compTab.rootNode
 
         window.addSubview(w)
+        w.editor.mCurrentComposition = compTab.composition
 
     if w.editor.currentProject.tabs.isNil:
         for rt in registeredEditorTabs():

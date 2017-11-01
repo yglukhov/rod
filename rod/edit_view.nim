@@ -124,7 +124,7 @@ when loadingAndSavingAvailable:
             var data = c.rootNode.serialize(s)
             writeFile(c.path, $data)
 
-        echo "try save composition ", c.path
+        # echo "try save composition ", c.path
 
     proc openComposition*(e: Editor, p: string)=
         try:
@@ -296,6 +296,45 @@ proc onFirstResponderChanged(e: Editor, fr: View)=
             e.currentComposition = t.composition
             e.sceneView = t.rootNode.sceneView # todo: fix this
             break
+#[
+    const RodEditorNotif_onNodeLoad* = "RodEditorNotif_onNodeLoad"
+    const RodEditorNotif_onNodeSave* = "RodEditorNotif_onNodeSave"
+    const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
+    const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
+    const RodEditorNotif_onCompositionNew* = "RodEditorNotif_onCompositionNew"
+]#
+proc initNotifHandlers(e: Editor)=
+    e.notifCenter = newNotificationCenter()
+    e.notifCenter.addObserver(RodEditorNotif_onNodeLoad, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.loadNode()
+        else: discard
+
+    e.notifCenter.addObserver(RodEditorNotif_onNodeSave, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.saveNode(e.selectedNode)
+        else: discard
+
+    # e.notifCenter.addObserver(RodEditorNotif_onCompositionNew, e) do(args: Variant):
+        # discard
+
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionSave, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.saveComposition(e.mCurrentComposition)
+        else: discard
+
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionOpen, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            var di: DialogInfo
+            di.folder = e.currentProject.path
+            di.extension = "json"
+            di.kind = dkOpenFile
+            di.filters = @[(name:"Json", ext:"*.json")]
+            di.title = "Open composition"
+            let path = di.show()
+            if path.len > 0:
+                e.openComposition(path)
+        else: discard
 
 proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     result.new()
@@ -304,6 +343,7 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     editor.window = w
     editor.currentProject = p
     editor.startFromGame = false
+    editor.initNotifHandlers()
     editor.workspaceView = createWorkspaceLayout(w, editor)
 
     sharedNotificationCenter().addObserver(NimxFristResponderChangedInWindow, editor) do(args: Variant):
@@ -324,6 +364,7 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
     editor.sceneView = n.sceneView
     editor.sceneView.editing = true
     editor.startFromGame = startFromGame
+    editor.initNotifHandlers()
     editor.workspaceView = createWorkspaceLayout(v.window, editor)
 
     var updateAnimation = newAnimation()
