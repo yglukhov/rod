@@ -327,7 +327,6 @@ proc initNotifHandlers(e: Editor)=
         when loadingAndSavingAvailable:
             var di: DialogInfo
             di.folder = e.currentProject.path
-            di.extension = "json"
             di.kind = dkOpenFile
             di.filters = @[(name:"Json", ext:"*.json")]
             di.title = "Open composition"
