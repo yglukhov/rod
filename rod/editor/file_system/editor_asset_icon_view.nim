@@ -116,41 +116,42 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
         res.icon = imgView
 
     of akContainer:
-        # res.icon = newView(newRect(iconPos, iconSize))
-        # res.icon.backgroundColor = newColor(0.5, 0.4, 0.6, 1.0)
-
         let img_data = iconBitmapForFile(p.fullPath, 128, 128)
-        let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
-
-        let imgView = new(ImageIconView)
-        imgView.init(newRect(iconPos, iconSize))
-        imgView.makeThumb = true
-        imgView.image = img
-        res.icon = imgView
+        if not img_data.isNil: 
+            let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
+            let imgView = new(ImageIconView)
+            imgView.init(newRect(iconPos, iconSize))
+            imgView.makeThumb = true
+            imgView.image = img
+            res.icon = imgView
+        else:
+            res.icon = newView(newRect(iconPos, iconSize))
+            res.icon.backgroundColor = newColor(0.5, 0.4, 0.6, 1.0)
 
     of akComposition:
         res.icon = newView(newRect(iconPos, iconSize))
         res.icon.backgroundColor = newColor(0.5, 0.8, 0.6, 1.0)
 
     else:
-        # res.icon = newView(newRect(iconPos, iconSize))
-        # res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
-        # var extField = newLabel(newRect(0.0, 0.0, iconSize.width, iconSize.height))
-        # extField.formattedText.horizontalAlignment = haCenter
-        # extField.formattedText.verticalAlignment = vaCenter
-        # extField.formattedText.truncationBehavior = tbCut
-        # extField.text = sp.ext[1..^1]
-        # extField.formattedText.boundingSize = extField.bounds.size
-
-        # res.icon.addSubview(extField)
         let img_data = iconBitmapForFile(p.fullPath, 128, 128)
-        let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
+        if not img_data.isNil:
+            let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
+            let imgView = new(ImageIconView)
+            imgView.init(newRect(iconPos, iconSize))
+            imgView.makeThumb = true
+            imgView.image = img
+            res.icon = imgView
+        else:
+            res.icon = newView(newRect(iconPos, iconSize))
+            res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
+            var extField = newLabel(newRect(0.0, 0.0, iconSize.width, iconSize.height))
+            extField.formattedText.horizontalAlignment = haCenter
+            extField.formattedText.verticalAlignment = vaCenter
+            extField.formattedText.truncationBehavior = tbCut
+            extField.text = sp.ext[1..^1]
+            extField.formattedText.boundingSize = extField.bounds.size
 
-        let imgView = new(ImageIconView)
-        imgView.init(newRect(iconPos, iconSize))
-        imgView.makeThumb = true
-        imgView.image = img
-        res.icon = imgView
+            res.icon.addSubview(extField)
 
     res.addSubview(res.icon)
     var textFrame = newRect(0.0, r.size.height - 20.0, r.size.width, 20.0)
@@ -179,14 +180,15 @@ proc doubleClicked*(v: FilePreview)=
     if not v.onDoubleClicked.isNil:
         v.onDoubleClicked()
     else:
-        case v.kind:
+        openInDefaultApp(v.path)
+        # case v.kind:
 
-        of akImage:
-            loadAsset[Image]("file://" & v.path) do(i: Image, err: string):
-                var imgpreview = newImagePreview(newRect(0.0, 0.0, 0.0, 0.0), i)
-                imgpreview.popupAtPoint(v.window, v.frame.origin)
-        else:
-            echo "double clicked ", v.kind, " path ", v.path
+        # of akImage:
+        #     loadAsset[Image]("file://" & v.path) do(i: Image, err: string):
+        #         var imgpreview = newImagePreview(newRect(0.0, 0.0, 0.0, 0.0), i)
+        #         imgpreview.popupAtPoint(v.window, v.frame.origin)
+        # else:
+        #     echo "double clicked ", v.kind, " path ", v.path
 
 proc rename*(v: FilePreview, cb:proc(name: string))=
     if not v.selectionView.isNil:

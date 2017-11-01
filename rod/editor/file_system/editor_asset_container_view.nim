@@ -56,7 +56,7 @@ proc selectItem(v: AssetContainerView, i: int, notify: bool = true)=
     let subv = v.subviews[i]
     subv.backgroundColor = selectionColor
     if notify and not v.onItemSelected.isNil:
-        echo "select ", i
+        # echo "select ", i
         v.onItemSelected(i)
 
 proc deselectItem(v: AssetContainerView, i: int, notify: bool = true)=
@@ -64,7 +64,7 @@ proc deselectItem(v: AssetContainerView, i: int, notify: bool = true)=
     let subv = v.subviews[i]
     subv.backgroundColor = clearColor()
     if notify and not v.onItemDeselected.isNil:
-        echo "deselect ", i
+        # echo "deselect ", i
         v.onItemDeselected(i)
 
 method onTouchEv*(v: AssetContainerView, e: var Event): bool =
@@ -109,7 +109,7 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
 
     else:
         if v.dragStarted:
-            echo "draging"
+            # echo "draging"
             # v.selectedItems.setLen(0)
             v.selectionRect = zeroRect
         else:
@@ -117,7 +117,7 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
             var selected = newSeq[int]()
 
             if hasSelectionRect:
-                echo "hasSelectionRect"
+                # echo "hasSelectionRect"
                 for i, subv in v.subviews:
                     if subv.frame.intersect(v.selectionRect):
                         v.selectItem(i, false)
@@ -126,7 +126,7 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
                         v.deselectItem(i)
             else:
                 if v.selectedItems.len > 1:
-                    echo "selitems > 1"
+                    # echo "selitems > 1"
                     for si in v.selectedItems:
                         if v.subviews[si].frame.contains(v.selectionOrigin):
                             v.selectItem(si)
@@ -139,7 +139,7 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
                     var dc = newSeq[int]()
 
                     for i, subv in v.subviews:
-                        echo "subv nil ", subv.isNil, " ", v.isNil
+                        # echo "subv nil ", subv.isNil, " ", v.isNil
                         if subv.frame.contains(v.selectionOrigin):
                             if i in v.selectedItems and not v.onItemDoubleClick.isNil:
                                 dc.add(i)
