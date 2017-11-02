@@ -69,7 +69,7 @@ method init*(i: InspectorView, r: Rect) =
 
 proc createComponentsView(inspector: InspectorView, n: Node)
 
-proc `inspectedNode=`*(i: InspectorView, n: Node3D) =
+proc `inspectedNode=`*(i: InspectorView, n: Node) =
     # TODO: This is a hacky hardcode! Here we assume that inspector can have either
     # 2 subviews (no node edited) or 3 subviews, first of which is the scrollview
     # with property editors. We want to remove the scrollview.

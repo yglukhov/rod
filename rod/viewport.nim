@@ -18,7 +18,6 @@ import component.camera
 import rod.material.shader
 
 import ray
-export Viewport
 export SceneView
 
 const GridVertexShader = """
@@ -53,9 +52,9 @@ proc getDeltaTime*(): float =
 proc `camera=`*(v: SceneView, c: Camera) =
     v.mCamera = c
 
-template rootNode*(v: SceneView): Node2D = v.mRootNode
+template rootNode*(v: SceneView): Node = v.mRootNode
 
-proc `rootNode=`*(v: SceneView, n: Node2D) =
+proc `rootNode=`*(v: SceneView, n: Node) =
     if not v.mRootNode.isNil:
         v.mRootNode.nodeWillBeRemovedFromSceneView()
     v.mRootNode = n
@@ -64,7 +63,7 @@ proc `rootNode=`*(v: SceneView, n: Node2D) =
 
 proc camera*(v: SceneView): Camera =
     if v.mCamera.isNil:
-        let nodeWithCamera = v.rootNode.findNode(proc (n: Node2D): bool = not n.componentIfAvailable(Camera).isNil)
+        let nodeWithCamera = v.rootNode.findNode(proc (n: Node): bool = not n.componentIfAvailable(Camera).isNil)
         if not nodeWithCamera.isNil:
             v.mCamera = nodeWithCamera.componentIfAvailable(Camera)
     result = v.mCamera
@@ -80,18 +79,6 @@ proc prepareFramebuffer(v: SceneView, i: var SelfContainedImage, sz: Size) =
         logi "Recreating buffer"
         i = imageWithSize(sz)
         i.flipVertically()
-
-proc prepareFramebuffers(v: SceneView) =
-    v.numberOfNodesWithBackCompositionInCurrentFrame = v.numberOfNodesWithBackComposition
-    if v.numberOfNodesWithBackComposition > 0:
-        let gl = currentContext().gl
-        let vp = gl.getViewport()
-        let sz = newSize(vp[2].Coord, vp[3].Coord)
-        v.prepareFramebuffer(v.mActiveFrameBuffer, sz)
-        v.prepareFramebuffer(v.mBackupFrameBuffer, sz)
-        v.mScreenFramebuffer = gl.boundFramebuffer()
-        gl.bindFramebuffer(v.mActiveFrameBuffer, false)
-        gl.clearWithColor(0, 0, 0, 0)
 
 proc getProjectionMatrix*(v: SceneView): Matrix4 =
     v.camera.getProjectionMatrix(v.bounds, result)
@@ -147,8 +134,6 @@ proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
 
 template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProjectionMatrix()
 
-proc swapCompositingBuffers*(v: SceneView)
-
 const gridLineCount = 10
 proc drawGrid(v: SceneView) =
     let c = currentContext()
@@ -200,7 +185,6 @@ method draw*(v: SceneView, r: Rect) =
     if v.rootNode.isNil: return
 
     let c = currentContext()
-    v.prepareFramebuffers()
 
     if drawTable.isNil:
         drawTable = newTable[int, seq[Node]]()
@@ -218,12 +202,6 @@ method draw*(v: SceneView, r: Rect) =
 
         if not v.afterDrawProc.isNil:
             v.afterDrawProc()
-
-    if v.numberOfNodesWithBackCompositionInCurrentFrame > 0:
-        # When some compositing nodes are optimized away, we have
-        # to blit current backup buffer to the screen.
-        v.numberOfNodesWithBackCompositionInCurrentFrame = 1
-        v.swapCompositingBuffers()
 
 proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     if v.camera.projectionMode == cpOrtho:
@@ -246,70 +224,6 @@ proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     result.direction.normalize()
 
 import opengl
-
-proc aquireTempFramebuffer*(v: SceneView): SelfContainedImage =
-    let vp = currentContext().gl.getViewport()
-    let size = newSize(vp[2].Coord, vp[3].Coord)
-
-    if not v.tempFramebuffers.isNil and v.tempFramebuffers.len > 0:
-        result = v.tempFramebuffers[^1]
-        v.tempFramebuffers.setLen(v.tempFramebuffers.len - 1)
-        if result.size != size:
-            logi "REALLOCATING TEMP BUFFER"
-            result = imageWithSize(size)
-            result.flipVertically()
-            #swap(result.texCoords[1], result.texCoords[3])
-    else:
-        logi "CREATING TEMP BUFFER"
-        result = imageWithSize(size)
-        result.flipVertically()
-        #swap(result.texCoords[1], result.texCoords[3])
-
-proc releaseTempFramebuffer*(v: SceneView, fb: SelfContainedImage) =
-    if v.tempFramebuffers.isNil:
-        v.tempFramebuffers = newSeq[SelfContainedImage]()
-    v.tempFramebuffers.add(fb)
-
-proc swapCompositingBuffers*(v: SceneView) =
-    assert(v.numberOfNodesWithBackCompositionInCurrentFrame > 0)
-    dec v.numberOfNodesWithBackCompositionInCurrentFrame
-    let c = currentContext()
-    let gl = c.gl
-    when defined(js) or defined(emscripten) or defined(gles2only):
-        let vp = gl.getViewport()
-        #proc ortho*(dest: var Matrix4, left, right, bottom, top, near, far: Coord) =
-        var mat = ortho(0, Coord(vp[2]), Coord(vp[3]), 0, -1, 1)
-
-        c.withTransform mat:
-            if v.numberOfNodesWithBackCompositionInCurrentFrame == 0:
-                gl.bindFramebuffer(gl.FRAMEBUFFER, v.mScreenFrameBuffer)
-            else:
-                gl.bindFramebuffer(v.mBackupFrameBuffer, false)
-            let a = c.alpha
-            c.alpha = 1.0
-            gl.disable(gl.BLEND)
-            c.drawImage(v.mActiveFrameBuffer, newRect(0, 0, Coord(vp[2]), Coord(vp[3])))
-            gl.enable(gl.BLEND)
-            c.alpha = a
-    else:
-        if v.numberOfNodesWithBackCompositionInCurrentFrame == 0:
-            # Swap active buffer to screen
-            gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
-            gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, v.mScreenFrameBuffer)
-        else:
-            # Swap active buffer to backup buffer
-            gl.bindFramebuffer(v.mBackupFrameBuffer, false)
-            gl.bindFramebuffer(GL_READ_FRAMEBUFFER, v.mActiveFrameBuffer.framebuffer)
-        var bounds = v.convertRectToWindow(v.bounds)
-        let pixelRatio = if v.window.isNil: 1.0 else: v.window.pixelRatio
-        bounds.origin.x *= pixelRatio
-        bounds.origin.y *= pixelRatio
-        bounds.size.width *= pixelRatio
-        bounds.size.height *= pixelRatio
-        glBlitFramebuffer(bounds.x.GLint, bounds.y.GLint, bounds.width.GLint, bounds.height.GLint,
-                            bounds.x.GLint, bounds.y.GLint, bounds.width.GLint, bounds.height.GLint, GL_COLOR_BUFFER_BIT, GLenum(GL_NEAREST))
-
-    swap(v.mActiveFrameBuffer, v.mBackupFrameBuffer)
 
 proc addAnimation*(v: SceneView, a: Animation) =
     v.animationRunner.pushAnimation(a)

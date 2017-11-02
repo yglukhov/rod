@@ -38,7 +38,7 @@ type
     ParticleEmitter* = ref object of Component
         lifetime*: float
         birthRate*: float
-        particlePrototype*: Node2D
+        particlePrototype*: Node
         numberOfParticles*: int
         currentParticles: int
         gravity*: Vector3
