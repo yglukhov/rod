@@ -23,7 +23,7 @@ proc registerComponentGroup(group, component: string) =
     var g = componentGroupsTable.getOrDefault(validatedGroup)
     if g.isNil:
         g = newSeq[string]()
-    
+
     g.add(component)
     componentGroupsTable[validatedGroup] = g
 
@@ -123,7 +123,7 @@ method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
         return false
 
     let localRay = r.transform(inv_mat)
-    if c.node.getGlobalAlpha() < 0.0001:
+    if c.node.getGlobalAlpha() < 0.01 or not c.node.isEnabledInTree():
         result = false
     else:
         result = localRay.intersectWithAABB(bbox.minPoint, bbox.maxPoint, distance)

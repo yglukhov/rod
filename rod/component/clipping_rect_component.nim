@@ -95,7 +95,7 @@ method isPosteffectComponent*(c: ClippingRectComponent): bool = true
 
 method getBBox*(c: ClippingRectComponent): BBox =
     result.minPoint = newVector3(c.clippingRect.x, c.clippingRect.y, 0.0)
-    result.maxPoint = newVector3(c.clippingRect.width, c.clippingRect.height, 0.01)
+    result.maxPoint = newVector3(c.clippingRect.width, c.clippingRect.height, 0.0)
 
 method visitProperties*(cl: ClippingRectComponent, p: var PropertyVisitor) =
     p.visitProperty("rect", cl.clippingRect)

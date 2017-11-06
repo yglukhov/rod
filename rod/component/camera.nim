@@ -40,6 +40,7 @@ proc calculateOrthoData(c: Camera): tuple[top, bottom, left, right: float] =
     var logicalSize = c.viewportSize
     if logicalSize == zeroSize:
         logicalSize = absBounds.size
+        c.viewportSize = logicalSize
     let k = absBounds.height / logicalSize.height
     result.top = -cy / k
     result.bottom = (winSize.height - cy) / k

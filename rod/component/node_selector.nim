@@ -17,7 +17,7 @@ import rod.component.camera
 import rod.component.sprite
 import rod.node
 import rod.viewport
-import rod.editor.gizmos.move_axis
+import opengl
 
 const vertexShader = """
 attribute vec4 aPosition;
@@ -92,7 +92,7 @@ proc createVBO(ns: NodeSelector) =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
 
 method init*(ns: NodeSelector) =
-    ns.color = newColor(0, 0, 0, 1)
+    ns.color = newColor(0.12, 1, 0, 1)
     ns.modelMatrix.loadIdentity()
     procCall ns.Component.init()
 
@@ -147,7 +147,9 @@ method draw*(ns: NodeSelector) =
         let mvpMatrix = vp.getViewProjectionMatrix() * ns.modelMatrix
         gl.uniformMatrix4fv(gl.getUniformLocation(selectorSharedShader, "mvpMatrix"), false, mvpMatrix)
 
+        glLineWidth(2.0)
         gl.drawElements(gl.LINES, selectorSharedNumberOfIndexes, gl.UNSIGNED_SHORT)
+        glLineWidth(1.0)
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
         gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
