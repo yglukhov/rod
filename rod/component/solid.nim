@@ -46,7 +46,7 @@ method draw*(s: Solid) =
     c.drawRect(r)
 
 method getBBox*(s: Solid): BBox =
-    result.minPoint = newVector3(0.0, 0.0, 0.01)
+    result.minPoint = newVector3(0.0, 0.0, 0.0)
     result.maxPoint = newVector3(s.size.width, s.size.height, 0.0)
 
 method visitProperties*(c: Solid, p: var PropertyVisitor) =

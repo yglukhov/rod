@@ -1,13 +1,12 @@
-import nimx.view
-import nimx.collection_view
-import nimx.types
-import nimx.event
-import nimx.context
-import nimx.view_event_handling_new
-import nimx.drag_and_drop
-import nimx.pasteboard.pasteboard_item
-import nimx.view_render_to_image
+import nimx / [ view, collection_view, types, event, context,
+    view_event_handling_new, drag_and_drop, text_field,
+    pasteboard/pasteboard_item, view_render_to_image ]
+
 import os
+
+import editor_asset_icon_view
+
+export collection_view
 
 const selectionColor = newColor(0.0, 0.0, 0.5, 0.2)
 
@@ -23,12 +22,14 @@ type AssetContainerView* = ref object of CollectionView
     onItemsDelete*: proc(item:seq[int])
     onBackspace*: proc()
     onItemsDragStart*: proc(item: seq[int])
+    onItemRenamed*: proc(item:int)
+    mIsCompact: bool
 
 proc newAssetContainerView*(r: Rect): AssetContainerView=
     result = new(AssetContainerView)
     result.backgroundColor = whiteColor()
     result.layoutDirection = LayoutDirection.TopDown
-    result.itemSize = newSize(100.0, 100.0)
+    result.itemSize = newSize(128.0, 128.0)
     result.layoutWidth = 0
     result.offset = 35.0
     result.init(r)
@@ -39,9 +40,35 @@ proc reload*(v: AssetContainerView)=
     v.selectedItems.setLen(0)
     v.updateLayout()
 
+proc setCompact*(v: AssetContainerView, val: bool)=
+    if v.mIsCompact != val:
+        v.mIsCompact = val
+        if not val:
+            v.itemSize = newSize(128.0, 128.0)
+        else:
+            v.itemSize = newSize(256.0, 32.0)
+        v.reload()
+
+template isCompact*(v: AssetContainerView): bool = v.mIsCompact
+
+proc selectItem(v: AssetContainerView, i: int, notify: bool = true)=
+    # if i >= 0 and i < v.subviews.len:
+    let subv = v.subviews[i]
+    subv.backgroundColor = selectionColor
+    if notify and not v.onItemSelected.isNil:
+        # echo "select ", i
+        v.onItemSelected(i)
+
+proc deselectItem(v: AssetContainerView, i: int, notify: bool = true)=
+    # if i >= 0 and i < v.subviews.len:
+    let subv = v.subviews[i]
+    subv.backgroundColor = clearColor()
+    if notify and not v.onItemDeselected.isNil:
+        # echo "deselect ", i
+        v.onItemDeselected(i)
+
 method onTouchEv*(v: AssetContainerView, e: var Event): bool =
     discard procCall v.View.onTouchEv(e)
-
     if e.buttonState == bsDown:
         v.dragStarted = false
         v.selectionRect = zeroRect
@@ -55,9 +82,9 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
         if not v.onItemsDragStart.isNil:
             for i, sub in v.subviews:
                 if sub.frame.contains(orig):
-                    v.selectedItems.setLen(0)
+                    # v.selectedItems.setLen(0)
                     if dragLen > 10.0:
-                        sub.backgroundColor = selectionColor
+                        # sub.backgroundColor = selectionColor
                         v.onItemsDragStart(@[i])
                         v.dragStarted = true
                         return false
@@ -74,62 +101,73 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
         v.selectionRect.origin = topLeft
         v.selectionRect.size = newSize(botRight.x - topLeft.x, botRight.y - topLeft.y)
 
-        for subv in v.subviews:
+        for i, subv in v.subviews:
             if subv.frame.intersect(v.selectionRect):
-                subv.backgroundColor = selectionColor
+                v.selectItem(i, false)
             else:
-                subv.backgroundColor = clearColor()
+                v.deselectItem(i, false)
 
     else:
         if v.dragStarted:
-            v.selectedItems.setLen(0)
+            # echo "draging"
+            # v.selectedItems.setLen(0)
             v.selectionRect = zeroRect
+        else:
+            let hasSelectionRect = v.selectionRect.width + v.selectionRect.height > 5.0
+            var selected = newSeq[int]()
 
-        let hasSelectionRect = v.selectionRect.width + v.selectionRect.height > 0.1
-        var selected = newSeq[int]()
-        var doubleClick = false
-
-        if v.selectedItems.len > 1:
-            v.selectedItems.setLen(0)
-
-        for i, subv in v.subviews:
-            if subv.isNil: continue
-            if hasSelectionRect and subv.frame.intersect(v.selectionRect):
-                subv.backgroundColor = selectionColor
-                selected.add(i)
-
-            elif subv.frame.contains(v.selectionOrigin):
-                if i in v.selectedItems and not v.onItemDoubleClick.isNil:
-                    if not v.onItemDeselected.isNil:
-                        v.onItemDeselected(i)
-
-                    v.onItemDoubleClick(i)
-                    doubleClick = true
-                    v.selectedItems.setLen(0)
-                    subv.backgroundColor = clearColor()
-                else:
-                    subv.backgroundColor = selectionColor
-                    selected.add(i)
+            if hasSelectionRect:
+                # echo "hasSelectionRect"
+                for i, subv in v.subviews:
+                    if subv.frame.intersect(v.selectionRect):
+                        v.selectItem(i, false)
+                        selected.add(i)
+                    elif i in v.selectedItems:
+                        v.deselectItem(i)
             else:
-                subv.backgroundColor = clearColor()
+                if v.selectedItems.len > 1:
+                    # echo "selitems > 1"
+                    for si in v.selectedItems:
+                        if v.subviews[si].frame.contains(v.selectionOrigin):
+                            v.selectItem(si)
+                            selected.add(si)
+                        else:
+                            v.deselectItem(si)
 
-        if not v.onItemSelected.isNil and not doubleClick:
-            for i, subv in v.subviews:
-                if i in selected:
-                    v.onItemSelected(i)
-                elif not v.onItemDeselected.isNil:
-                    v.onItemDeselected(i)
+                    v.selectedItems.setLen(0)
+                else:
+                    var dc = newSeq[int]()
 
-        v.selectedItems = selected
+                    for i, subv in v.subviews:
+                        # echo "subv nil ", subv.isNil, " ", v.isNil
+                        if subv.frame.contains(v.selectionOrigin):
+                            if i in v.selectedItems and not v.onItemDoubleClick.isNil:
+                                dc.add(i)
+                                # v.deselectItem(i)
+                                # v.onItemDoubleClick(i)
+                                v.selectedItems.setLen(0)
+                            else:
+                                v.selectItem(i)
+                                selected.add(i)
 
-        v.selectionRect = newRect(0.0, 0.0, 0.0, 0.0)
+                        elif i in v.selectedItems:
+                            v.deselectItem(i)
+
+                    for i in dc:
+                        v.deselectItem(i)
+                        v.onItemDoubleClick(i)
+
+            v.selectedItems = selected
+            v.selectionRect = zeroRect
 
     result = true
     discard v.makeFirstResponder()
 
 method onKeyDown*(v: AssetContainerView, e: var Event):bool=
+    if not v.isFirstResponder: return
     case e.keyCode:
     of VirtualKey.Delete:
+        if v.subviews.len == 0: return
         if not v.onItemsDelete.isNil and v.selectedItems.len > 0:
             v.onItemsDelete(v.selectedItems)
             v.selectedItems.setLen(0)
@@ -137,9 +175,10 @@ method onKeyDown*(v: AssetContainerView, e: var Event):bool=
         result = true
 
     of VirtualKey.Up, VirtualKey.Down, VirtualKey.Left, VirtualKey.Right:
+        if v.subviews.len == 0: return
         if v.selectedItems.len == 0:
             v.selectedItems.add(0)
-            v.subviews[0].backgroundColor = selectionColor
+            v.selectItem(0)
         else:
             let itemsInLine = v.columnCount
             var step = if e.keyCode == VirtualKey.Left: -1
@@ -147,12 +186,11 @@ method onKeyDown*(v: AssetContainerView, e: var Event):bool=
                        elif e.keyCode == VirtualKey.Up: -itemsInLine
                        else: itemsInLine
 
-
             var last = -1
             if not e.modifiers.anyCtrl():
                 for sel in v.selectedItems:
                     last = sel
-                    v.subviews[sel].backgroundColor = clearColor()
+                    v.deselectItem(sel)
 
                 v.selectedItems.setLen(0)
             else:
@@ -163,11 +201,12 @@ method onKeyDown*(v: AssetContainerView, e: var Event):bool=
 
             for sel in v.selectedItems:
                 last = sel
-                v.subviews[sel].backgroundColor = selectionColor
+                v.selectItem(sel)
 
         result = true
 
     of VirtualKey.Space:
+        if v.subviews.len == 0: return
         if v.selectedItems.len == 1 and not v.onItemDoubleClick.isNil:
             v.onItemDoubleClick(v.selectedItems[0])
             result = true
@@ -175,6 +214,12 @@ method onKeyDown*(v: AssetContainerView, e: var Event):bool=
     of VirtualKey.Backspace:
         if not v.onBackspace.isNil():
             v.onBackspace()
+            result = true
+
+    of VirtualKey.Return:
+        if v.subviews.len == 0: return
+        if v.selectedItems.len == 1 and not v.onItemRenamed.isNil:
+            v.onItemRenamed(v.selectedItems[0])
             result = true
 
     else: discard

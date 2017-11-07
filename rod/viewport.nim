@@ -10,6 +10,7 @@ import nimx.view_event_handling_new
 import nimx.notification_center
 import nimx.system_logger
 
+import algorithm
 import times
 import tables
 import rod_types
@@ -222,6 +223,21 @@ proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     let target = v.screenToWorldPoint(newVector3(coords.x, coords.y, -1))
     result.direction = target - result.origin
     result.direction.normalize()
+
+proc rayCastFirstNode*(v: SceneView, node: Node, coords: Point): Node =
+    let r = v.rayWithScreenCoords(coords)
+    var castResult = newSeq[RayCastInfo]()
+    node.rayCast(r, castResult)
+
+    if castResult.len > 0:
+        castResult.sort do(x, y: RayCastInfo) -> int:
+            result = -cmp(x.distance, y.distance)
+
+        # for i in countdown(castResult.len - 1, 0):
+        #     if castResult[i].node.isEnabledInTree:
+        #         return castResult[i].node
+
+        result = castResult[^1].node
 
 import opengl
 

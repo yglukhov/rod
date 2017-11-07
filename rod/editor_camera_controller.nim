@@ -24,6 +24,7 @@ type EditorCameraController* = ref object
     currNode: Node
     currKey: VirtualKey
     currMouseKey: VirtualKey
+    prev_x, prev_y: float
 
 
 proc calculatePivotPos(camNode: Node): Vector3 =
@@ -82,13 +83,11 @@ proc setToNode*(cc: EditorCameraController, n: Node) =
 
     cc.updateCamera()
 
-var prev_x = 0.0
-var prev_y = 0.0
 proc onTapDown*(cc: EditorCameraController, e : var Event) =
     cc.camAnchor.worldPos = cc.editedView.camera.node.worldPos
     cc.currMouseKey = e.keyCode
-    prev_x = 0.0
-    prev_y = 0.0
+    cc.prev_x = 0.0
+    cc.prev_y = 0.0
 
 proc onTapUp*(cc: EditorCameraController, dx, dy : float32, e : var Event) =
     cc.currMouseKey = 0.VirtualKey
@@ -109,8 +108,8 @@ proc onKeyUp*(cc: EditorCameraController, e: var Event) =
 
 proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event) =
     if cc.currKey == VirtualKey.LeftAlt or cc.currKey == VirtualKey.RightAlt:
-        cc.currentAngle.x += prev_y - dy
-        cc.currentAngle.y += prev_x - dx
+        cc.currentAngle.x += cc.prev_y - dy
+        cc.currentAngle.y += cc.prev_x - dx
 
         let q = newQuaternionFromEulerXYZ(cc.currentAngle.x, cc.currentAngle.y, cc.currentAngle.z)
         cc.camPivot.rotation = q
@@ -120,14 +119,14 @@ proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event
         if cc.currKey == VirtualKey.LeftShift:
             speed = 1.0
 
-        var shift_pos = newVector3(prev_x - dx, -prev_y + dy, 0.0) * speed
+        var shift_pos = newVector3(cc.prev_x - dx, -cc.prev_y + dy, 0.0) * speed
         var rotMat = cc.camPivot.rotation.toMatrix4()
         rotMat.multiply(shift_pos, shift_pos)
 
         cc.camPivot.worldPos = cc.camPivot.worldPos + shift_pos
 
-    prev_x = dx
-    prev_y = dy
+    cc.prev_x = dx
+    cc.prev_y = dy
 
     cc.updateCamera()
 

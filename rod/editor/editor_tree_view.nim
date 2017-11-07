@@ -27,7 +27,7 @@ proc nodeFromSelectedOutlinePath(v: EditorTreeView): Node=
 
 method init*(v: EditorTreeView, r: Rect)=
     procCall v.View.init(r)
-    
+
     v.filterField = newTextField(newRect(0.0, 0.0, r.width, 20.0))
     v.filterField.autoresizingMask = {afFlexibleWidth}
     v.filterField.continuous = true
@@ -35,10 +35,10 @@ method init*(v: EditorTreeView, r: Rect)=
         v.outlineView.reloadData()
 
     v.addSubview(v.filterField)
-    
+
     v.renameField = newTextField(newRect(0.0, 0.0, r.width, 30.0))
     v.renameField.autoresizingMask = {afFlexibleWidth}
-    
+
 
     let outlineView = OutlineView.new(newRect(0.0, 25.0, r.width, r.height - 20))
     v.outlineView = outlineView
@@ -95,7 +95,7 @@ method init*(v: EditorTreeView, r: Rect)=
             textField.textColor = newGrayColor(0.0)
 
         textField.text = if n.name.isNil: "(node)" else: n.name
-        
+
         btn.onAction do():
             n.enabled = not n.enabled
             v.onTreeChanged()
@@ -197,7 +197,7 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
                 v.outlineView.superview.addSubview(v.renameField)
                 discard v.window.makeFirstResponder(v.renameField)
             else:
-                discard v.window.makeFirstResponder(v.outlineView)    
+                discard v.window.makeFirstResponder(v.outlineView)
         else:
             if not v.renameField.superview.isNil and v.renameField.isFirstResponder():
                 n.name = v.renameField.text
@@ -243,14 +243,14 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
             sip[^1].dec
         elif sip.len > 1:
             sip = sip[0..^2]
-    
+
         let n = v.nodeFromSelectedOutlinePath()
-        
+
         n.removeFromParent()
         v.outlineView.selectItemAtIndexPath(sip)
         v.onTreeChanged()
         v.editor.selectedNode = nil
-        
+
         result = true
 
 proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node, indexPath: var seq[int]) =
@@ -272,7 +272,7 @@ method setEditedNode*(v: EditorTreeView, n: Node)=
         v.getTreeViewIndexPathForNode(n, indexPath)
         v.outlineView.expandBranch(indexPath[0..^2])
 
-    if indexPath.len > 1:
+    if indexPath.len > 1: # todo: check this!
         v.outlineView.selectItemAtIndexPath(indexPath)
 
 method onEditorTouchDown*(v: EditorTreeView, e: var Event)=
@@ -295,5 +295,10 @@ method update*(v: EditorTreeView)=
     if frames > framesPerUpdate:
         v.outlineView.reloadData()
         frames = 0
+
+method onCompositionChanged*(v: EditorTreeView, comp: CompositionDocument) =
+    v.rootNode = comp.rootNode
+    v.outlineView.reloadData()
+    v.setEditedNode(comp.selectedNode)
 
 registerEditorTab("Tree", EditorTreeView)
