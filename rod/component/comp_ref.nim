@@ -23,7 +23,7 @@ proc setSize(n: Node, sz: Size) =
         c.setSize(sz)
 
 proc awake(c: CompRef) =
-    let n = newNodeWithResource(c.path & ".json")
+    let n = newNodeWithResource(c.path)
     n.setSize(c.size)
     c.node.addChild(n)
     c.refNode = n

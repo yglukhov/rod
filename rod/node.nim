@@ -688,7 +688,7 @@ proc newNodeWithResource*(path: string): Node =
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
-    result.loadComposition("compositions/" & name & ".json")
+    result.loadComposition("compositions/" & name)
 
 proc serialize*(n: Node, s: Serializer): JsonNode =
     result = newJObject()

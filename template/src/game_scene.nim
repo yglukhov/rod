@@ -53,7 +53,7 @@ method viewOnEnter*(gs: GameScene)=
     let gui = gs.rootNode.newChild("Gui")
 
     ## load seialized node from json, constructed in editor
-    let hello = newNodeWithResource("helloworld.json")
+    let hello = newNodeWithResource("helloworld")
     gui.addChild(hello)
 
     let btnExit = newButton(newRect(0, 0, 200, 50))
