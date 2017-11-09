@@ -108,25 +108,26 @@ proc newBinDeserializer*(s: Stream): BinDeserializer =
     result.stream = s
     result.init()
 
-proc hasComposition*(b: BinDeserializer, name: string): bool {.inline.} =
-    name in b.compsTable
-
-proc rewindToComposition*(b: BinDeserializer, name: string) =
-    var pos = b.compsTable.getOrDefault(name)
-    if pos == 0:
+proc offsetToComposition(b: BinDeserializer, name: string): int32 =
+    result = b.compsTable.getOrDefault(name)
+    if result == 0:
         if name.endsWith(".json"):
             # if name ends with ".json" try find a composition without extension
-            pos = b.compsTable.getOrDefault(changeFileExt(name, ""))
+            result = b.compsTable.getOrDefault(changeFileExt(name, ""))
         elif name.searchExtPos() == -1:
             # if name doesn't have any extension, try append ".json", maybe we have
             # an old pack format.
-            pos = b.compsTable.getOrDefault(name & ".json")
+            result = b.compsTable.getOrDefault(name & ".json")
 
-        if pos == 0:
-            for k in b.compsTable.keys:
-                echo "COMP: ", k
-            raise newException(Exception, "Could not rewind to " & name)
+proc hasComposition*(b: BinDeserializer, name: string): bool {.inline.} =
+    b.offsetToComposition(name) != 0
 
+proc rewindToComposition*(b: BinDeserializer, name: string) =
+    let pos = b.offsetToComposition(name)
+    if pos == 0:
+        for k in b.compsTable.keys:
+            echo "COMP: ", k
+        raise newException(Exception, "Could not rewind to " & name)
     b.stream.setPosition(pos)
 
 proc setLenX[T](s: var seq[T], sz: int) =
