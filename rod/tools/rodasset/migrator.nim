@@ -60,7 +60,7 @@ const upgraders = {
 
 proc upgradeAssetBundle*(path: string) =
     for f in walkDirRec(path):
-        if f.endsWith(".json"):
+        if f.endsWith(".json") or f.endsWith(".jcomp"):
             echo "processing ", f
             try:
                 var j = parseJson(readFile(f))

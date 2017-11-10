@@ -1,6 +1,6 @@
 import json
 
-import nimx / [ types, matrixes, property_visitor, resource ]
+import nimx / [ types, matrixes, property_visitor ]
 import rod / [ node, rod_types, component, tools/serializer ]
 import rod.component.sprite
 import rod / utils / [property_desc, serialization_codegen ]
@@ -23,7 +23,7 @@ proc setSize(n: Node, sz: Size) =
         c.setSize(sz)
 
 proc awake(c: CompRef) =
-    let n = newNodeWithResource(c.path & ".json")
+    let n = newNodeWithResource(c.path)
     n.setSize(c.size)
     c.node.addChild(n)
     c.refNode = n

@@ -147,8 +147,6 @@ proc isConfigRabExternal(configRab: string): bool {.compileTime.} =
 proc isConfigRabDebugOnly(configRab: string): bool {.compileTime.} =
     configRab.find("debugOnly true") != -1
 
-import nimx.resource_cache
-
 proc getEnvCt(k: string): string {.compileTime.} =
     when defined(buildOnWindows): # This should be defined by the naketools.nim
         result = staticExec("cmd /c \"echo %" & k & "%\"")

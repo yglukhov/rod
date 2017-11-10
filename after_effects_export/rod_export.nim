@@ -649,7 +649,7 @@ proc serializeLayer(layer: Layer): JsonNode =
                 result["children"] = chres
 
     if layer.layerIsCompositionRef():
-        result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
+        result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name)
 
     if not transitiveEffects: result["affectsChildren"] = %false
 
@@ -1086,7 +1086,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring) =
                 logi "ERROR: Could not create folder ", fullExportPath
         except:
             discard
-        let filePath = fullExportPath & "/" & $c.name & ".json"
+        let filePath = fullExportPath & "/" & $c.name & ".jcomp"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
         file.encoding = "UTF-8"

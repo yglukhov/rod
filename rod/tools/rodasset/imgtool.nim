@@ -105,8 +105,8 @@ proc checkCompositionRefs(c: JsonNode, compPath, originalResPath: string) =
         let jcr = n{"compositionRef"}
         if not jcr.isNil:
             let cr = jcr.str
-            let acr = absImagePath(compPath, cr)
-            if not fileExists(acr):
+            let acr = absImagePath(compPath, cr).changeFileExt("")
+            if not (fileExists(acr & ".json") or fileExists(acr & ".jcomp")):
                 missingRefs.add(acr)
     if missingRefs.len != 0:
         echo "Missing compositionRefs in ", compPath, ":"

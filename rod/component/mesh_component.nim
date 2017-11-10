@@ -1,17 +1,8 @@
-import tables
-import hashes
-import strutils
-import json
+import tables, hashes, strutils, json
 import opengl
 
-import nimx.image
-import nimx.resource
-import nimx.context
-import nimx.portable_gl
-import nimx.types
-import nimx.view
-import nimx.system_logger
-import nimx.property_visitor
+import nimx / [ image, context, portable_gl, types, view, property_visitor ]
+import nimx.assets.url_stream
 
 import nimasset.obj
 
@@ -136,7 +127,7 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
 
 proc loadMeshComponent(m: MeshComponent, resourceName: string) =
     if not vboCache.contains(m.resourceName):
-        loadResourceAsync resourceName, proc(s: Stream) =
+        openStreamForURL("res://" & resourceName) do(s: Stream, err: string):
             let loadFunc = proc() =
                 var loader: ObjLoader
                 var vertexData = newSeq[GLfloat]()

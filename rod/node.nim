@@ -1,28 +1,14 @@
-import tables
-import typetraits
-import json
-import strutils
-import math
+import tables, typetraits, json, strutils, math
 
-import nimx.context
-import nimx.types
-import nimx.resource
-import nimx.animation
-import nimx.image
-import nimx.portable_gl
-import nimx.view
-import nimx.property_visitor
+import nimx / [ context, types, animation, image, portable_gl, view, property_visitor ]
 
-import nimx.assets.asset_manager
-import nimx.assets.asset_loading
+import nimx / assets / [ asset_manager, asset_loading ]
 
-import quaternion
-import ray
+import quaternion, ray, rod_types
 import rod.tools.serializer
 import rod / utils / [ bin_deserializer, json_serializer ]
 import rod.asset_bundle
 
-import rod_types
 export Node
 
 proc sceneView*(n: Node): SceneView = n.mSceneView
@@ -688,7 +674,7 @@ proc newNodeWithResource*(path: string): Node =
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
-    result.loadComposition("compositions/" & name & ".json")
+    result.loadComposition("compositions/" & name)
 
 proc serialize*(n: Node, s: Serializer): JsonNode =
     result = newJObject()

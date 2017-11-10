@@ -1,15 +1,5 @@
-import streams
-import tables
-
-import nimx.types
-import nimx.context
-import nimx.portable_gl
-import nimx.render_to_image
-import nimx.matrixes
-import nimx.view
-import nimx.image
-import nimx.resource
-import nimx.property_visitor
+import nimx / [ types, context, portable_gl, render_to_image, matrixes, view,
+    image, property_visitor ]
 
 import rod.node
 import rod.viewport

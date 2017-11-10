@@ -119,7 +119,7 @@ proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name
     b.write($typ)
     b.write(nodeIds)
     b.writeArrayNoLen(components)
-    
+
 proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name: string, nodes: seq[JsonNode], default: T) =
     var nodeIds = newSeqOfCap[int16](nodes.len)
     var components = newSeqOfCap[T](nodes.len)
@@ -180,7 +180,7 @@ proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string
         let c = n{"compositionRef"}
         if not c.isNil:
             nodeIds.add(int16(n["_id"].num))
-            var p = parentDir(path) & "/" & c.str
+            var p = changeFileExt(parentDir(path) & "/" & c.str, "")
             normalizePath(p, false)
             components.add(p)
 
@@ -478,11 +478,11 @@ proc writeCompsTable(b: BinSerializer, paths: openarray[string], s: Stream) =
     # write offsets:
     s.align(sizeof(b.compsTable[""]))
     for p in spaths:
-        s.write(b.compsTable[p])
+        s.write(b.compsTable[changeFileExt(p, "")])
 
     # Write names:
     for p in spaths:
-        s.write(b.revStrTab[p])
+        s.write(b.revStrTab[changeFileExt(p, "")])
 
 proc writeCompositions(b: BinSerializer, comps: openarray[JsonNode], paths: openarray[string], s: Stream, images: JsonNode) =
     b.strTab = initTable[int16, string]()
@@ -491,13 +491,14 @@ proc writeCompositions(b: BinSerializer, comps: openarray[JsonNode], paths: open
     b.stringEntries = newSeqOfCap[int32](256)
     b.compsTable = initTable[string, int32]()
     b.images = images
-    
+
     for i, c in comps:
-        discard b.newString(paths[i])
+        let pathWithoutExt = changeFileExt(paths[i], "")
+        discard b.newString(pathWithoutExt)
         b.align(sizeof(int16))
-        b.compsTable[paths[i]] = int32(b.stream.getPosition())
-        b.writeComposition(c, paths[i])
-        
+        b.compsTable[pathWithoutExt] = int32(b.stream.getPosition())
+        b.writeComposition(c, pathWithoutExt)
+
     b.writeStringTable(s)
     s.align(sizeof(int16))
     s.write(int16(comps.len))

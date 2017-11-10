@@ -112,9 +112,9 @@ when loadingAndSavingAvailable:
         if c.path.len == 0:
             var di: DialogInfo
             di.folder = e.currentProject.path
-            di.extension = "json"
+            di.extension = "jcomp"
             di.kind = dkSaveFile
-            di.filters = @[(name:"Json", ext:"*.json")]
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
             di.title = "Save composition"
 
             c.path = di.show()
@@ -156,9 +156,9 @@ when loadingAndSavingAvailable:
     proc saveNode(editor: Editor, selectedNode: Node) =
         var di: DialogInfo
         di.folder = editor.currentProject.path
-        di.extension = "json"
+        di.extension = "jcomp"
         di.kind = dkSaveFile
-        di.filters = @[(name:"Json", ext:"*.json")]
+        di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
         di.title = "Save composition"
         let path = di.show()
         if not path.isNil:
@@ -170,7 +170,7 @@ when loadingAndSavingAvailable:
         var di: DialogInfo
         di.folder = editor.currentProject.path
         di.kind = dkOpenFile
-        di.filters = @[(name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
+        di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
         di.title = "Load composition or dae"
         let path = di.show()
         if not path.isNil:
@@ -183,7 +183,7 @@ when loadingAndSavingAvailable:
                         p.addChild(n)
                         editor.selectedNode = n
 
-                elif path.endsWith(".json"):
+                elif path.endsWith(".json") or path.endsWith(".jcomp"):
                     let ln = newNodeWithURL("file://" & path)
                     if not editor.selectedNode.isNil:
                         editor.selectedNode.addChild(ln)
@@ -328,7 +328,7 @@ proc initNotifHandlers(e: Editor)=
             var di: DialogInfo
             di.folder = e.currentProject.path
             di.kind = dkOpenFile
-            di.filters = @[(name:"Json", ext:"*.json")]
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json")]
             di.title = "Open composition"
             let path = di.show()
             if path.len > 0:

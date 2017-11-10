@@ -1,14 +1,6 @@
-import nimx.image
-import nimx.resource
-import nimx.context
-import nimx.portable_gl
-import nimx.types
-import nimx.system_logger
-import nimx.matrixes
+import tables, hashes, streams
+import nimx / [ image, context, portable_gl, types, matrixes ]
 
-import tables
-import hashes
-import streams
 import rod.node
 import rod.component.mesh_component
 import rod.component.material_shaders
@@ -836,33 +828,34 @@ proc assignShaders*(m: Material, vertexShader: string = "", fragmentShader: stri
     m.fragmentShader = fragmentShader
     m.shaderNeedUpdate()
 
-proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
-    m.bUserDefinedShader = true
-    var bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded: bool
+when false:
+    proc assignShadersWithResource*(m: Material, vertexShader: string = "", fragmentShader: string = "") =
+        m.bUserDefinedShader = true
+        var bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded: bool
 
-    template shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded: bool) =
-        if bVertexShaderSourceLoaded and bFragmentShaderSourceLoaded:
-            m.shaderNeedUpdate()
+        template shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded: bool) =
+            if bVertexShaderSourceLoaded and bFragmentShaderSourceLoaded:
+                m.shaderNeedUpdate()
 
-    if vertexShader != "":
-        loadResourceAsync vertexShader, proc(s: Stream) =
-            m.vertexShader = s.readAll()
-            s.close()
-            bVertexShaderSourceLoaded = true
-            shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
-    else:
-        m.vertexShader = materialVertexShaderDefault
+        if vertexShader != "":
+            loadResourceAsync vertexShader, proc(s: Stream) =
+                m.vertexShader = s.readAll()
+                s.close()
+                bVertexShaderSourceLoaded = true
+                shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
+        else:
+            m.vertexShader = materialVertexShaderDefault
 
-    if fragmentShader != "":
-        loadResourceAsync fragmentShader, proc(s: Stream) =
-            m.fragmentShader = s.readAll()
-            s.close()
-            bFragmentShaderSourceLoaded = true
-            shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
-    else:
-        m.fragmentShader = materialFragmentShaderDefault
+        if fragmentShader != "":
+            loadResourceAsync fragmentShader, proc(s: Stream) =
+                m.fragmentShader = s.readAll()
+                s.close()
+                bFragmentShaderSourceLoaded = true
+                shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
+        else:
+            m.fragmentShader = materialFragmentShaderDefault
 
-    shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
+        shaderSourceLoaded(bVertexShaderSourceLoaded, bFragmentShaderSourceLoaded)
 
 method initSetup*(m: Material) {.base.} = discard
 
