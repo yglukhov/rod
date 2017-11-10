@@ -78,6 +78,7 @@ proc addEditedProperty(v: AnimationEditView, name: string) =
     var ap: AnimatedProperty
     ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, nil, -1, name)
     ep.name = name
+    ap.new()
     ap.propName = name
     template createCurve(T: typedesc): typed =
         ep.curve = newAnimationCurve[T]()
