@@ -165,6 +165,9 @@ proc drawGrid(v: SceneView) =
         c.vertexes[index + 4] = p2.y
         c.vertexes[index + 5] = p2.z
 
+    if gridShader.isNil:
+        gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
+
     gridShader.bindShader()
     gridShader.setTransformUniform()
 
@@ -352,8 +355,6 @@ method init*(v: SceneView, frame: Rect) =
             deltaTime = 0.0001
 
     v.addAnimation(v.deltaTimeAnimation)
-
-    gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
 
 method resizeSubviews*(v: SceneView, oldSize: Size) =
     procCall v.View.resizeSubviews(oldSize)
