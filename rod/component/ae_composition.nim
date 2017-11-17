@@ -58,19 +58,21 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): Compo
         if layerIn >= 1.0 or layerOut <= 0.0:
             return #skip layers from other markers
 
-        let pDur = (layerOut - layerIn) * marker.duration / cl.animScale
-        var pIn = 0.0 #todo: startTime support
+        var allp = abs(layerIn) + layerOut
+
+        var pIn = 0.0
         if layerIn < 0.0:
-            pIn += abs(layerIn) / (abs(layerIn) + layerOut)
+            pIn = abs(layerIn) / allp
 
         var pOut = 1.0
         if layerOut > 1.0:
-            pOut /= layerOut
+            pOut = layerOut / (allp - pIn)
 
         let prop = lc.compositionNamed(aeAllCompositionAnimation)
 
         prop.loopDuration *= (pOut - pIn) * cl.animScale
         let oldCompAnimate = prop.onAnimate
+
         prop.animate prog in pIn..pOut:
             oldCompAnimate(prog)
 

@@ -246,7 +246,9 @@ method getBBox*(rti: RTI): BBox =
     var mtrInv = rti.node.worldTransform
     mtrInv = mtrInv.inv()
     result.minPoint = mtrInv * rti.bbx.minPoint
+    result.minPoint.z = 0
     result.maxPoint = mtrInv * rti.bbx.maxPoint
+    result.maxPoint.z = 0
 
 method componentNodeWillBeRemovedFromSceneView*(rti: RTI) =
     if not rti.image.isNil:
