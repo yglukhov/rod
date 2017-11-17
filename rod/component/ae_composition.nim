@@ -49,8 +49,6 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation
 
-
-
 proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): ComposeMarker=
     let lc = cl.node.componentIfAvailable(AEComposition)
     if not lc.isNil:
