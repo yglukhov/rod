@@ -75,6 +75,7 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): Compo
 
         prop.loopDuration *= (pOut - pIn) * cl.animScale
         let oldCompAnimate = prop.onAnimate
+
         prop.animate prog in pIn..pOut:
             oldCompAnimate(prog)
 
