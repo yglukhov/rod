@@ -66,7 +66,8 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): Compo
 
         var pOut = 1.0
         if layerOut > 1.0:
-            pOut = layerOut / (allp - pIn)
+            let skip = layerOut - 1.0
+            pOut = 1.0 - skip / allp
 
         let prop = lc.compositionNamed(aeAllCompositionAnimation)
 
