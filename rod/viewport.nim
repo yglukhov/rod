@@ -299,7 +299,7 @@ method onScroll*(v: SceneView, e: var Event): bool =
         result = procCall v.View.onScroll(e)
 
 method onTouchEv*(v: SceneView, e: var Event): bool =
-    if v.uiComponents.len > 0:
+    if v.uiComponents.len > 0 and e.target != v:
         if e.buttonState == bsDown:
             let r = v.rayWithScreenCoords(e.localPosition)
             let intersections = v.getUiComponentsIntersectingWithRay(r)
