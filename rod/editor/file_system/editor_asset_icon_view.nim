@@ -4,7 +4,7 @@ import tables, os, streams
 import nimx.event
 import nimx.view_event_handling_new
 when not defined(android) and not defined(ios) and not defined(emscripten):
-    import file_dialog.file_info
+    import os_files.file_info
 
 type PathNode* = ref object of RootObj
     children*: seq[PathNode]
@@ -26,10 +26,7 @@ var filesExtensions = newTable[string, AssetKind]()
 
 filesExtensions[".png"] = akImage
 filesExtensions[".jpg"] = akImage
-# filesExtensions[".txt"] = akText
-# filesExtensions[".json"] = akComposition
-# filesExtensions[".mp3"] = akSound
-# filesExtensions[".ogg"] = akSound
+filesExtensions[".jcomp"] = akComposition
 
 type ImageIconView* = ref object of View
     image: Image
@@ -181,14 +178,6 @@ proc doubleClicked*(v: FilePreview)=
         v.onDoubleClicked()
     else:
         openInDefaultApp(v.path)
-        # case v.kind:
-
-        # of akImage:
-        #     loadAsset[Image]("file://" & v.path) do(i: Image, err: string):
-        #         var imgpreview = newImagePreview(newRect(0.0, 0.0, 0.0, 0.0), i)
-        #         imgpreview.popupAtPoint(v.window, v.frame.origin)
-        # else:
-        #     echo "double clicked ", v.kind, " path ", v.path
 
 proc rename*(v: FilePreview, cb:proc(name: string))=
     if not v.selectionView.isNil:
