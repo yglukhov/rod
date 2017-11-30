@@ -1,17 +1,8 @@
-import tables
-import hashes
-import strutils
-import json
+import tables, hashes, strutils, json
 import opengl
 
-import nimx.image
-import nimx.resource
-import nimx.context
-import nimx.portable_gl
-import nimx.types
-import nimx.view
-import nimx.system_logger
-import nimx.property_visitor
+import nimx / [ image, context, portable_gl, types, view, property_visitor ]
+import nimx.assets.url_stream
 
 import nimasset.obj
 
@@ -136,7 +127,7 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
 
 proc loadMeshComponent(m: MeshComponent, resourceName: string) =
     if not vboCache.contains(m.resourceName):
-        loadResourceAsync resourceName, proc(s: Stream) =
+        openStreamForURL("res://" & resourceName) do(s: Stream, err: string):
             let loadFunc = proc() =
                 var loader: ObjLoader
                 var vertexData = newSeq[GLfloat]()
@@ -395,6 +386,33 @@ method rayCast*(ns: MeshComponent, r: Ray, distance: var float32): bool =
 
     result = procCall ns.Component.rayCast(r, distance)
 
+proc createVertexData*(m: MeshComponent, stride, size: int32, vertCoords, texCoords, normals, tangents: seq[float32]): seq[GLfloat] =
+    result = newSeq[GLfloat](size)
+    for i in 0 ..< int32(vertCoords.len / 3):
+        var offset = 0
+        result[stride * i + 0] = vertCoords[3*i + 0]
+        result[stride * i + 1] = vertCoords[3*i + 1]
+        result[stride * i + 2] = vertCoords[3*i + 2]
+        m.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
+        offset += 3
+
+        if texCoords.len != 0:
+            result[stride * i + offset + 0] = texCoords[2*i + 0]
+            result[stride * i + offset + 1] = texCoords[2*i + 1]
+            offset += 2
+
+        if normals.len != 0:
+            result[stride * i + offset + 0] = normals[3*i + 0]
+            result[stride * i + offset + 1] = normals[3*i + 1]
+            result[stride * i + offset + 2] = normals[3*i + 2]
+            offset += 3
+
+        if tangents.len != 0:
+            result[stride * i + offset + 0] = tangents[3*i + 0]
+            result[stride * i + offset + 1] = tangents[3*i + 1]
+            result[stride * i + offset + 2] = tangents[3*i + 2]
+            offset += 3
+
 method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
@@ -427,20 +445,19 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "reflectionPercent", m.material.reflectionPercent)
     s.deserializeValue(j, "falloffPercent", m.material.falloffPercent)
     s.deserializeValue(j, "maskPercent", m.material.maskPercent)
-
-    s.deserializeValue(j, "matcapTextureR", m.material.matcapTextureR)
-    s.deserializeValue(j, "matcapTextureG", m.material.matcapTextureG)
-    s.deserializeValue(j, "matcapTextureB", m.material.matcapTextureB)
-    s.deserializeValue(j, "matcapTextureA", m.material.matcapTextureA)
-    s.deserializeValue(j, "matcapMaskTexture", m.material.matcapMaskTexture)
-    s.deserializeValue(j, "albedoTexture", m.material.albedoTexture)
-    s.deserializeValue(j, "glossTexture", m.material.glossTexture)
-    s.deserializeValue(j, "specularTexture", m.material.specularTexture)
-    s.deserializeValue(j, "normalTexture", m.material.normalTexture)
-    s.deserializeValue(j, "bumpTexture", m.material.bumpTexture)
-    s.deserializeValue(j, "reflectionTexture", m.material.reflectionTexture)
-    s.deserializeValue(j, "falloffTexture", m.material.falloffTexture)
-    s.deserializeValue(j, "maskTexture", m.material.maskTexture)
+    deserializeImage(j{"matcapTextureR"}, s) do(img: Image, err: string): m.material.matcapTextureR = img
+    deserializeImage(j{"matcapTextureG"}, s) do(img: Image, err: string): m.material.matcapTextureG = img
+    deserializeImage(j{"matcapTextureB"}, s) do(img: Image, err: string): m.material.matcapTextureB = img
+    deserializeImage(j{"matcapTextureA"}, s) do(img: Image, err: string): m.material.matcapTextureA = img
+    deserializeImage(j{"matcapMaskTexture"}, s) do(img: Image, err: string): m.material.matcapMaskTexture = img
+    deserializeImage(j{"albedoTexture"}, s) do(img: Image, err: string): m.material.albedoTexture = img
+    deserializeImage(j{"glossTexture"}, s) do(img: Image, err: string): m.material.glossTexture = img
+    deserializeImage(j{"specularTexture"}, s) do(img: Image, err: string): m.material.specularTexture = img
+    deserializeImage(j{"normalTexture"}, s) do(img: Image, err: string): m.material.normalTexture = img
+    deserializeImage(j{"bumpTexture"}, s) do(img: Image, err: string): m.material.bumpTexture = img
+    deserializeImage(j{"reflectionTexture"}, s) do(img: Image, err: string): m.material.reflectionTexture = img
+    deserializeImage(j{"falloffTexture"}, s) do(img: Image, err: string): m.material.falloffTexture = img
+    deserializeImage(j{"maskTexture"}, s) do(img: Image, err: string): m.material.maskTexture = img
 
     proc getAttribs(name: string): seq[float32] =
         result = newSeq[float32]()
@@ -464,31 +481,7 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
 
     let stride = int32( m.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = newSeq[GLfloat](size)
-    for i in 0 ..< int32(vertCoords.len / 3):
-        var offset = 0
-        vertexData[stride * i + 0] = vertCoords[3*i + 0]
-        vertexData[stride * i + 1] = vertCoords[3*i + 1]
-        vertexData[stride * i + 2] = vertCoords[3*i + 2]
-        m.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
-        offset += 3
-
-        if texCoords.len != 0:
-            vertexData[stride * i + offset + 0] = texCoords[2*i + 0]
-            vertexData[stride * i + offset + 1] = texCoords[2*i + 1]
-            offset += 2
-
-        if normals.len != 0:
-            vertexData[stride * i + offset + 0] = normals[3*i + 0]
-            vertexData[stride * i + offset + 1] = normals[3*i + 1]
-            vertexData[stride * i + offset + 2] = normals[3*i + 2]
-            offset += 3
-
-        if tangents.len != 0:
-            vertexData[stride * i + offset + 0] = tangents[3*i + 0]
-            vertexData[stride * i + offset + 1] = tangents[3*i + 1]
-            vertexData[stride * i + offset + 2] = tangents[3*i + 2]
-            offset += 3
+    var vertexData = m.createVertexData(stride, size, vertCoords, texCoords, normals, tangents)
 
     m.createVBO(indices, vertexData)
 

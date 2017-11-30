@@ -14,6 +14,7 @@ import rod.component.material
 import rod.vertex_data_info
 import rod.tools.serializer
 import rod / utils / [ property_desc, serialization_codegen ]
+
 type SphereComponent* = ref object of MeshComponent
     radius: float32
     segments: int32
@@ -99,25 +100,7 @@ proc generateMesh*(c: SphereComponent) =
 
     let stride = int32( mesh.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = newSeq[GLfloat](size)
-    for i in 0 ..< int32(vertCoords.len / 3):
-        var offset = 0
-        vertexData[stride * i + 0] = vertCoords[3*i + 0]
-        vertexData[stride * i + 1] = vertCoords[3*i + 1]
-        vertexData[stride * i + 2] = vertCoords[3*i + 2]
-        mesh.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
-        offset += 3
-
-        if texCoords.len != 0:
-            vertexData[stride * i + offset + 0] = texCoords[2*i + 0]
-            vertexData[stride * i + offset + 1] = texCoords[2*i + 1]
-            offset += 2
-
-        if normals.len != 0:
-            vertexData[stride * i + offset + 0] = normals[3*i + 0]
-            vertexData[stride * i + offset + 1] = normals[3*i + 1]
-            vertexData[stride * i + offset + 2] = normals[3*i + 2]
-            offset += 3
+    var vertexData = c.createVertexData(stride, size, vertCoords, texCoords, normals, nil)
 
     mesh.createVBO(indices, vertexData)
 
@@ -153,6 +136,6 @@ method visitProperties*(c: SphereComponent, p: var PropertyVisitor) =
     p.visitProperty("radius", c.radiusAux)
     p.visitProperty("segments", c.segmentsAux)
     procCall c.MeshComponent.visitProperties(p)
-    
+
 genSerializationCodeForComponent(SphereComponent)
 registerComponent(SphereComponent, "Primitives")

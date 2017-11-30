@@ -15,10 +15,10 @@ import rod.tools.serializer
 import rod / utils / [ property_desc, serialization_codegen ]
 
 type CubeComponent* = ref object of MeshComponent
-    size: Vector3
+    mSize: Vector3
 
 CubeComponent.properties:
-    size
+    mSize
 
 proc fillVertexBuffers(vertCoords, texCoords, normals: var seq[float32], size: Vector3) =
     #front
@@ -132,7 +132,10 @@ proc fillIndexBuffer(indices: var seq[GLushort]) =
 
 method init*(c: CubeComponent) =
     procCall c.MeshComponent.init()
-    c.size = newVector3(1.0, 1.0, 1.0)
+    c.mSize = newVector3(1.0, 1.0, 1.0)
+
+    c.material.ambient = newColor(1.0, 1.0, 1.0, 0.2)
+    c.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
 
 proc generateMesh(c: CubeComponent) =
     let mesh = c
@@ -141,7 +144,7 @@ proc generateMesh(c: CubeComponent) =
     var normals = newSeq[float32]()
     var indices = newSeq[GLushort]()
 
-    fillVertexBuffers(vertCoords, texCoords, normals, c.size)
+    fillVertexBuffers(vertCoords, texCoords, normals, c.mSize)
     fillIndexBuffer(indices)
 
     mesh.vboData.minCoord = newVector3(high(int).Coord, high(int).Coord, high(int).Coord)
@@ -149,31 +152,14 @@ proc generateMesh(c: CubeComponent) =
     mesh.vboData.vertInfo = newVertexInfoWithVertexData(vertCoords.len, texCoords.len, normals.len, 0)
 
     let stride = int32( mesh.vboData.vertInfo.stride / sizeof(GLfloat) )
-    let size = int32(vertCoords.len * stride / 3)
-    var vertexData = newSeq[GLfloat](size)
-    for i in 0 ..< int32(vertCoords.len / 3):
-        var offset = 0
-        vertexData[stride * i + 0] = vertCoords[3*i + 0]
-        vertexData[stride * i + 1] = vertCoords[3*i + 1]
-        vertexData[stride * i + 2] = vertCoords[3*i + 2]
-        mesh.checkMinMax(vertCoords[3*i + 0], vertCoords[3*i + 1], vertCoords[3*i + 2])
-        offset += 3
-
-        if texCoords.len != 0:
-            vertexData[stride * i + offset + 0] = texCoords[2*i + 0]
-            vertexData[stride * i + offset + 1] = texCoords[2*i + 1]
-            offset += 2
-
-        if normals.len != 0:
-            vertexData[stride * i + offset + 0] = normals[3*i + 0]
-            vertexData[stride * i + offset + 1] = normals[3*i + 1]
-            vertexData[stride * i + offset + 2] = normals[3*i + 2]
-            offset += 3
-
+    let mSize = int32(vertCoords.len * stride / 3)
+    var vertexData = c.createVertexData(stride, mSize, vertCoords, texCoords, normals, nil)
     mesh.createVBO(indices, vertexData)
 
-    mesh.material.ambient = newColor(1.0, 1.0, 1.0, 0.2)
-    mesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
+proc size*(cc: CubeComponent): Vector3 = cc.mSize
+proc `size=`*(cc: CubeComponent, v: Vector3) =
+    cc.mSize = v
+    cc.generateMesh()
 
 method componentNodeWasAddedToSceneView*(c: CubeComponent) =
     c.generateMesh()
@@ -182,19 +168,14 @@ method deserialize*(c: CubeComponent, j: JsonNode, s: Serializer) =
     if j.isNil:
         return
 
-    s.deserializeValue(j, "size", c.size)
+    s.deserializeValue(j, "size", c.mSize)
 
 method serialize*(c: CubeComponent, s: Serializer): JsonNode =
     result = newJObject()
-    result.add("size", s.getValue(c.size))
+    result.add("size", s.getValue(c.mSize))
 
 method visitProperties*(c: CubeComponent, p: var PropertyVisitor) =
-    template sizeAux(cc: CubeComponent): Vector3 = c.size
-    template `sizeAux=`(cc: CubeComponent, v: Vector3) =
-        cc.size = v
-        cc.generateMesh()
-
-    p.visitProperty("size", c.sizeAux)
+    p.visitProperty("size", c.size)
     procCall c.MeshComponent.visitProperties(p)
 
 genSerializationCodeForComponent(CubeComponent)

@@ -74,7 +74,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles:
                     convertAudio(r, dest, true)
                 else:
                     convertAudio(r, dest, false)
-            of ".json":
+            of ".json", ".jcomp":
                 doIndex = not tool.packCompositions
             of ".rab":
                 discard
@@ -99,7 +99,7 @@ proc packSingleAssetBundle(s: Settings, cache: string, onlyCache: bool, src, dst
         var tool = newImgTool()
 
         for f in walkDirRec(src):
-            if f.endsWith(".json"):
+            if f.endsWith(".json") or f.endsWith(".jcomp"):
                 var tp = f
                 normalizePath(tp, false)
                 tool.compositionPaths.add(tp)

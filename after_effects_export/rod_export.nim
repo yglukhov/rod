@@ -615,7 +615,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         let zprop = transform.property("Z Rotation", float)
 
         let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
-            % cutDecimal(quaternionWithEulerRotation(newVector3(v[0], v[1], v[2])))
+            % cutDecimal(newQuaternionFromEulerYXZ(v[0], v[1], v[2]))
         if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
             gAnimatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
@@ -649,7 +649,7 @@ proc serializeLayer(layer: Layer): JsonNode =
                 result["children"] = chres
 
     if layer.layerIsCompositionRef():
-        result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name & ".json")
+        result["compositionRef"] = %relativePathToPath(gCompExportPath, layer.source.exportPath & "/" & $layer.source.name)
 
     if not transitiveEffects: result["affectsChildren"] = %false
 
@@ -1086,7 +1086,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring) =
                 logi "ERROR: Could not create folder ", fullExportPath
         except:
             discard
-        let filePath = fullExportPath & "/" & $c.name & ".json"
+        let filePath = fullExportPath & "/" & $c.name & ".jcomp"
         logi("Exporting: ", c.name, " to ", filePath)
         let file = newFile(filePath)
         file.encoding = "UTF-8"

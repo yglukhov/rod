@@ -1,33 +1,20 @@
-import tables
-import typetraits
-import json
-import strutils
-import math
+import tables, typetraits, json, strutils, math
 
-import nimx.context
-import nimx.types
-import nimx.resource
-import nimx.animation
-import nimx.image
-import nimx.portable_gl
-import nimx.view
-import nimx.property_visitor
+import nimx / [ context, types, animation, image, portable_gl, view, property_visitor ]
 
-import nimx.assets.asset_manager
-import nimx.assets.asset_loading
+import nimx / assets / [ asset_manager, asset_loading ]
 
-import quaternion
-import ray
+import quaternion, ray, rod_types
 import rod.tools.serializer
 import rod / utils / [ bin_deserializer, json_serializer ]
 import rod.asset_bundle
 
-import rod_types
 export Node
 
 proc sceneView*(n: Node): SceneView = n.mSceneView
 proc getGlobalAlpha*(n: Node): float32
 proc worldTransform*(n: Node): Matrix4
+proc isEnabledInTree*(n: Node): bool
 
 import rod.component
 
@@ -687,7 +674,7 @@ proc newNodeWithResource*(path: string): Node =
 
 proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
     result = newNode()
-    result.loadComposition("compositions/" & name & ".json")
+    result.loadComposition("compositions/" & name)
 
 proc serialize*(n: Node, s: Serializer): JsonNode =
     result = newJObject()
@@ -700,7 +687,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("layer", s.getValue(n.layer))
     result.add("affectsChildren", s.getValue(n.affectsChildren))
     result.add("enabled", s.getValue(n.enabled))
-    
+
     if not n.components.isNil and n.components.len > 0:
         var componentsNode = newJArray()
         result.add("components", componentsNode)
@@ -791,7 +778,6 @@ proc getTreeDistance*(x, y: Node): int =
         else:
             return 1
 
-    #assert(px != py)
     var cx, cy : Node
     while px != py:
         cx = px
@@ -805,7 +791,6 @@ proc getTreeDistance*(x, y: Node): int =
     let iy = px.children.find(cy)
 
     result = iy - ix
-
 
 proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
     if not n.components.isNil:

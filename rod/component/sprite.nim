@@ -71,10 +71,10 @@ proc calculatedSize(s: Sprite): Size =
 
 proc effectiveSize*(s: Sprite): Size =
     result = s.calculatedSize()
-    let off = s.getOffset()
+    # let off = s.getOffset()
 
-    result.width += off.x
-    result.height += off.y
+    # result.width += off.x
+    # result.height += off.y
 
 method draw*(s: Sprite) =
     let c = currentContext()
@@ -100,8 +100,8 @@ proc createFrameAnimation(s: Sprite) {.inline.} =
 
 method getBBox*(s: Sprite): BBox =
     let sz = s.effectiveSize()
-    result.maxPoint = newVector3(sz.width + s.offset.x, sz.height + s.offset.y, 0.01)
-    result.minPoint = newVector3(s.offset.x, s.offset.y, 0.0)
+    result.maxPoint = newVector3(sz.width + s.getOffset.x, sz.height + s.getOffset.y, 0.0)
+    result.minPoint = newVector3(s.getOffset.x, s.getOffset.y, 0.0)
 
 method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated

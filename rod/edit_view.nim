@@ -1,22 +1,24 @@
 import math, algorithm, strutils, tables, json, logging
 
 import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
-                outline_view, toolbar, color_picker, scroll_view, clip_view,
+                outline_view, color_picker, scroll_view, clip_view,
                 text_field, table_view_cell, gesture_detector, menu,
                 key_commands, linear_layout, view_event_handling_new,
-                mini_profiler, drag_and_drop, image ]
+                mini_profiler, drag_and_drop, image, notification_center,
+                animation, window ]
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
-import nimx.assets.asset_loading
-
 import rod_types, node
 import rod.scene_composition
 import rod.component.mesh_component
 import rod.component.node_selector
 import rod.component.sprite
-import rod.editor_camera_controller
-import rod.editor.gizmo_axis
+import rod.editor.editor_project_settings
+import rod.editor.editor_workspace_view
+import rod.editor.editor_types
+export editor_types
+
 import tools.serializer
 
 import rod.editor.editor_tab_registry
@@ -27,168 +29,47 @@ export editor_tab_registry
 
 import variant
 
-const NodePboardKind = "io.github.yglukhov.rod.node"
-
-const toolbarHeight = 30
-const defaultTabs = ["Inspector", "Tree"]
-
-const loadingAndSavingAvailable = not defined(android) and not defined(ios) and
-    not defined(emscripten) and not defined(js)
-
 when loadingAndSavingAvailable:
-    import native_dialogs
-
-const rodPbComposition* = "rod.composition"
-const rodPbSprite* = "rod.sprite"
-const rodPbFiles* = "rod.files"
-
-type
-    EditorTabAnchor* = enum
-        etaLeft
-        etaRight
-        etaBottom
-        etaCenter
-
-    EditorTabView* = ref object of View
-        rootNode*: Node
-        editor*: Editor
-
-    Editor* = ref object
-        rootNode*: Node
-        workspaceView: WorkspaceView
-        eventCatchingView*: EventCatchingView
-        toolbar*: Toolbar
-        sceneView*: SceneView
-        mSelectedNode: Node
-        cameraController*: EditorCameraController
-        cameraSelector: PopupButton
-        gizmo: GizmoAxis
-
-    EditorDropDelegate* = ref object of DragDestinationDelegate
-
-    WorkspaceView = ref object of View
-        editor: Editor
-        tabs: seq[EditorTabView]
-        anchors: array[4, TabView]
-        horizontalLayout: LinearLayout
-        verticalLayout: LinearLayout
-
-    EventCatchingView* = ref object of View
-        keyDownDelegate*: proc(event: var Event): bool
-        keyUpDelegate*: proc(event: var Event): bool
-        mouseScrrollDelegate*: proc(event: var Event)
-        allowGameInput: bool
-        editor*: Editor
-
-    EventCatchingListener = ref object of BaseScrollListener
-        view: EventCatchingView
-
-method setEditedNode*(v: EditorTabView, n: Node)=
-    discard
-
-method update*(v: EditorTabView) = discard
-
-method tabSize*(v: EditorTabView, bounds: Rect): Size=
-    result = bounds.size
-
-method tabAnchor*(v: EditorTabView): EditorTabAnchor =
-    result = etaCenter
-
-method onEditorTouchDown*(v: EditorTabView, e: var Event)=
-    discard
-
-method onSceneChanged*(v: EditorTabView)=
-    discard
-
-proc newTabView(): TabView
-
-method acceptsFirstResponder(v: EventCatchingView): bool = true
-
-method onKeyUp(v: EventCatchingView, e : var Event): bool =
-    if not v.keyUpDelegate.isNil:
-        result = v.keyUpDelegate(e)
-
-method onKeyDown(v: EventCatchingView, e : var Event): bool =
-    if not v.keyDownDelegate.isNil:
-        result = v.keyDownDelegate(e)
-
-method onScroll*(v: EventCatchingView, e: var Event): bool =
-    result = true
-    if not v.mouseScrrollDelegate.isNil:
-        v.mouseScrrollDelegate(e)
-
-proc newEventCatchingListener(v: EventCatchingView): EventCatchingListener =
-    result.new
-    result.view = v
-
-method onTapDown*(ecl: EventCatchingListener, e : var Event) =
-    procCall ecl.BaseScrollListener.onTapDown(e)
-
-method onScrollProgress*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
-    procCall ecl.BaseScrollListener.onScrollProgress(dx, dy, e)
-
-method onTapUp*(ecl: EventCatchingListener, dx, dy : float32, e : var Event) =
-    procCall ecl.BaseScrollListener.onTapUp(dx, dy, e)
-
-
-method onDragEnter*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
-    if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:
-        target.backgroundColor.a = 0.5
-
-method onDragExit*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
-    if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:
-        target.backgroundColor.a = 0.0
-
-method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
-    target.backgroundColor.a = 0.0
-    case i.kind:
-    of rodPbComposition:
-        var n = try: newNodeWithURL("file://" & i.data) except: nil
-        if not n.isNil:
-            if target of EventCatchingView:
-                var editor = (target.EventCatchingView).editor
-                if editor.mSelectedNode.isNil:
-                    editor.rootNode.addChild(n)
-                else:
-                    editor.mSelectedNode.addChild(n)
-
-                discard target.makeFirstResponder()
-        else:
-            warn "Can't deserialize ", i.data
-
-    of rodPbSprite:
-        loadAsset[Image]("file://" & i.data) do(image: Image, err: string):
-            if image.isNil:
-                warn "Can't load image from ", i.data
-                return
-
-            var n = newNode(i.data)
-            n.component(Sprite).image = image
-
-            if target of EventCatchingView:
-                var editor = (target.EventCatchingView).editor
-                if editor.mSelectedNode.isNil:
-                    editor.rootNode.addChild(n)
-                else:
-                    editor.mSelectedNode.addChild(n)
-    else:
-        discard
+    import file_dialog.dialog
+    import rod.editor.editor_open_project_view
+    import os
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
         if not e.mSelectedNode.isNil and e.mSelectedNode.componentIfAvailable(LightSource).isNil:
             e.mSelectedNode.removeComponent(NodeSelector)
         e.mSelectedNode = n
+
+        if not e.mCurrentComposition.isNil:
+            e.mCurrentComposition.selectedNode = n
+            e.mCurrentComposition.owner.setEditedNode(n)
+
         if not e.mSelectedNode.isNil:
             discard e.mSelectedNode.component(NodeSelector)
 
         for etv in e.workspaceView.tabs:
             etv.setEditedNode(e.mSelectedNode)
+        if not e.startFromGame:
+            for stv in e.workspaceView.compositionEditors:
+                if stv.composition == e.mCurrentComposition:
+                    stv.setEditedNode(e.mSelectedNode)
+                    break
+        else:
+            for stv in e.workspaceView.compositionEditors:
+                stv.setEditedNode(e.mSelectedNode)
 
-        e.gizmo.editedNode = e.mSelectedNode
+proc onCompositionChanged*(e: Editor, c: CompositionDocument)=
+    for etv in e.workspaceView.tabs:
+        etv.onCompositionChanged(c)
 
-template selectedNode*(e: Editor): Node = e.mSelectedNode
+proc `currentComposition=`*(e: Editor, c: CompositionDocument)=
+    if e.mCurrentComposition != c:
+        e.mCurrentComposition = c
+        e.onCompositionChanged(c)
 
+template currentComposition*(e: Editor): CompositionDocument = e.mCurrentComposition
+
+# todo: mb move to editor_scene_view
 proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
     let distance = 100.Coord
     cameraNode.position = newVector3(
@@ -197,20 +78,20 @@ proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
         focusNode.position.z + distance
     )
 
-proc updateCameraSelector(e: Editor) =
-    var items = newSeq[string]()
-    var i = 0
-    var selectedIndex = -1
-    discard e.rootNode.findNode() do(n: Node) -> bool:
-        let cam = n.componentIfAvailable(Camera)
-        if not cam.isNil:
-            if not n.name.isNil:
-                if cam == n.sceneView.camera:
-                    selectedIndex = i
-                items.add(n.name)
-                inc i
-    e.cameraSelector.items = items
-    e.cameraSelector.selectedIndex = selectedIndex
+proc updateCameraSelector(e: Editor) = discard #todo: fix this!
+    # var items = newSeq[string]()
+    # var i = 0
+    # var selectedIndex = -1
+    # discard e.rootNode.findNode() do(n: Node) -> bool:
+    #     let cam = n.componentIfAvailable(Camera)
+    #     if not cam.isNil:
+    #         if not n.name.isNil:
+    #             if cam == n.sceneView.camera:
+    #                 selectedIndex = i
+    #             items.add(n.name)
+    #             inc i
+    # e.cameraSelector.items = items
+    # e.cameraSelector.selectedIndex = selectedIndex
 
 proc sceneTreeDidChange*(e: Editor) =
     e.updateCameraSelector()
@@ -218,17 +99,90 @@ proc sceneTreeDidChange*(e: Editor) =
     for t in e.workspaceView.tabs:
         t.onSceneChanged()
 
+proc saveComposition*(e: Editor, c: CompositionDocument)
+
 when loadingAndSavingAvailable:
-    import os
+
+    proc currentProjectPath*(e: Editor): string=
+        result = e.currentProject.path
+        if result.len == 0 or e.startFromGame:
+            result = getAppDir() & "/../.."
+
+    proc saveComposition*(e: Editor, c: CompositionDocument)=
+        if c.path.len == 0:
+            var di: DialogInfo
+            di.folder = e.currentProject.path
+            di.extension = "jcomp"
+            di.kind = dkSaveFile
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
+            di.title = "Save composition"
+
+            c.path = di.show()
+
+        if c.path.len > 0:
+            var s = Serializer.new()
+            var data = c.rootNode.serialize(s)
+            writeFile(c.path, $data)
+
+        # echo "try save composition ", c.path
+
+    proc openComposition*(e: Editor, p: string)=
+        try:
+            if p.endsWith(".dae"):
+                    var pn = if not e.selectedNode.isNil: e.selectedNode else: e.rootNode
+                    loadSceneAsync ("file://" & p), proc(n: Node) =
+                        pn.addChild(n)
+                        # e.selectedNode = n
+
+            elif p.endsWith(".json") or p.endsWith(".jcomp"):
+                if e.startFromGame:
+                    return
+
+                var n = newNodeWithUrl("file://" & p)
+                var c:CompositionDocument
+
+                for tb in e.workspaceView.compositionEditors:
+                    if tb.composition.path == p:
+                        c = tb.composition
+                        c.rootNode = n
+                        tb.onCompositionChanged(c)
+                        e.workspaceView.selectTab(tb)
+                        return
+
+                c = new(CompositionDocument)
+                c.path = p
+                c.rootNode = n
+                var tbv = e.workspaceView.createCompositionEditor(c)
+                if not tbv.isNil:
+                    tbv.name = splitFile(p).name
+                    e.workspaceView.addTab(tbv)
+                    e.workspaceView.selectTab(tbv)
+
+        except:
+            let ex = getCurrentException()
+            warn "Can't load composition at ", p, "\n", ex.name, ": ", getCurrentExceptionMsg(), "\n", ex.getStackTrace()
+
+
     proc saveNode(editor: Editor, selectedNode: Node) =
-        let path = callDialogFileSave("Save Json")
+        var di: DialogInfo
+        di.folder = editor.currentProject.path
+        di.extension = "jcomp"
+        di.kind = dkSaveFile
+        di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
+        di.title = "Save composition"
+        let path = di.show()
         if not path.isNil:
             var s = Serializer.new()
             var sData = selectedNode.serialize(s)
             s.save(sData, path)
 
     proc loadNode(editor: Editor) =
-        let path = callDialogFileOpen("Load Json or DAE")
+        var di: DialogInfo
+        di.folder = editor.currentProject.path
+        di.kind = dkOpenFile
+        di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
+        di.title = "Load composition or dae"
+        let path = di.show()
         if not path.isNil:
             try:
                 if path.endsWith(".dae"):
@@ -239,7 +193,7 @@ when loadingAndSavingAvailable:
                         p.addChild(n)
                         editor.selectedNode = n
 
-                elif path.endsWith(".json"):
+                elif path.endsWith(".json") or path.endsWith(".jcomp"):
                     let ln = newNodeWithURL("file://" & path)
                     if not editor.selectedNode.isNil:
                         editor.selectedNode.addChild(ln)
@@ -252,52 +206,12 @@ when loadingAndSavingAvailable:
                 error "Exception caught: ", getCurrentExceptionMsg()
                 error "stack trace: ", getCurrentException().getStackTrace()
 
+else:
+    proc saveComposition*(e: Editor, c: CompositionDocument)= discard
+    proc openComposition*(e: Editor, p: string) = discard
+
 proc selectNode*(editor: Editor, node: Node) =
     editor.selectedNode = node
-
-proc rayCastFirstNode(editor: Editor, node: Node, coords: Point): Node =
-    let r = editor.sceneView.rayWithScreenCoords(coords)
-    var castResult = newSeq[RayCastInfo]()
-    node.rayCast(r, castResult)
-
-    if castResult.len > 0:
-        castResult.sort( proc (x, y: RayCastInfo): int =
-            result = int(x.node.layer < y.node.layer)
-            if x.node.layer == y.node.layer:
-                result = int(x.distance > y.distance)
-                if abs(x.distance - y.distance) < 0.00001:
-                    result = getTreeDistance(x.node, y.node) )
-
-        result = castResult[0].node
-
-proc onTouchDown*(editor: Editor, e: var Event) =
-    #TODO Hack to sync node tree and treeView
-    for t in editor.workspaceView.tabs:
-        t.onEditorTouchDown(e)
-
-    if e.keyCode != VirtualKey.MouseButtonPrimary:
-        return
-
-    var castedNode = editor.rayCastFirstNode(editor.gizmo.gizmoNode, e.localPosition)
-    if not castedNode.isNil:
-        editor.gizmo.startTransform(castedNode, e.localPosition)
-        return
-
-    castedNode = editor.rayCastFirstNode(editor.rootNode, e.localPosition)
-    if not castedNode.isNil:
-        editor.selectNode(castedNode)
-
-proc onScroll*(editor: Editor, dx, dy: float32, e: var Event) =
-    if editor.selectedNode.isNil:
-        return
-
-    editor.gizmo.proccesTransform(e.localPosition)
-
-proc onTouchUp*(editor: Editor, e: var Event) =
-    if editor.selectedNode.isNil:
-        return
-
-    editor.gizmo.stopTransform()
 
 proc currentCamera*(e: Editor): Camera =
     if e.cameraSelector.selectedIndex >= 0:
@@ -305,159 +219,24 @@ proc currentCamera*(e: Editor): Camera =
         if not n.isNil:
             result = n.componentIfAvailable(Camera)
 
-proc newToolbarButton(e: Editor, title: string): Button =
-    let f = systemFont()
-    let width = f.sizeOfString(title).width
-    result = Button.new(newRect(0, 0, width + 20, 20))
-    result.title = title
-    e.toolbar.addSubview(result)
-
-proc addToolbarMenu(e: Editor, item: MenuItem) =
-    let b = e.newToolbarButton(item.title)
-    b.onAction() do():
-        item.popupAtPoint(b, newPoint(0, 25))
-
-proc createSceneMenu(e: Editor) =
-    when loadingAndSavingAvailable:
-        let m = makeMenu("Scene"):
-            - "Load":
-                e.loadNode()
-            - "Save":
-                if not e.selectedNode.isNil:
-                    e.saveNode(e.selectedNode)
-        e.addToolbarMenu(m)
-
-proc toggleEditTab(e: Editor, tab:EditViewEntry): proc() =
-    result = proc()=
-        var tabindex = -1
-        var tabview: EditorTabView
-        for i, t in e.workspaceView.tabs:
-            if t.name == tab.name:
-                tabindex = i
-                tabview = t
-                break
-
-        let frame = e.workspaceView.bounds
-
-        if tabindex >= 0:
-            var anchorView: TabView
-            var anchorIndex = -1
-
-            for i, av in e.workspaceView.anchors:
-                if not av.isNil and av.tabIndex(tab.name) >= 0:
-                    anchorIndex = i
-                    anchorView = av
-                    break
-
-            if not anchorView.isNil:
-                let edtabi = anchorView.tabIndex(tab.name)
-                if edtabi >= 0:
-                    anchorView.removeTab(edtabi)
-                    if anchorView.tabsCount == 0:
-                        anchorView.removeFromSuperview()
-                        e.workspaceView.anchors[anchorIndex] = nil
-
-            e.workspaceView.tabs.delete(tabindex)
-        else:
-            tabview = tab.create().EditorTabView
-            tabview.editor = e
-
-            var anchor = tabview.tabAnchor()
-            var size = tabview.tabSize(frame)
-            tabview.rootNode = e.rootNode
-
-            tabview.init(newRect(newPoint(0.0, 0.0), size))
-            tabview.setEditedNode(e.selectedNode)
-            var anchorView = e.workspaceView.anchors[anchor.int]
-            if anchorView.isNil or anchorView.tabsCount == 0:
-                var tb = newTabView()
-                anchorView = tb
-                let horl = e.workspaceView.horizontalLayout
-                let verl = e.workspaceView.verticalLayout
-                case anchor:
-                of etaLeft:
-                    let dps = horl.dividerPositions()
-                    horl.insertSubview(anchorView, 0)
-                    horl.setDividerPosition(size.width, 0)
-                    if dps.len > 0:
-                        horl.setDividerPosition(dps[0], dps.len)
-
-                of etaRight:
-                    let dps = horl.dividerPositions()
-                    horl.addSubview(anchorView)
-                    horl.setDividerPosition(frame.width - size.width, dps.len)
-                of etaBottom:
-                    verl.addSubview(anchorView)
-                    verl.setDividerPosition(frame.height - size.height, 0)
-                else:
-                    discard
-                e.workspaceView.anchors[anchor.int] = anchorView
-
-            anchorView.addTab(tab.name, tabview)
-            e.workspaceView.tabs.add(tabview)
-
-proc createTabView(e: Editor)=
-    var m = newMenuItem("Tabs")
-    m.children = @[]
-    for rv in registeredEditorTabs():
-        var rmi = newMenuItem(rv.name)
-        rmi.action = e.toggleEditTab(rv)
-        m.children.add(rmi)
-
-    e.addToolbarMenu(m)
-
-proc createViewMenu(e: Editor) =
-    when loadingAndSavingAvailable:
-        let m = makeMenu("View"):
-            - "Zoom on Selection":
-                if not e.selectedNode.isNil:
-                    let cam = e.rootNode.findNode("camera")
-                    if not cam.isNil:
-                        e.rootNode.findNode("camera").focusOnNode(e.selectedNode)
-            - "-"
-            - "2D":
-                let cam = e.currentCamera()
-                if not cam.isNil: cam.projectionMode = cpOrtho
-            - "3D":
-                let cam = e.currentCamera()
-                if not cam.isNil: cam.projectionMode = cpPerspective
-            - "Profiler":
-                sharedProfiler().enabled = not sharedProfiler().enabled
-
-        e.addToolbarMenu(m)
-
 proc createGameInputToggle(e: Editor) =
-    let toggle = e.newToolbarButton("Game Input")
+    let toggle = e.workspaceView.newToolbarButton("Game Input")
     toggle.behavior = bbToggle
-    toggle.onAction do():
-        e.eventCatchingView.allowGameInput = (toggle.value == 1)
-    toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
+    #todo: fix this!!!
+    # toggle.onAction do():
+    #     e.eventCatchingView.allowGameInput = (toggle.value == 1)
+    # toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
 
 proc createCameraSelector(e: Editor) =
     e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
     e.updateCameraSelector()
-    e.toolbar.addSubview(e.cameraSelector)
+    e.workspaceView.toolbar.addSubview(e.cameraSelector)
 
     e.cameraSelector.onAction do():
         let cam = e.currentCamera()
         if not cam.isNil:
             e.rootNode.sceneView.camera = cam
-            e.cameraController.setCamera(cam.node)
-
-proc createChangeBackgroundColorButton(e: Editor) =
-    var cPicker: ColorPickerView
-    let b = e.newToolbarButton("Background Color")
-    b.onAction do():
-        if cPicker.isNil:
-            cPicker = newColorPickerView(newRect(0, 0, 300, 200))
-            cPicker.onColorSelected = proc(c: Color) =
-                e.sceneView.backgroundColor = c
-            let popupPoint = b.convertPointToWindow(newPoint(0, b.bounds.height + 5))
-            cPicker.setFrameOrigin(popupPoint)
-            b.window.addSubview(cPicker)
-        else:
-            cPicker.removeFromSuperview()
-            cPicker = nil
+            # e.cameraController.setCamera(cam.node)
 
 proc endEditing*(e: Editor) =
     if not e.selectedNode.isNil:
@@ -465,162 +244,150 @@ proc endEditing*(e: Editor) =
         if not nodeSelector.isNil:
             e.selectedNode.removeComponent(NodeSelector)
 
-    e.gizmo.gizmoNode.nodeWillBeRemovedFromSceneView()
     e.sceneView.afterDrawProc = nil
-    e.gizmo = nil
     e.sceneView.removeFromSuperview()
     e.sceneView.setFrame(e.workspaceView.frame)
-    let rootEditorView = e.workspaceView.superview
-    rootEditorView.replaceSubview(e.workspaceView, e.sceneView)
-    e.sceneView.editing = false
 
-proc createCloseEditorButton(e: Editor) =
-    e.newToolbarButton("x").onAction do():
+    if e.startFromGame:
+        let rootEditorView = e.workspaceView.superview
+        rootEditorView.replaceSubview(e.workspaceView, e.sceneView)
+
+    e.sceneView.editing = false
+    discard e.sceneView.makeFirstResponder()
+
+proc createCloseEditorButton(e: Editor, cb: proc()) =
+    e.workspaceView.newToolbarButton("x").onAction do():
         e.sceneView.dragDestination = nil
         e.endEditing()
+        cb()
 
-proc onKeyDown(editor: Editor, e: var Event): bool =
-    editor.cameraController.onKeyDown(e)
-    let cmd = commandFromEvent(e)
-    result = false
-    case commandFromEvent(e):
-    of kcCopy, kcCut:
-        let n = editor.mSelectedNode
-        if not n.isNil:
-            var s = Serializer.new()
-            var sData = n.serialize(s)
-            let pbi = newPasteboardItem(NodePboardKind, $sData)
-            pasteboardWithName(PboardGeneral).write(pbi)
-            if cmd == kcCut:
-                n.removeFromParent()
-                editor.sceneTreeDidChange()
-            result = true
-    of kcPaste:
-        let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
-        if not pbi.isNil:
-            let j = parseJson(pbi.data)
-            let n = newNode()
-            n.loadComposition(j)
-            if not editor.mSelectedNode.isNil:
-                editor.mSelectedNode.addChild(n)
-                editor.sceneTreeDidChange()
-            result = true
-    else: result = false
+proc copyNode*(e: Editor, n: Node = nil)=
+    var cn = n
+    if n.isNil:
+        cn = e.selectedNode
 
-proc onKeyUp(editor: Editor, e: var Event): bool =
-    editor.cameraController.onKeyUp(e)
-    if e.keyCode == VirtualKey.F:
-        editor.cameraController.setToNode(editor.selectedNode)
+    if not cn.isNil:
+        var s = Serializer.new()
+        var data = cn.serialize(s)
+        let pbi = newPasteboardItem(NodePboardKind, $data)
+        pasteboardWithName(PboardGeneral).write(pbi)
 
-method onKeyDown(v: WorkspaceView, e: var Event): bool = v.editor.onKeyDown(e)
-method onKeyUp(v: WorkspaceView, e: var Event): bool = v.editor.onKeyUp(e)
+proc cutNode*(e: Editor, n: Node = nil)=
+    e.copyNode(n)
+    var cn = n
+    if n.isNil:
+        cn = e.selectedNode
 
-proc newTabView(): TabView =
-    result = TabView.new(newRect(0, 0, 100, 100))
-    result.dockingTabs = true
-    result.userConfigurable = true
+    if not cn.isNil:
+        cn.removeFromParent()
+        e.sceneTreeDidChange()
 
-proc createWorkspaceLayout(e: Editor) =
-    let v = WorkspaceView.new(e.sceneView.frame)
-    v.editor = e
-    v.tabs = @[]
+proc pasteNode*(e: Editor, n: Node = nil)=
+    let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
+    if not pbi.isNil:
+        let j = parseJson(pbi.data)
+        let pn = newNode()
+        pn.loadComposition(j)
 
-    e.workspaceView = v
-    v.autoresizingMask = e.sceneView.autoresizingMask
+        var cn = n
+        if cn.isNil:
+            cn = e.selectedNode
 
-    let s = newTabView()
-    let sceneClipView = ClipView.new(zeroRect)
-    s.addTab("Scene", sceneClipView)
+        if cn.isNil:
+            cn = e.rootNode
 
-    v.verticalLayout = newVerticalLayout(newRect(0, toolbarHeight, v.bounds.width, v.bounds.height - toolbarHeight))
-    v.verticalLayout.userResizeable = true
-    v.horizontalLayout = newHorizontalLayout(newRect(0, 0, 800, 200))
-    v.horizontalLayout.userResizeable = true
-    v.horizontalLayout.resizingMask = "wh"
-    v.verticalLayout.resizingMask = "wh"
-    v.horizontalLayout.addSubview(s)
+        cn.addChild(pn)
+        e.sceneTreeDidChange()
 
-    v.addSubview(e.toolbar)
+proc onFirstResponderChanged(e: Editor, fr: View)=
+    for t in e.workspaceView.compositionEditors:
+        if fr.isDescendantOf(t):
+            # echo " Compositioneditor become frist responder " ,t.name
+            e.currentComposition = t.composition
+            e.sceneView = t.rootNode.sceneView # todo: fix this
+            break
+#[
+    const RodEditorNotif_onNodeLoad* = "RodEditorNotif_onNodeLoad"
+    const RodEditorNotif_onNodeSave* = "RodEditorNotif_onNodeSave"
+    const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
+    const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
+    const RodEditorNotif_onCompositionNew* = "RodEditorNotif_onCompositionNew"
+]#
+proc initNotifHandlers(e: Editor)=
+    e.notifCenter = newNotificationCenter()
+    e.notifCenter.addObserver(RodEditorNotif_onNodeLoad, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.loadNode()
+        else: discard
 
-    v.verticalLayout.addSubview(v.horizontalLayout)
-    v.addSubview(v.verticalLayout)
-    v.anchors[etaCenter.int] = s
-    e.sceneView.editing = true
+    e.notifCenter.addObserver(RodEditorNotif_onNodeSave, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.saveNode(e.selectedNode)
+        else: discard
 
-    let rootEditorView = e.sceneView.superview
-    rootEditorView.replaceSubview(e.sceneView, v)
-    e.sceneView.setFrame(sceneClipView.bounds)
-    e.eventCatchingView.setFrame(sceneClipView.bounds)
-    sceneClipView.addSubview(e.sceneView)
-    sceneClipView.addSubview(e.eventCatchingView)
+    # e.notifCenter.addObserver(RodEditorNotif_onCompositionNew, e) do(args: Variant):
+        # discard
 
-    for rt in registeredEditorTabs():
-        if rt.name in defaultTabs:
-            e.toggleEditTab(rt)()
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionSave, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.saveComposition(e.mCurrentComposition)
+        else: discard
 
-method onTouchEv*(v: EventCatchingView, e: var Event): bool =
-    if not v.allowGameInput:
-        result = procCall v.View.onTouchEv(e)
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionOpen, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            var di: DialogInfo
+            di.folder = e.currentProject.path
+            di.kind = dkOpenFile
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
+            di.title = "Open composition"
+            let path = di.show()
+            if path.len > 0:
+                e.openComposition(path)
+        else: discard
 
-proc createEventCatchingView(e: Editor) =
-    e.eventCatchingView = EventCatchingView.new(newRect(0, 0, 1960, 1680))
-    e.eventCatchingView.dragDestination = new(EditorDropDelegate)
-    e.eventCatchingView.resizingMask = "wh"
-    #e.eventCatchingView.backgroundColor = newColor(1, 0, 0)
-    let eventListener = e.eventCatchingView.newEventCatchingListener()
-    e.eventCatchingView.addGestureDetector(newScrollGestureDetector(eventListener))
-    e.eventCatchingView.editor = e
+proc startEditorForProject*(w: Window, p: EditorProject): Editor=
+    result.new()
 
-    eventListener.tapDownDelegate = proc(evt: var Event) =
-        e.onTouchDown(evt)
-        e.cameraController.onTapDown(evt)
-    eventListener.scrollProgressDelegate = proc(dx, dy: float32, evt: var Event) =
-        e.onScroll(dx, dy, evt)
-        e.cameraController.onScrollProgress(dx, dy, evt)
-    eventListener.tapUpDelegate = proc(dx, dy: float32, evt: var Event) =
-        e.onTouchUp(evt)
-        e.cameraController.onTapUp(dx, dy, evt)
-    e.eventCatchingView.mouseScrrollDelegate = proc(evt: var Event) =
-        e.cameraController.onMouseScrroll(evt)
-    e.eventCatchingView.keyUpDelegate = proc(evt: var Event): bool =
-        e.onKeyUp(evt)
-    e.eventCatchingView.keyDownDelegate = proc(evt: var Event): bool =
-        e.onKeyDown(evt)
+    var editor = result
+    editor.window = w
+    editor.currentProject = p
+    editor.startFromGame = false
+    editor.initNotifHandlers()
+    editor.workspaceView = createWorkspaceLayout(w, editor)
+
+    sharedNotificationCenter().addObserver(NimxFristResponderChangedInWindow, editor) do(args: Variant):
+        editor.onFirstResponderChanged(args.get(View))
+
+    var updateAnimation = newAnimation()
+    updateAnimation.onAnimate = proc(p: float)=
+        for t in editor.workspaceView.tabs:
+            t.update()
+        for t in editor.workspaceView.compositionEditors:
+            t.update()
+    w.addAnimation(updateAnimation)
 
 proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Editor =
-    let editor = Editor.new()
+    var editor = new(Editor)
     editor.rootNode = n
+    editor.window = v.window
     editor.sceneView = n.sceneView
+    editor.sceneView.editing = true
+    editor.startFromGame = startFromGame
+    editor.initNotifHandlers()
+    editor.workspaceView = createWorkspaceLayout(v.window, editor)
 
-    # Create widgets and stuff
-    editor.toolbar = Toolbar.new(newRect(0, 0, 20, toolbarHeight))
-    editor.toolbar.userResizeable = false
-    editor.cameraController = newEditorCameraController(editor.sceneView)
-    editor.createEventCatchingView()
+    var updateAnimation = newAnimation()
+    updateAnimation.onAnimate = proc(p: float)=
+        for t in editor.workspaceView.tabs:
+            t.update()
+        for t in editor.workspaceView.compositionEditors:
+            t.update()
+    editor.window.addAnimation(updateAnimation)
 
-    # Toolbar buttons
-    editor.createSceneMenu()
-    editor.createViewMenu()
-    editor.createTabView()
-    editor.createGameInputToggle()
-    editor.createCameraSelector()
-    editor.createChangeBackgroundColorButton()
+    editor.createCloseEditorButton() do():
+        updateAnimation.cancel()
 
-    if startFromGame:
-        editor.createCloseEditorButton()
-
-    editor.createWorkspaceLayout()
-    editor.gizmo = newGizmoAxis()
-    editor.gizmo.gizmoNode.nodeWasAddedToSceneView(editor.sceneView)
-    editor.sceneView.afterDrawProc = proc() =
-        currentContext().gl.clearDepthStencil()
-        editor.gizmo.updateGizmo()
-        editor.gizmo.gizmoNode.drawNode(true, nil)
-
-        for etv in editor.workspaceView.tabs:
-            etv.update()
-
-    return editor
+    result = editor
 
 # default tabs hacky registering
 import rod.editor.editor_default_tabs

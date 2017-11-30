@@ -27,6 +27,7 @@ proc align*(b: BinSerializer, sz: int) =
             b.stream.write(0xff'u8)
 
 proc newString*(b: BinSerializer, s: string): int16 =
+    doAssert(not s.endsWith(".json"))
     if s in b.revStrTab:
         result = b.revStrTab[s]
     else:
@@ -35,7 +36,7 @@ proc newString*(b: BinSerializer, s: string): int16 =
         b.revStrTab[s] = result
 
 
-type Serializable = 
+type Serializable =
     array | openarray | tuple | seq | string | int8 | int16 | int32 | bool | enum | uint8 | Image
 
 proc write*(b: BinSerializer, data: float32) =
@@ -43,7 +44,7 @@ proc write*(b: BinSerializer, data: float32) =
     b.stream.write(data)
 
 proc write*[T: Serializable](b: BinSerializer, data: T)
-        
+
 proc writeArrayNoLen*[T](b: BinSerializer, data: openarray[T]) =
     when isPODType(T):
         if data.len != 0:
@@ -66,7 +67,7 @@ proc getNeighbourImageBundlePath(b: BinSerializer, p2: string):tuple[asset:strin
         if fileExists(p / "config.rab"):
             var p3 = path.substr(p.len + 1)
             path = p.subStr(curDir.len + 1)
-            
+
             return (asset:p3, bundle: path)
 
     raise newException(Exception, "Neighbour assetbundle not found for " & p2 )
@@ -78,7 +79,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
     elif T is tuple:
         when isPODType(T):
             b.align(alignsize(type(data[0])))
-            b.stream.writeData(unsafeAddr data, sizeof(data)) 
+            b.stream.writeData(unsafeAddr data, sizeof(data))
         else:
             for k, v in fieldPairs(data):
                 b.write(v)

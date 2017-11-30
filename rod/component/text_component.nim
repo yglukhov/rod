@@ -518,7 +518,7 @@ method getBBox*(t: Text): BBox =
     else:
         if t.mText.truncationBehavior != tbNone or t.mText.boundingSize.height > height:
             height = t.mText.boundingSize.height
-        
+
         if t.mText.truncationBehavior != tbNone:
             width = t.mText.boundingSize.width
         else:
@@ -532,8 +532,8 @@ method getBBox*(t: Text): BBox =
                         offsetLeft -= (width - t.mText.boundingSize.width) / 2
                     of haRight:
                         offsetLeft -= width - t.mText.boundingSize.width
-                
-    result.maxPoint = newVector3(width + offsetLeft, height + offsetTop, 0.01)
+
+    result.maxPoint = newVector3(width + offsetLeft, height + offsetTop, 0.0)
     result.minPoint = newVector3(offsetLeft, offsetTop, 0.0)
 
 proc shadowMultiplier(t: Text): Size =

@@ -3,6 +3,7 @@ import nimx / [ types, image ]
 
 type JsonSerializer* = ref object
     node*: JsonNode
+    resourcePath*: string
 
 proc newJsonSerializer*(): JsonSerializer =
     result.new()

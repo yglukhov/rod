@@ -1,4 +1,4 @@
-import streams, tables, json
+import streams, tables, json, strutils, ospaths
 
 import nimx / [ image, types, assets/asset_manager ]
 import rod / utils / [ property_desc, serialization_helpers ]
@@ -12,7 +12,7 @@ type
         images*: JsonNode
         curCompPath*: string
         disableAwake*: bool
-        
+
     UncheckedArr {.unchecked.} [T] = array[0, T]
 
     BufferView*[T] = object
@@ -108,16 +108,26 @@ proc newBinDeserializer*(s: Stream): BinDeserializer =
     result.stream = s
     result.init()
 
+proc offsetToComposition(b: BinDeserializer, name: string): int32 =
+    result = b.compsTable.getOrDefault(name)
+    if result == 0:
+        if name.endsWith(".json"):
+            # if name ends with ".json" try find a composition without extension
+            result = b.compsTable.getOrDefault(changeFileExt(name, ""))
+        elif name.searchExtPos() == -1:
+            # if name doesn't have any extension, try append ".json", maybe we have
+            # an old pack format.
+            result = b.compsTable.getOrDefault(name & ".json")
+
 proc hasComposition*(b: BinDeserializer, name: string): bool {.inline.} =
-    name in b.compsTable
+    b.offsetToComposition(name) != 0
 
 proc rewindToComposition*(b: BinDeserializer, name: string) =
-    let pos = b.compsTable.getOrDefault(name)
+    let pos = b.offsetToComposition(name)
     if pos == 0:
         for k in b.compsTable.keys:
             echo "COMP: ", k
         raise newException(Exception, "Could not rewind to " & name)
-
     b.stream.setPosition(pos)
 
 proc setLenX[T](s: var seq[T], sz: int) =
@@ -145,7 +155,7 @@ proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image) =
         var asset = b.readStr()
         var bundle = b.readStr()
         im = sharedAssetManager().cachedAsset(Image, bundle & '/' & asset)
-        
+
     elif idx != -1:
         var path: string
         var p: Point
@@ -154,7 +164,7 @@ proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image) =
 
 proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image, frameOffset: var Point) =
     assert(idx != -2, "Internal error")
-        
+
     if idx != -1:
         var path: string
         b.getImageInfoForIndex(idx, path, frameOffset)
@@ -165,7 +175,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
         when isPODType(T):
             if data.len != 0:
                 b.align(alignsize(type(data[0])))
-                discard b.stream.readData(addr data[0], data.len * sizeof(data[0]))    
+                discard b.stream.readData(addr data[0], data.len * sizeof(data[0]))
         else:
             for i in 0 ..< data.len:
                 b.read(data[i])
@@ -173,11 +183,11 @@ proc read*[T](b: BinDeserializer, data: var T) =
     elif T is tuple:
         when isPODType(T):
             b.align(alignsize(type(data[0])))
-            discard b.stream.readData(addr data, sizeof(data)) 
+            discard b.stream.readData(addr data, sizeof(data))
         else:
             for k, v in fieldPairs(data):
                 b.read(v)
-    
+
     elif T is seq:
         let sz = b.readInt16()
         if sz == 0:
@@ -203,7 +213,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
 
     elif T is Image:
         let idx = b.readInt16()
-            
+
         b.getImageForIndex(idx, data)
 
     elif T is enum:
