@@ -9,6 +9,7 @@ import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
+
 import rod_types, node
 import rod.scene_composition
 import rod.component.mesh_component
@@ -30,7 +31,7 @@ export editor_tab_registry
 import variant
 
 when loadingAndSavingAvailable:
-    import file_dialog.dialog
+    import os_files.dialog
     import rod.editor.editor_open_project_view
     import os
 
@@ -151,7 +152,9 @@ when loadingAndSavingAvailable:
                 e.workspaceView.addTab(tbv)
                 e.workspaceView.selectTab(tbv)
         except:
-            warn "Can't load composition at ", p
+            error "Can't load composition at ", p
+            error "Exception caught: ", getCurrentExceptionMsg()
+            error "stack trace: ", getCurrentException().getStackTrace()
 
     proc saveNode(editor: Editor, selectedNode: Node) =
         var di: DialogInfo
@@ -184,6 +187,7 @@ when loadingAndSavingAvailable:
                         editor.selectedNode = n
 
                 elif path.endsWith(".json") or path.endsWith(".jcomp"):
+
                     let ln = newNodeWithURL("file://" & path)
                     if not editor.selectedNode.isNil:
                         editor.selectedNode.addChild(ln)
@@ -208,25 +212,6 @@ proc currentCamera*(e: Editor): Camera =
         let n = e.rootNode.findNode(e.cameraSelector.selectedItem)
         if not n.isNil:
             result = n.componentIfAvailable(Camera)
-
-proc createGameInputToggle(e: Editor) =
-    let toggle = e.workspaceView.newToolbarButton("Game Input")
-    toggle.behavior = bbToggle
-    #todo: fix this!!!
-    # toggle.onAction do():
-    #     e.eventCatchingView.allowGameInput = (toggle.value == 1)
-    # toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
-
-proc createCameraSelector(e: Editor) =
-    e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
-    e.updateCameraSelector()
-    e.workspaceView.toolbar.addSubview(e.cameraSelector)
-
-    e.cameraSelector.onAction do():
-        let cam = e.currentCamera()
-        if not cam.isNil:
-            e.rootNode.sceneView.camera = cam
-            # e.cameraController.setCamera(cam.node)
 
 proc endEditing*(e: Editor) =
     if not e.selectedNode.isNil:
@@ -380,4 +365,16 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
     result = editor
 
 # default tabs hacky registering
+import nimx.assets.asset_loading
+import nimx.resource_cache
+import nimx.resource
+import nimx.assets.json_loading
+
+registerResourcePreloader(["json", "jcomp"]) do(name: string, callback: proc(j: JsonNode)):
+    loadJsonResourceAsync(name) do(j: JsonNode):
+        callback(j)
+
+registerAssetLoader(["json", "jcomp"]) do(url: string, callback: proc(j: JsonNode)):
+    loadJsonFromURL(url, callback)
+
 import rod.editor.editor_default_tabs
