@@ -160,15 +160,9 @@ when loadingAndSavingAvailable:
                     e.workspaceView.selectTab(tbv)
 
         except:
-<<<<<<< HEAD
-            let ex = getCurrentException()
-            warn "Can't load composition at ", p, "\n", ex.name, ": ", getCurrentExceptionMsg(), "\n", ex.getStackTrace()
-
-=======
             error "Can't load composition at ", p
             error "Exception caught: ", getCurrentExceptionMsg()
             error "stack trace: ", getCurrentException().getStackTrace()
->>>>>>> 9e0a1cc0fbd242f413c0c0fd585c8a2719f5f4ba
 
     proc saveNode(editor: Editor, selectedNode: Node) =
         var di: DialogInfo
