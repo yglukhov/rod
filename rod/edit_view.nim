@@ -128,30 +128,40 @@ when loadingAndSavingAvailable:
 
     proc openComposition*(e: Editor, p: string)=
         try:
-            if e.startFromGame:
-                return
+            if p.endsWith(".dae"):
+                    var pn = if not e.selectedNode.isNil: e.selectedNode else: e.rootNode
+                    loadSceneAsync ("file://" & p), proc(n: Node) =
+                        pn.addChild(n)
+                        # e.selectedNode = n
 
-            var n = newNodeWithUrl("file://" & p)
-            var c:CompositionDocument
-
-            for tb in e.workspaceView.compositionEditors:
-                if tb.composition.path == p:
-                    c = tb.composition
-                    c.rootNode = n
-                    tb.onCompositionChanged(c)
-                    e.workspaceView.selectTab(tb)
+            elif p.endsWith(".json") or p.endsWith(".jcomp"):
+                if e.startFromGame:
                     return
 
-            c = new(CompositionDocument)
-            c.path = p
-            c.rootNode = n
-            var tbv = e.workspaceView.createCompositionEditor(c)
-            if not tbv.isNil:
-                tbv.name = splitFile(p).name
-                e.workspaceView.addTab(tbv)
-                e.workspaceView.selectTab(tbv)
+                var n = newNodeWithUrl("file://" & p)
+                var c:CompositionDocument
+
+                for tb in e.workspaceView.compositionEditors:
+                    if tb.composition.path == p:
+                        c = tb.composition
+                        c.rootNode = n
+                        tb.onCompositionChanged(c)
+                        e.workspaceView.selectTab(tb)
+                        return
+
+                c = new(CompositionDocument)
+                c.path = p
+                c.rootNode = n
+                var tbv = e.workspaceView.createCompositionEditor(c)
+                if not tbv.isNil:
+                    tbv.name = splitFile(p).name
+                    e.workspaceView.addTab(tbv)
+                    e.workspaceView.selectTab(tbv)
+
         except:
-            warn "Can't load composition at ", p
+            let ex = getCurrentException()
+            warn "Can't load composition at ", p, "\n", ex.name, ": ", getCurrentExceptionMsg(), "\n", ex.getStackTrace()
+
 
     proc saveNode(editor: Editor, selectedNode: Node) =
         var di: DialogInfo
@@ -328,7 +338,7 @@ proc initNotifHandlers(e: Editor)=
             var di: DialogInfo
             di.folder = e.currentProject.path
             di.kind = dkOpenFile
-            di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json")]
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
             di.title = "Open composition"
             let path = di.show()
             if path.len > 0:

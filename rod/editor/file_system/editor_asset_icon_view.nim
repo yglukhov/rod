@@ -117,7 +117,7 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
 
     of akContainer:
         let img_data = iconBitmapForFile(p.fullPath, 128, 128)
-        if not img_data.isNil: 
+        if not img_data.isNil:
             let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
             let imgView = new(ImageIconView)
             imgView.init(newRect(iconPos, iconSize))

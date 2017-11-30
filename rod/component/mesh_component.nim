@@ -445,20 +445,19 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "reflectionPercent", m.material.reflectionPercent)
     s.deserializeValue(j, "falloffPercent", m.material.falloffPercent)
     s.deserializeValue(j, "maskPercent", m.material.maskPercent)
-
-    s.deserializeValue(j, "matcapTextureR", m.material.matcapTextureR)
-    s.deserializeValue(j, "matcapTextureG", m.material.matcapTextureG)
-    s.deserializeValue(j, "matcapTextureB", m.material.matcapTextureB)
-    s.deserializeValue(j, "matcapTextureA", m.material.matcapTextureA)
-    s.deserializeValue(j, "matcapMaskTexture", m.material.matcapMaskTexture)
-    s.deserializeValue(j, "albedoTexture", m.material.albedoTexture)
-    s.deserializeValue(j, "glossTexture", m.material.glossTexture)
-    s.deserializeValue(j, "specularTexture", m.material.specularTexture)
-    s.deserializeValue(j, "normalTexture", m.material.normalTexture)
-    s.deserializeValue(j, "bumpTexture", m.material.bumpTexture)
-    s.deserializeValue(j, "reflectionTexture", m.material.reflectionTexture)
-    s.deserializeValue(j, "falloffTexture", m.material.falloffTexture)
-    s.deserializeValue(j, "maskTexture", m.material.maskTexture)
+    deserializeImage(j{"matcapTextureR"}, s) do(img: Image, err: string): m.material.matcapTextureR = img
+    deserializeImage(j{"matcapTextureG"}, s) do(img: Image, err: string): m.material.matcapTextureG = img
+    deserializeImage(j{"matcapTextureB"}, s) do(img: Image, err: string): m.material.matcapTextureB = img
+    deserializeImage(j{"matcapTextureA"}, s) do(img: Image, err: string): m.material.matcapTextureA = img
+    deserializeImage(j{"matcapMaskTexture"}, s) do(img: Image, err: string): m.material.matcapMaskTexture = img
+    deserializeImage(j{"albedoTexture"}, s) do(img: Image, err: string): m.material.albedoTexture = img
+    deserializeImage(j{"glossTexture"}, s) do(img: Image, err: string): m.material.glossTexture = img
+    deserializeImage(j{"specularTexture"}, s) do(img: Image, err: string): m.material.specularTexture = img
+    deserializeImage(j{"normalTexture"}, s) do(img: Image, err: string): m.material.normalTexture = img
+    deserializeImage(j{"bumpTexture"}, s) do(img: Image, err: string): m.material.bumpTexture = img
+    deserializeImage(j{"reflectionTexture"}, s) do(img: Image, err: string): m.material.reflectionTexture = img
+    deserializeImage(j{"falloffTexture"}, s) do(img: Image, err: string): m.material.falloffTexture = img
+    deserializeImage(j{"maskTexture"}, s) do(img: Image, err: string): m.material.maskTexture = img
 
     proc getAttribs(name: string): seq[float32] =
         result = newSeq[float32]()
