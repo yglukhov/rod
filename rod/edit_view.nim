@@ -31,7 +31,7 @@ export editor_tab_registry
 import variant
 
 when loadingAndSavingAvailable:
-    import file_dialog.dialog
+    import os_files.dialog
     import rod.editor.editor_open_project_view
     import os
 

@@ -4,7 +4,7 @@ import tables, os, streams
 import nimx.event
 import nimx.view_event_handling_new
 when not defined(android) and not defined(ios) and not defined(emscripten):
-    import file_dialog.file_info
+    import os_files.file_info
 
 type PathNode* = ref object of RootObj
     children*: seq[PathNode]
