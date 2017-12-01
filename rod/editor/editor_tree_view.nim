@@ -46,13 +46,13 @@ method init*(v: EditorTreeView, r: Rect)=
     outlineView.autoresizingMask = { afFlexibleWidth, afFlexibleMaxX }
     outlineView.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
         if indexPath.len == 0:
-            return 1
+            result = 1
         else:
             let n = item.get(Node)
             if n.children.isNil:
-                return 0
+                result = 0
             else:
-                return n.children.len
+                result = n.children.len
 
     outlineView.childOfItem = proc(item: Variant, indexPath: openarray[int]): Variant =
         if indexPath.len == 1:
@@ -85,6 +85,7 @@ method init*(v: EditorTreeView, r: Rect)=
 
     outlineView.configureCell = proc (cell: TableViewCell, indexPath: openarray[int]) =
         let n = outlineView.itemAtIndexPath(indexPath).get(Node)
+        # echo "configure ", @indexPath, " node ", n.name
         let textField = TextField(cell.subviews[0])
 
         var btn = Button(cell.subviews[1])
@@ -112,6 +113,9 @@ method init*(v: EditorTreeView, r: Rect)=
             v.renameField.removeFromSuperview()
 
         let ip = outlineView.selectedIndexPath
+        if ip.len == 0:
+            return
+
         let n = if ip.len > 0:
                 outlineView.itemAtIndexPath(ip).get(Node)
             else:
@@ -229,6 +233,8 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
     elif e.keyCode == VirtualKey.N and e.modifiers.anyOsModifier():
         let n = v.nodeFromSelectedOutlinePath()
         var sip = v.outlineView.selectedIndexPath
+        if sip.len == 0:
+            sip.add(0)
         v.outlineView.expandRow(sip)
         discard n.newChild("New Node")
         if not e.modifiers.anyShift():
@@ -239,6 +245,8 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
     elif e.keyCode == VirtualKey.Delete:
         if v.renameField.isFirstResponder() or v.filterField.isFirstResponder(): return false
         var sip = v.outlineView.selectedIndexPath
+        if sip.len == 0:
+            return
         if sip[^1] > 0:
             sip[^1].dec
         elif sip.len > 1:
@@ -255,24 +263,31 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
 
 proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node, indexPath: var seq[int]) =
     # running up and calculate the path to the node in the tree
-    let parent = n.parent
-    if not parent.isNil:
-        indexPath.insert(parent.children.find(n), 0)
+    if v.rootNode == n:
+        indexPath.add(0)
+        # indexPath.add(1)
+    else:
+        let rootParent = v.rootNode
 
-    # because there is the root node, it's necessary to add 0
-    elif parent.isNil or parent == v.rootNode:
-        indexPath.insert(0, 0)
-        return
+        var p = n.parent
+        var n = n
+        while not p.isNil and n != rootParent:
+            indexPath.insert(p.children.find(n), 0)
+            n = p
+            p = p.parent
 
-    v.getTreeViewIndexPathForNode(parent, indexPath)
+        indexPath.insert(0,0)
 
 method setEditedNode*(v: EditorTreeView, n: Node)=
     var indexPath = newSeq[int]()
     if not n.isNil:
         v.getTreeViewIndexPathForNode(n, indexPath)
+
         v.outlineView.expandBranch(indexPath[0..^2])
 
-    if indexPath.len > 1: # todo: check this!
+        if indexPath.len > 0: # todo: check this!
+            v.outlineView.selectItemAtIndexPath(indexPath)
+    else:
         v.outlineView.selectItemAtIndexPath(indexPath)
 
 method onEditorTouchDown*(v: EditorTreeView, e: var Event)=
