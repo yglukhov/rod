@@ -10,19 +10,6 @@ const toolbarHeight* = 30
 const loadingAndSavingAvailable* = not defined(android) and not defined(ios) and
     not defined(emscripten) and not defined(js)
 
-const RodEditorNotif_onNodeLoad* = "RodEditorNotif_onNodeLoad"
-const RodEditorNotif_onNodeSave* = "RodEditorNotif_onNodeSave"
-const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
-const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
-const RodEditorNotif_onCompositionNew* = "RodEditorNotif_onCompositionNew"
-
-const rodPbComposition* = "rod.composition"
-const rodPbSprite* = "rod.sprite"
-const rodPbFiles* = "rod.files"
-const NodePboardKind* = "io.github.yglukhov.rod.node"
-
-const defaultTabs* = ["Inspector", "Tree"]
-
 type
     EditorTabAnchor* = enum
         etaLeft
@@ -85,3 +72,28 @@ method onSceneChanged*(v: EditorTabView) {.base, deprecated.}=
 
 method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base.}=
     discard
+
+# Notifications
+const RodEditorNotif_onNodeLoad* = "RodEditorNotif_onNodeLoad"
+const RodEditorNotif_onNodeSave* = "RodEditorNotif_onNodeSave"
+const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
+const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
+const RodEditorNotif_onCompositionSaveAs* = "RodEditorNotif_onCompositionSaveAs"
+const RodEditorNotif_onCompositionNew* = "RodEditorNotif_onCompositionNew"
+
+# Pasteboard
+const rodPbComposition* = "rod.composition"
+const rodPbSprite* = "rod.sprite"
+const rodPbFiles* = "rod.files"
+const NodePboardKind* = "io.github.yglukhov.rod.node"
+
+# Editor's nodes
+const EditorCameraNodeName2D* = "[EditorCamera2D]"
+const EditorCameraNodeName3D* = "[EditorCamera3D]"
+const EditorRootNodeName* = "[EditorRoot]"
+
+# Default open tabs
+const defaultTabs* = ["Inspector", "Tree", "EditScene Settings"]
+
+# Other
+const EditorViewportSize* = newSize(1920.0, 1080.0)

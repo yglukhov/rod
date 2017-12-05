@@ -100,7 +100,7 @@ proc sceneTreeDidChange*(e: Editor) =
     for t in e.workspaceView.tabs:
         t.onSceneChanged()
 
-proc saveComposition*(e: Editor, c: CompositionDocument)
+proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)
 
 when loadingAndSavingAvailable:
 
@@ -109,23 +109,34 @@ when loadingAndSavingAvailable:
         if result.len == 0 or e.startFromGame:
             result = getAppDir() & "/../.."
 
-    proc saveComposition*(e: Editor, c: CompositionDocument)=
-        if c.path.len == 0:
+    proc openComposition*(e: Editor, p: string)
+
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)=
+        var newPath: string
+        if c.path.len == 0 or saveAs:
             var di: DialogInfo
             di.folder = e.currentProject.path
             di.extension = "jcomp"
             di.kind = dkSaveFile
             di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
-            di.title = "Save composition"
 
-            c.path = di.show()
+            di.title = "Save composition" & (if saveAs: " as" else: "")
 
-        if c.path.len > 0:
-            var s = Serializer.new()
-            var data = c.rootNode.serialize(s)
-            writeFile(c.path, $data)
+            newPath = di.show()
 
-        # echo "try save composition ", c.path
+        try:
+            if newPath.len > 0:
+                let compName = splitFile(newPath).name
+                var s = Serializer.new()
+                c.rootNode.name = compName
+                var data = c.rootNode.serialize(s)
+                writeFile(newPath, $data)
+
+                c.path = newPath
+                e.workspaceView.setTabTitle(c.owner, compName)
+
+        except:
+            error "Can't save composition at ", newPath
 
     proc openComposition*(e: Editor, p: string)=
         try:
@@ -300,12 +311,14 @@ proc initNotifHandlers(e: Editor)=
             e.saveNode(e.selectedNode)
         else: discard
 
-    # e.notifCenter.addObserver(RodEditorNotif_onCompositionNew, e) do(args: Variant):
-        # discard
-
     e.notifCenter.addObserver(RodEditorNotif_onCompositionSave, e) do(args: Variant):
         when loadingAndSavingAvailable:
             e.saveComposition(e.mCurrentComposition)
+        else: discard
+
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionSaveAs, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.saveComposition(e.mCurrentComposition, saveAs = true)
         else: discard
 
     e.notifCenter.addObserver(RodEditorNotif_onCompositionOpen, e) do(args: Variant):
