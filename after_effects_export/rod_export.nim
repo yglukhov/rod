@@ -615,7 +615,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         let zprop = transform.property("Z Rotation", float)
 
         let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
-            % cutDecimal(quaternionWithEulerRotation(newVector3(v[0], v[1], v[2])))
+            % cutDecimal(newQuaternionFromEulerYXZ(v[0], v[1], v[2]))
         if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
             gAnimatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
