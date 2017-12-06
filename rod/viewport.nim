@@ -5,6 +5,7 @@ import nimx.render_to_image
 import nimx.portable_gl
 import nimx.animation
 import nimx.window
+import nimx.view
 import nimx.view_event_handling
 import nimx.view_event_handling_new
 import nimx.notification_center
@@ -299,7 +300,8 @@ method onScroll*(v: SceneView, e: var Event): bool =
         result = procCall v.View.onScroll(e)
 
 method onTouchEv*(v: SceneView, e: var Event): bool =
-    if v.uiComponents.len > 0:
+    let target = v.window.mCurrentTouches.getOrDefault(e.pointerId)
+    if v.uiComponents.len > 0 and target != v:
         if e.buttonState == bsDown:
             let r = v.rayWithScreenCoords(e.localPosition)
             let intersections = v.getUiComponentsIntersectingWithRay(r)
