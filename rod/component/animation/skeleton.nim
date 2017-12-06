@@ -109,7 +109,7 @@ proc debugDraw(b: Bone, parent: Bone, parentMatrix: Matrix4) =
         else:
             mat = parentMatrix * b.startMatrix
     else:
-        mat = b.currFrame.matrix
+        mat = if not b.currFrame.isNil: b.currFrame.matrix else: b.matrix
 
     for k, v in b.children:
         v.debugDraw(b, mat)
