@@ -16,6 +16,7 @@ import rod.viewport
 var blinkComposition = newComposition """
 uniform Image uMask;
 uniform Image uLight;
+uniform vec2 uLightSize;
 uniform vec4 uFromRect;
 uniform float uLightPos;
 uniform float uScale;
@@ -26,13 +27,22 @@ void compose() {
     vec2 srcxy = uMask.texCoords.xy + duv * uFromRect.xy;
     vec2 srczw = uMask.texCoords.xy + duv * uFromRect.zw;
     vec2 uv = srcxy + (srczw - srcxy) * destuv;
-
     vec4 mask = texture2D(uMask.tex, uv);
-    float lightUV = (uv.x * 2.0 - uLightPos) * uScale;
-    vec4 light = texture2D(uLight.tex, vec2(lightUV, uv.y));
+
+    vec2 lightdestuv = (vPos - vec2(uLightPos, 0.0)) / uLightSize;
+    vec2 lightduv = uLight.texCoords.zw - uLight.texCoords.xy;
+    vec2 lightsrcxy = uLight.texCoords.xy + lightduv * uFromRect.xy;
+    vec2 lightsrczw = uLight.texCoords.xy + lightduv * uFromRect.zw;
+    vec2 lightuv = lightsrcxy + (lightsrczw - lightsrcxy) * lightdestuv;
+
+    float rect_alpha = 1.0;
+    if (lightuv.x < uLight.texCoords.x || lightuv.x > uLight.texCoords.z || lightuv.y < uLight.texCoords.y || lightuv.y > uLight.texCoords.w) {
+        rect_alpha = 0.0;
+    }    
+    vec4 light = texture2D(uLight.tex, lightuv);
 
     gl_FragColor = light;
-    gl_FragColor.a *= mask.a * step(0.0, lightUV) * step(0.0, uLight.texCoords.z - lightUV);
+    gl_FragColor.a *= mask.a * step(0.0, lightuv.x) * step(0.0, uLight.texCoords.z - lightuv.x) * rect_alpha;
 }
 """
 
@@ -71,13 +81,13 @@ method draw*(b: Blink) =
     if b.remainingTime <= 0.0:
         b.remainingTime = b.period
         b.currLightPos = 0.0
-
-
+    
     blinkComposition.draw r:
         setUniform("uMask", b.mask)
         setUniform("uLight", b.light)
+        setUniform("uLightSize", b.light.size)
         setUniform("uFromRect", fr)
-        setUniform("uLightPos", b.currLightPos / b.mask.size.width)
+        setUniform("uLightPos", b.currLightPos )
         setUniform("uScale", scale)
 
 method getBBox*(b: Blink): BBox =
