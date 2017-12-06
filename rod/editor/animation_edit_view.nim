@@ -162,6 +162,18 @@ proc createPlayButton(v: AnimationEditView): Button =
                 a.onComplete do():
                     b.title = "Play"
                     currentlyPlayingAnimation = nil
+
+                var anims = newSeq[Animation]()
+                proc collectAnims(n: Node) =
+                    for ch in n.children:
+                        if not ch.animations.isNil:
+                            for name, anim in ch.animations:
+                                anims.add(anim)
+                        ch.collectAnims()
+                v.mEditedNode.collectAnims()
+                for anim in anims:
+                    v.window.addAnimation(anim)
+
                 v.window.addAnimation(a)
                 b.title = "Stop"
 

@@ -1,6 +1,7 @@
 import json
 import tables
 import math
+import typetraits
 
 import nimx.types
 import nimx.context
@@ -11,6 +12,7 @@ import nimx.composition
 import nimx.property_visitor
 import nimx.system_logger
 import nimx.portable_gl
+import nimx.class_registry
 
 import rod.rod_types
 import rod.node
@@ -19,6 +21,7 @@ import rod / utils / [ property_desc, serialization_codegen ]
 import rod.component
 import rod.component.sprite
 import rod.component.solid
+import rod.component.rti
 import rod.component.camera
 import rod.viewport
 
@@ -34,6 +37,17 @@ const comonPrefix = """
         rect_alpha = 0.0;
     }
 """
+
+const comonSolidPrefix = """
+(vec4 mask_bounds, vec4 mask_color, mat4 mvp_inv, float msk_alpha) {
+    vec4 pos = mvp_inv * vec4(gl_FragCoord.xyz, 1.0);
+    vec2 mskVpos = pos.xy / pos.w;
+    vec2 b = mask_bounds.zw / 2.0;
+    vec2 dp = mskVpos - (mask_bounds.xy + b);
+    vec2 d = abs(dp) - b;
+    float rect_alpha = min(min(max(d.x, d.y), 0.0) + length(max(d, 0.0)), 1.0);
+"""
+
 const alphaPostfix = """
     float mask_alpha = mask_color.a * rect_alpha * msk_alpha;
     gl_FragColor.a *= mask_alpha;
@@ -69,19 +83,81 @@ var effect = [
     maskPost("maskLumaInvertedEffect", comonPrefix & lumaInvertedPostfix) # tmLumaInverted
 ]
 
+template maskSolidPost(name, src: string): PostEffect =
+    newPostEffect("void " & name & src, name, ["vec4", "vec4", "mat4", "float"])
+
+var effectSolid = [
+    maskSolidPost("maskSolidAlphaEffect", comonSolidPrefix & alphaPostfix), # tmAlpha
+    maskSolidPost("maskSolidAlphaInvertedEffect", comonSolidPrefix & alphaInvertedPostfix), # tmAlphaInverted
+    maskSolidPost("maskSolidLumaEffect", comonSolidPrefix & lumaPostfix), # tmLuma
+    maskSolidPost("maskSolidLumaInvertedEffect", comonSolidPrefix & lumaInvertedPostfix) # tmLumaInverted
+]
+
 type MaskType* = enum
     tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
+
+type MaskPushProc = proc(c: Component, maskType: MaskType): bool
 
 type Mask* = ref object of Component
     maskType*: MaskType
     mMaskNode: Node
-    maskSprite*: Sprite
-    mWithRTI: bool
+    pushPostProc: proc(m: MaskType): bool
+    bWasPost: bool
 
 Mask.properties:
     maskType
     layerName:
         phantom: string
+
+template inv(m: Matrix4): Matrix4 =
+    var res: Matrix4
+    if not m.tryInverse(res):
+        res.loadIdentity()
+    res
+
+proc getInvTransform(n: Node): Matrix4 =
+    let vp = n.sceneView
+    result = (vp.viewProjMatrix * n.worldTransform()).inv()
+    result.scale(newVector3(2.0,2.0,2.0))
+    result.translate(newVector3(-0.5, -0.5, -0.5))
+    let glvp = currentContext().gl.getViewport()
+    result.scale(newVector3(1.0/(glvp[2] - glvp[0]).float, 1.0/(glvp[3] - glvp[1]).float, 1.0))
+
+var maskTypesRegistry = newTable[string, MaskPushProc]()
+
+proc registerMaskType(T: typedesc[Component], pushPostProc: MaskPushProc) =
+    maskTypesRegistry[typetraits.name(T)] = pushPostProc
+
+proc getPostProc(c: Component): MaskPushProc =
+    maskTypesRegistry[c.className()]
+
+proc spriteMaskImpl(c: Component, maskType: MaskType): bool =
+    let s = c.Sprite
+    if not s.image.isNil:
+        var theQuad {.noinit.}: array[4, GLfloat]
+        let tex = getTextureQuad(s.image, currentContext().gl, theQuad)
+        let maskImgCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
+        let maskBounds = newRect(s.getOffset(), s.image.size)
+        let trInv = s.node.getInvTransform()
+        let maskAlpha = s.node.getGlobalAlpha()
+        pushPostEffect(effect[maskType.int-1], tex, maskImgCoords, maskBounds, trInv, maskAlpha)
+        return true
+
+registerMaskType(Sprite, spriteMaskImpl)
+
+proc solidMaskImpl(c: Component, maskType: MaskType): bool =
+    let s = c.Solid
+    let maskBounds = newRect(newPoint(0, 0), s.size)
+    let trInv = s.node.getInvTransform()
+    let maskAlpha = s.node.getGlobalAlpha()
+    pushPostEffect(effectSolid[maskType.int-1], maskBounds, s.color, trInv, maskAlpha)
+    return true
+
+registerMaskType(Solid, solidMaskImpl)
+
+registerMaskType(RTI, proc(c: Component, maskType: MaskType): bool =
+    echo "------------im RTI "
+)
 
 proc findComponents*(n: Node, T: typedesc[Component]): auto =
     type TT = T
@@ -92,8 +168,29 @@ proc findComponents*(n: Node, T: typedesc[Component]): auto =
         if not comp.isNil: compSeq.add(comp)
     return compSeq
 
+proc findRegisteredComponents*(n: Node): Table[string, seq[Component]] =
+    var res = initTable[string, seq[Component]]()
+    for k, v in maskTypesRegistry:
+        res[k] = newSeq[Component]()
+    discard n.findNode do(nd: Node) -> bool:
+        for k, v in maskTypesRegistry:
+            let comp = nd.componentIfAvailable(k)
+            if not comp.isNil:
+                res[k].add(comp)
+        discard
+    return res
+
 proc setupMaskComponent(msk: Mask)
 proc trySetupMask(msk: Mask)
+
+proc `maskSprite=`*(msk: Mask, s: Sprite) {.deprecated.} =
+    if s.isNil:
+        msk.pushPostProc = nil
+    else:
+        let sprt = s
+        let p = getPostProc(sprt)
+        msk.pushPostProc = proc(maskType: MaskType): bool =
+            return p(sprt, maskType)
 
 template maskNode*(msk: Mask): Node = msk.mMaskNode
 template `maskNode=`*(msk: Mask, val: Node) =
@@ -102,18 +199,21 @@ template `maskNode=`*(msk: Mask, val: Node) =
 
 proc setupMaskComponent(msk: Mask) =
     if not msk.maskNode.isNil:
-        let spriteCmps = msk.maskNode.findComponents(Sprite)
-        let solidCmps = msk.maskNode.findComponents(Solid)
-        if spriteCmps.len > 1 or solidCmps.len > 0:
-            msk.mWithRTI = true
-            # TODO
-            # if solidCmps.len == 1 and spriteCmps.len == 0: # do solid RTI
-            # else: # do all branch RTI
-            raise newException(Exception, "RTI not implemented")
-        elif spriteCmps.len == 1:
-            msk.maskSprite = spriteCmps[0]
-        else:
-            msk.maskSprite = nil
+        msk.pushPostProc = nil
+        let components = msk.maskNode.findRegisteredComponents()
+        for k, v in components:
+            if v.len > 1:
+                msk.pushPostProc = nil
+                raise newException(Exception, "more than one mask targets found, use rti")
+            elif v.len == 1:
+                if msk.pushPostProc.isNil:
+                    let cmp = v[0]
+                    let p = getPostProc(cmp)
+                    msk.pushPostProc = proc(maskType: MaskType): bool =
+                        return p(cmp, maskType)
+                else:
+                    msk.pushPostProc = nil
+                    raise newException(Exception, "more than one mask targets found, use rti")
 
 proc trySetupMask(msk: Mask) =
     try: msk.setupMaskComponent()
@@ -122,43 +222,20 @@ proc trySetupMask(msk: Mask) =
         logi ex.name, ": ", getCurrentExceptionMsg(), "\n", ex.getStackTrace()
 
 method componentNodeWasAddedToSceneView*(msk: Mask) =
-    if msk.maskSprite.isNil:
+    if msk.pushPostProc.isNil:
         msk.trySetupMask()
 
 method componentNodeWillBeRemovedFromSceneView*(msk: Mask) =
-    msk.maskSprite = nil
-
-template inv(m: Matrix4): Matrix4 =
-    var res: Matrix4
-    if not m.tryInverse(res):
-        res.loadIdentity()
-    res
+    msk.pushPostProc = nil
 
 method beforeDraw*(msk: Mask, index: int): bool =
-    if not msk.maskSprite.isNil and not msk.maskSprite.image.isNil and msk.maskType != tmNone:
-
-        if msk.mWithRTI:
-            # TODO RTI
-            discard
-
-        let vp = msk.node.sceneView
-        var theQuad {.noinit.}: array[4, GLfloat]
-        let tex = getTextureQuad(msk.maskSprite.image, currentContext().gl, theQuad)
-        let maskImgCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
-        let maskBounds = newRect(msk.maskSprite.getOffset(), msk.maskSprite.image.size)
-
-        var trInv = (vp.viewProjMatrix * msk.maskSprite.node.worldTransform()).inv()
-        trInv.scale(newVector3(2.0,2.0,2.0))
-        trInv.translate(newVector3(-0.5, -0.5, -0.5))
-        let glvp = currentContext().gl.getViewport()
-        trInv.scale(newVector3(1.0/(glvp[2] - glvp[0]).float, 1.0/(glvp[3] - glvp[1]).float, 1.0))
-
-        let maskAlpha = msk.maskSprite.node.getGlobalAlpha()
-
-        pushPostEffect(effect[msk.maskType.int-1], tex, maskImgCoords, maskBounds, trInv, maskAlpha)
+    if msk.maskType != tmNone and not msk.pushPostProc.isNil:
+        msk.bWasPost = msk.pushPostProc(msk.maskType)
+    else:
+        msk.bWasPost = false
 
 method afterDraw*(msk: Mask, index: int) =
-    if not msk.maskSprite.isNil and not msk.maskSprite.image.isNil and msk.maskType != tmNone:
+    if msk.bWasPost:
         popPostEffect()
 
 method serialize*(msk: Mask, serealizer: Serializer): JsonNode =
