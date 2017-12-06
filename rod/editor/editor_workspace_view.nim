@@ -34,6 +34,13 @@ proc selectTab*(w: WorkspaceView, tb: EditorTabView)=
             tv.selectTab(i)
             return
 
+proc setTabTitle*(w: WorkspaceView, tb: EditorTabView, title: string)=
+    for tv in w.tabViews:
+        var i = tv.tabIndex(tb)
+        if i >= 0:
+            tv.setTitleOfTab(title, i)
+            return
+
 proc newToolbarButton*(w: WorkspaceView, title: string): Button =
     let f = systemFont()
     let width = f.sizeOfString(title).width
@@ -62,6 +69,19 @@ proc newTabView(w: WorkspaceView): TabView =
 
     r.onRemove = proc(v: TabView)=
         w.onTabRemove(v)
+
+    r.onClose = proc(v: View)=
+        if v of EditorTabView:
+            let et = v.EditorTabView
+            for i, t in w.tabs:
+                if t == et:
+                    w.tabs.del(i)
+                    return
+
+            for i, t in w.compositionEditors:
+                if t == et:
+                    w.compositionEditors.del(i)
+                    return
 
     w.tabViews.add(r)
 
@@ -127,7 +147,7 @@ proc createCompositionEditor*(w: WorkspaceView, c: CompositionDocument = nil): E
     else:
         tabView.name = "new composition"
         comp = new(CompositionDocument)
-        comp.rootNode = newNode("(root)")
+        comp.rootNode = newNode("new composition")
         tabView.rootNode = comp.rootNode
 
     comp.owner = tabView
@@ -135,11 +155,20 @@ proc createCompositionEditor*(w: WorkspaceView, c: CompositionDocument = nil): E
     let frame = w.bounds
     var size = tabview.tabSize(frame)
 
-    tabview.init(newRect(newPoint(0.0, 0.0), size))
     tabview.composition = comp
+    tabview.init(newRect(newPoint(0.0, 0.0), size))
     w.compositionEditors.add(tabView)
 
     result = tabView
+
+# proc closeCompositionEditor*(w: WorkspaceView, c: CompositionDocument)=
+#     for i, t in w.compositionEditors:
+#         if t.composition == c:
+#             t.removeFromSplitViewSystem()
+#             t.removeFromSuperview()
+#             w.compositionEditors.del(i)
+#             break
+
 
 proc createViewMenu(w: WorkspaceView) =
     when loadingAndSavingAvailable:
@@ -307,11 +336,20 @@ proc createSceneMenu(w: WorkspaceView) =
                     var sceneEdit = w.createCompositionEditor()
                     if not sceneEdit.isNil:
                         w.addTab(sceneEdit)
-                - "Load":
+                - "Load comp":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionOpen)
                     # e.loadNode()
-                - "Save":
+                - "Save comp":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionSave)
+
+                - "Save comp as ...":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionSaveAs)
+
+                - "Load node":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeLoad)
+
+                - "Save node":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeSave)
                     # if not e.selectedNode.isNil:
                     #     e.saveNode(e.selectedNode)
             w.addToolbarMenu(m)
