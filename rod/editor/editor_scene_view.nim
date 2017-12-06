@@ -97,13 +97,20 @@ method init*(v: EditorSceneView, r: Rect)=
         let editView = SceneView.new(newRect(0,0,r.width, r.height))
         editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
 
-        editView.rootNode = v.rootNode
+        editView.rootNode = newNode(EditorRootNodeName)
         editView.editing = true
 
-        let cameraNode = editView.rootNode.newChild("camera")
-        discard cameraNode.component(Camera)
-        cameraNode.positionZ = 100
+        let cameraNode3d = editView.rootNode.newChild(EditorCameraNodeName3D)
+        discard cameraNode3d.component(Camera)
+        cameraNode3d.positionZ = 100
 
+        let cameraNode2d = editView.rootNode.newChild(EditorCameraNodeName2D)
+        let c2d = cameraNode2d.component(Camera)
+        c2d.viewportSize = EditorViewportSize
+        c2d.projectionMode = cpOrtho
+        cameraNode2d.position = newVector3(EditorViewportSize.width * 0.5, EditorViewportSize.height * 0.5, 100.0)
+
+        editView.rootNode.addChild(v.composition.rootNode)
         clipView.addSubview(editView)
 
         v.sceneView = editView
@@ -146,9 +153,6 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     target.backgroundColor.a = 0.0
     case i.kind:
     of rodPbComposition:
-        # var editorScene = target.EditorSceneView
-        # editorScene.editor.openComposition(i.data)
-
         var n = try: newNodeWithURL("file://" & i.data) except: nil
         if not n.isNil:
             var editorScene = target.EditorSceneView

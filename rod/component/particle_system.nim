@@ -922,7 +922,7 @@ method serialize*(c: ParticleSystem, s: Serializer): JsonNode =
     result.add("scaleSeq", s.getValue(c.scaleSeq))
     result.add("colorSeq", s.getValue(c.colorSeq))
 
-    if c.texture.filePath().len > 0:
+    if not c.texture.isNil and c.texture.filePath().len > 0:
         result.add("texture", s.getValue(s.getRelativeResourcePath(c.texture.filePath())))
         result.add("isTextureAnimated", s.getValue(c.isTextureAnimated))
         result.add("texSize", s.getValue(c.frameSize))

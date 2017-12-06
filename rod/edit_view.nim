@@ -9,6 +9,7 @@ import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
+
 import rod_types, node
 import rod.scene_composition
 import rod.component.mesh_component
@@ -30,7 +31,7 @@ export editor_tab_registry
 import variant
 
 when loadingAndSavingAvailable:
-    import file_dialog.dialog
+    import os_files.dialog
     import rod.editor.editor_open_project_view
     import os
 
@@ -99,32 +100,42 @@ proc sceneTreeDidChange*(e: Editor) =
     for t in e.workspaceView.tabs:
         t.onSceneChanged()
 
-proc saveComposition*(e: Editor, c: CompositionDocument)
-
 when loadingAndSavingAvailable:
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)
 
     proc currentProjectPath*(e: Editor): string=
         result = e.currentProject.path
         if result.len == 0 or e.startFromGame:
             result = getAppDir() & "/../.."
 
-    proc saveComposition*(e: Editor, c: CompositionDocument)=
-        if c.path.len == 0:
+    proc openComposition*(e: Editor, p: string)
+
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)=
+        var newPath: string
+        if c.path.len == 0 or saveAs:
             var di: DialogInfo
             di.folder = e.currentProject.path
             di.extension = "jcomp"
             di.kind = dkSaveFile
             di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
-            di.title = "Save composition"
 
-            c.path = di.show()
+            di.title = "Save composition" & (if saveAs: " as" else: "")
 
-        if c.path.len > 0:
-            var s = Serializer.new()
-            var data = c.rootNode.serialize(s)
-            writeFile(c.path, $data)
+            newPath = di.show()
 
-        # echo "try save composition ", c.path
+        try:
+            if newPath.len > 0:
+                let compName = splitFile(newPath).name
+                var s = Serializer.new()
+                c.rootNode.name = compName
+                var data = c.rootNode.serialize(s)
+                writeFile(newPath, $data)
+
+                c.path = newPath
+                e.workspaceView.setTabTitle(c.owner, compName)
+
+        except:
+            error "Can't save composition at ", newPath
 
     proc openComposition*(e: Editor, p: string)=
         try:
@@ -151,7 +162,9 @@ when loadingAndSavingAvailable:
                 e.workspaceView.addTab(tbv)
                 e.workspaceView.selectTab(tbv)
         except:
-            warn "Can't load composition at ", p
+            error "Can't load composition at ", p
+            error "Exception caught: ", getCurrentExceptionMsg()
+            error "stack trace: ", getCurrentException().getStackTrace()
 
     proc saveNode(editor: Editor, selectedNode: Node) =
         var di: DialogInfo
@@ -184,6 +197,7 @@ when loadingAndSavingAvailable:
                         editor.selectedNode = n
 
                 elif path.endsWith(".json") or path.endsWith(".jcomp"):
+
                     let ln = newNodeWithURL("file://" & path)
                     if not editor.selectedNode.isNil:
                         editor.selectedNode.addChild(ln)
@@ -197,7 +211,7 @@ when loadingAndSavingAvailable:
                 error "stack trace: ", getCurrentException().getStackTrace()
 
 else:
-    proc saveComposition*(e: Editor, c: CompositionDocument)= discard
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false) = discard
     proc openComposition*(e: Editor, p: string) = discard
 
 proc selectNode*(editor: Editor, node: Node) =
@@ -208,25 +222,6 @@ proc currentCamera*(e: Editor): Camera =
         let n = e.rootNode.findNode(e.cameraSelector.selectedItem)
         if not n.isNil:
             result = n.componentIfAvailable(Camera)
-
-proc createGameInputToggle(e: Editor) =
-    let toggle = e.workspaceView.newToolbarButton("Game Input")
-    toggle.behavior = bbToggle
-    #todo: fix this!!!
-    # toggle.onAction do():
-    #     e.eventCatchingView.allowGameInput = (toggle.value == 1)
-    # toggle.value = if e.eventCatchingView.allowGameInput: 1 else: 0
-
-proc createCameraSelector(e: Editor) =
-    e.cameraSelector = PopupButton.new(newRect(0, 0, 150, 20))
-    e.updateCameraSelector()
-    e.workspaceView.toolbar.addSubview(e.cameraSelector)
-
-    e.cameraSelector.onAction do():
-        let cam = e.currentCamera()
-        if not cam.isNil:
-            e.rootNode.sceneView.camera = cam
-            # e.cameraController.setCamera(cam.node)
 
 proc endEditing*(e: Editor) =
     if not e.selectedNode.isNil:
@@ -315,12 +310,14 @@ proc initNotifHandlers(e: Editor)=
             e.saveNode(e.selectedNode)
         else: discard
 
-    # e.notifCenter.addObserver(RodEditorNotif_onCompositionNew, e) do(args: Variant):
-        # discard
-
     e.notifCenter.addObserver(RodEditorNotif_onCompositionSave, e) do(args: Variant):
         when loadingAndSavingAvailable:
             e.saveComposition(e.mCurrentComposition)
+        else: discard
+
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionSaveAs, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.saveComposition(e.mCurrentComposition, saveAs = true)
         else: discard
 
     e.notifCenter.addObserver(RodEditorNotif_onCompositionOpen, e) do(args: Variant):
@@ -380,4 +377,16 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
     result = editor
 
 # default tabs hacky registering
+import nimx.assets.asset_loading
+import nimx.resource_cache
+import nimx.resource
+import nimx.assets.json_loading
+
+registerResourcePreloader(["json", "jcomp"]) do(name: string, callback: proc(j: JsonNode)):
+    loadJsonResourceAsync(name) do(j: JsonNode):
+        callback(j)
+
+registerAssetLoader(["json", "jcomp"]) do(url: string, callback: proc(j: JsonNode)):
+    loadJsonFromURL(url, callback)
+
 import rod.editor.editor_default_tabs
