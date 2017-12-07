@@ -64,9 +64,9 @@ method init*(v: EditorTreeView, r: Rect)=
         var lbl = newLabel(newRect(0, 0, 100, 20))
         result = newTableViewCell(lbl)
         result.autoresizingMask = {afFlexibleWidth}
-        var btn = newCheckbox(newRect(80.0, 0.0, 20.0, 20.0))
-        btn.autoResizingMask = {afFlexibleMinX}
-        result.addSubview(btn)
+        # var btn = newCheckbox(newRect(80.0, 0.0, 20.0, 20.0))
+        # btn.autoResizingMask = {afFlexibleMinX}
+        # result.addSubview(btn)
 
     outlineView.setDisplayFilter do(item: Variant)-> bool:
         if v.filterField.text.len == 0:
@@ -88,8 +88,8 @@ method init*(v: EditorTreeView, r: Rect)=
         # echo "configure ", @indexPath, " node ", n.name
         let textField = TextField(cell.subviews[0])
 
-        var btn = Button(cell.subviews[1])
-        btn.value = n.enabled.int8
+        # var btn = Button(cell.subviews[1])
+        # btn.value = n.enabled.int8
         if not n.isEnabledInTree():
             textField.textColor = newColor(0.3, 0.3, 0.3, 1.0)
         else:
@@ -97,9 +97,9 @@ method init*(v: EditorTreeView, r: Rect)=
 
         textField.text = if n.name.isNil: "(node)" else: n.name
 
-        btn.onAction do():
-            n.enabled = not n.enabled
-            v.onTreeChanged()
+        # btn.onAction do():
+        #     n.enabled = not n.enabled
+        #     v.onTreeChanged()
 
         if v.filterField.text.len() > 0:
             let lowerFilter= v.filterField.text.toLowerAscii()
