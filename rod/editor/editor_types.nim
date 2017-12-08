@@ -1,7 +1,7 @@
 
 import nimx / [view, button, editor/tab_view, linear_layout, popup_button,
     toolbar, notification_center, event ]
-import rod / [node, viewport, editor/editor_project_settings]
+import rod / [node, viewport, editor/editor_project_settings, editor/editor_error_handling]
 
 export notification_center
 

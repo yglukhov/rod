@@ -134,6 +134,7 @@ proc createCompositionEditor*(w: WorkspaceView, c: CompositionDocument = nil): E
     var comp: CompositionDocument
     if not c.isNil:
         when loadingAndSavingAvailable:
+            # try:
             var compRoot = c.rootNode
             if compRoot.isNil:
                 compRoot = newNodeWithUrl("file://"&c.path)
@@ -142,6 +143,8 @@ proc createCompositionEditor*(w: WorkspaceView, c: CompositionDocument = nil): E
             tabview.rootNode = compRoot
             tabView.name = splitFile(c.path).name
             comp = c
+            # except:
+
         else:
             return nil
     else:

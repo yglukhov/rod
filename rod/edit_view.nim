@@ -124,48 +124,48 @@ when loadingAndSavingAvailable:
 
             newPath = di.show()
 
-        try:
-            if newPath.len > 0:
-                let compName = splitFile(newPath).name
-                var s = Serializer.new()
-                c.rootNode.name = compName
-                var data = c.rootNode.serialize(s)
-                writeFile(newPath, $data)
+        # try:
+        if newPath.len > 0:
+            let compName = splitFile(newPath).name
+            var s = Serializer.new()
+            c.rootNode.name = compName
+            var data = c.rootNode.serialize(s)
+            writeFile(newPath, $data)
 
-                c.path = newPath
-                e.workspaceView.setTabTitle(c.owner, compName)
+            c.path = newPath
+            e.workspaceView.setTabTitle(c.owner, compName)
 
-        except:
-            error "Can't save composition at ", newPath
+        # except:
+        #     error "Can't save composition at ", newPath
+        #     e.handleError()
 
     proc openComposition*(e: Editor, p: string)=
-        try:
-            if e.startFromGame:
+        # try:
+        if e.startFromGame:
+            return
+
+        var n = newNodeWithUrl("file://" & p)
+        var c:CompositionDocument
+
+        for tb in e.workspaceView.compositionEditors:
+            if tb.composition.path == p:
+                c = tb.composition
+                c.rootNode = n
+                tb.onCompositionChanged(c)
+                e.workspaceView.selectTab(tb)
                 return
 
-            var n = newNodeWithUrl("file://" & p)
-            var c:CompositionDocument
-
-            for tb in e.workspaceView.compositionEditors:
-                if tb.composition.path == p:
-                    c = tb.composition
-                    c.rootNode = n
-                    tb.onCompositionChanged(c)
-                    e.workspaceView.selectTab(tb)
-                    return
-
-            c = new(CompositionDocument)
-            c.path = p
-            c.rootNode = n
-            var tbv = e.workspaceView.createCompositionEditor(c)
-            if not tbv.isNil:
-                tbv.name = splitFile(p).name
-                e.workspaceView.addTab(tbv)
-                e.workspaceView.selectTab(tbv)
-        except:
-            error "Can't load composition at ", p
-            error "Exception caught: ", getCurrentExceptionMsg()
-            error "stack trace: ", getCurrentException().getStackTrace()
+        c = new(CompositionDocument)
+        c.path = p
+        c.rootNode = n
+        var tbv = e.workspaceView.createCompositionEditor(c)
+        if not tbv.isNil:
+            tbv.name = splitFile(p).name
+            e.workspaceView.addTab(tbv)
+            e.workspaceView.selectTab(tbv)
+        # except:
+        #     error "Can't load composition at ", p
+        #     e.handleError()
 
     proc saveNode(editor: Editor, selectedNode: Node) =
         var di: DialogInfo
@@ -176,9 +176,12 @@ when loadingAndSavingAvailable:
         di.title = "Save composition"
         let path = di.show()
         if not path.isNil:
+            # try:
             var s = Serializer.new()
             var sData = selectedNode.serialize(s)
             s.save(sData, path)
+            # except:
+            #     editor.handleError()
 
     proc loadNode(editor: Editor) =
         var di: DialogInfo
@@ -188,29 +191,27 @@ when loadingAndSavingAvailable:
         di.title = "Load composition or dae"
         let path = di.show()
         if not path.isNil:
-            try:
-                if path.endsWith(".dae"):
-                    var p = if not editor.selectedNode.isNil: editor.selectedNode
-                            else: editor.rootNode
+            # try:
+            if path.endsWith(".dae"):
+                var p = if not editor.selectedNode.isNil: editor.selectedNode
+                        else: editor.rootNode
 
-                    loadSceneAsync path, proc(n: Node) =
-                        p.addChild(n)
-                        editor.selectedNode = n
+                loadSceneAsync path, proc(n: Node) =
+                    p.addChild(n)
+                    editor.selectedNode = n
 
-                elif path.endsWith(".json") or path.endsWith(".jcomp"):
+            elif path.endsWith(".json") or path.endsWith(".jcomp"):
 
-                    let ln = newNodeWithURL("file://" & path)
-                    if not editor.selectedNode.isNil:
-                        editor.selectedNode.addChild(ln)
-                    else:
-                        editor.rootNode.addChild(ln)
+                let ln = newNodeWithURL("file://" & path)
+                if not editor.selectedNode.isNil:
+                    editor.selectedNode.addChild(ln)
+                else:
+                    editor.rootNode.addChild(ln)
 
-                editor.sceneTreeDidChange()
-            except:
-                error "ERROR:: Resource at path doesn't load ", path
-                error "Exception caught: ", getCurrentExceptionMsg()
-                error "stack trace: ", getCurrentException().getStackTrace()
-
+            editor.sceneTreeDidChange()
+            # except:
+            #     error "ERROR: Resource at path doesn't load ", path
+            #     editor.handleError()
 else:
     proc saveComposition*(e: Editor, c: CompositionDocument)= discard
     proc openComposition*(e: Editor, p: string) = discard
