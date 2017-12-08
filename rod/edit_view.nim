@@ -100,9 +100,8 @@ proc sceneTreeDidChange*(e: Editor) =
     for t in e.workspaceView.tabs:
         t.onSceneChanged()
 
-proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)
-
 when loadingAndSavingAvailable:
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)
 
     proc currentProjectPath*(e: Editor): string=
         result = e.currentProject.path
@@ -213,7 +212,7 @@ when loadingAndSavingAvailable:
             #     error "ERROR: Resource at path doesn't load ", path
             #     editor.handleError()
 else:
-    proc saveComposition*(e: Editor, c: CompositionDocument)= discard
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)= discard
     proc openComposition*(e: Editor, p: string) = discard
 
 proc selectNode*(editor: Editor, node: Node) =
