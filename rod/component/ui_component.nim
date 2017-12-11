@@ -46,7 +46,7 @@ proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool 
 
 method convertPointToParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
-    warn "WARNING: UICompView.convertPointToParent not implemented"
+    warn "UICompView.convertPointToParent not implemented"
 
 method convertPointFromParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
