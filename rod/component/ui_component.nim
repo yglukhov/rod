@@ -68,8 +68,13 @@ proc updSuperview(c: UIComponent) =
         c.mView.addSubview(c.mView.UICompView.uiCompSubview)
 
 proc `view=`*(c: UIComponent, v: View) =
+    if not c.mView.isNil:
+        c.mView.removeFromSuperview()
+        if v == nil:
+            c.mView = nil
+            return
+
     let cv = UICompView.new(newRect(0, 0, 20, 20))
-    cv.backgroundColor = clearColor()
     cv.uiComp = c
     c.mView = cv
     c.enabled = true
