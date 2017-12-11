@@ -3,7 +3,6 @@ import nimx.matrixes
 import nimx.event
 import nimx.view_event_handling
 import nimx.view_event_handling_new
-import nimx.system_logger
 import nimx.property_visitor
 
 import rod.component
@@ -11,6 +10,7 @@ import rod.ray
 import rod.viewport
 import rod.rod_types
 import rod.node
+import logging
 export UIComponent
 
 type UICompView = ref object of View
@@ -46,7 +46,7 @@ proc intersectsWithUINode*(uiComp: UIComponent, r: Ray, res: var Vector3): bool 
 
 method convertPointToParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
-    logi "WARNING: UICompView.convertPointToParent not implemented"
+    warn "WARNING: UICompView.convertPointToParent not implemented"
 
 method convertPointFromParent*(v: UICompView, p: Point): Point =
     result = newPoint(-9999999, -9999999) # Some ridiculous value
@@ -68,11 +68,12 @@ proc updSuperview(c: UIComponent) =
         c.mView.addSubview(c.mView.UICompView.uiCompSubview)
 
 proc `view=`*(c: UIComponent, v: View) =
-    if not c.mView.isNil:
-        c.mView.removeFromSuperview()
-        if v == nil:
-            c.mView = nil
-            return
+    if not c.view.isNil:
+        c.view.removeFromSuperview()
+
+    if v == nil:
+        c.mView = nil
+        return
 
     let cv = UICompView.new(newRect(0, 0, 20, 20))
     cv.uiComp = c
@@ -130,6 +131,10 @@ method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
         let i = sv.uiComponents.find(ui)
         if i != -1:
             sv.uiComponents.del(i)
+
+    if not ui.view.isNil:
+        ui.view.removeFromSuperview()
+        ui.mView = nil
 
 method visitProperties*(ui: UIComponent, p: var PropertyVisitor) =
     p.visitProperty("enabled", ui.enabled)
