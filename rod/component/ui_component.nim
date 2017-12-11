@@ -15,6 +15,7 @@ export UIComponent
 
 type UICompView = ref object of View
     uiComp: UIComponent
+    uiCompSubview: View
 
 method `enabled=`*(c: UIComponent, state: bool) {.base.}=
     c.mEnabled = state
@@ -24,7 +25,7 @@ proc enabled*(c: UIComponent): bool =
 
 proc view*(c: UIComponent): View =
     if not c.mView.isNil:
-        result = c.mView.subviews[0]
+        result = c.mView.UICompView.uiCompSubview
 
 proc intersectsWithUIPlane(uiComp: UIComponent, r: Ray, res: var Vector3): bool=
     let n = uiComp.node
@@ -64,7 +65,7 @@ proc updSuperview(c: UIComponent) =
     if not c.mView.isNil and not c.node.sceneView.isNil:
         c.mView.superview = c.node.sceneView
         c.mView.window = c.node.sceneView.window
-        c.view.window = c.mView.window
+        c.mView.addSubview(c.mView.UICompView.uiCompSubview)
 
 proc `view=`*(c: UIComponent, v: View) =
     let cv = UICompView.new(newRect(0, 0, 20, 20))
@@ -72,7 +73,7 @@ proc `view=`*(c: UIComponent, v: View) =
     cv.uiComp = c
     c.mView = cv
     c.enabled = true
-    cv.addSubview(v)
+    cv.uiCompSubview = v
     c.updSuperview()
 
 proc moveToWindow(v: View, w: Window) =
