@@ -6,6 +6,7 @@ import nimx.animation
 
 import rod.viewport
 import rod.edit_view
+import rod.editor.editor_error_handling
 import rod.component.camera
 import rod.node
 import rod.quaternion

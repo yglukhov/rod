@@ -134,14 +134,18 @@ proc createCompositionEditor*(w: WorkspaceView, c: CompositionDocument = nil): E
     var comp: CompositionDocument
     if not c.isNil:
         when loadingAndSavingAvailable:
-            var compRoot = c.rootNode
-            if compRoot.isNil:
-                compRoot = newNodeWithUrl("file://"&c.path)
-                c.rootNode = compRoot
+            try:
+                var compRoot = c.rootNode
+                if compRoot.isNil:
+                    compRoot = newNodeWithUrl("file://"&c.path)
+                    c.rootNode = compRoot
 
-            tabview.rootNode = compRoot
-            tabView.name = splitFile(c.path).name
-            comp = c
+                tabview.rootNode = compRoot
+                tabView.name = splitFile(c.path).name
+                comp = c
+            except:
+                error "Exception caught: ", getCurrentExceptionMsg()
+                error "stack trace: ", getCurrentException().getStackTrace()
         else:
             return nil
     else:
