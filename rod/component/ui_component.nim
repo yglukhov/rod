@@ -134,7 +134,6 @@ method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
 
     if not ui.view.isNil:
         ui.view.removeFromSuperview()
-        ui.mView = nil
 
 method visitProperties*(ui: UIComponent, p: var PropertyVisitor) =
     p.visitProperty("enabled", ui.enabled)
