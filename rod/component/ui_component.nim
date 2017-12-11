@@ -60,16 +60,20 @@ method draw*(c: UIComponent) =
     if not c.mView.isNil:
         c.mView.recursiveDrawSubviews()
 
+proc updSuperview(c: UIComponent) =
+    if not c.mView.isNil and not c.node.sceneView.isNil:
+        c.mView.superview = c.node.sceneView
+        c.mView.window = c.node.sceneView.window
+        c.view.window = c.mView.window
+
 proc `view=`*(c: UIComponent, v: View) =
     let cv = UICompView.new(newRect(0, 0, 20, 20))
     cv.backgroundColor = clearColor()
     cv.uiComp = c
-    cv.superview = c.node.sceneView
     c.mView = cv
     c.enabled = true
-    if not c.node.sceneView.isNil:
-        cv.window = c.node.sceneView.window
     cv.addSubview(v)
+    c.updSuperview()
 
 proc moveToWindow(v: View, w: Window) =
     v.window = w
@@ -111,9 +115,8 @@ method componentNodeWasAddedToSceneView*(ui: UIComponent) =
         sv.uiComponents = @[ui]
     else:
         sv.uiComponents.add(ui)
-        
-    if not ui.mView.isNil:
-        ui.mView.window = sv.window
+
+    ui.updSuperview()
 
 method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
     let sv = ui.node.sceneView
