@@ -47,10 +47,10 @@ task "docs", "Build documentation":
     withDir "./build/doc":
         for t, f in walkDir "../../rod":
             if f.endsWith(".nim"):
-                shell "nim doc2 -d:js " & f
+                shell "nim doc2 -d:js " & f & " &>/dev/null"
 
         for t, f in walkDir "../../doc":
             if f.endsWith(".rst"):
-                direShell "nim rst2html " & f
+                direShell "nim rst2html " & f & " &>/dev/null"
 
         copyDir "../js", "./livedemo"
