@@ -147,9 +147,9 @@ method draw*(ns: NodeSelector) =
         let mvpMatrix = vp.getViewProjectionMatrix() * ns.modelMatrix
         gl.uniformMatrix4fv(gl.getUniformLocation(selectorSharedShader, "mvpMatrix"), false, mvpMatrix)
 
-        glLineWidth(2.0)
+        when not defined(js): glLineWidth(2.0)
         gl.drawElements(gl.LINES, selectorSharedNumberOfIndexes, gl.UNSIGNED_SHORT)
-        glLineWidth(1.0)
+        when not defined(js): glLineWidth(1.0)
 
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
         gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)

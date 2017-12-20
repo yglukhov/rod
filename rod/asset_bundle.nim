@@ -1,10 +1,11 @@
-import strutils, ospaths, json, tables, logging
+import strutils, ospaths, json, tables, logging, streams
 import nimx.assets.abstract_asset_bundle as nab
 import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager, asset_cache ]
 import nimx / [ image, types ]
 import variant
 
-import os, streams
+when not defined(js):
+    import os
 
 import rod.utils.bin_deserializer
 
@@ -52,11 +53,12 @@ proc init(ab: AssetBundle, handler: proc()) {.inline.} =
     openStreamForUrl(ab.mBaseUrl / "comps.rodpack") do(s: Stream, err: string):
         if not s.isNil:
             var ss = s
-            if not (s of StringStream):
-                var str = s.readAll()
-                s.close()
-                shallow(str)
-                ss = newStringStream(str)
+            when not defined(js):
+                if not (s of StringStream):
+                    var str = s.readAll()
+                    s.close()
+                    shallow(str)
+                    ss = newStringStream(str)
             echo "Create bindeser: ", ab.mBaseUrl
             ab.binDeserializer = newBinDeserializer(ss)
             ab.binDeserializer.basePath = ab.path
