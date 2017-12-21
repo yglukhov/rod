@@ -24,6 +24,8 @@ import nimx.image
 import nimx.window
 import nimx.autotest
 
+import rod.editor.editor_project_settings
+
 when loadingAndSavingAvailable:
     import rod.editor.editor_open_project_view
 

@@ -58,11 +58,8 @@ var gEditorLogger* = new(EditorLogger)
 
 addHandler(gEditorLogger)
 
-onUnhandledException = proc(msg: string) =
-    var msg = msg.indent(8)
-    error "Exception caught:\n ", msg
-    # error "stack trace: ", getCurrentException().getStackTrace()
-
-
-
-
+when not defined(js):
+    onUnhandledException = proc(msg: string) =
+        var msg = msg.indent(8)
+        error "Exception caught:\n ", msg
+        # error "stack trace: ", getCurrentException().getStackTrace()
