@@ -11,7 +11,7 @@ type
         strTab*: Table[int16, string]
         revStrTab*: Table[string, int16]
         compsTable*: Table[string, int32]
-        stream*: Stream
+        stream*: (when defined(js): Stream else: StringStream)
         stringEntries*: seq[int32]
         images*: JsonNode
         totalAlignBytes*: int
