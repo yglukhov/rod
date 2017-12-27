@@ -1,14 +1,17 @@
-import tables, streams, json, ospaths, os, strutils
+import tables, streams, json, ospaths, strutils
 import nimx / [image, types, pathutils ]
 import rod.quaternion
 import serialization_helpers
+
+when not defined(js):
+    import os
 
 type
     BinSerializer* = ref object
         strTab*: Table[int16, string]
         revStrTab*: Table[string, int16]
         compsTable*: Table[string, int32]
-        stream*: StringStream
+        stream*: (when defined(js): Stream else: StringStream)
         stringEntries*: seq[int32]
         images*: JsonNode
         totalAlignBytes*: int
@@ -55,20 +58,21 @@ proc writeArrayNoLen*[T](b: BinSerializer, data: openarray[T]) =
             b.write(data[i])
 
 proc getNeighbourImageBundlePath(b: BinSerializer, p2: string):tuple[asset:string, bundle:string]=
-    var curDir = getCurrentDir() / "res"
-    var path = curDir / b.assetBundlePath / p2
+    when not defined(js):
+        var curDir = getCurrentDir() / "res"
+        var path = curDir / b.assetBundlePath / p2
 
-    normalizePath(path, false)
-    var dir = path.splitFile().dir
+        normalizePath(path, false)
+        var dir = path.splitFile().dir
 
-    for p in parentDirs(dir):
-        if p == curDir: break
+        for p in parentDirs(dir):
+            if p == curDir: break
 
-        if fileExists(p / "config.rab"):
-            var p3 = path.substr(p.len + 1)
-            path = p.subStr(curDir.len + 1)
+            if fileExists(p / "config.rab"):
+                var p3 = path.substr(p.len + 1)
+                path = p.subStr(curDir.len + 1)
 
-            return (asset:p3, bundle: path)
+                return (asset:p3, bundle: path)
 
     raise newException(Exception, "Neighbour assetbundle not found for " & p2 )
 
@@ -79,7 +83,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
     elif T is tuple:
         when isPODType(T):
             b.align(alignsize(type(data[0])))
-            b.stream.writeData(unsafeAddr data, sizeof(data))
+            b.stream.write(data)
         else:
             for k, v in fieldPairs(data):
                 b.write(v)
@@ -100,14 +104,13 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
 
     elif T is int16 | int32:
         b.align(sizeof(data))
-        b.stream.writeData(unsafeAddr data, sizeof(data))
+        b.stream.write(data)
 
     elif T is int8 | uint8:
-        b.stream.writeData(unsafeAddr data, sizeof(data))
+        b.stream.write(data)
 
     elif T is bool:
-        var tb = data.uint8
-        b.stream.writeData(unsafeAddr tb, sizeof(tb))
+        b.stream.write(data.uint8)
 
     elif T is enum:
         var v = (when ord(high(T)) < high(int8): int8 else: int16)data

@@ -455,7 +455,7 @@ proc cleanup*(t: Trail) =
 proc newTrail(): Trail =
     new(result, cleanup)
 
-template checkShader(t: Trail) =
+proc checkShader(t: Trail) =
     if not t.image.isNil:
         if t.bIsTiled:
             t.shader = TrailTextureShaderTiled
@@ -706,6 +706,86 @@ proc emitQuad(t: Trail) =
         else:
             t.drawMode = Second
 
+proc setupAttribArray(t: Trail, gl: GL) =
+    var attribArrayOffset = 0
+    if not t.matcap.isNil:
+        gl.enableVertexAttribArray(aPosition.GLuint)
+        gl.vertexAttribPointer(aPosition.GLuint, 3, gl.FLOAT, false, (8 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
+        attribArrayOffset += 3 * sizeof(GLfloat)
+        gl.enableVertexAttribArray(aNormal.GLuint)
+        gl.vertexAttribPointer(aNormal.GLuint, 3, gl.FLOAT, false, (8 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
+        attribArrayOffset += 3 * sizeof(GLfloat)
+        gl.enableVertexAttribArray(aTexCoord.GLuint)
+        gl.vertexAttribPointer(aTexCoord.GLuint, 2, gl.FLOAT, false, (8 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
+    else:
+        gl.enableVertexAttribArray(aPosition.GLuint)
+        gl.vertexAttribPointer(aPosition.GLuint, 3, gl.FLOAT, false, (5 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
+        attribArrayOffset += 3 * sizeof(GLfloat)
+        gl.enableVertexAttribArray(aTexCoord.GLuint)
+        gl.vertexAttribPointer(aTexCoord.GLuint, 2, gl.FLOAT, false, (5 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
+
+proc setupUniforms(t: Trail, gl: GL) =
+    gl.uniform1f(gl.getUniformLocation(t, "uCropOffset"), t.cropOffset)
+    gl.uniform1f(gl.getUniformLocation(t, "uLength"), t.totalLen)
+    gl.uniform1f(gl.getUniformLocation(t, "uAlphaCut"), t.alphaCut)
+
+proc updateLastVertex(t: Trail, gl: GL, currBuff: DataInBuffer) =
+    t.currLength = distance(t.currPos, t.prevPos)
+
+    t.totalLen += t.currLength
+
+    if t.totalLen > t.widthOffset and not t.bStretch:
+        t.cropOffset += t.currLength
+
+    if t.bCollapsible:
+        if t.cutSpeed > 0:
+            t.cropOffset += t.cutSpeed * getDeltaTime()
+
+    t.getVertexData(t.prevVertexData)
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
+    if t.buffers[currBuff.int].vertices.curr > t.prevVertexData.len:
+        gl.bufferSubData(gl.ARRAY_BUFFER, ((t.buffers[currBuff.int].vertices.curr - t.prevVertexData.len) * sizeof(GLfloat)).int32, t.prevVertexData)
+    else:
+        gl.bufferSubData(gl.ARRAY_BUFFER, 0.int32, t.prevVertexData)
+
+proc singleBufferDraw(t: Trail, gl: GL, drawVertices: int, currBuff: DataInBuffer) {.inline.} =
+    gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[currBuff.int].indexBuffer)
+    t.updateLastVertex(gl, currBuff)
+    t.setupAttribArray(gl)
+    t.setupUniforms(gl)
+
+    var offset = t.buffers[currBuff.int].indices.curr - drawVertices
+    if offset < 0:
+        gl.drawElements(gl.TRIANGLE_STRIP, t.buffers[currBuff.int].indices.curr.GLsizei, gl.UNSIGNED_SHORT, 0.int )
+    else:
+        gl.drawElements(gl.TRIANGLE_STRIP, drawVertices.GLsizei, gl.UNSIGNED_SHORT, (offset*sizeof(GLushort)).int )
+
+proc multipleBuffersDraw(t: Trail, gl: GL, drawVertices: int, currBuff, nextBuff: DataInBuffer) =
+    var indicesCount = t.buffers[currBuff.int].indices.curr
+
+    if (t.buffers[currBuff.int].indices.curr + t.buffers[nextBuff.int].indices.curr) > drawVertices:
+        indicesCount -= t.buffers[nextBuff.int].indices.curr
+
+    if indicesCount <= 0:
+        t.buffers[currBuff.int].bValidData = false
+    else:
+        gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[currBuff.int].indexBuffer)
+        t.setupAttribArray(gl)
+        t.setupUniforms(gl)
+        let indicesOffset = t.buffers[currBuff.int].indices.curr - indicesCount
+        gl.drawElements(gl.TRIANGLE_STRIP, indicesCount.GLsizei, gl.UNSIGNED_SHORT, (indicesOffset*sizeof(GLushort)).int )
+
+    t.updateLastVertex(gl, nextBuff)
+    gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[nextBuff.int].vertexBuffer)
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[nextBuff.int].indexBuffer)
+
+    t.setupAttribArray(gl)
+    t.setupUniforms(gl)
+    gl.drawElements(gl.TRIANGLE_STRIP, t.buffers[nextBuff.int].indices.curr.GLsizei, gl.UNSIGNED_SHORT, 0.int )
+
 method draw*(t: Trail) =
     let c = currentContext()
     let gl = c.gl
@@ -811,95 +891,12 @@ method draw*(t: Trail) =
 
     var drawVertices = t.quadsToDraw * 2
 
-    template setupAttribArray() =
-        if not t.matcap.isNil:
-            var attribArrayOffset: int = 0
-            gl.enableVertexAttribArray(aPosition.GLuint)
-            gl.vertexAttribPointer(aPosition.GLuint, 3, gl.FLOAT, false, (8 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
-            attribArrayOffset += 3 * sizeof(GLfloat)
-            gl.enableVertexAttribArray(aNormal.GLuint)
-            gl.vertexAttribPointer(aNormal.GLuint, 3, gl.FLOAT, false, (8 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
-            attribArrayOffset += 3 * sizeof(GLfloat)
-            gl.enableVertexAttribArray(aTexCoord.GLuint)
-            gl.vertexAttribPointer(aTexCoord.GLuint, 2, gl.FLOAT, false, (8 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
-        else:
-            var attribArrayOffset: int = 0
-            gl.enableVertexAttribArray(aPosition.GLuint)
-            gl.vertexAttribPointer(aPosition.GLuint, 3, gl.FLOAT, false, (5 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
-            attribArrayOffset += 3 * sizeof(GLfloat)
-            gl.enableVertexAttribArray(aTexCoord.GLuint)
-            gl.vertexAttribPointer(aTexCoord.GLuint, 2, gl.FLOAT, false, (5 * sizeof(GLfloat)).GLsizei, attribArrayOffset)
-
-    template updateLastVertex(currBuff: DataInBuffer) =
-        t.currLength = distance(t.currPos, t.prevPos)
-
-        t.totalLen += t.currLength
-
-        if t.totalLen > t.widthOffset and not t.bStretch:
-            t.cropOffset += t.currLength
-
-        if t.bCollapsible:
-            if t.cutSpeed > 0:
-                t.cropOffset += t.cutSpeed * getDeltaTime()
-
-        t.getVertexData(t.prevVertexData)
-
-        gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
-        if t.buffers[currBuff.int].vertices.curr > t.prevVertexData.len:
-            gl.bufferSubData(gl.ARRAY_BUFFER, ((t.buffers[currBuff.int].vertices.curr - t.prevVertexData.len) * sizeof(GLfloat)).int32, t.prevVertexData)
-        else:
-            gl.bufferSubData(gl.ARRAY_BUFFER, 0.int32, t.prevVertexData)
-
-    template setupUniforms() =
-        gl.uniform1f(gl.getUniformLocation(t, "uCropOffset"), t.cropOffset)
-        gl.uniform1f(gl.getUniformLocation(t, "uLength"), t.totalLen)
-        gl.uniform1f(gl.getUniformLocation(t, "uAlphaCut"), t.alphaCut)
-
-    template singleBufferDraw(currBuff: DataInBuffer) =
-        gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[currBuff.int].indexBuffer)
-        updateLastVertex(currBuff)
-        setupAttribArray()
-        setupUniforms()
-
-        var offset = t.buffers[currBuff.int].indices.curr - drawVertices
-        if offset < 0:
-            gl.drawElements(gl.TRIANGLE_STRIP, t.buffers[currBuff.int].indices.curr.GLsizei, gl.UNSIGNED_SHORT, 0.int )
-        else:
-            gl.drawElements(gl.TRIANGLE_STRIP, drawVertices.GLsizei, gl.UNSIGNED_SHORT, (offset*sizeof(GLushort)).int )
-
-    template multiplyBuffersDraw(currBuff, nextBuff: DataInBuffer) =
-        var indicesCount = t.buffers[currBuff.int].indices.curr
-
-        if (t.buffers[currBuff.int].indices.curr + t.buffers[nextBuff.int].indices.curr) > drawVertices:
-            indicesCount -= t.buffers[nextBuff.int].indices.curr
-
-        if indicesCount <= 0:
-            t.buffers[currBuff.int].bValidData = false
-        else:
-            gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[currBuff.int].vertexBuffer)
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[currBuff.int].indexBuffer)
-            setupAttribArray()
-            setupUniforms()
-            let indicesOffset = t.buffers[currBuff.int].indices.curr - indicesCount
-            gl.drawElements(gl.TRIANGLE_STRIP, indicesCount.GLsizei, gl.UNSIGNED_SHORT, (indicesOffset*sizeof(GLushort)).int )
-
-        updateLastVertex(nextBuff)
-        gl.bindBuffer(gl.ARRAY_BUFFER, t.buffers[nextBuff.int].vertexBuffer)
-        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, t.buffers[nextBuff.int].indexBuffer)
-
-        setupAttribArray()
-        setupUniforms()
-        gl.drawElements(gl.TRIANGLE_STRIP, t.buffers[nextBuff.int].indices.curr.GLsizei, gl.UNSIGNED_SHORT, 0.int )
-
-    if t.drawMode == First:
-        singleBufferDraw(First)
+    if t.drawMode == First or t.drawMode == Second:
+        t.singleBufferDraw(gl, drawVertices, t.drawMode)
     elif t.drawMode == FirstSecond:
-        multiplyBuffersDraw(First, Second)
-    elif t.drawMode == Second:
-        singleBufferDraw(Second)
+        t.multipleBuffersDraw(gl, drawVertices, First, Second)
     elif t.drawMode == SecondFirst:
-        multiplyBuffersDraw(Second, First)
+        t.multipleBuffersDraw(gl, drawVertices, Second, First)
     elif t.drawMode == Skip:
         t.reset()
 

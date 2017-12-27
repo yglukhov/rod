@@ -1,4 +1,4 @@
-import securehash, os, osproc, algorithm, strutils, times, hashes
+import sha1, os, osproc, algorithm, strutils, times, hashes
 
 import settings
 import nimx.class_registry
@@ -106,7 +106,7 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
 
     result &= ";" & $hashVersion & ";" & $componentsHash()
 
-    result = ($secureHash(result)).toLowerAscii()
+    result = sha1.compute(result).toHex()
 
 proc dirHashImplNoGit(path: string, s: Settings): string =
     var hasSound = false
@@ -137,7 +137,7 @@ proc dirHashImplNoGit(path: string, s: Settings): string =
 
     hashStr &= $hashVersion & $componentsHash()
 
-    result = ($secureHash(hashStr)).toLowerAscii()
+    result = sha1.compute(hashStr).toHex()
 
 proc dirHash*(path: string, s: Settings): string {.inline.} =
 #    let startTime = epochTime()
