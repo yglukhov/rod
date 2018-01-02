@@ -145,13 +145,17 @@ type
         font*: cstring
         fontSize*: int
         fillColor*: array[3, float]
+        leading*: float
         tracking*: float
         strokeWidth*: float
         strokeColor*: array[3, float]
         applyStroke*: bool
+        applyFill*: bool
+        allCaps*: bool
         pointText*: bool
         boxText*: bool
-        boxTextSize*: array[2, int]
+        boxTextSize*: array[2, float] # According to the docs, these are ints, but in reality they are floats
+        boxTextPos*: array[2, float]
 
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted

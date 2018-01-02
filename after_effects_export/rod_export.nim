@@ -512,29 +512,26 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
         txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
-        var textRect: Rect
-        var boxSize: Vector2
         if textDoc.boxText:
-            textRect = layer.sourceRectAtTime(0, false)
-            if textDoc.boxTextSize[0] > 0:
-                boxSize = newVector2(textDoc.boxTextSize[0].float, textDoc.boxTextSize[1].float)
-            else:
-                boxSize = newVector2(textRect.width, textRect.height)
-            txt["bounds"] = % [textRect.left, textRect.top, boxSize.x, boxSize.y]
+            let pos = textDoc.boxTextPos
+            let sz = textDoc.boxTextSize
+
+            # Bounded text in rod respect line spacing, so that first line is
+            # drawn at top + lineSpacing. AfterEffect draws the first line
+            # immediately at the bounds top. Here we adjust bounds top by leading
+            # to correspond to rod logic.
+            let topOffsetFix = textDoc.leading - textDoc.fontSize.float
+
+            txt["bounds"] = % [pos[0], pos[1] - topOffsetFix, sz[0], sz[1] + topOffsetFix]
+            # logi "bounds: ", txt["bounds"]
 
         case textDoc.justification
         of tjLeft:
             txt["justification"] = %"haLeft"
-            if not textRect.isNil:
-                txt["bounds"] = % [textRect.left, textRect.top, boxSize.x, boxSize.y]
         of tjRight:
             txt["justification"] = %"haRight"
-            if not textRect.isNil:
-                txt["bounds"] = % [textRect.left + textRect.width - boxSize.x, textRect.top, boxSize.x, boxSize.y]
         of tjCenter:
             txt["justification"] = %"haCenter"
-            if not textRect.isNil:
-                txt["bounds"] = % [textRect.left + textRect.width / 2.0 - boxSize.x / 2.0, textRect.top, boxSize.x, boxSize.y]
 
         let layerStyles = layer.propertyGroup("Layer Styles")
         let shadow = layerStyles.propertyGroup("Drop Shadow")
