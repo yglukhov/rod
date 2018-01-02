@@ -100,15 +100,15 @@ method init*(v: EditorSceneView, r: Rect)=
         editView.rootNode = newNode(EditorRootNodeName)
         editView.editing = true
 
-        let cameraNode3d = editView.rootNode.newChild(EditorCameraNodeName3D)
-        discard cameraNode3d.component(Camera)
-        cameraNode3d.positionZ = 100
-
         let cameraNode2d = editView.rootNode.newChild(EditorCameraNodeName2D)
         let c2d = cameraNode2d.component(Camera)
         c2d.viewportSize = EditorViewportSize
         c2d.projectionMode = cpOrtho
         cameraNode2d.position = newVector3(EditorViewportSize.width * 0.5, EditorViewportSize.height * 0.5, 100.0)
+
+        let cameraNode3d = editView.rootNode.newChild(EditorCameraNodeName3D)
+        discard cameraNode3d.component(Camera)
+        cameraNode3d.positionZ = 100
 
         editView.rootNode.addChild(v.composition.rootNode)
         clipView.addSubview(editView)
