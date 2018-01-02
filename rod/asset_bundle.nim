@@ -223,6 +223,8 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         result = true
 
     proc downloadAndUnzip(url, destPath: string, ctx: pointer) =
+        let zipFilePath = destPath & ".gz"
+
         try:
             when defined(ssl):
                 when defined(windows) or defined(android):
@@ -233,8 +235,6 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             else:
                 let client = newHttpClient(sslContext = nil)
 
-            let zipFilePath = destPath & ".gz"
-
             client.downloadFile(url, zipFilePath)
             client.close()
             when defined(ssl):
@@ -242,15 +242,14 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
 
             if not extractGz(zipFilePath, destPath):
                 raise newException(Exception, "Could not extract")
-            discard tryRemoveFile(zipFilePath)
         except:
             var errorMsg = "Error downloading " & url & " to " & destPath & ": " & getCurrentExceptionMsg()
             let cerrorMsg = cast[cstring](allocShared(errorMsg.len + 1))
             copyMem(cerrorMsg, addr errorMsg[0], errorMsg.len + 1)
             cast[DownloadCtx](ctx).errorMsg = cerrorMsg
-            discard tryRemoveFile(destPath & ".gz")
             removeDir(destPath)
         finally:
+            discard tryRemoveFile(zipFilePath)
             performOnMainThread(onDownloadComplete, ctx)
 
 proc downloadedAssetsDir(abd: AssetBundleDescriptor): string =
