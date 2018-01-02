@@ -42,6 +42,7 @@ type GradientFill* = ref object of Component
     startColor*: Color
     endColor*: Color
     shape*: RampShape
+    localCoords*: bool
 
 GradientFill.properties:
     startPoint
@@ -49,6 +50,7 @@ GradientFill.properties:
     startColor
     endColor
     shape
+    localCoords
 
 method serialize*(gf: GradientFill, serealizer: Serializer): JsonNode =
     result = newJObject()
@@ -102,6 +104,7 @@ method visitProperties*(gf: GradientFill, p: var PropertyVisitor) =
     p.visitProperty("endPoint", gf.endPoint)
     p.visitProperty("endColor", gf.endColor)
     p.visitProperty("shape", gf.shape)
+    p.visitProperty("localCoords", gf.localCoords)
 
 genSerializationCodeForComponent(GradientFill)
 
