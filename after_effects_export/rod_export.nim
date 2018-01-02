@@ -1,5 +1,6 @@
 import tables, dom, math
 import after_effects
+import gradient_property
 import times
 import json
 import algorithm
@@ -426,6 +427,48 @@ proc effectWithMatchName(layer: Layer, name: cstring): PropertyGroup =
     for e in layer.effects:
         if e.matchName == name: return e
 
+proc serializeLayerStyles(layer: Layer, result: JsonNode) =
+    let layerStyles = layer.propertyGroup("Layer Styles")
+    let gradientOverlay = layerStyles.propertyGroup("Gradient Overlay")
+
+    if not gradientOverlay.isNil and gradientOverlay.canSetEnabled and gradientOverlay.enabled:
+        var go = newJObject()
+        let angle = addPropDesc(layer, result.len, "angle", gradientOverlay.property("Angle", float))
+        let alpha = addPropDesc(layer, result.len, "alpha", gradientOverlay.property("Opacity", float), 0) do(v: float) -> JsonNode:
+            % cutDecimal(v / 100)
+        let scale = addPropDesc(layer, result.len, "scale", gradientOverlay.property("Scale", float), 0) do(v: float) -> JsonNode:
+            % cutDecimal(v / 100)
+        let offset = addPropDesc(layer, result.len, "offset", gradientOverlay.property("Offset", Vector2))
+        let smoothness = addPropDesc(layer, result.len, "smoothness", gradientOverlay.property("Gradient Smoothness", float), 0) do(v: float) -> JsonNode:
+            % cutDecimal(v / 100)
+
+        #{.emit: "alert(`gradientOverlay`.property(\"Style\").value);".}
+
+        angle.setInitialValueToResult(go)
+        alpha.setInitialValueToResult(go)
+        scale.setInitialValueToResult(go)
+        offset.setInitialValueToResult(go)
+        smoothness.setInitialValueToResult(go)
+
+        let align = gradientOverlay.property("Align with Layer", float).value != 0
+        let reverse = gradientOverlay.property("Reverse", float).value != 0
+        let style = gradientOverlay.property("Style", int).value.int
+        let colors = gradientOverlay.getGradientColors(layer.containingComp)
+
+        if style > 1: #now we support linear and radial style only
+            raise newException(Exception, "Gradient overlay style for " & $layer.name & " is not supported! ")
+
+        let c0 = colors[0]
+        let c1 = colors[0]
+
+        go["align"] = %align
+        go["reverse"] = %reverse
+        go["colorFrom"] = %newVector4(c0[0], c0[1], c0[2], c0[3])
+        go["colorTo"] = %newVector4(c1[0], c1[1], c1[2], c1[3])
+        go["_c"] = %"Gradient Overlay"
+        result.add(go)
+
+
 proc serializeEffectComponents(layer: Layer, result: JsonNode) =
     let blendMode = layer.blendMode
     if blendMode != BlendingMode.NORMAL:
@@ -658,6 +701,9 @@ proc serializeLayer(layer: Layer): JsonNode =
     var components = newJArray()
     layer.serializeEffectComponents(components)
 
+    var styles = newJArray()
+    layer.serializeLayerStyles(styles)
+
     let additionalComponents = md{"components"}
     if not additionalComponents.isNil:
         for c in additionalComponents:
@@ -669,6 +715,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         layer.serializeDrawableComponents(components)
 
     if components.len > 0: result["components"] = components
+    if styles.len > 0: result["layerStyles"] = styles
 
 type Marker = object
     time*, duration*: float
