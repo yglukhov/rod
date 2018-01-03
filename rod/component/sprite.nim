@@ -38,7 +38,7 @@ template `currentFrame=`*(s: Sprite, v: int) =
     s.mCurrentFrame = int16(v)
 
 proc image*(s: Sprite): Image =
-    if s.images.len > s.currentFrame:
+    if s.images.len > s.currentFrame and s.currentFrame >= 0:
         result = s.images[s.currentFrame]
 
 proc `image=`*(s: Sprite, i: Image) =
@@ -51,7 +51,7 @@ proc `image=`*(s: Sprite, i: Image) =
 
 proc getOffset*(s: Sprite): Point =
     result = s.offset
-    if s.frameOffsets.len > s.currentFrame:
+    if s.frameOffsets.len > s.currentFrame and s.currentFrame >= 0:
         result += s.frameOffsets[s.currentFrame]
 
 template isNinePart(s: Sprite): bool = not s.segmentsGeometry.isNil
