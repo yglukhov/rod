@@ -1,4 +1,4 @@
-import strutils, tables
+import strutils, tables, logging
 import nimx.view
 import nimx.text_field
 import nimx.button

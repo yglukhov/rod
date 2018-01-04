@@ -1,9 +1,4 @@
-import logging
-import times
-import tables
-import strutils
-
-export logging
+import logging, tables, strutils, times
 
 type EditorLogger* = ref object of Logger
     msgDump*: TableRef[Level, seq[string]]
@@ -57,9 +52,3 @@ proc dump*(logger: EditorLogger, level: Level):seq[string]=
 var gEditorLogger* = new(EditorLogger)
 
 addHandler(gEditorLogger)
-
-when not defined(js):
-    onUnhandledException = proc(msg: string) =
-        var msg = msg.indent(8)
-        error "Exception caught:\n ", msg
-        # error "stack trace: ", getCurrentException().getStackTrace()

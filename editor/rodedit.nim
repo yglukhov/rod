@@ -1,15 +1,9 @@
-import tables
+import tables, logging, strutils
 
-import nimx.matrixes
-import nimx.system_logger
-import nimx.animation
-
-import rod.viewport
-import rod.edit_view
+import nimx / [ matrixes, system_logger ]
+import rod / [ viewport, edit_view, node ]
 import rod.editor.editor_error_handling
 import rod.component.camera
-import rod.node
-import rod.quaternion
 
 import rod.component.solid
 
@@ -87,6 +81,11 @@ proc startApplication() =
         mainWindow.switchToEditView(proj)
 
     runAutoTestsIfNeeded()
+
+when not defined(js):
+    onUnhandledException = proc(msg: string) =
+        var msg = msg.indent(8)
+        error "Exception caught:\n ", msg
 
 runApplication:
     startApplication()
