@@ -433,39 +433,47 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
 
     if not gradientOverlay.isNil and gradientOverlay.canSetEnabled and gradientOverlay.enabled:
         var go = newJObject()
-        let angle = addPropDesc(layer, result.len, "angle", gradientOverlay.property("Angle", float))
-        let alpha = addPropDesc(layer, result.len, "alpha", gradientOverlay.property("Opacity", float), 0) do(v: float) -> JsonNode:
-            % cutDecimal(v / 100)
-        let scale = addPropDesc(layer, result.len, "scale", gradientOverlay.property("Scale", float), 0) do(v: float) -> JsonNode:
-            % cutDecimal(v / 100)
-        let offset = addPropDesc(layer, result.len, "offset", gradientOverlay.property("Offset", Vector2))
-        let smoothness = addPropDesc(layer, result.len, "smoothness", gradientOverlay.property("Gradient Smoothness", float), 0) do(v: float) -> JsonNode:
-            % cutDecimal(v / 100)
+        let shape = gradientOverlay.property("Style", int).value.int
 
-        #{.emit: "alert(`gradientOverlay`.property(\"Style\").value);".}
-
-        angle.setInitialValueToResult(go)
-        alpha.setInitialValueToResult(go)
-        scale.setInitialValueToResult(go)
-        offset.setInitialValueToResult(go)
-        smoothness.setInitialValueToResult(go)
-
-        let align = gradientOverlay.property("Align with Layer", float).value != 0
-        let reverse = gradientOverlay.property("Reverse", float).value != 0
-        let style = gradientOverlay.property("Style", int).value.int
-        let colors = gradientOverlay.getGradientColors(layer.containingComp)
-
-        if style > 1: #now we support linear and radial style only
+        if shape > 2: #now we support linear and radial style only
             raise newException(Exception, "Gradient overlay style for " & $layer.name & " is not supported! ")
 
-        let c0 = colors[0]
-        let c1 = colors[0]
+        let angle = gradientOverlay.property("Angle", float).value
+        let angleR = angle.degToRad()
+        let width = layer.width.float
+        let height = layer.height.float
+        let alpha = arctan(height / width).radToDeg()
+        var startPoint: Vector2
+        var endPoint: Vector2
 
-        go["align"] = %align
-        go["reverse"] = %reverse
-        go["colorFrom"] = %newVector4(c0[0], c0[1], c0[2], c0[3])
-        go["colorTo"] = %newVector4(c1[0], c1[1], c1[2], c1[3])
-        go["_c"] = %"Gradient Overlay"
+        if angle >= 0 and angle < alpha:
+            startPoint = newVector2(0, height / 2 * tan(angleR) + height / 2)
+        elif angle >= alpha and angle < 180 - alpha:
+            startPoint = newVector2(width / 2 - height / (2.0 * tan(angleR)), height)
+        elif angle >= 180 - alpha and angle < 180 + alpha:
+            startPoint = newVector2(width, width / 2 - height / 2 * tan(angleR))
+        else:
+            startPoint = newVector2(width / 2 + height / (2 * tan(angleR)), 0)
+
+        endPoint = newVector2(width - startPoint.x, height - startPoint.y)
+
+        if shape == 2: #Radial
+            startPoint = newVector2(width / 2, height / 2)
+
+        if gradientOverlay.property("Reverse", float).value == 1:
+            swap(startPoint, endPoint)
+
+        let colors = gradientOverlay.getGradientColors(layer.containingComp)
+        let c0 = colors[0]
+        let c1 = colors[1]
+
+        go["shape"] = %(shape - 1)
+        go["startColor"] = %newVector4(c0[0], c0[1], c0[2], c0[3])
+        go["endColor"] = %newVector4(c1[0], c1[1], c1[2], c1[3])
+        go["startPoint"] = %startPoint
+        go["endPoint"] = %endPoint
+        go["localCoords"] = %true
+        go["_c"] = %"GradientFill"
         result.add(go)
 
 
@@ -702,7 +710,7 @@ proc serializeLayer(layer: Layer): JsonNode =
     layer.serializeEffectComponents(components)
 
     var styles = newJArray()
-    layer.serializeLayerStyles(styles)
+    layer.serializeLayerStyles(components)
 
     let additionalComponents = md{"components"}
     if not additionalComponents.isNil:
@@ -715,7 +723,6 @@ proc serializeLayer(layer: Layer): JsonNode =
         layer.serializeDrawableComponents(components)
 
     if components.len > 0: result["components"] = components
-    if styles.len > 0: result["layerStyles"] = styles
 
 type Marker = object
     time*, duration*: float

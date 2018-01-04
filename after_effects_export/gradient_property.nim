@@ -11,9 +11,9 @@ proc getGradientColors*(gradientOverlay: PropertyGroup, comp: Composition): arra
     tempLayer.selected = true
     app.executeCommand(app.findMenuCommandId("Gradient Overlay"))
     tempLayer.selected = false
-    gradientOverlay.selected = true
+    gradientOverlay.property("Colors").selected = true
     app.executeCommand(app.findMenuCommandId("Copy"))
-    gradientOverlay.selected = false
+    gradientOverlay.property("Colors").selected = false
     tempLayer.propertyGroup("Layer Styles").propertyGroup("Gradient Overlay").selected = true
     app.executeCommand(app.findMenuCommandId("Paste"))
     tempLayer.propertyGroup("Layer Styles").propertyGroup("Gradient Overlay").selected = false
@@ -29,14 +29,14 @@ proc getGradientColors*(gradientOverlay: PropertyGroup, comp: Composition): arra
         if $tempText.valueAtTime(0, false).text != "[0, 0, 0, 0]": break
 
     let c0 = parseJson($tempText.value.text)
-    result[0] = [c0[0].getFloat(), c0[1].getFloat(), c0[2].getFloat(), c0[3].getFloat()]
+    result[1] = [c0[0].getFloat(), c0[1].getFloat(), c0[2].getFloat(), c0[3].getFloat()]
 
     tempText.expression = "thisComp.layer(\"tempComp\").sampleImage([254, 254], [0.5, 0.5], true).toSource()"
     for i in 0 ..< 10000000:
         if $tempText.valueAtTime(0, false).text != "[0, 0, 0, 0]": break
 
     let c1 = parseJson($tempText.value.text)
-    result[1] = [c1[0].getFloat(), c1[1].getFloat(), c1[2].getFloat(), c1[3].getFloat()]
+    result[0] = [c1[0].getFloat(), c1[1].getFloat(), c1[2].getFloat(), c1[3].getFloat()]
 
     app.endUndoGroup()
     app.undo(undoGroupId)
