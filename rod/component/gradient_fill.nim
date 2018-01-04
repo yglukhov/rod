@@ -14,7 +14,7 @@ import rod.tools.serializer
 import rod / utils / [ property_desc, serialization_codegen ]
 
 var effectLinearLocal = newPostEffect("""
-void grad_fill_effect(vec2 gradientStartPos, vec2 gradientEndPos, vec4 startColor, vec4 endColor) {
+void grad_fill_effect_linear_local(vec2 gradientStartPos, vec2 gradientEndPos, vec4 startColor, vec4 endColor) {
     float  alpha = atan( -gradientEndPos.y + gradientStartPos.y, gradientEndPos.x - gradientStartPos.x );
     float  gradientStartPosRotatedX = gradientStartPos.x*cos(alpha) - gradientStartPos.y*sin(alpha);
     float  gradientEndPosRotatedX   = gradientEndPos.x*cos(alpha) - gradientEndPos.y*sin(alpha);
@@ -22,44 +22,40 @@ void grad_fill_effect(vec2 gradientStartPos, vec2 gradientEndPos, vec4 startColo
     float y = vPos.y;
     float x = vPos.x;
     float xLocRotated = x*cos( alpha ) - y*sin( alpha );
-    float stops[2];
 
-    stops[0] = 0.0;
-    stops[1] = 1.0;
-
-    gl_FragColor = mix(startColor, endColor, smoothstep( gradientStartPosRotatedX + stops[0]*d, gradientStartPosRotatedX + stops[1]*d, xLocRotated ) );
+    gl_FragColor = mix(startColor, endColor, smoothstep( gradientStartPosRotatedX, gradientStartPosRotatedX + d, xLocRotated ) );
 
 }
-""", "grad_fill_effect", ["vec2", "vec2", "vec4", "vec4"])
+""", "grad_fill_effect_linear_local", ["vec2", "vec2", "vec4", "vec4"])
 
 var effectLinear = newPostEffect("""
-void grad_fill_effect(vec2 startPoint, vec2 diff, vec4 startColor, vec4 endColor) {
+void grad_fill_effect_linear(vec2 startPoint, vec2 diff, vec4 startColor, vec4 endColor) {
     float s = dot(gl_FragCoord.xy-startPoint, diff) / dot(diff, diff);
     vec4 color = mix(startColor, endColor, s);
     color.a *= gl_FragColor.a;
     gl_FragColor = color;
 }
-""", "grad_fill_effect", ["vec2", "vec2", "vec4", "vec4"])
+""", "grad_fill_effect_linear", ["vec2", "vec2", "vec4", "vec4"])
 
 var effectRadialLocal = newPostEffect("""
-void grad_fill_effect(vec2 center, float radius, vec4 startColor, vec4 endColor) {
+void grad_fill_effect_radial_local(vec2 center, float radius, vec4 startColor, vec4 endColor) {
     float dist = distance(center, vPos.xy);
     float d = smoothstep(0.0, 1.0, dist / radius);
     vec4 color = mix(startColor, endColor, d);
     color.a *= gl_FragColor.a;
     gl_FragColor = color;
 }
-""", "grad_fill_effect", ["vec2", "float", "vec4", "vec4"])
+""", "grad_fill_effect_radial_local", ["vec2", "float", "vec4", "vec4"])
 
 var effectRadial = newPostEffect("""
-void grad_fill_effect(vec2 center, float radius, vec4 startColor, vec4 endColor) {
+void grad_fill_effect_radial(vec2 center, float radius, vec4 startColor, vec4 endColor) {
     float dist = distance(center, gl_FragCoord.xy);
     float d = dist / radius;
     vec4 color = mix(startColor, endColor, d);
     color.a *= gl_FragColor.a;
     gl_FragColor = color;
 }
-""", "grad_fill_effect", ["vec2", "float", "vec4", "vec4"])
+""", "grad_fill_effect_radial", ["vec2", "float", "vec4", "vec4"])
 
 type RampShape* = enum
     LinearRamp
@@ -97,35 +93,39 @@ method deserialize*(gf: GradientFill, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "shape", gf.shape)
 
 method beforeDraw*(gf: GradientFill, index: int): bool =
-    let tl = gf.startPoint
-    let br = gf.endPoint
-    let tlv = newVector3(tl.x, tl.y)
-    let brv = newVector3(br.x, br.y)
-
-    let sv = gf.node.sceneView
-
-    var screenBounds = sv.bounds
-    if not sv.window.isNil:
-        screenBounds = sv.window.bounds
-
-    let tlvw = sv.worldToScreenPoint(gf.node.localToWorld(tlv))
-    let brvw = sv.worldToScreenPoint(gf.node.localToWorld(brv))
-
-    var tlp = sv.convertPointToWindow(newPoint(tlvw.x, tlvw.y))
-    var brp = sv.convertPointToWindow(newPoint(brvw.x, brvw.y))
-
-    tlp.y = screenBounds.height - tlp.y
-    brp.y = screenBounds.height - brp.y
+    var tlp: Point
+    var brp: Point
 
     if gf.localCoords:
         tlp = gf.startPoint
         brp = gf.endPoint
+    else:
+        let tl = gf.startPoint
+        let br = gf.endPoint
+        let tlv = newVector3(tl.x, tl.y)
+        let brv = newVector3(br.x, br.y)
+
+        let sv = gf.node.sceneView
+
+        var screenBounds = sv.bounds
+        if not sv.window.isNil:
+            screenBounds = sv.window.bounds
+
+        let tlvw = sv.worldToScreenPoint(gf.node.localToWorld(tlv))
+        let brvw = sv.worldToScreenPoint(gf.node.localToWorld(brv))
+
+        tlp = sv.convertPointToWindow(newPoint(tlvw.x, tlvw.y))
+        brp = sv.convertPointToWindow(newPoint(brvw.x, brvw.y))
+
+        tlp.y = screenBounds.height - tlp.y
+        brp.y = screenBounds.height - brp.y
+
     if gf.shape == RadialRamp:
         let radius = distanceTo(tlp, brp)
         if gf.localCoords:
             pushPostEffect(effectRadialLocal, tlp, radius, gf.startColor, gf.endColor)
         else:
-           pushPostEffect(effectRadial, tlp, radius, gf.startColor, gf.endColor)
+            pushPostEffect(effectRadial, tlp, radius, gf.startColor, gf.endColor)
     else:
         let diff = brp - tlp
         if gf.localCoords:

@@ -439,7 +439,7 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
             raise newException(Exception, "Gradient overlay style for " & $layer.name & " is not supported! ")
 
         let angle = gradientOverlay.property("Angle", float).value
-        let angleR = gradientOverlay.property("Angle", float).value.degToRad()
+        let angleR = angle.degToRad()
         let width = layer.width.float
         let height = layer.height.float
         let alpha = arctan(height / width).radToDeg()
@@ -447,11 +447,11 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
         var endPoint: Vector2
 
         if angle >= 0 and angle < alpha:
-            startPoint = newVector2(0, height / 2 * tan(angleR) + height / 2) # 0 < angle < alpha
+            startPoint = newVector2(0, height / 2 * tan(angleR) + height / 2)
         elif angle >= alpha and angle < 180 - alpha:
-            startPoint = newVector2(width / 2 - height / (2.0 * tan(angleR)), height) # alpha < angle < 180 - alpha
+            startPoint = newVector2(width / 2 - height / (2.0 * tan(angleR)), height)
         elif angle >= 180 - alpha and angle < 180 + alpha:
-            startPoint = newVector2(width, width / 2 - height / 2 * tan(angleR)) # 180 - alpha < angle < 180 + alpha
+            startPoint = newVector2(width, width / 2 - height / 2 * tan(angleR))
         else:
             startPoint = newVector2(width / 2 + height / (2 * tan(angleR)), 0)
 
