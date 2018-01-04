@@ -13,6 +13,25 @@ import rod.component
 import rod.tools.serializer
 import rod / utils / [ property_desc, serialization_codegen ]
 
+var effectLinearLocal = newPostEffect("""
+void grad_fill_effect(vec2 gradientStartPos, vec2 gradientEndPos, vec4 startColor, vec4 endColor) {
+    float  alpha = atan( -gradientEndPos.y + gradientStartPos.y, gradientEndPos.x - gradientStartPos.x );
+    float  gradientStartPosRotatedX = gradientStartPos.x*cos(alpha) - gradientStartPos.y*sin(alpha);
+    float  gradientEndPosRotatedX   = gradientEndPos.x*cos(alpha) - gradientEndPos.y*sin(alpha);
+    float  d = gradientEndPosRotatedX - gradientStartPosRotatedX;
+    float y = vPos.y;
+    float x = vPos.x;
+    float xLocRotated = x*cos( alpha ) - y*sin( alpha );
+    float stops[2];
+
+    stops[0] = 0.0;
+    stops[1] = 1.0;
+
+    gl_FragColor = mix(startColor, endColor, smoothstep( gradientStartPosRotatedX + stops[0]*d, gradientStartPosRotatedX + stops[1]*d, xLocRotated ) );
+
+}
+""", "grad_fill_effect", ["vec2", "vec2", "vec4", "vec4"])
+
 var effectLinear = newPostEffect("""
 void grad_fill_effect(vec2 startPoint, vec2 diff, vec4 startColor, vec4 endColor) {
     float s = dot(gl_FragCoord.xy-startPoint, diff) / dot(diff, diff);
@@ -21,6 +40,16 @@ void grad_fill_effect(vec2 startPoint, vec2 diff, vec4 startColor, vec4 endColor
     gl_FragColor = color;
 }
 """, "grad_fill_effect", ["vec2", "vec2", "vec4", "vec4"])
+
+var effectRadialLocal = newPostEffect("""
+void grad_fill_effect(vec2 center, float radius, vec4 startColor, vec4 endColor) {
+    float dist = distance(center, vPos.xy);
+    float d = smoothstep(0.0, 1.0, dist / radius);
+    vec4 color = mix(startColor, endColor, d);
+    color.a *= gl_FragColor.a;
+    gl_FragColor = color;
+}
+""", "grad_fill_effect", ["vec2", "float", "vec4", "vec4"])
 
 var effectRadial = newPostEffect("""
 void grad_fill_effect(vec2 center, float radius, vec4 startColor, vec4 endColor) {
@@ -88,12 +117,21 @@ method beforeDraw*(gf: GradientFill, index: int): bool =
     tlp.y = screenBounds.height - tlp.y
     brp.y = screenBounds.height - brp.y
 
+    if gf.localCoords:
+        tlp = gf.startPoint
+        brp = gf.endPoint
     if gf.shape == RadialRamp:
         let radius = distanceTo(tlp, brp)
-        pushPostEffect(effectRadial, tlp, radius, gf.startColor, gf.endColor)
+        if gf.localCoords:
+            pushPostEffect(effectRadialLocal, tlp, radius, gf.startColor, gf.endColor)
+        else:
+           pushPostEffect(effectRadial, tlp, radius, gf.startColor, gf.endColor)
     else:
         let diff = brp - tlp
-        pushPostEffect(effectLinear, tlp, diff, gf.startColor, gf.endColor)
+        if gf.localCoords:
+            pushPostEffect(effectLinearLocal, tlp, brp, gf.startColor, gf.endColor)
+        else:
+            pushPostEffect(effectLinear, tlp, brp, gf.startColor, gf.endColor)
 
 method afterDraw*(gf: GradientFill, index: int) =
     popPostEffect()
