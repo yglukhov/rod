@@ -438,19 +438,33 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
         if shape > 2: #now we support linear and radial style only
             raise newException(Exception, "Gradient overlay style for " & $layer.name & " is not supported! ")
 
+        var text = layer.propertyGroup("Text")
+        let alpha = gradientOverlay.property("Opacity", float32).valueAtTime(0) / 100
         let angle = gradientOverlay.property("Angle", float).value
         let angleR = angle.degToRad()
-        let width = layer.width.float
-        let height = layer.height.float
-        let alpha = arctan(height / width).radToDeg()
+        var width = layer.width.float
+        var height = layer.height.float
+        let beta = arctan(height / width).radToDeg()
         var startPoint: Vector2
         var endPoint: Vector2
 
-        if angle >= 0 and angle < alpha:
+        var offset = newVector2()
+        if not text.isNil:
+            var textDoc = text.property("Source Text", TextDocument).value
+            if textDoc.boxText:
+                let pos = textDoc.boxTextPos
+                let sz = textDoc.boxTextSize
+
+                offset.x = pos[0]
+                offset.y = pos[1]
+                width = sz[0]
+                height = sz[1]
+
+        if angle >= 0 and angle < beta:
             startPoint = newVector2(0, height / 2 * tan(angleR) + height / 2)
-        elif angle >= alpha and angle < 180 - alpha:
+        elif angle >= beta and angle < 180 - beta:
             startPoint = newVector2(width / 2 - height / (2.0 * tan(angleR)), height)
-        elif angle >= 180 - alpha and angle < 180 + alpha:
+        elif angle >= 180 - beta and angle < 180 + beta:
             startPoint = newVector2(width, width / 2 - height / 2 * tan(angleR))
         else:
             startPoint = newVector2(width / 2 + height / (2 * tan(angleR)), 0)
@@ -463,13 +477,16 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
         if gradientOverlay.property("Reverse", float).value == 1:
             swap(startPoint, endPoint)
 
+        startPoint += offset
+        endPoint += offset
+
         let colors = gradientOverlay.getGradientColors(layer.containingComp)
         let c0 = colors[0]
         let c1 = colors[1]
 
         go["shape"] = %(shape - 1)
-        go["startColor"] = %newVector4(c0[0], c0[1], c0[2], c0[3])
-        go["endColor"] = %newVector4(c1[0], c1[1], c1[2], c1[3])
+        go["startColor"] = %newVector4(c0[0], c0[1], c0[2], alpha)
+        go["endColor"] = %newVector4(c1[0], c1[1], c1[2], alpha)
         go["startPoint"] = %startPoint
         go["endPoint"] = %endPoint
         go["localCoords"] = %true

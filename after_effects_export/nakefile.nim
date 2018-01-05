@@ -4,13 +4,15 @@ import os
 when defined(windows):
     const searchPaths = [
         "C:/Program Files/Adobe/Adobe After Effects CC 2015.3/Support Files/Scripts",
-        "C:/Program Files/Adobe/Adobe After Effects CC 2017/Support Files/Scripts"
+        "C:/Program Files/Adobe/Adobe After Effects CC 2017/Support Files/Scripts",
+        "C:/Program Files/Adobe/Adobe After Effects CC 2018/Support Files/Scripts"
     ]
 else:
     const searchPaths = [
         "/Applications/Adobe After Effects CC 2015/Scripts",
         "/Applications/Adobe After Effects CC 2015.3/Scripts",
-        "/Applications/Adobe After Effects CC 2017/Scripts"
+        "/Applications/Adobe After Effects CC 2017/Scripts",
+        "/Applications/Adobe After Effects CC 2018/Scripts"
     ]
 
 task defaultTask, "Build and install":

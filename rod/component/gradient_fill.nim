@@ -22,9 +22,9 @@ void grad_fill_effect_linear_local(vec2 gradientStartPos, vec2 gradientEndPos, v
     float y = vPos.y;
     float x = vPos.x;
     float xLocRotated = x*cos( alpha ) - y*sin( alpha );
+    vec4 gradientColor = mix(startColor, endColor, smoothstep( gradientStartPosRotatedX, gradientStartPosRotatedX + d, xLocRotated ) );
 
-    gl_FragColor = mix(startColor, endColor, smoothstep( gradientStartPosRotatedX, gradientStartPosRotatedX + d, xLocRotated ) );
-
+    gl_FragColor.rgb = mix(gl_FragColor, gradientColor, gradientColor.a).rgb;
 }
 """, "grad_fill_effect_linear_local", ["vec2", "vec2", "vec4", "vec4"])
 
@@ -42,8 +42,8 @@ void grad_fill_effect_radial_local(vec2 center, float radius, vec4 startColor, v
     float dist = distance(center, vPos.xy);
     float d = smoothstep(0.0, 1.0, dist / radius);
     vec4 color = mix(startColor, endColor, d);
-    color.a *= gl_FragColor.a;
-    gl_FragColor = color;
+
+    gl_FragColor.rgb = mix(gl_FragColor, color, color.a).rgb;
 }
 """, "grad_fill_effect_radial_local", ["vec2", "float", "vec4", "vec4"])
 
