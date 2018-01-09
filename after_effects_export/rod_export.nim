@@ -1,5 +1,6 @@
 import tables, dom, math
 import after_effects
+import gradient_property
 import times
 import json
 import algorithm
@@ -426,6 +427,73 @@ proc effectWithMatchName(layer: Layer, name: cstring): PropertyGroup =
     for e in layer.effects:
         if e.matchName == name: return e
 
+proc serializeLayerStyles(layer: Layer, result: JsonNode) =
+    let layerStyles = layer.propertyGroup("Layer Styles")
+    let gradientOverlay = layerStyles.propertyGroup("Gradient Overlay")
+
+    if not gradientOverlay.isNil and gradientOverlay.canSetEnabled and gradientOverlay.enabled:
+        var go = newJObject()
+        let shape = gradientOverlay.property("Style", int).value.int
+
+        if shape > 2: #now we support linear and radial style only
+            raise newException(Exception, "Gradient overlay style for " & $layer.name & " is not supported! ")
+
+        var text = layer.propertyGroup("Text")
+        let alpha = gradientOverlay.property("Opacity", float32).valueAtTime(0) / 100
+        let angle = gradientOverlay.property("Angle", float).value
+        let angleR = angle.degToRad()
+        var width = layer.width.float
+        var height = layer.height.float
+        let beta = arctan(height / width).radToDeg()
+        var startPoint: Vector2
+        var endPoint: Vector2
+
+        var offset = newVector2()
+        if not text.isNil:
+            var textDoc = text.property("Source Text", TextDocument).value
+            if textDoc.boxText:
+                let pos = textDoc.boxTextPos
+                let sz = textDoc.boxTextSize
+
+                offset.x = pos[0]
+                offset.y = pos[1]
+                width = sz[0]
+                height = sz[1]
+
+        if angle >= 0 and angle < beta:
+            startPoint = newVector2(0, height / 2 * tan(angleR) + height / 2)
+        elif angle >= beta and angle < 180 - beta:
+            startPoint = newVector2(width / 2 - height / (2.0 * tan(angleR)), height)
+        elif angle >= 180 - beta and angle < 180 + beta:
+            startPoint = newVector2(width, width / 2 - height / 2 * tan(angleR))
+        else:
+            startPoint = newVector2(width / 2 + height / (2 * tan(angleR)), 0)
+
+        endPoint = newVector2(width - startPoint.x, height - startPoint.y)
+
+        if shape == 2: #Radial
+            startPoint = newVector2(width / 2, height / 2)
+
+        if gradientOverlay.property("Reverse", float).value == 1:
+            swap(startPoint, endPoint)
+
+        startPoint += offset
+        endPoint += offset
+
+        let colors = gradientOverlay.getGradientColors(layer.containingComp)
+        let c0 = colors[0]
+        let c1 = colors[1]
+
+        go["shape"] = %(shape - 1)
+        go["startColor"] = %newVector4(c0[0], c0[1], c0[2], alpha)
+        go["endColor"] = %newVector4(c1[0], c1[1], c1[2], alpha)
+        go["startPoint"] = %startPoint
+        go["endPoint"] = %endPoint
+        go["localCoords"] = %true
+        go["_c"] = %"GradientFill"
+        result.add(go)
+
+
 proc serializeEffectComponents(layer: Layer, result: JsonNode) =
     let blendMode = layer.blendMode
     if blendMode != BlendingMode.NORMAL:
@@ -512,29 +580,26 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
         txt["font"] = % $textDoc.font
         txt["fontSize"] = % textDoc.fontSize
         txt["color"] = % textDoc.fillColor
-        var textRect: Rect
-        var boxSize: Vector2
         if textDoc.boxText:
-            textRect = layer.sourceRectAtTime(0, false)
-            if textDoc.boxTextSize[0] > 0:
-                boxSize = newVector2(textDoc.boxTextSize[0].float, textDoc.boxTextSize[1].float)
-            else:
-                boxSize = newVector2(textRect.width, textRect.height)
-            txt["bounds"] = % [textRect.left, textRect.top, boxSize.x, boxSize.y]
+            let pos = textDoc.boxTextPos
+            let sz = textDoc.boxTextSize
+
+            # Bounded text in rod respect line spacing, so that first line is
+            # drawn at top + lineSpacing. AfterEffect draws the first line
+            # immediately at the bounds top. Here we adjust bounds top by leading
+            # to correspond to rod logic.
+            let topOffsetFix = textDoc.leading - textDoc.fontSize.float
+
+            txt["bounds"] = % [pos[0], pos[1] - topOffsetFix, sz[0], sz[1] + topOffsetFix]
+            # logi "bounds: ", txt["bounds"]
 
         case textDoc.justification
         of tjLeft:
             txt["justification"] = %"haLeft"
-            if not textRect.isNil:
-                txt["bounds"] = % [textRect.left, textRect.top, boxSize.x, boxSize.y]
         of tjRight:
             txt["justification"] = %"haRight"
-            if not textRect.isNil:
-                txt["bounds"] = % [textRect.left + textRect.width - boxSize.x, textRect.top, boxSize.x, boxSize.y]
         of tjCenter:
             txt["justification"] = %"haCenter"
-            if not textRect.isNil:
-                txt["bounds"] = % [textRect.left + textRect.width / 2.0 - boxSize.x / 2.0, textRect.top, boxSize.x, boxSize.y]
 
         let layerStyles = layer.propertyGroup("Layer Styles")
         let shadow = layerStyles.propertyGroup("Drop Shadow")
@@ -660,6 +725,9 @@ proc serializeLayer(layer: Layer): JsonNode =
 
     var components = newJArray()
     layer.serializeEffectComponents(components)
+
+    var styles = newJArray()
+    layer.serializeLayerStyles(components)
 
     let additionalComponents = md{"components"}
     if not additionalComponents.isNil:

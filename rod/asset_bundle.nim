@@ -223,6 +223,8 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         result = true
 
     proc downloadAndUnzip(url, destPath: string, ctx: pointer) =
+        let zipFilePath = destPath & ".gz"
+
         try:
             when defined(ssl):
                 when defined(windows) or defined(android):
@@ -232,9 +234,6 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
                 let client = newHttpClient(sslContext = sslCtx)
             else:
                 let client = newHttpClient(sslContext = nil)
-
-            let zipFilePath = destPath & ".gz"
-            discard tryRemoveFile(zipFilePath)
 
             client.downloadFile(url, zipFilePath)
             client.close()
@@ -248,7 +247,9 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             let cerrorMsg = cast[cstring](allocShared(errorMsg.len + 1))
             copyMem(cerrorMsg, addr errorMsg[0], errorMsg.len + 1)
             cast[DownloadCtx](ctx).errorMsg = cerrorMsg
+            removeDir(destPath)
         finally:
+            discard tryRemoveFile(zipFilePath)
             performOnMainThread(onDownloadComplete, ctx)
 
 proc downloadedAssetsDir(abd: AssetBundleDescriptor): string =
@@ -291,31 +292,48 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
             else:
                 result = newNativeAssetBundle(abd.path)
 
-proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) =
+proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string)) =
     abd.downloadAssetBundle() do(err: string):
         if err.isNil:
             let ab = newAssetBundle(abd)
             ab.init() do():
-                handler(abd.path, ab)
+                handler(abd.path, ab, nil)
         else:
             warn "Asset bundle error for ", abd.hash, " (", abd.path, "): " , err
+            handler(abd.path, nil, err)
 
-proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle])) =
+proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) {.deprecated.}  =
+    let newHandler = proc(mountPaths: string, ab: AssetBundle, err: string) =
+        if not handler.isNil: handler(mountPaths, ab)
+
+    loadAssetBundle(abd, newHandler)
+
+proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle], err: string)) =
     var mountPaths = newSeq[string](abds.len)
     var abs = newSeq[AssetBundle](abds.len)
     let abds = @abds
     var i = 0
+    var err: string
 
     proc load() =
         if i == abds.len:
-            handler(mountPaths, abs)
+            handler(mountPaths, abs, nil)
         else:
-            abds[i].loadAssetBundle() do(mountPath: string, ab: AssetBundle):
-                abs[i] = ab
-                mountPaths[i] = mountPath
-                inc i
-                load()
+            abds[i].loadAssetBundle() do(mountPath: string, ab: AssetBundle, err: string):
+                if not err.isNil:
+                    handler(mountPaths, abs, err)
+                else:
+                    abs[i] = ab
+                    mountPaths[i] = mountPath
+                    inc i
+                    load()
     load()
+
+proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle])) {.deprecated.} =
+    let newHandler = proc(mountPaths: openarray[string], abs: openarray[AssetBundle], err: string) =
+        if not handler.isNil: handler(mountPaths, abs)
+
+    loadAssetBundles(abds, newHandler)
 
 registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tga"]) do(url, path: string, cache: AssetCache, handler: proc()):
     const prefix = "rod_ss://"

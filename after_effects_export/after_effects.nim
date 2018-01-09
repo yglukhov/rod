@@ -73,6 +73,7 @@ type
         timeRemapEnabled*: bool
         nullLayer*: bool
         threeDLayer*: bool
+        expression*: cstring
         ## The start time of the layer, expressed in composition time (seconds).
         ## Floating-point value in the range [-10800.0..10800.0] (minus or plus three hours); read/write.
         startTime*: float
@@ -83,6 +84,9 @@ type
     TextLayer* = ref TextLayerObj
     TextLayerObj {.importc.} = object of LayerObj
 
+    AVLayer* = ref AVLayerObj
+    AVLayerObj {.importc.} = object of LayerObj
+
     PropertyBase* = ref PropertyBaseObj
     PropertyBaseObj {.importc.} = object of RootObj
         name*: cstring
@@ -90,6 +94,7 @@ type
         enabled*: bool
         active*: bool
         isEffect*: bool
+        selected*: bool
         parentProperty*: PropertyGroup
         canSetEnabled*: bool
 
@@ -145,13 +150,17 @@ type
         font*: cstring
         fontSize*: int
         fillColor*: array[3, float]
+        leading*: float
         tracking*: float
         strokeWidth*: float
         strokeColor*: array[3, float]
         applyStroke*: bool
+        applyFill*: bool
+        allCaps*: bool
         pointText*: bool
         boxText*: bool
-        boxTextSize*: array[2, int]
+        boxTextSize*: array[2, float] # According to the docs, these are ints, but in reality they are floats
+        boxTextPos*: array[2, float]
 
     TrackMatteType* = enum
         tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
@@ -215,6 +224,7 @@ proc propertyValueType*(p: AbstractProperty): PropertyValueType =
         case PropertyValueType.TwoD_SPATIAL: `result` = 10; break;
         case PropertyValueType.ThreeD: `result` = 11; break;
         case PropertyValueType.ThreeD_SPATIAL: `result` = 12; break;
+        default: throw "Unknown property type";
     }
     """.}
 
@@ -224,6 +234,7 @@ template valueTypeFromType(t: typedesc[array[4, float32]]): untyped = [pvtColor]
 template valueTypeFromType(t: typedesc[float32]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[float]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[cstring]): untyped = [pvt1d]
+template valueTypeFromType(t: typedesc[int]): untyped = [pvt1d]
 template valueTypeFromType(t: typedesc[TextDocument]): untyped = [pvtTextDocument]
 template valueTypeFromType(t: typedesc[MarkerValue]): untyped = [pvtMarker]
 
@@ -256,6 +267,7 @@ proc property*(layer: Layer, name: cstring): PropertyBase {.importcpp.}
 proc indexedProperty(layer: Layer, i: int): PropertyBase {.importcpp: "property".}
 
 proc property*(prop: PropertyGroup, name: cstring): PropertyBase {.importcpp.}
+proc addProperty*(prop: PropertyGroup, name: cstring) {.importcpp.}
 proc indexedProperty(prop: PropertyGroup, i: int): PropertyBase {.importcpp: "property".}
 
 type PropertyOwner* = Layer or PropertyGroup
@@ -324,6 +336,8 @@ proc addText*(col: Collection[Layer], text: cstring): TextLayer {.importcpp.}
 proc addText*(col: Collection[Layer]): TextLayer {.importcpp.}
 proc addNull*(col: Collection[Layer], duration: float): Layer {.importcpp.}
 proc addNull*(col: Collection[Layer]): Layer {.importcpp.}
+proc addSolid*(col: Collection[Layer], color: array[3, float], name: cstring, width, height: int, aspect: float): AVLayer {.importcpp.}
+proc precompose*(col: Collection[Layer], indices: openarray[int], name: cstring, moveAllAttributes: bool): Composition {.importcpp.}
 
 proc newTextDocument*(text: cstring = ""): TextDocument {.importc: "new TextDocument".}
 proc newKeyframeEase*(speed, influence: float): KeyframeEase {.importc: "new KeyframeEase".}
@@ -473,7 +487,8 @@ proc projectPath*(i: Item): string =
 proc beginUndoGroup*(a: Application, name: cstring) {.importcpp.}
 proc endUndoGroup*(a: Application) {.importcpp.}
 
-proc executeCommand(a: Application, c: int) {.importcpp.}
+proc executeCommand*(a: Application, c: int) {.importcpp.}
+proc findMenuCommandId*(a: Application, name: cstring): int {.importcpp.}
 proc undo*(a: Application, name: string) =
     ## This function uses undocumented API. Use at your own risk.
     a.executeCommand(16)

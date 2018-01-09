@@ -189,8 +189,7 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 
         v = j{"bounds"}
         if not v.isNil:
-            let attr = newPoint(font.getCharComponent(t.text, GlyphMetricsComponent.compX), font.getCharComponent(t.text, GlyphMetricsComponent.compY))
-            t.mBoundingOffset = newPoint(v[0].getFNum() - attr.x * font.scale, v[1].getFNum() - attr.y * font.scale)
+            t.mBoundingOffset = newPoint(v[0].getFNum(), v[1].getFNum())
             t.mText.boundingSize = newSize(v[2].getFNum(), v[3].getFNum())
 
         t.mText.processAttributedText()
@@ -420,8 +419,7 @@ proc fromPhantom(c: Text, p: object) =
             c.mText.setStrokeInRange(0, -1, p.strokeColor, p.strokeSize)
 
     if p.bounds != zeroRect:
-        let attr = newPoint(font.getCharComponent(c.text, GlyphMetricsComponent.compX), font.getCharComponent(c.text, GlyphMetricsComponent.compY))
-        c.mBoundingOffset = newPoint(p.bounds.x - attr.x * font.scale, p.bounds.y - attr.y * font.scale)
+        c.mBoundingOffset = p.bounds.origin
         c.mText.boundingSize = p.bounds.size
 
     c.mText.lineSpacing = p.lineSpacing
@@ -430,74 +428,6 @@ proc fromPhantom(c: Text, p: object) =
     c.mText.verticalAlignment = p.verticalAlignment
 
 genSerializationCodeForComponent(Text)
-
-# method deserialize*(c: Text, b: BinDeserializer) =
-#     c.mText.text = b.readStr()
-
-#     let attrs = cast[set[TextAttributes]](b.readInt16())
-
-#     var fontFace: string
-#     if taFont in attrs:
-#         fontFace = b.readStr()
-
-#     var fontSize: float32
-#     if taFontSize in attrs:
-#         fontSize = b.readFloat32()
-#     else:
-#         fontSize = systemFontSize()
-
-#     var font: Font
-#     if fontFace.len == 0:
-#         font = systemFontOfSize(fontSize)
-#     if font.isNil:
-#         font = newFontWithFace(fontFace, fontSize)
-#     c.mText.setFontInRange(0, -1, font)
-
-#     var buf: BufferView[float32]
-
-#     if taColor in attrs:
-#         buf = b.getBuffer(float32, 4)
-#         c.mText.setTextColorInRange(0, -1, newColor(buf[0], buf[1], buf[2], buf[3]))
-#     elif taColorGradient in attrs:
-#         buf = b.getBuffer(float32, 4)
-#         let startColor = newColor(buf[0], buf[1], buf[2], buf[3])
-#         buf = b.getBuffer(float32, 4)
-#         let endColor = newColor(buf[0], buf[1], buf[2], buf[3])
-#         c.mText.setTextColorInRange(0, -1, startColor, endColor)
-
-#     if taShadow in attrs:
-#         let shadowOff = newSize(b.readFloat32(), b.readFloat32())
-#         buf = b.getBuffer(float32, 4)
-#         let color = newColor(buf[0], buf[1], buf[2], buf[3])
-#         let spread = b.readFloat32()
-#         let radius = b.readFloat32()
-#         c.mText.setShadowInRange(0, -1, color, shadowOff, radius, spread)
-
-#     if taStroke in attrs:
-#         let size = b.readFloat32()
-#         buf = b.getBuffer(float32, 4)
-#         let startColor = newColor(buf[0], buf[1], buf[2], buf[3])
-#         if taStrokeGradient in attrs:
-#             buf = b.getBuffer(float32, 4)
-#             let endColor = newColor(buf[0], buf[1], buf[2], buf[3])
-#             c.mText.setStrokeInRange(0, -1, startColor, endColor, size)
-#         else:
-#             c.mText.setStrokeInRange(0, -1, startColor, size)
-
-#     if taBounds in attrs:
-#         buf = b.getBuffer(float32, 4)
-#         let bounds = newRect(buf[0], buf[1], buf[2], buf[3])
-#         let attr = newPoint(font.getCharComponent(c.text, GlyphMetricsComponent.compX), font.getCharComponent(c.text, GlyphMetricsComponent.compY))
-#         c.mBoundingOffset = newPoint(bounds.x - attr.x * font.scale, bounds.y - attr.y * font.scale)
-#         c.mText.boundingSize = bounds.size
-
-#     if taLineSpacing in attrs:
-#         c.mText.lineSpacing = b.readFloat32()
-
-#     c.mText.horizontalAlignment = HorizontalTextAlignment(b.readUint8())
-#     c.mText.verticalAlignment = VerticalAlignment(b.readUint8())
-
-#     c.mText.processAttributedText()
 
 method getBBox*(t: Text): BBox =
     var height = t.mText.totalHeight()
