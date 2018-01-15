@@ -541,6 +541,53 @@ proc ninePartSpriteGeometry(layer: Layer): array[4, float] =
 
     result = [marginLeft, marginRight, marginTop, marginBottom]
 
+proc serializeShape(layer: Layer, result: JsonNode) =
+    let vectorLayer = layer.property("Contents")
+    if not vectorLayer.isNil:
+        let shapes = vectorLayer.toPropertyGroup()
+        for q in 0 ..< shapes.numProperties:
+            let shape = shapes.property(q)
+            let shapeProps = shape.toPropertyGroup()
+
+            let transform = shapeProps.propertyGroup("Transform")
+            if not transform.isNil:
+                let position = transform.property("Position", Vector2).valueAtTime(0)
+                if position[0] > 0 or position[1] > 0:
+                    raise newException(Exception, "wrong way to set position")
+
+            if not shape.isNil and shape.isPropertyGroup:
+                let shapeGroup = shapeProps.property("Contents").toPropertyGroup()
+
+                var shape = newJObject()
+                shape["_c"] = % "VectorShape"
+
+                for i in 0 ..< shapeGroup.numProperties:
+                    let p = shapeGroup.property(i)
+                    let shapePathGroup = p.toPropertyGroup()
+                    let name = $p.name
+
+                    if "Rectangle Path " & $(q+1) in name:
+                        shape["size"] = %* shapePathGroup.property("Size", Vector2).valueAtTime(0)
+                        shape["radius"] = % shapePathGroup.property("Roundness", float32).valueAtTime(0)
+                        shape["shapeType"] = % 0
+                    elif "Ellipse Path " & $(q+1) in name:
+                        shape["size"] = %* shapePathGroup.property("Size", Vector2).valueAtTime(0)
+                        shape["shapeType"] = % 1
+                    elif "Polystar Path " & $(q+1) in name:
+                        shape["shapeType"] = % 2
+                        #TODO need support?
+                    elif "Stroke " & $(q+1) in name:
+                        var strokeColor = shapePathGroup.property("Color", Vector4).valueAtTime(0)
+                        strokeColor[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
+                        shape["strokeColor"] = %* strokeColor
+                        shape["strokeWidth"] = % shapePathGroup.property("Stroke Width", float32).valueAtTime(0)
+                    elif "Fill " & $(q+1) in name:
+                        var color = shapePathGroup.property("Color", Vector4).valueAtTime(0)
+                        color[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
+                        shape["color"] = %* color
+
+                result.add(shape)
+
 proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
     let numbers = layer.effectWithMatchName("ADBE Numbers2")
     if not numbers.isNil:
@@ -626,6 +673,13 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
 
         txt["_c"] = %"Text"
         result.add(txt)
+
+    for q in 0 ..< layer.numProperties:
+        var p = layer.property(q)
+        case $p.matchName
+        of "ADBE Root Vectors Group":
+            layer.serializeShape(result)
+        else: discard
 
 proc layerIsCompositionRef(layer: Layer): bool =
     not layer.source.isNil and layer.source.jsObjectType == "CompItem"
@@ -1306,6 +1360,5 @@ proc buildUI(contextObj: ref RootObj) =
     //    readMetaData();
   }
   """.}
-
 var this {.importc.}: ref RootObj
 buildUI(this)
