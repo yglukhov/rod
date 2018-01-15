@@ -17,10 +17,10 @@ type VectorShapeType* = enum
     vsStar
 
 type VectorShape* = ref object of Component
-    size*: Size
     color*: Color
-    strokeWidth*: float32
     strokeColor*: Color
+    size*: Size
+    strokeWidth*: float32
     radius*: float32
     shapeType*: VectorShapeType
 
