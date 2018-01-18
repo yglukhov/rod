@@ -6,4 +6,4 @@ import blink, particle_system, particle_helpers, camera, channel_levels,
     sprite, text_component, light, clipping_rect_component,
     blur_component, visual_modifier, tracer, trail, fxaa_post,
     color_balance_hls, gradient_fill, color_fill, tint, ae_composition,
-    primitives.cube, primitives.sphere, primitives.cone, mask, comp_ref, rti
+    primitives.cube, primitives.sphere, primitives.cone, mask, comp_ref, rti, vector_shape
