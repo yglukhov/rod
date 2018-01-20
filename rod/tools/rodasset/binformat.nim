@@ -1,7 +1,7 @@
 import json, streams, sequtils, sets, algorithm, tables, strutils, parseutils, ospaths
 import tree_traversal
 
-import nimx / [ pathutils, class_registry ]
+import nimx / [ types, image, pathutils, class_registry ]
 import ../../utils/[ bin_serializer, json_deserializer ]
 import ../../node
 import ../../component
@@ -188,14 +188,30 @@ proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string
     b.write(nodeIds)
     b.writeArrayNoLen(components)
 
+proc imageDesc(b: BinSerializer, path: string): JsonNode =
+    for j in b.images:
+        if j["orig"].str == path:
+            return j
+
+    doAssert(false, "Image desc not found: " & path)
+
 proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, compPath: string) =
     let n = newNode()
     let c = n.addComponent(className)
     let s = newJsonDeserializer()
     s.node = j
-    s.images = b.images
     s.disableAwake = true
     s.compPath = relativePathToPath(b.assetBundlePath, compPath)
+
+    s.getImageForPath = proc(path: string, offset: var Point): Image =
+        let desc = b.imageDesc(path)
+        let sz = desc["size"]
+        let joff = desc{"off"}
+        if not joff.isNil:
+            JsonDeserializer(nil).get(joff, offset)
+        result = imageWithSize(newSize(sz[0].getFloat(), sz[1].getFloat()))
+        result.setFilePath(path)
+
     let oldNodeRefTab = nodeLoadRefTable
     nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
     defer: nodeLoadRefTable = oldNodeRefTab
