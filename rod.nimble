@@ -4,7 +4,7 @@ author        = "Anonymous"
 description   = "Graphics engine"
 license       = "MIT"
 
-bin           = @["rod/tools/rodasset/rodasset"]
+bin           = @["rod/tools/rodasset/rodasset", "editor/rodedit"]
 
 # Dependencies
 requires "nimx"
