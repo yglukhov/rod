@@ -3,7 +3,7 @@ import osproc
 
 beforeBuild = proc(b: Builder) =
     #b.disableClosureCompiler = true
-    b.mainFile = "editor/rodedit"
+    b.mainFile = "editor/rodedit_main"
     b.originalResourcePath = "editor/res"
     b.additionalNimFlags.add("-d:rodplugin")
     b.additionalNimFlags.add("--putenv:PREFS_FILE_NAME=rodedit.json")
