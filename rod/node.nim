@@ -558,7 +558,9 @@ proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc()
         var p = url[prefix.len .. ^1]
         p = p.parentDir / path
         normalizePath(p, false)
-        result = imageWithContentsOfFile(p)
+        when not defined(js):
+            # TODO: We have to figure out smth about js...
+            result = imageWithContentsOfFile(p)
 
     serializer.onComplete = onComplete
     let oldNodeRefTab = nodeLoadRefTable
