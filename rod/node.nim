@@ -558,7 +558,7 @@ proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc()
         var p = url[prefix.len .. ^1]
         p = p.parentDir / path
         normalizePath(p, false)
-        when not defined(js):
+        when not defined(js) and not defined(emscripten):
             # TODO: We have to figure out smth about js...
             result = imageWithContentsOfFile(p)
 
