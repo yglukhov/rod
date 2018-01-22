@@ -6,7 +6,8 @@ proc getGradientColors*(gradientOverlay: PropertyGroup, comp: Composition): arra
     app.beginUndoGroup(undoGroupId)
 
     let color = [1.0, 1.0, 1.0]
-    let tempLayer = comp.layers.addSolid(color, "temp", 255, 255, 1.0)
+    let composSize = comp
+    let tempLayer = comp.layers.addSolid(color, "temp", comp.width, comp.height, 1.0)
 
     tempLayer.selected = true
     app.executeCommand(app.findMenuCommandId("Gradient Overlay"))
@@ -25,16 +26,18 @@ proc getGradientColors*(gradientOverlay: PropertyGroup, comp: Composition): arra
     let tempText = tempLayerText.propertyGroup("Text").property("Source Text", TextDocument)
 
     tempText.expression = "thisComp.layer(\"tempComp\").sampleImage([0, 0], [0.5, 0.5], true).toSource()"
-    for i in 0 ..< 10000000:
+    for i in 0 ..< 1000:
         if $tempText.valueAtTime(0, false).text != "[0, 0, 0, 0]": break
 
+    # end color
     let c0 = parseJson($tempText.value.text)
     result[1] = [c0[0].getFloat(), c0[1].getFloat(), c0[2].getFloat(), c0[3].getFloat()]
 
-    tempText.expression = "thisComp.layer(\"tempComp\").sampleImage([254, 254], [0.5, 0.5], true).toSource()"
-    for i in 0 ..< 10000000:
+    tempText.expression = "thisComp.layer(\"tempComp\").sampleImage([0, " & $(comp.height - 1) & "], [0.5, 0.5], true).toSource()"
+    for i in 0 ..< 1000:
         if $tempText.valueAtTime(0, false).text != "[0, 0, 0, 0]": break
 
+    # start color
     let c1 = parseJson($tempText.value.text)
     result[0] = [c1[0].getFloat(), c1[1].getFloat(), c1[2].getFloat(), c1[3].getFloat()]
 
