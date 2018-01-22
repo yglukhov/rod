@@ -1,12 +1,15 @@
-import tables, typetraits, json, strutils, math
+import tables, typetraits, json, strutils, math, ospaths
 
-import nimx / [ context, types, animation, image, portable_gl, view, property_visitor ]
+import nimx / [ context, types, animation, image, portable_gl, view, property_visitor, pathutils ]
 
 import nimx / assets / [ asset_manager, asset_loading ]
 
 import quaternion, ray, rod_types
 import rod.tools.serializer
 import rod / utils / [ bin_deserializer, json_serializer ]
+
+import rod / utils / json_deserializer
+
 import rod.asset_bundle
 
 export Node
@@ -548,6 +551,15 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
     let serializer = Serializer.new()
     serializer.url = url
+    serializer.jdeser = newJsonDeserializer()
+    serializer.jdeser.getImageForPath = proc(path: string, off: var Point): Image =
+        const prefix = "file://"
+        doAssert(url.startsWith(prefix), "Internal error")
+        var p = url[prefix.len .. ^1]
+        p = p.parentDir / path
+        normalizePath(p, false)
+        result = imageWithContentsOfFile(p)
+
     serializer.onComplete = onComplete
     let oldNodeRefTab = nodeLoadRefTable
     nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
@@ -561,11 +573,19 @@ proc binDeserializerForPath(path: string): BinDeserializer =
     let am = sharedAssetManager()
     let ab = am.assetBundleForPath(path)
     var rab: AssetBundle
-    if not ab.isNil: rab = AssetBundle(ab)
+    if ab of AssetBundle: rab = AssetBundle(ab)
     if not rab.isNil:
         return rab.binDeserializer
 
 proc newNode*(b: BinDeserializer, compName: string): Node
+
+proc fixupCompositionUrlExtension(url: string): string =
+    ## Makes sure the extension is jcomp
+    result = url
+    if result.endsWith(".json"):
+        result = result.changeFileExt("jcomp")
+    elif not result.endsWith(".jcomp"):
+        result &= ".jcomp"
 
 proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
     const prefix = "res://"
@@ -589,6 +609,8 @@ proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
                 raise
         else:
             echo "No BinDeserializer for ", path
+
+    let url = fixupCompositionUrlExtension(url)
 
     loadAsset(url) do(j: JsonNode, err: string):
         assert err.isNil, err
