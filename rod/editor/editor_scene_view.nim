@@ -90,6 +90,8 @@ method init*(v: EditorSceneView, r: Rect)=
     var clipView = new(ClipView, newRect(0,0,r.width, r.height))
     clipView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
 
+    v.nodeSelector = newNodeSelector()
+
     if not v.editor.startFromGame:
 
         let editView = SceneView.new(newRect(0,0,r.width, r.height))
@@ -122,6 +124,7 @@ method init*(v: EditorSceneView, r: Rect)=
     v.sceneView.afterDrawProc = proc()=
         currentContext().gl.clearDepthStencil()
         v.updateGizmo()
+        v.nodeSelector.draw()
 
     v.addSubview(clipView)
 
@@ -138,7 +141,7 @@ method update*(v: EditorSceneView) = discard
 method setEditedNode*(v: EditorSceneView, n: Node)=
     v.selectedNode = n
     v.gizmo.editedNode = n
-    # v.nodeSelector.editedNode = n
+    v.nodeSelector.selectedNode = n
 
 method onDragEnter*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:

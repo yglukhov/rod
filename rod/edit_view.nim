@@ -1,4 +1,4 @@
-import math, algorithm, strutils, tables, json, logging
+import strutils, json, logging
 
 import nimx / [ matrixes, button, popup_button, key_commands, animation,
         notification_center, window, view_event_handling ]
@@ -8,17 +8,13 @@ import nimx.pasteboard.pasteboard
 
 import rod_types, node
 import rod.scene_composition
-import rod.component.mesh_component
-import rod.component.sprite
-import rod.editor.editor_project_settings
-import rod.editor.editor_workspace_view
-import rod.editor.editor_types
+import rod / editor / [editor_project_settings, editor_tab_registry,
+        editor_workspace_view, editor_types]
 import rod.utils.json_serializer
 export editor_types
 
 import tools.serializer
 
-import rod / editor / [ editor_tab_registry, node_selector ]
 import ray, viewport
 
 export editor_tab_registry
@@ -32,16 +28,11 @@ when loadingAndSavingAvailable:
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
-        if not e.mSelectedNode.isNil and e.mSelectedNode.componentIfAvailable(LightSource).isNil:
-            e.mSelectedNode.removeComponent(NodeSelector)
         e.mSelectedNode = n
 
         if not e.mCurrentComposition.isNil:
             e.mCurrentComposition.selectedNode = n
             e.mCurrentComposition.owner.setEditedNode(n)
-
-        if not e.mSelectedNode.isNil:
-            discard e.mSelectedNode.component(NodeSelector)
 
         for etv in e.workspaceView.tabs:
             etv.setEditedNode(e.mSelectedNode)
@@ -228,11 +219,6 @@ proc currentCamera*(e: Editor): Camera =
             result = n.componentIfAvailable(Camera)
 
 proc endEditing*(e: Editor) =
-    if not e.selectedNode.isNil:
-        let nodeSelector = e.selectedNode.getComponent(NodeSelector)
-        if not nodeSelector.isNil:
-            e.selectedNode.removeComponent(NodeSelector)
-
     e.sceneView.afterDrawProc = nil
     e.sceneView.removeFromSuperview()
     e.sceneView.setFrame(e.workspaceView.frame)
