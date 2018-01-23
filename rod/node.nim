@@ -654,8 +654,6 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
         else:
             # Deprecated. Old save format support
             for k, c in v:
-                if k == "NodeSelector":
-                    continue
                 let comp = n.component(k)
                 comp.deserialize(c, s)
 
@@ -717,9 +715,6 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
         result.add("components", componentsNode)
 
         for value in n.components:
-            if value.className() == "NodeSelector":
-                continue
-
             var jcomp: JsonNode
             jcomp = value.serialize(s)
 
