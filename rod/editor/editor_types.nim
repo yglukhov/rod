@@ -50,6 +50,7 @@ type
         anchors*: array[4, TabView]
         horizontalLayout*: LinearLayout
         verticalLayout*: LinearLayout
+        onKeyDown*: proc(e: var Event): bool
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 
