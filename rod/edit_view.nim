@@ -108,16 +108,14 @@ proc nodeToJson(n: Node, path: string): JsonNode =
     result = n.serialize(s)
 
 when loadingAndSavingAvailable:
-    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)
-
-    proc currentProjectPath*(e: Editor): string=
+    proc currentProjectPath*(e: Editor): string =
         result = e.currentProject.path
         if result.len == 0 or e.startFromGame:
             result = getAppDir() & "/../.."
 
     proc openComposition*(e: Editor, p: string)
 
-    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)=
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false) =
         var newPath: string
         if c.path.len == 0 or saveAs:
             var di: DialogInfo
