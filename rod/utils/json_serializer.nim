@@ -21,10 +21,10 @@ proc write[T](data: T): JsonNode =
         for v in data:
             result.add(write(v))
     elif T is Image:
-        if not data.isNil:
-            result = %filePath(data)
-        else:
+        if data.isNil:
             result = %""
+        else:
+            result = %filePath(data)
     else:
         result = %data
 
@@ -44,8 +44,27 @@ proc visit*(b: JsonSerializer, v: Image, key: string) =
     if not v.isNil:
         b.node[key] = %filePath(v)
 
+proc visit*[T](b: JsonSerializer, v: seq[T], key: string) =
+    if not v.isNil:
+        b.node[key] = write(v)
+
 proc visit*[T](b: JsonSerializer, v: T, key: string) =
     b.node[key] = write(v)
 
 proc visit*(b: JsonSerializer, images: seq[Image], imagesKey: string, frameOffsets: seq[Point], frameOffsetsKey: string) =
-    doAssert(false)
+    let jImages = newJArray()
+    let jOffs = newJArray()
+    var haveNonZeroOffset = false
+
+    for i in 0 ..< images.len:
+        jImages.add(write(images[i]))
+
+    for i in 0 ..< frameOffsets.len:
+        if frameOffsets[i] != zeroPoint:
+            haveNonZeroOffset = true
+        jOffs.add(write(frameOffsets[i]))
+
+    if jImages.len != 0:
+        b.node[imagesKey] = jImages
+        if haveNonZeroOffset:
+            b.node[frameOffsetsKey] = jOffs
