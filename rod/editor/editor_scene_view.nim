@@ -7,6 +7,7 @@ import rod / [node, rod_types, edit_view, component, viewport, ray]
 import rod / component / [ sprite, light, camera ]
 
 import rod.editor_camera_controller
+import node_selector
 
 import logging, sequtils, algorithm
 
@@ -16,6 +17,7 @@ type
     EditorSceneView* = ref object of EditorTabView
         gizmo: Gizmo
         selectedNode: Node
+        nodeSelector: NodeSelector
         sceneView: SceneView
         cameraController: EditorCameraController
         startPoint: Point
@@ -38,9 +40,6 @@ method onScroll*(v: EditorSceneView, e: var Event): bool=
     if not v.editor.sceneInput:
         v.cameraController.onMouseScrroll(e)
         return true
-
-proc castGizmo(v: EditorSceneView, e: var Event ): Node =
-    result = v.sceneView.rayCastFirstNode(v.gizmo.gizmoNode, e.localPosition)
 
 proc tryRayCast(v: EditorSceneView, e: var Event): Node=
     result = v.sceneView.rayCastFirstNode(v.rootNode, e.localPosition)
@@ -138,7 +137,8 @@ method update*(v: EditorSceneView) = discard
 
 method setEditedNode*(v: EditorSceneView, n: Node)=
     v.selectedNode = n
-    v.gizmo.editedNode = v.selectedNode
+    v.gizmo.editedNode = n
+    # v.nodeSelector.editedNode = n
 
 method onDragEnter*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:

@@ -31,8 +31,6 @@ proc newGizmo*(): Gizmo =
     result.gizmoNode = newNode()
     result.gizmoNode.alpha = 0.0
 
-    result.updateGizmo()
-
 proc `editedNode=`*(g: Gizmo, n: Node) =
     g.mEditedNode = n
     if not n.isNil:

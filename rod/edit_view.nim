@@ -1,11 +1,7 @@
 import math, algorithm, strutils, tables, json, logging
 
-import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
-                outline_view, color_picker, scroll_view, clip_view,
-                text_field, table_view_cell, gesture_detector, menu,
-                key_commands, linear_layout, view_event_handling_new,
-                mini_profiler, drag_and_drop, image, notification_center,
-                animation, window ]
+import nimx / [ matrixes, button, popup_button, key_commands, animation,
+        notification_center, window, view_event_handling ]
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
@@ -13,7 +9,6 @@ import nimx.pasteboard.pasteboard
 import rod_types, node
 import rod.scene_composition
 import rod.component.mesh_component
-import rod.component.node_selector
 import rod.component.sprite
 import rod.editor.editor_project_settings
 import rod.editor.editor_workspace_view
@@ -23,9 +18,8 @@ export editor_types
 
 import tools.serializer
 
-import rod.editor.editor_tab_registry
-import ray
-import viewport
+import rod / editor / [ editor_tab_registry, node_selector ]
+import ray, viewport
 
 export editor_tab_registry
 
