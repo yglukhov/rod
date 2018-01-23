@@ -61,9 +61,9 @@ method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
 method isPosteffectComponent*(c: Component): bool {.base.} = false
 
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
-method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} = discard
-method serialize*(c: Component, s: Serializer): JsonNode {.base.} = discard
 method getBBox*(c: Component): BBox {.base.} = discard
+
+method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.}
 
 proc deserializeFromJson*(c: Component, b: BinDeserializer) =
     # Temporary hacky way to fall back to json deserialization when binary is not implemented
@@ -86,6 +86,16 @@ method deserialize*(c: Component, s: JsonDeserializer) {.base.} = discard
 method serialize*(c: Component, s: BinSerializer) {.base.} = discard
 method serialize*(c: Component, s: JsonSerializer) {.base.} = discard
 method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
+
+method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} =
+    let js = s.jdeser
+    js.node = j
+    c.deserialize(js)
+
+method serialize*(c: Component, s: Serializer): JsonNode {.base.} =
+    result = newJObject()
+    s.jser.node = result
+    c.serialize(s.jser)
 
 type UpdateProcComponent = ref object of Component
     updateProc: proc()

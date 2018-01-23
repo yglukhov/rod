@@ -439,6 +439,7 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
             raise newException(Exception, "Gradient overlay style for " & $layer.name & " is not supported! ")
 
         var text = layer.propertyGroup("Text")
+        let vectorLayer = layer.property("Contents")
         let alpha = gradientOverlay.property("Opacity", float32).valueAtTime(0) / 100
         let angle = gradientOverlay.property("Angle", float).value
         let angleR = angle.degToRad()
@@ -449,6 +450,7 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
         var endPoint: Vector2
 
         var offset = newVector2()
+        # offset for text
         if not text.isNil:
             var textDoc = text.property("Source Text", TextDocument).value
             if textDoc.boxText:
@@ -459,6 +461,26 @@ proc serializeLayerStyles(layer: Layer, result: JsonNode) =
                 offset.y = pos[1]
                 width = sz[0]
                 height = sz[1]
+
+        # offset for vector shapes
+        if not vectorLayer.isNil:
+            let shapes = vectorLayer.toPropertyGroup()
+            for q in 0 ..< shapes.numProperties:
+                let shape = shapes.property(q)
+                let shapeProps = shape.toPropertyGroup()
+
+                if not shape.isNil and shape.isPropertyGroup:
+                    let shapeGroup = shapeProps.property("Contents").toPropertyGroup()
+
+                    for i in 0 ..< shapeGroup.numProperties:
+                        let p = shapeGroup.property(i)
+                        let shapePathGroup = p.toPropertyGroup()
+                        let name = $p.name
+
+                        if "Rectangle Path " & $(q+1) in name or "Ellipse Path " & $(q+1) in name:
+                            let size = shapePathGroup.property("Size", Vector2).valueAtTime(0)
+                            offset -= size / 2.0
+                            break
 
         if angle >= 0 and angle < beta:
             startPoint = newVector2(0, height / 2 * tan(angleR) + height / 2)
@@ -549,11 +571,12 @@ proc serializeShape(layer: Layer, result: JsonNode) =
             let shape = shapes.property(q)
             let shapeProps = shape.toPropertyGroup()
 
-            let transform = shapeProps.propertyGroup("Transform")
-            if not transform.isNil:
-                let position = transform.property("Position", Vector2).valueAtTime(0)
-                if position[0] > 0 or position[1] > 0:
-                    raise newException(Exception, "wrong way to set position")
+
+            # let transform = shapeProps.propertyGroup("Transform")
+            # if not transform.isNil:
+            #     let position = transform.property("Position", Vector2).valueAtTime(0)
+            #     if position[0] > 0 or position[1] > 0:
+            #         raise newException(Exception, "wrong way to set position")
 
             if not shape.isNil and shape.isPropertyGroup:
                 let shapeGroup = shapeProps.property("Contents").toPropertyGroup()
@@ -565,10 +588,13 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                     let p = shapeGroup.property(i)
                     let shapePathGroup = p.toPropertyGroup()
                     let name = $p.name
-
                     if "Rectangle Path " & $(q+1) in name:
-                        shape["size"] = %* shapePathGroup.property("Size", Vector2).valueAtTime(0)
-                        shape["radius"] = % shapePathGroup.property("Roundness", float32).valueAtTime(0)
+                        let size = shapePathGroup.property("Size", Vector2).valueAtTime(0)
+                        let radius = shapePathGroup.property("Roundness", float32).valueAtTime(0)
+                        let minSize = min(size[0], size[1])
+                        let minRadius = min(minSize / 2.0, radius)
+                        shape["size"] = % size
+                        shape["radius"] = % minRadius
                         shape["shapeType"] = % 0
                     elif "Ellipse Path " & $(q+1) in name:
                         shape["size"] = %* shapePathGroup.property("Size", Vector2).valueAtTime(0)
@@ -579,13 +605,12 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                     elif "Stroke " & $(q+1) in name:
                         var strokeColor = shapePathGroup.property("Color", Vector4).valueAtTime(0)
                         strokeColor[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
-                        shape["strokeColor"] = %* strokeColor
+                        shape["strokeColor"] = % strokeColor
                         shape["strokeWidth"] = % shapePathGroup.property("Stroke Width", float32).valueAtTime(0)
                     elif "Fill " & $(q+1) in name:
                         var color = shapePathGroup.property("Color", Vector4).valueAtTime(0)
                         color[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
-                        shape["color"] = %* color
-
+                        shape["color"] = % color
                 result.add(shape)
 
 proc serializeDrawableComponents(layer: Layer, result: JsonNode) =

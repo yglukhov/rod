@@ -2,7 +2,7 @@ import math, algorithm, strutils, tables, json, logging
 
 import nimx / [ view, toolbar, editor / tab_view, linear_layout, button,
     font, popup_button, window, menu, notification_center, mini_profiler,
-    color_picker ]
+    color_picker, view_event_handling ]
 
 import rod / [ rod_types, node ]
 import rod / editor / [ editor_types, editor_tab_registry ]
@@ -424,3 +424,7 @@ proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
         w.editor.sceneInput = not w.editor.sceneInput
     w.createChangeBackgroundColorButton()
     result = w
+
+method onKeyDown(v: WorkspaceView, e: var Event): bool =
+    if not v.onKeyDown.isNil:
+        result = v.onKeyDown(e)

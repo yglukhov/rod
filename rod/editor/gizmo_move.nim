@@ -116,8 +116,6 @@ proc newMoveGizmo*(): MoveGizmo =
     # result.gizmoNode.loadComposition( getMoveAxisJson() )
     result.gizmoNode.alpha = 0.0
 
-    result.updateGizmo()
-
 method startTransform*(ga: MoveGizmo, selectedGizmo: Node, position: Point) =
     let axis = selectedGizmo.parent
     if axis.name.contains("axis_x"):

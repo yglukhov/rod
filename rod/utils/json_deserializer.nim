@@ -5,9 +5,9 @@ import rod.quaternion
 
 type JsonDeserializer* = ref object
     node*: JsonNode
-    images*: JsonNode
     disableAwake*: bool
     compPath*: string # Path relative to bundle root
+    getImageForPath*: proc(path: string, offset: var Point): Image
 
 proc newJsonDeserializer*(): JsonDeserializer =
     result.new()
@@ -20,15 +20,15 @@ proc setLenX[T](s: var seq[T], sz: int) =
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image
 
-proc get[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
+proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
     when T is float | float32 | float64:
-        v = j.getFNum()
+        v = j.getFloat()
     elif T is int | int32 | int64 | int16:
-        v = T(j.num)
+        v = T(j.getBiggestInt())
     elif T is string:
         v = if j.kind == JNull: nil else: j.str
     elif T is Rect:
-        v = newRect(j[0].getFNum(), j[1].getFNum(), j[2].getFNum(), j[3].getFNum())
+        v = newRect(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
     elif T is tuple:
         var i = 0
         for k, vv in fieldPairs(v):
@@ -52,13 +52,6 @@ proc get[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
     else:
         {.error: "unknown type".}
 
-proc imageDesc(b: JsonDeserializer, path: string): JsonNode =
-    for j in b.images:
-        if j["orig"].str == path:
-            return j
-
-    doAssert(false, "Image desc not found: " & path)
-
 proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
     case jimage.kind
     of JString:
@@ -69,13 +62,7 @@ proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode, offset: var Point): Image =
     var path = b.imagePath(j)
-    let desc = b.imageDesc(path)
-    let sz = desc["size"]
-    let joff = desc{"off"}
-    if not joff.isNil:
-        b.get(joff, offset)
-    result = imageWithSize(newSize(sz[0].getFNum(), sz[1].getFNum()))
-    result.setFilePath(path)
+    result = b.getImageForPath(path, offset)
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image =
     var path = b.imagePath(j)
@@ -93,7 +80,7 @@ proc visit*[T: tuple](b: JsonDeserializer, v: var T, key: string) =
 proc visit*(b: JsonDeserializer, v: var float32, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = j.getFNum()
+        v = j.getFloat()
 
 proc visit*(b: JsonDeserializer, v: var int16, key: string) =
     let j = b.node{key}
@@ -124,9 +111,9 @@ proc visit*(b: JsonDeserializer, v: var bool, key: string) =
 proc visit*(b: JsonDeserializer, v: var Color, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = newColor(j[0].getFNum(), j[1].getFNum(), j[2].getFNum())
+        v = newColor(j[0].getFloat(), j[1].getFloat(), j[2].getFloat())
         if j.len > 3:
-            v.a = j[3].getFNum()
+            v.a = j[3].getFloat()
 
 proc visit*(b: JsonDeserializer, v: var string, key: string) {.inline.} =
     let j = b.node{key}
@@ -164,4 +151,4 @@ proc visit*[I: static[int], T](b: JsonDeserializer, v: var array[I, T], key: str
 proc visit*(b: JsonDeserializer, v: var Quaternion, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = newQuaternion(j[0].getFNum(), j[1].getFNum(), j[2].getFNum(), j[3].getFNum())
+        v = newQuaternion(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())

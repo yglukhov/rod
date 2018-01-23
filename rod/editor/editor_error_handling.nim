@@ -7,7 +7,10 @@ method log*(logger: EditorLogger, level: Level, args: varargs[string,`$`])=
     var t = "[" & getClockStr() & "] "
     var msg = ""
     for arg in args:
-        msg &= arg
+        if arg.isNil:
+            msg &= "nil"
+        else:
+            msg &= arg
 
     var msgseq = msg.split("\n")
 
