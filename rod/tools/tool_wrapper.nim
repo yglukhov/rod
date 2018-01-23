@@ -37,17 +37,21 @@ proc runWrapper*(toolName, pathToToolMainNim: string) =
     let tmp = getTempDir()
     let cd = getCurrentDir()
     let projName = splitPath(cd).tail
-
     let bin = tmp / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
     var needsCompile = not fileExists(bin)
+    var passArgs = newSeq[string]()
+
+    for i in 1 .. paramCount():
+        let p = paramStr(i)
+        if p == "--recompile":
+            needsCompile = true
+        else:
+            passArgs.add(p)
+
     if needsCompile:
         echo "Compiling ", toolName
         compileRealBin(bin, toolName, pathToToolMainNim)
 
     # Run the tool
-    var args = newSeq[string]()
-    for i in 1 .. paramCount():
-        args.add(paramStr(i))
-
-    if startProcess(bin, args = args, options = {poParentStreams}).waitForExit != 0:
+    if startProcess(bin, args = passArgs, options = {poParentStreams}).waitForExit != 0:
         raise newException(Exception, toolName & " failed")

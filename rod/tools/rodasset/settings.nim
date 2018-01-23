@@ -40,11 +40,12 @@ proc parseExceptions(val, dir: string): seq[string] =
 
     result = @[]
     for v in values:
-        if v.contains("*"):
-            for file in walkFiles(dir / v):
+        let vStripped = v.strip()
+        if vStripped.contains("*"):
+            for file in walkFiles(dir / vStripped):
                 result.add(splitFile(file).name)
         else:
-            result.add(v)
+            result.add(vStripped)
 
 proc parseConfig*(rabFilePath: string, fast: bool = false): Settings =
     result = newSettings()
@@ -54,7 +55,8 @@ proc parseConfig*(rabFilePath: string, fast: bool = false): Settings =
     result.graphics.packCompositions = true
 
     for line in lines(rabFilePath):
-        let pairs = line.split(" ")
+        let pairs = line.split(" ", 1)
+        doAssert(pairs.len == 2, "Wrong rab config params format in "& pairs[0])
         let key = pairs[0]
         let val = pairs[1]
         case key:

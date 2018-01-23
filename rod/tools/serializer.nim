@@ -9,12 +9,15 @@ import nimx.assets.asset_loading
 
 import rod.rod_types
 import rod.quaternion
+import rod/utils/[json_serializer, json_deserializer]
 
 type Serializer* = ref object
     url*: string
     asyncOps: int
     onComplete*: proc()
     finished: bool
+    jser*: JsonSerializer # Migration to new serialization
+    jdeser*: JsonDeserializer # Migration to new serialization
 
 proc `%`*(n: Node): JsonNode =
     if not n.isNil:
