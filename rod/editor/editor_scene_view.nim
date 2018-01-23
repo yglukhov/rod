@@ -53,7 +53,6 @@ method onInterceptTouchEv*(v: EditorSceneView, e: var Event): bool  = not v.edit
 method onTouchEv*(v: EditorSceneView, e: var Event): bool =
     result = procCall v.View.onTouchEv(e)
     let gizmoTouch = v.gizmo.onTouchEv(e)
-    echo e.keyCode
     case e.buttonState:
     of bsUp:
         v.cameraController.onTapUp(0.0,0.0,e)
