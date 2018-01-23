@@ -92,8 +92,10 @@ method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} =
     js.node = j
     c.deserialize(js)
 
-method serialize*(c: Component, s: Serializer): JsonNode {.base.} = discard
-
+method serialize*(c: Component, s: Serializer): JsonNode {.base.} =
+    result = newJObject()
+    s.jser.node = result
+    c.serialize(s.jser)
 
 type UpdateProcComponent = ref object of Component
     updateProc: proc()

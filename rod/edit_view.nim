@@ -18,6 +18,7 @@ import rod.component.sprite
 import rod.editor.editor_project_settings
 import rod.editor.editor_workspace_view
 import rod.editor.editor_types
+import rod.utils.json_serializer
 export editor_types
 
 import tools.serializer
@@ -100,8 +101,10 @@ proc sceneTreeDidChange*(e: Editor) =
     for t in e.workspaceView.tabs:
         t.onSceneChanged()
 
-proc nodeToJson(n: Node): JsonNode =
+proc nodeToJson(n: Node, path: string): JsonNode =
     let s = Serializer.new()
+    s.url = "file://" & path
+    s.jser = newJsonSerializer()
     result = n.serialize(s)
 
 when loadingAndSavingAvailable:
@@ -131,7 +134,7 @@ when loadingAndSavingAvailable:
             if newPath.len > 0:
                 let compName = splitFile(newPath).name
                 c.rootNode.name = compName
-                let data = nodeToJson(c.rootNode)
+                let data = nodeToJson(c.rootNode, newPath)
                 writeFile(newPath, $data)
 
                 c.path = newPath
@@ -179,9 +182,9 @@ when loadingAndSavingAvailable:
         di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
         di.title = "Save composition"
         let path = di.show()
-        if not path.isNil:
+        if path.len != 0:
             try:
-                let sData = nodeToJson(selectedNode)
+                let sData = nodeToJson(selectedNode, path)
                 writeFile(path, sData.pretty())
             except:
                 error "Exception caught: ", getCurrentExceptionMsg()
@@ -195,7 +198,7 @@ when loadingAndSavingAvailable:
         di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
         di.title = "Load composition or dae"
         let path = di.show()
-        if not path.isNil:
+        if path.len != 0:
             try:
                 if path.endsWith(".dae"):
                     var p = if not editor.selectedNode.isNil: editor.selectedNode
@@ -261,7 +264,7 @@ proc copyNode*(e: Editor, n: Node = nil)=
         cn = e.selectedNode
 
     if not cn.isNil:
-        let data = nodeToJson(cn)
+        let data = nodeToJson(cn, "/j")
         let pbi = newPasteboardItem(NodePboardKind, $data)
         pasteboardWithName(PboardGeneral).write(pbi)
 
@@ -280,7 +283,7 @@ proc pasteNode*(e: Editor, n: Node = nil)=
     if not pbi.isNil:
         let j = parseJson(pbi.data)
         let pn = newNode()
-        pn.loadComposition(j)
+        pn.loadComposition(j, "file:///j")
 
         var cn = n
         if cn.isNil:
