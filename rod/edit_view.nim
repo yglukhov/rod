@@ -100,6 +100,10 @@ proc sceneTreeDidChange*(e: Editor) =
     for t in e.workspaceView.tabs:
         t.onSceneChanged()
 
+proc nodeToJson(n: Node): JsonNode =
+    let s = Serializer.new()
+    result = n.serialize(s)
+
 when loadingAndSavingAvailable:
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)
 
@@ -126,9 +130,8 @@ when loadingAndSavingAvailable:
         try:
             if newPath.len > 0:
                 let compName = splitFile(newPath).name
-                var s = Serializer.new()
                 c.rootNode.name = compName
-                var data = c.rootNode.serialize(s)
+                let data = nodeToJson(c.rootNode)
                 writeFile(newPath, $data)
 
                 c.path = newPath
@@ -178,9 +181,8 @@ when loadingAndSavingAvailable:
         let path = di.show()
         if not path.isNil:
             try:
-                var s = Serializer.new()
-                var sData = selectedNode.serialize(s)
-                s.save(sData, path)
+                let sData = nodeToJson(selectedNode)
+                writeFile(path, sData.pretty())
             except:
                 error "Exception caught: ", getCurrentExceptionMsg()
                 error "stack trace: ", getCurrentException().getStackTrace()
@@ -259,8 +261,7 @@ proc copyNode*(e: Editor, n: Node = nil)=
         cn = e.selectedNode
 
     if not cn.isNil:
-        var s = Serializer.new()
-        var data = cn.serialize(s)
+        let data = nodeToJson(cn)
         let pbi = newPasteboardItem(NodePboardKind, $data)
         pasteboardWithName(PboardGeneral).write(pbi)
 
@@ -339,6 +340,25 @@ proc initNotifHandlers(e: Editor)=
                 e.openComposition(path)
         else: discard
 
+proc onKeyDown(ed: Editor, e: var Event): bool =
+    case commandFromEvent(e)
+    of kcCopy:
+        ed.copyNode()
+        result = true
+    of kcCut:
+        ed.cutNode()
+        result = true
+    of kcPaste:
+        ed.pasteNode()
+        result = true
+    else:
+        discard
+
+proc createWorkspace(w: Window, e: Editor): WorkspaceView =
+    result = createWorkspaceLayout(w, e)
+    result.onKeyDown = proc(ev: var Event): bool =
+        e.onKeyDown(ev)
+
 proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     result.new()
 
@@ -347,7 +367,7 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     editor.currentProject = p
     editor.startFromGame = false
     editor.initNotifHandlers()
-    editor.workspaceView = createWorkspaceLayout(w, editor)
+    editor.workspaceView = createWorkspace(w, editor)
 
     sharedNotificationCenter().addObserver(NimxFristResponderChangedInWindow, editor) do(args: Variant):
         editor.onFirstResponderChanged(args.get(View))
@@ -368,7 +388,7 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
     editor.sceneView.editing = true
     editor.startFromGame = startFromGame
     editor.initNotifHandlers()
-    editor.workspaceView = createWorkspaceLayout(v.window, editor)
+    editor.workspaceView = createWorkspace(v.window, editor)
 
     var updateAnimation = newAnimation()
     updateAnimation.onAnimate = proc(p: float)=
