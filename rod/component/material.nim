@@ -353,7 +353,7 @@ template `isLightReceiver=`*(m: Material, val: bool) =
         m.bShaderNeedUpdate = true
 
         if not val:
-            for i in 0 .. <m.currentLightSourcesCount:
+            for i in 0 ..< m.currentLightSourcesCount:
                 m.shaderMacroFlags.excl(ShaderMacro(int(WITH_LIGHT_0) + i))
 
             m.shaderMacroFlags.excl(WITH_LIGHT_POSITION)

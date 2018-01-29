@@ -108,13 +108,13 @@ method init(pgs: ConePSGenShape) =
 
 method generate*(pgs: ConePSGenShape): ParticleGenerationData =
     if pgs.is2D:
-        result.position = newVector3(random(-pgs.radius .. pgs.radius), 0.0, 0.0)
+        result.position = newVector3(rand(-pgs.radius .. pgs.radius), 0.0, 0.0)
         let dirAngle = degToRad(pgs.angle) * result.position.x / pgs.radius
         result.direction = newVector3(sin(dirAngle), cos(dirAngle), 0.0)
 
     else:
-        let rand_angle = random(2 * 3.14)
-        let distance = random(pgs.radius)
+        let rand_angle = rand(2 * 3.14)
+        let distance = rand(pgs.radius)
 
         let pos = newVector3(distance * cos(rand_angle), 0.0, distance * sin(rand_angle))
 
@@ -172,26 +172,26 @@ method init(pgs: SpherePSGenShape) =
 
 template generateRandDir(pd: var ParticleGenerationData, is2D: bool) =
     if is2D:
-        pd.direction = newVector3(random(-1.0..1.0), random(-1.0..1.0), 0.0)
+        pd.direction = newVector3(rand(-1.0..1.0), rand(-1.0..1.0), 0.0)
         pd.direction.normalize()
 
     else:
-        pd.direction = newVector3(random(-1.0..1.0), random(-1.0..1.0), random(-1.0..1.0))
+        pd.direction = newVector3(rand(-1.0..1.0), rand(-1.0..1.0), rand(-1.0..1.0))
         pd.direction.normalize()
 
 method generate*(pgs: SpherePSGenShape): ParticleGenerationData =
     if pgs.isRandPos:
         if pgs.is2D:
-            let angle = random(2 * 3.14)
-            let r = random(pgs.radius)
+            let angle = rand(2 * 3.14)
+            let r = rand(pgs.radius)
 
             result.position.x = r * cos(angle)
             result.position.y = r * sin(angle)
 
         else:
-            let theta = random(2 * 3.14)
-            let phi = random((-3.14/2) .. (3.14/2))
-            let r = random(pgs.radius)
+            let theta = rand(2 * 3.14)
+            let phi = rand((-3.14/2) .. (3.14/2))
+            let r = rand(pgs.radius)
 
             result.position.x = r * cos(theta) * cos(phi)
             result.position.y = r * sin(phi)
@@ -248,9 +248,9 @@ method init(pgs: BoxPSGenShape) =
 method generate*(pgs: BoxPSGenShape): ParticleGenerationData =
     let d = pgs.dimension / 2.0
     if pgs.is2D:
-        result.position = newVector3(random(-d.x .. d.x), random(-d.y .. d.y), 0.0)
+        result.position = newVector3(rand(-d.x .. d.x), rand(-d.y .. d.y), 0.0)
     else:
-        result.position = newVector3(random(-d.x .. d.x), random(-d.y .. d.y), random(-d.z .. d.z))
+        result.position = newVector3(rand(-d.x .. d.x), rand(-d.y .. d.y), rand(-d.z .. d.z))
 
 proc debugDraw(pgs: BoxPSGenShape) =
     let gl = currentContext().gl
@@ -363,15 +363,15 @@ method visitProperties*(attr: PSModifierSpiral, p: var PropertyVisitor) =
     p.visitProperty("force", attr.force)
 
 
-# -------------------- Random Wind Modifier --------------------------
+# -------------------- rand Wind Modifier --------------------------
 method init(attr: PSModifierRandWind) =
     attr.force = newVector3(1,1,1)
 
 method updateParticle*(attr: PSModifierRandWind, part: var Particle) =
     var force: Vector3
-    force.x = random(-attr.force.x .. attr.force.x)
-    force.y = random(-attr.force.y .. attr.force.y)
-    force.z = random(-attr.force.z .. attr.force.z)
+    force.x = rand(-attr.force.x .. attr.force.x)
+    force.y = rand(-attr.force.y .. attr.force.y)
+    force.z = rand(-attr.force.z .. attr.force.z)
     part.velocity += force / 60.0
 
 method deserialize*(attr: PSModifierRandWind, j: JsonNode, s: Serializer) =
