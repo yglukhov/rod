@@ -84,7 +84,7 @@ proc sceneTreeDidChange*(e: Editor) =
     e.updateCameraSelector()
 
     for t in e.workspaceView.tabs:
-        t.onSceneChanged()
+        t.onCompositionChanged(e.currentComposition)
 
 proc nodeToJson(n: Node, path: string): JsonNode =
     let s = Serializer.new()

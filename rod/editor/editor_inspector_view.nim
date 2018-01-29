@@ -111,7 +111,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
                 closureScope:
                     expView = newExpandingView(newRect(0, 0, 328, 20.0))
                     expView.title = v.className
-                    let class_name = v.className
+                    # let class_name = v.className
                     let component = v
                     expView.expand()
 
