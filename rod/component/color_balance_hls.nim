@@ -74,11 +74,11 @@ template areValuesNormal(c: ColorBalanceHLS): bool =
     c.hue ~== 0 and c.saturation ~== 0 and c.lightness ~== 0
 
 method deserialize*(c: ColorBalanceHLS, j: JsonNode, s: Serializer) =
-    c.hue = j["hue"].getFNum()
-    c.saturation = j["saturation"].getFNum()
-    c.lightness = j["lightness"].getFNum()
-    c.hlsMin = j{"hlsMin"}.getFNum()
-    c.hlsMax = j{"hlsMax"}.getFNum(1.0)
+    c.hue = j["hue"].getFloat()
+    c.saturation = j["saturation"].getFloat()
+    c.lightness = j["lightness"].getFloat()
+    c.hlsMin = j{"hlsMin"}.getFloat()
+    c.hlsMax = j{"hlsMax"}.getFloat(1.0)
 
 method serialize*(c: ColorBalanceHLS, s: Serializer): JsonNode =
     result = newJObject()

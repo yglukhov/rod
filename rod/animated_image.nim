@@ -52,4 +52,4 @@ method isLoaded*(ai: AnimatedImage): bool =
 method getTextureQuad*(ai: AnimatedImage, gl: GL, texCoords: var array[4, GLfloat]): TextureRef =
     result = getTextureQuad(ai.images[ai.currentFrame], gl, texCoords)
 
-method size*(ai: AnimatedImage): Size = ai.images[ai.currentFrame].size()
+proc size*(ai: AnimatedImage): Size = ai.images[ai.currentFrame].size()

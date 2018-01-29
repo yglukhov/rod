@@ -83,7 +83,7 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
         var fontSize: float
         v = j{"fontSize"}
         if not v.isNil:
-            fontSize = v.getFNum()
+            fontSize = v.getFloat()
 
         v = j{"font"}
         var font: Font
@@ -99,16 +99,16 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 
         v = j{"color"}
         if not v.isNil:
-            let color = newColor(v[0].getFnum(), v[1].getFnum(), v[2].getFnum())
+            let color = newColor(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
             t.mText.setTextColorInRange(0, -1, color)
             if v.len > 3: # Deprecated
-                t.node.alpha = v[3].getFnum()
+                t.node.alpha = v[3].getFloat()
 
         v = j{"shadowOff"}
         var shadowX, shadowY: float  # TODO do only one format
         if not v.isNil:
-            shadowX = v[0].getFnum()
-            shadowY = v[1].getFnum()
+            shadowX = v[0].getFloat()
+            shadowY = v[1].getFloat()
         else:
             s.deserializeValue(j, "shadowX", shadowX)
             s.deserializeValue(j, "shadowY", shadowY)
@@ -117,8 +117,8 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
         if shadowX > 0.0 or shadowY > 0.0: isShadowExist = true
 
         elif "shadowX" in j and "shadowY" in j:
-            shadowY = j["shadowY"].getFnum()
-            shadowX = j["shadowX"].getFnum()
+            shadowY = j["shadowY"].getFloat()
+            shadowX = j["shadowX"].getFloat()
 
         v = j{"shadowColor"}
         var shadowColor: Color
@@ -189,8 +189,8 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 
         v = j{"bounds"}
         if not v.isNil:
-            t.mBoundingOffset = newPoint(v[0].getFNum(), v[1].getFNum())
-            t.mText.boundingSize = newSize(v[2].getFNum(), v[3].getFNum())
+            t.mBoundingOffset = newPoint(v[0].getFloat(), v[1].getFloat())
+            t.mText.boundingSize = newSize(v[2].getFloat(), v[3].getFloat())
 
         t.mText.processAttributedText()
 ################################################################################

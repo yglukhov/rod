@@ -34,19 +34,6 @@ proc propertyDescWithName(typdesc: NimNode, name: string): PropertyDesc =
     result.name = name
     result.attributes = initTable[string, NimNode]()
 
-proc actualReference(typdesc: NimNode, p: NimNode): NimNode =
-    result = copyNimTree(p)
-    var ident = result
-    while ident.kind == nnkDotExpr:
-        ident = ident[0]
-    ident.expectKind(nnkIdent)
-
-    let pd = typdesc.propertyDescWithName($ident)
-    if result.kind == nnkDotExpr:
-        result[0] = actualReference(pd)
-    else:
-        result = actualReference(pd)
-
 macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
         serTyp: typed{nkSym}, keyed: static[bool], serialize: static[bool],
         bin: static[bool], skipPhantom: static[bool]): untyped =
@@ -79,9 +66,6 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
     for p in typdesc.serializablePropertyDescs:
         let visitCall = newCall(!"visit", s, actualReference(p))
         if keyed: visitCall.add(p.serializationKey())
-
-        # if bin and p.hasAttr("serializeLen"):
-        #     visitCall.add(typdesc.actualReference(p.attributes["serializeLen"]))
 
         if p.hasAttr("combinedWith"):
             let p1 = typdesc.propertyDescWithName($p.attributes["combinedWith"])

@@ -85,12 +85,12 @@ proc visit*(b: JsonDeserializer, v: var float32, key: string) =
 proc visit*(b: JsonDeserializer, v: var int16, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = int16(j.getNum())
+        v = int16(j.getInt())
 
 proc visit*(b: JsonDeserializer, v: var int32, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = int32(j.getNum())
+        v = int32(j.getInt())
 
 proc visit*[T: enum](b: JsonDeserializer, v: var T, key: string) =
     let j = b.node{key}
@@ -106,7 +106,7 @@ proc visit*[T: enum](b: JsonDeserializer, v: var T, key: string) =
 proc visit*(b: JsonDeserializer, v: var bool, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = j.getBVal()
+        v = j.getBool()
 
 proc visit*(b: JsonDeserializer, v: var Color, key: string) =
     let j = b.node{key}
