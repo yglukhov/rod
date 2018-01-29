@@ -34,10 +34,10 @@ void tint_effect(vec4 black, vec4 white, float amount) {
 
 method deserialize*(c: Tint, j: JsonNode, s: Serializer) =
     var v = j["black"]
-    c.black = newColor(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
+    c.black = newColor(v[0].getFloat(), v[1].getFloat(), v[2].getFloat(), v[3].getFloat())
     v = j["white"]
-    c.white = newColor(v[0].getFNum(), v[1].getFNum(), v[2].getFNum(), v[3].getFNum())
-    c.amount = j{"amount"}.getFNum(1)
+    c.white = newColor(v[0].getFloat(), v[1].getFloat(), v[2].getFloat(), v[3].getFloat())
+    c.amount = j{"amount"}.getFloat(1)
 
 method beforeDraw*(c: Tint, index: int): bool =
     pushPostEffect(effect, c.black, c.white, c.amount)

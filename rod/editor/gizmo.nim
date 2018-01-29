@@ -22,9 +22,9 @@ type Gizmo* = ref object of RootObj
 method updateGizmo*(g: Gizmo) {.base.} = discard
 method startTransform*(g: Gizmo, selectedGizmo: Node, position: Point) {.base.} = discard
 method proccesTransform*(g: Gizmo, position: Point) {.base.} = discard
-method stopTransform*(g: Gizmo) = discard
-method onMouseIn*(g: Gizmo, castedNode: Node) = discard
-method onMouseOut*(g: Gizmo, castedNode: Node) = discard
+method stopTransform*(g: Gizmo) {.base.} = discard
+method onMouseIn*(g: Gizmo, castedNode: Node) {.base.} = discard
+method onMouseOut*(g: Gizmo, castedNode: Node) {.base.} = discard
 
 proc newGizmo*(): Gizmo =
     result = new(Gizmo)

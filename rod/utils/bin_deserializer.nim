@@ -150,8 +150,8 @@ proc getImageInfoForIndex(b: BinDeserializer, idx: int16, path: var string, fram
     path = b.basePath & "/" & j["orig"].str
     let joff = j{"off"}
     if not joff.isNil:
-        frameOffset.x = joff[0].getFNum()
-        frameOffset.y = joff[1].getFNum()
+        frameOffset.x = joff[0].getFloat()
+        frameOffset.y = joff[1].getFloat()
 
 proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image) =
     if idx == -2:

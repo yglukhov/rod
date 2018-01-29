@@ -26,14 +26,14 @@ method init*(s: Solid) =
 method deserialize*(s: Solid, j: JsonNode, serializer: Serializer) =
     var v = j{"color"}
     if not v.isNil:
-        s.color = newColor(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
+        s.color = newColor(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
     v = j{"alpha"} # Deprecated.
     if not v.isNil:
-        s.node.alpha = v.getFNum(1.0)
+        s.node.alpha = v.getFloat(1.0)
 
     v = j{"size"}
     if not v.isNil:
-        s.size = newSize(v[0].getFNum(), v[1].getFNum())
+        s.size = newSize(v[0].getFloat(), v[1].getFloat())
 
 genSerializationCodeForComponent(Solid)
 

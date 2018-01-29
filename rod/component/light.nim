@@ -83,42 +83,42 @@ method getBBox*(ls: LightSource): BBox =
 method deserialize*(ls: LightSource, j: JsonNode, s: Serializer) =
     var v = j{"ambient"}
     if not v.isNil:
-        ls.lightAmbient = v.getFNum()
+        ls.lightAmbient = v.getFloat()
 
     v = j{"diffuse"}
     if not v.isNil:
-        ls.lightDiffuse = v.getFNum()
+        ls.lightDiffuse = v.getFloat()
 
     v = j{"specular"}
     if not v.isNil:
-        ls.lightSpecular = v.getFNum()
+        ls.lightSpecular = v.getFloat()
 
     v = j{"constant"}
     if not v.isNil:
-        ls.lightConstant = v.getFNum()
+        ls.lightConstant = v.getFloat()
 
     v = j{"linear"}
     if not v.isNil:
-        ls.lightLinear = v.getFNum()
+        ls.lightLinear = v.getFloat()
 
     v = j{"quadratic"}
     if not v.isNil:
-        ls.lightQuadratic = v.getFNum()
+        ls.lightQuadratic = v.getFloat()
 
     v = j{"is_precomp_attenuation"}
     if not v.isNil:
-        ls.lightAttenuationInited = v.getBVal()
+        ls.lightAttenuationInited = v.getBool()
 
     v = j{"attenuation"}
     if not v.isNil:
-        ls.lightAttenuation = v.getFNum()
+        ls.lightAttenuation = v.getFloat()
 
     v = j{"color"}
     if not v.isNil:
-        ls.lightColor.r = v[0].getFNum()
-        ls.lightColor.g = v[1].getFNum()
-        ls.lightColor.b = v[2].getFNum()
-        ls.lightColor.a = v[3].getFNum()
+        ls.lightColor.r = v[0].getFloat()
+        ls.lightColor.g = v[1].getFloat()
+        ls.lightColor.b = v[2].getFloat()
+        ls.lightColor.a = v[3].getFloat()
 
 method serialize*(c: LightSource, s: Serializer): JsonNode =
     result = newJObject()

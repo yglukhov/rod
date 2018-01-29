@@ -39,9 +39,6 @@ method urlForPath*(ab: AssetBundle, path: string): string =
         result = ab.realUrlForPath(path)
 
 proc init(ab: AssetBundle, handler: proc()) {.inline.} =
-    # echo "INIT AB: ", ab.mBaseUrl
-    let rpPath = ab.mBaseUrl["file://".len .. ^1] / "comps.rodpack"
-    # echo "RPPATH: ", rpPath
     var indexComplete = false
     var compsComplete = false
 
@@ -222,7 +219,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         removeFile(zipFileName)
         result = true
 
-    proc downloadAndUnzip(url, destPath: string, ctx: pointer) =
+    proc downloadAndUnzip(url, destPath: string, ctx: pointer) {.used.} =
         let zipFilePath = destPath & ".gz"
 
         try:
@@ -313,7 +310,6 @@ proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mou
     var abs = newSeq[AssetBundle](abds.len)
     let abds = @abds
     var i = 0
-    var err: string
 
     proc load() =
         if i == abds.len:
@@ -351,13 +347,13 @@ registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tg
             for j in rab.spriteSheets[path]:
                 let jt = j["tex"]
                 let texCoords = [
-                    jt[0].getFNum().float32,
-                    jt[1].getFNum().float32,
-                    jt[2].getFNum().float32,
-                    jt[3].getFNum().float32
+                    jt[0].getFloat().float32,
+                    jt[1].getFloat().float32,
+                    jt[2].getFloat().float32,
+                    jt[3].getFloat().float32
                 ]
                 let js = j["size"]
-                let sz = newSize(js[0].getFNum(), js[1].getFNum())
+                let sz = newSize(js[0].getFloat(), js[1].getFloat())
                 let imagePath = rab.path & '/' & j["orig"].str
                 let si: Image = i.subimageWithTexCoords(sz, texCoords)
                 si.setFilePath(imagePath)

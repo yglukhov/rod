@@ -140,7 +140,7 @@ proc newBezierKeyFrameAnimationSampler*[T](keys: seq[BezierKeyFrame[T]]): Bezier
         let normalizedP = (p - s.keys[a].p) / temporalLength
 
         #let spacialLength = abs(s.keys[b].v - s.keys[a].v)
-        let spacialLength = 300.Coord
+        # let spacialLength = 300.Coord
 
 
         # echo "a: ", s.keys[a].v

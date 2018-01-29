@@ -34,7 +34,7 @@ proc propertyDescWithName(typdesc: NimNode, name: string): PropertyDesc =
     result.name = name
     result.attributes = initTable[string, NimNode]()
 
-proc actualReference(typdesc: NimNode, p: NimNode): NimNode =
+proc actualReference(typdesc: NimNode, p: NimNode): NimNode {.used.} =
     result = copyNimTree(p)
     var ident = result
     while ident.kind == nnkDotExpr:
