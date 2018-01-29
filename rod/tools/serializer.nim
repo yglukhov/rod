@@ -230,20 +230,3 @@ template deserializeValue*(s: Serializer, j: JsonNode, name: string, val: untype
         var tmp = val
         s.getDeserialized(j, name, tmp)
         val = tmp
-
-proc save*(s: Serializer, n: JsonNode, path: string) =
-    when not defined(js) and not defined(android) and not defined(ios):
-        s.url = "file://" & path
-        var nd = n #s.getNodeData(n)
-        var str = nd.pretty()
-
-        var fs = newFileStream(path, fmWrite)
-        if fs.isNil:
-            echo "WARNING: Resource can not open: ", path
-        else:
-            fs.write(str)
-            fs.close()
-            echo "save at path ", path
-    else:
-        echo "serializer::save don't support js"
-

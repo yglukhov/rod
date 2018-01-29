@@ -1,30 +1,21 @@
-import math, algorithm, strutils, tables, json, logging
+import strutils, json, logging
 
-import nimx / [ context, portable_gl, matrixes, button, popup_button, font,
-                outline_view, color_picker, scroll_view, clip_view,
-                text_field, table_view_cell, gesture_detector, menu,
-                key_commands, linear_layout, view_event_handling_new,
-                mini_profiler, drag_and_drop, image, notification_center,
-                animation, window ]
+import nimx / [ matrixes, button, popup_button, key_commands, animation,
+        notification_center, window, view_event_handling ]
 
 import nimx.editor.tab_view
 import nimx.pasteboard.pasteboard
 
 import rod_types, node
 import rod.scene_composition
-import rod.component.mesh_component
-import rod.component.node_selector
-import rod.component.sprite
-import rod.editor.editor_project_settings
-import rod.editor.editor_workspace_view
-import rod.editor.editor_types
+import rod / editor / [editor_project_settings, editor_tab_registry,
+        editor_workspace_view, editor_types]
+import rod.utils.json_serializer
 export editor_types
 
 import tools.serializer
 
-import rod.editor.editor_tab_registry
-import ray
-import viewport
+import ray, viewport
 
 export editor_tab_registry
 
@@ -37,16 +28,11 @@ when loadingAndSavingAvailable:
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
-        if not e.mSelectedNode.isNil and e.mSelectedNode.componentIfAvailable(LightSource).isNil:
-            e.mSelectedNode.removeComponent(NodeSelector)
         e.mSelectedNode = n
 
         if not e.mCurrentComposition.isNil:
             e.mCurrentComposition.selectedNode = n
             e.mCurrentComposition.owner.setEditedNode(n)
-
-        if not e.mSelectedNode.isNil:
-            discard e.mSelectedNode.component(NodeSelector)
 
         for etv in e.workspaceView.tabs:
             etv.setEditedNode(e.mSelectedNode)
@@ -100,17 +86,21 @@ proc sceneTreeDidChange*(e: Editor) =
     for t in e.workspaceView.tabs:
         t.onSceneChanged()
 
-when loadingAndSavingAvailable:
-    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)
+proc nodeToJson(n: Node, path: string): JsonNode =
+    let s = Serializer.new()
+    s.url = "file://" & path
+    s.jser = newJsonSerializer()
+    result = n.serialize(s)
 
-    proc currentProjectPath*(e: Editor): string=
+when loadingAndSavingAvailable:
+    proc currentProjectPath*(e: Editor): string =
         result = e.currentProject.path
         if result.len == 0 or e.startFromGame:
             result = getAppDir() & "/../.."
 
     proc openComposition*(e: Editor, p: string)
 
-    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)=
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false) =
         var newPath: string
         if c.path.len == 0 or saveAs:
             var di: DialogInfo
@@ -126,9 +116,8 @@ when loadingAndSavingAvailable:
         try:
             if newPath.len > 0:
                 let compName = splitFile(newPath).name
-                var s = Serializer.new()
                 c.rootNode.name = compName
-                var data = c.rootNode.serialize(s)
+                let data = nodeToJson(c.rootNode, newPath)
                 writeFile(newPath, $data)
 
                 c.path = newPath
@@ -176,11 +165,10 @@ when loadingAndSavingAvailable:
         di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
         di.title = "Save composition"
         let path = di.show()
-        if not path.isNil:
+        if path.len != 0:
             try:
-                var s = Serializer.new()
-                var sData = selectedNode.serialize(s)
-                s.save(sData, path)
+                let sData = nodeToJson(selectedNode, path)
+                writeFile(path, sData.pretty())
             except:
                 error "Exception caught: ", getCurrentExceptionMsg()
                 error "stack trace: ", getCurrentException().getStackTrace()
@@ -193,7 +181,7 @@ when loadingAndSavingAvailable:
         di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
         di.title = "Load composition or dae"
         let path = di.show()
-        if not path.isNil:
+        if path.len != 0:
             try:
                 if path.endsWith(".dae"):
                     var p = if not editor.selectedNode.isNil: editor.selectedNode
@@ -231,11 +219,6 @@ proc currentCamera*(e: Editor): Camera =
             result = n.componentIfAvailable(Camera)
 
 proc endEditing*(e: Editor) =
-    if not e.selectedNode.isNil:
-        let nodeSelector = e.selectedNode.getComponent(NodeSelector)
-        if not nodeSelector.isNil:
-            e.selectedNode.removeComponent(NodeSelector)
-
     e.sceneView.afterDrawProc = nil
     e.sceneView.removeFromSuperview()
     e.sceneView.setFrame(e.workspaceView.frame)
@@ -259,8 +242,7 @@ proc copyNode*(e: Editor, n: Node = nil)=
         cn = e.selectedNode
 
     if not cn.isNil:
-        var s = Serializer.new()
-        var data = cn.serialize(s)
+        let data = nodeToJson(cn, "/j")
         let pbi = newPasteboardItem(NodePboardKind, $data)
         pasteboardWithName(PboardGeneral).write(pbi)
 
@@ -279,7 +261,7 @@ proc pasteNode*(e: Editor, n: Node = nil)=
     if not pbi.isNil:
         let j = parseJson(pbi.data)
         let pn = newNode()
-        pn.loadComposition(j)
+        pn.loadComposition(j, "file:///j")
 
         var cn = n
         if cn.isNil:
@@ -339,6 +321,25 @@ proc initNotifHandlers(e: Editor)=
                 e.openComposition(path)
         else: discard
 
+proc onKeyDown(ed: Editor, e: var Event): bool =
+    case commandFromEvent(e)
+    of kcCopy:
+        ed.copyNode()
+        result = true
+    of kcCut:
+        ed.cutNode()
+        result = true
+    of kcPaste:
+        ed.pasteNode()
+        result = true
+    else:
+        discard
+
+proc createWorkspace(w: Window, e: Editor): WorkspaceView =
+    result = createWorkspaceLayout(w, e)
+    result.onKeyDown = proc(ev: var Event): bool =
+        e.onKeyDown(ev)
+
 proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     result.new()
 
@@ -347,7 +348,7 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     editor.currentProject = p
     editor.startFromGame = false
     editor.initNotifHandlers()
-    editor.workspaceView = createWorkspaceLayout(w, editor)
+    editor.workspaceView = createWorkspace(w, editor)
 
     sharedNotificationCenter().addObserver(NimxFristResponderChangedInWindow, editor) do(args: Variant):
         editor.onFirstResponderChanged(args.get(View))
@@ -368,7 +369,7 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
     editor.sceneView.editing = true
     editor.startFromGame = startFromGame
     editor.initNotifHandlers()
-    editor.workspaceView = createWorkspaceLayout(v.window, editor)
+    editor.workspaceView = createWorkspace(v.window, editor)
 
     var updateAnimation = newAnimation()
     updateAnimation.onAnimate = proc(p: float)=

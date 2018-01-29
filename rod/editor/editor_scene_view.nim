@@ -7,6 +7,7 @@ import rod / [node, rod_types, edit_view, component, viewport, ray]
 import rod / component / [ sprite, light, camera ]
 
 import rod.editor_camera_controller
+import node_selector
 
 import logging, sequtils, algorithm
 
@@ -16,6 +17,7 @@ type
     EditorSceneView* = ref object of EditorTabView
         gizmo: Gizmo
         selectedNode: Node
+        nodeSelector: NodeSelector
         sceneView: SceneView
         cameraController: EditorCameraController
         startPoint: Point
@@ -39,9 +41,6 @@ method onScroll*(v: EditorSceneView, e: var Event): bool=
         v.cameraController.onMouseScrroll(e)
         return true
 
-proc castGizmo(v: EditorSceneView, e: var Event ): Node =
-    result = v.sceneView.rayCastFirstNode(v.gizmo.gizmoNode, e.localPosition)
-
 proc tryRayCast(v: EditorSceneView, e: var Event): Node=
     result = v.sceneView.rayCastFirstNode(v.rootNode, e.localPosition)
 
@@ -53,7 +52,6 @@ method onInterceptTouchEv*(v: EditorSceneView, e: var Event): bool  = not v.edit
 method onTouchEv*(v: EditorSceneView, e: var Event): bool =
     result = procCall v.View.onTouchEv(e)
     let gizmoTouch = v.gizmo.onTouchEv(e)
-    echo e.keyCode
     case e.buttonState:
     of bsUp:
         v.cameraController.onTapUp(0.0,0.0,e)
@@ -92,6 +90,8 @@ method init*(v: EditorSceneView, r: Rect)=
     var clipView = new(ClipView, newRect(0,0,r.width, r.height))
     clipView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
 
+    v.nodeSelector = newNodeSelector()
+
     if not v.editor.startFromGame:
 
         let editView = SceneView.new(newRect(0,0,r.width, r.height))
@@ -124,6 +124,7 @@ method init*(v: EditorSceneView, r: Rect)=
     v.sceneView.afterDrawProc = proc()=
         currentContext().gl.clearDepthStencil()
         v.updateGizmo()
+        v.nodeSelector.draw()
 
     v.addSubview(clipView)
 
@@ -139,7 +140,8 @@ method update*(v: EditorSceneView) = discard
 
 method setEditedNode*(v: EditorSceneView, n: Node)=
     v.selectedNode = n
-    v.gizmo.editedNode = v.selectedNode
+    v.gizmo.editedNode = n
+    v.nodeSelector.selectedNode = n
 
 method onDragEnter*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     if i.kind in [rodPbComposition, rodPbFiles, rodPbSprite]:
