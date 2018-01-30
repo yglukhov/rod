@@ -1,4 +1,4 @@
-import math, algorithm, strutils, tables, json, logging
+import math, algorithm, strutils, tables, json, logging, ospaths
 
 import nimx / [ view, toolbar, editor / tab_view, linear_layout, button,
     font, popup_button, window, menu, notification_center, mini_profiler,
@@ -103,9 +103,10 @@ proc addTab*(w: WorkspaceView, tb: EditorTabView)=
                 horl.setDividerPosition(dps[0], dps.len)
 
         of etaRight:
-            let dps = horl.dividerPositions()
             horl.addSubview(anchorView)
-            horl.setDividerPosition(w.frame.width - size.width, dps.len)
+            let dps = horl.dividerPositions().len
+            if dps > 0:
+                horl.setDividerPosition(w.frame.width - size.width, dps - 1)
         of etaBottom:
             verl.addSubview(anchorView)
             verl.setDividerPosition(w.frame.height - size.height, 0)
@@ -133,21 +134,25 @@ proc createCompositionEditor*(w: WorkspaceView, c: CompositionDocument = nil): E
     tabView.editor = w.editor
     var comp: CompositionDocument
     if not c.isNil:
-        when loadingAndSavingAvailable:
-            try:
-                var compRoot = c.rootNode
+        var compRoot = c.rootNode
+
+        try:
+            when loadingAndSavingAvailable:
                 if compRoot.isNil:
                     compRoot = newNodeWithUrl("file://"&c.path)
                     c.rootNode = compRoot
 
-                tabview.rootNode = compRoot
-                tabView.name = splitFile(c.path).name
-                comp = c
-            except:
-                error "Exception caught: ", getCurrentExceptionMsg()
-                error "stack trace: ", getCurrentException().getStackTrace()
-        else:
+        except:
+            error "Exception caught: ", getCurrentExceptionMsg()
+            error "stack trace: ", getCurrentException().getStackTrace()
+
+        if compRoot.isNil:
+            error "rootNode isNil: ", getStackTrace()
             return nil
+
+        tabview.rootNode = compRoot
+        tabView.name = splitFile(c.path).name
+        comp = c
     else:
         tabView.name = "new composition"
         comp = new(CompositionDocument)
@@ -175,24 +180,23 @@ proc createCompositionEditor*(w: WorkspaceView, c: CompositionDocument = nil): E
 
 
 proc createViewMenu(w: WorkspaceView) =
-    when loadingAndSavingAvailable:
-        let m = makeMenu("View"):
-            # - "Zoom on Selection":
-            #     if not w.editor.selectedNode.isNil:
-            #         let cam = w.editor.rootNode.findNode("camera")
-            #         if not cam.isNil:
-            #             w.editor.rootNode.findNode("camera").focusOnNode(w.editor.selectedNode)
-            # - "-"
-            # - "2D":
-            #     let cam = w.editor.currentCamera()
-            #     if not cam.isNil: cam.projectionMode = cpOrtho
-            # - "3D":
-            #     let cam = w.editor.currentCamera()
-            #     if not cam.isNil: cam.projectionMode = cpPerspective
-            - "Profiler":
-                sharedProfiler().enabled = not sharedProfiler().enabled
+    let m = makeMenu("View"):
+        # - "Zoom on Selection":
+        #     if not w.editor.selectedNode.isNil:
+        #         let cam = w.editor.rootNode.findNode("camera")
+        #         if not cam.isNil:
+        #             w.editor.rootNode.findNode("camera").focusOnNode(w.editor.selectedNode)
+        # - "-"
+        # - "2D":
+        #     let cam = w.editor.currentCamera()
+        #     if not cam.isNil: cam.projectionMode = cpOrtho
+        # - "3D":
+        #     let cam = w.editor.currentCamera()
+        #     if not cam.isNil: cam.projectionMode = cpPerspective
+        - "Profiler":
+            sharedProfiler().enabled = not sharedProfiler().enabled
 
-        w.addToolbarMenu(m)
+    w.addToolbarMenu(m)
 
 when loadingAndSavingAvailable:
     proc createProjectMenu(w: WorkspaceView) =
