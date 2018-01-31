@@ -1,5 +1,5 @@
-import nimx / [ view, types, button, scroll_view, text_field, stack_view, animation, abstract_window,
-    view_event_handling_new, event ]
+import nimx / [ view, types, button, scroll_view, text_field, stack_view,
+                animation, abstract_window, view_event_handling ]
 
 import editor_project_settings
 import os_files.dialog

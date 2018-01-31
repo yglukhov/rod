@@ -1,4 +1,4 @@
-import nimx/[types, context, image, animation, property_visitor, system_logger]
+import nimx / [ types, context, image, animation, property_visitor ]
 
 import json, strutils, tables, times
 

@@ -1,7 +1,7 @@
-import sequtils, intsets, tables
+import sequtils, intsets, tables, logging
 import nimx.view, nimx.table_view, nimx.scroll_view, nimx.button, nimx.text_field
 import nimx.popup_button, nimx.window, nimx.linear_layout
-import nimx.menu, nimx.event, nimx.property_visitor, nimx.system_logger
+import nimx.menu, nimx.event, nimx.property_visitor
 import variant
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view
@@ -138,7 +138,7 @@ proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
                 ep.curve.color = colors[v.editedProperties.len mod colors.len]
                 v.editedProperties.add(ep)
             except:
-                logi "ERROR: Could not attach animatable property: ", getCurrentExceptionMsg()
+                error "Could not attach animatable property: ", getCurrentExceptionMsg()
     v.propertyTableView.reloadData()
     v.updateDopesheetCurves()
 

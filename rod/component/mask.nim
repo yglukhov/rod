@@ -1,6 +1,4 @@
-import json
-import tables
-import math
+import json, tables, math, logging
 
 import nimx.types
 import nimx.context
@@ -9,7 +7,6 @@ import nimx.view
 import nimx.matrixes
 import nimx.composition
 import nimx.property_visitor
-import nimx.system_logger
 import nimx.portable_gl
 
 import rod.rod_types
@@ -119,7 +116,7 @@ proc trySetupMask(msk: Mask) =
     try: msk.setupMaskComponent()
     except Exception:
         let ex = getCurrentException()
-        logi ex.name, ": ", getCurrentExceptionMsg(), "\n", ex.getStackTrace()
+        info ex.name, ": ", getCurrentExceptionMsg(), "\n", ex.getStackTrace()
 
 method componentNodeWasAddedToSceneView*(msk: Mask) =
     if msk.maskSprite.isNil:

@@ -1,6 +1,6 @@
-import nimx / [ view, collection_view, types, event, context,
-    view_event_handling_new, drag_and_drop, text_field,
-    pasteboard/pasteboard_item, view_render_to_image ]
+import nimx / [ view, collection_view, types, context, view_event_handling,
+                drag_and_drop, text_field, pasteboard/pasteboard_item,
+                view_render_to_image ]
 
 import os
 

@@ -1,15 +1,5 @@
-import nimx.view
-import nimx.matrixes
-import nimx.event
-import nimx.view_event_handling
-import nimx.view_event_handling_new
-import nimx.property_visitor
-
-import rod.component
-import rod.ray
-import rod.viewport
-import rod.rod_types
-import rod.node
+import nimx / [ view, matrixes, view_event_handling, property_visitor ]
+import rod / [ component, ray, viewport, node, rod_types ]
 import logging
 export UIComponent
 
