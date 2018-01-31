@@ -386,13 +386,7 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
 
 # default tabs hacky registering
 import nimx.assets.asset_loading
-import nimx.resource_cache
-import nimx.resource
 import nimx.assets.json_loading
-
-registerResourcePreloader(["json", "jcomp"]) do(name: string, callback: proc(j: JsonNode)):
-    loadJsonResourceAsync(name) do(j: JsonNode):
-        callback(j)
 
 registerAssetLoader(["json", "jcomp"]) do(url: string, callback: proc(j: JsonNode)):
     loadJsonFromURL(url, callback)
