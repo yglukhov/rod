@@ -1,7 +1,5 @@
-import json, strutils, tables, parseutils
-import nimx.types, nimx.matrixes, nimx.system_logger
-import nimx.animation
-import nimx.property_visitor
+import json, strutils, tables, parseutils, logging
+import nimx / [ types, matrixes, animation, property_visitor ]
 
 import variant
 import rod.node, rod.component, rod.animation.animation_sampler, rod.quaternion
@@ -238,7 +236,7 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
         try:
             t = typeIdForSetterAndGetter(sng)
         except:
-            logi "Wrong type of animated property ", k
+            warn "Wrong type of animated property ", k
             raise
 
         if "keys" in jp:
@@ -290,7 +288,7 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
         try:
             t = typeIdForSetterAndGetter(sng)
         except:
-            logi "Wrong type of animated property ", nodeName, ".", propName
+            warn "Wrong type of animated property ", nodeName, ".", propName
             raise
 
         let frameLerp = bool(b.readUint8())

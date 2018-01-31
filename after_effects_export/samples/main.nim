@@ -1,5 +1,4 @@
 import nimx.matrixes
-import nimx.system_logger
 import rod.viewport
 import rod.edit_view
 import rod.component.camera
@@ -48,15 +47,6 @@ proc startApplication() =
     mainWindow.addSubview(editView)
     mainWindow.addAnimation(c.animationNamed("anim1"))
 
-when defined js:
-    import dom
-    window.onload = proc (e: ref TEvent) =
-        startApplication()
-        startAnimation()
-else:
-    try:
-        startApplication()
-        runUntilQuit()
-    except:
-        logi "Exception caught: ", getCurrentExceptionMsg()
-        logi getCurrentException().getStackTrace()
+
+runApplication:
+    startApplication()

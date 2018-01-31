@@ -1,15 +1,7 @@
 import math, strutils
-import nimx.view
-import nimx.context
-import nimx.view_event_handling_new
-import nimx.font
-
-import nimx.event, nimx.keyboard, nimx.window_event_handling
-
+import nimx / [ view, context, view_event_handling, font, keyboard, window_event_handling ]
 import nimx.editor.grid_drawing
-
-import animation_editor_types
-import animation_chart_view
+import animation_editor_types, animation_chart_view
 
 type AnimationCurvesEditView* = ref object of AnimationChartView
 

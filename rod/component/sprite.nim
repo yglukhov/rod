@@ -1,7 +1,7 @@
-import nimx / [ types, context, image, animation, property_visitor, system_logger ]
+import nimx / [ types, context, image, animation, property_visitor ]
 import nimx / assets / asset_manager
 
-import json, strutils
+import json, strutils, logging
 
 import rod.rod_types
 import rod.node
@@ -107,7 +107,7 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
     if not v.isNil:
         s.node.alpha = v.getFloat(1.0)
-        logi "WARNING: Alpha in sprite component deprecated"
+        warn "Alpha in sprite component deprecated"
 
     when not defined(release):
         s.resourceUrl = serealizer.url
@@ -117,7 +117,7 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
         v = j{"fileNames"}
     if v.isNil:
         s.image = imageWithResource(j["name"].getStr())
-        logi "WARNING: Sprite component format deprecated: ", j["name"].getStr()
+        warn "Sprite component format deprecated: ", j["name"].getStr()
     else:
         s.images = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:

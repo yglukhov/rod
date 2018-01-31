@@ -3,7 +3,6 @@ import nimx.resource
 import nimx.context
 import nimx.portable_gl
 import nimx.types
-import nimx.system_logger
 import nimasset.obj
 import strutils
 
