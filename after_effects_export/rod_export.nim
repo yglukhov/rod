@@ -571,7 +571,6 @@ proc serializeShape(layer: Layer, result: JsonNode) =
             let shape = shapes.property(q)
             let shapeProps = shape.toPropertyGroup()
 
-
             # let transform = shapeProps.propertyGroup("Transform")
             # if not transform.isNil:
             #     let position = transform.property("Position", Vector2).valueAtTime(0)
@@ -588,6 +587,7 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                     let p = shapeGroup.property(i)
                     let shapePathGroup = p.toPropertyGroup()
                     let name = $p.name
+
                     if "Rectangle Path " & $(q+1) in name:
                         let size = shapePathGroup.property("Size", Vector2).valueAtTime(0)
                         let radius = shapePathGroup.property("Roundness", float32).valueAtTime(0)
@@ -611,6 +611,7 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                         var color = shapePathGroup.property("Color", Vector4).valueAtTime(0)
                         color[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
                         shape["color"] = % color
+
                 result.add(shape)
 
 proc serializeDrawableComponents(layer: Layer, result: JsonNode) =

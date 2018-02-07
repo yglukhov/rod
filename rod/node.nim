@@ -349,13 +349,20 @@ type
 
 var nodeLoadRefTable*: NodeRefTable
 
-template addNodeRef*(refNode: var Node, name: string) =
+proc addNodeRef*(name: string, refProc: proc(n: Node)) =
     assert(not nodeLoadRefTable.isNil)
-    let refProc = proc(nodeValue: Node) {.closure.} = refNode = nodeValue
     if name in nodeLoadRefTable:
         nodeLoadRefTable[name].add(refProc)
     else:
         nodeLoadRefTable[name] = @[refProc]
+
+template addNodeRef*(refNode: var Node, name: string) {.deprecated.} =
+    addNodeRef(name) do(n: Node):
+        refNode = n
+
+template addNodeRef*(name: string, refNode: var Node) =
+    addNodeRef(name) do(n: Node):
+        refNode = n
 
 proc resolveNodeRefs(n: Node) =
     assert(not nodeLoadRefTable.isNil)
