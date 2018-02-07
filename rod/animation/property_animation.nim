@@ -1,7 +1,5 @@
-import json, strutils, tables, parseutils
-import nimx.types, nimx.matrixes, nimx.system_logger
-import nimx.animation
-import nimx.property_visitor
+import json, strutils, tables, parseutils, logging
+import nimx / [ types, matrixes, animation, property_visitor ]
 
 import variant
 import rod.node, rod.component, rod.animation.animation_sampler, rod.quaternion
@@ -21,15 +19,15 @@ type
         animatedProperties*: seq[AnimatedProperty]
         b: BinDeserializer # Used for holding the sampler buffers alive.
 
-template elementFromJson(t: typedesc[Quaternion], jelem: JsonNode): Quaternion = Quaternion(newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum()))
-template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFNum()
-template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFNum(), jelem[1].getFNum())
-template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum())
-template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum())
-template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFNum(), jelem[1].getFNum(), jelem[2].getFNum(), jelem[3].getFNum(1))
-template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getNum().int
-template elementFromJson(t: typedesc[int16], jelem: JsonNode): int16 = jelem.getNum().int16
-template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBVal()
+template elementFromJson(t: typedesc[Quaternion], jelem: JsonNode): Quaternion = Quaternion(newVector4(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat(), jelem[3].getFloat()))
+template elementFromJson(t: typedesc[Coord], jelem: JsonNode): Coord = jelem.getFloat()
+template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVector2(jelem[0].getFloat(), jelem[1].getFloat())
+template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat())
+template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat(), jelem[3].getFloat())
+template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat(), jelem[3].getFloat(1))
+template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getInt()
+template elementFromJson(t: typedesc[int16], jelem: JsonNode): int16 = jelem.getInt().int16
+template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBool()
 
 proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) =
     # A property name can one of the following:
@@ -136,13 +134,13 @@ proc newKeyframeSampler[T](j: JsonNode): BezierKeyFrameAnimationSampler[T] {.inl
     var i = 0
     for v in j:
         keys[i].v = elementFromJson(T, v["v"])
-        keys[i].p = v["p"].getFNum()
+        keys[i].p = v["p"].getFloat()
         let ie = v["ie"]
-        keys[i].inX = ie[0].getFNum()
-        keys[i].inY = ie[1].getFNum()
+        keys[i].inX = ie[0].getFloat()
+        keys[i].inY = ie[1].getFloat()
         let oe = v["oe"]
-        keys[i].outX = oe[0].getFNum()
-        keys[i].outY = oe[1].getFNum()
+        keys[i].outX = oe[0].getFloat()
+        keys[i].outY = oe[1].getFloat()
         inc i
     result = newBezierKeyFrameAnimationSampler[T](keys)
 
@@ -216,11 +214,11 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
 
     result.loopDuration = 0.0 # TODO: Hack - remove
     for k, jp in j:
-        result.loopDuration = max(jp["duration"].getFNum(), result.loopDuration) # TODO: Hack - remove
-        result.numberOfLoops = jp{"numberOfLoops"}.getNum(1).int # TODO: Hack - remove
+        result.loopDuration = max(jp["duration"].getFloat(), result.loopDuration) # TODO: Hack - remove
+        result.numberOfLoops = jp{"numberOfLoops"}.getInt(1) # TODO: Hack - remove
         var animScale = 1.0
         if "animScale" in jp:
-            animScale = 1.0 / jp["animScale"].getFNum()
+            animScale = 1.0 / jp["animScale"].getFloat()
 
         var ap: AnimatedProperty
         ap.new()
@@ -238,18 +236,18 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
         try:
             t = typeIdForSetterAndGetter(sng)
         except:
-            logi "Wrong type of animated property ", k
+            warn "Wrong type of animated property ", k
             raise
 
         if "keys" in jp:
             ap.sampler = newKeyframeSampler(t, jp["keys"])
         elif "cutf" in jp:
-            let lerp = jp{"frameLerp"}.getBVal(true)
-            let olen = jp{"len"}.getNum(-1).int
-            let cutf = jp{"cutf"}.getNum(-1).int
+            let lerp = jp{"frameLerp"}.getBool(true)
+            let olen = jp{"len"}.getInt(-1)
+            let cutf = jp{"cutf"}.getInt(-1)
             ap.sampler = newValueSampler(t, jp["values"], lerp, olen, cutf)
         else:
-            ap.sampler = newValueSampler(t, jp["values"], jp{"frameLerp"}.getBVal(true))
+            ap.sampler = newValueSampler(t, jp["values"], jp{"frameLerp"}.getBool(true))
 
         ap.progressSetter = makeProgressSetter(sng, ap.sampler)
 
@@ -290,7 +288,7 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
         try:
             t = typeIdForSetterAndGetter(sng)
         except:
-            logi "Wrong type of animated property ", nodeName, ".", propName
+            warn "Wrong type of animated property ", nodeName, ".", propName
             raise
 
         let frameLerp = bool(b.readUint8())
@@ -307,9 +305,9 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
         # if "keys" in jp:
         #     ap.sampler = newKeyframeSampler(t, jp["keys"])
         # elif "cutf" in jp:
-        #     let lerp = jp{"frameLerp"}.getBVal(true)
-        #     let olen = jp{"len"}.getNum(-1).int
-        #     let cutf = jp{"cutf"}.getNum(-1).int
+        #     let lerp = jp{"frameLerp"}.getBool(true)
+        #     let olen = jp{"len"}.getInt(-1).int
+        #     let cutf = jp{"cutf"}.getInt(-1).int
         #     ap.sampler = newValueSampler(t, jp["values"], lerp, olen, cutf)
         # else:
 

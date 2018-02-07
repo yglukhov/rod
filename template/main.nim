@@ -1,5 +1,4 @@
 import nimx.view
-import nimx.system_logger
 import nimx.app
 import nimx.scroll_view
 import nimx.table_view

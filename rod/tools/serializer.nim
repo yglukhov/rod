@@ -60,17 +60,17 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getNum().int
+        val = jN.getInt()
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int16) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getNum().int16
+        val = jN.getInt().int16
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int32) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getNum().int32
+        val = jN.getInt().int32
 
 proc getDeserialized[T: enum](s: Serializer, j: JsonNode, name: string, val: var T) =
     let jN = j{name}
@@ -78,42 +78,42 @@ proc getDeserialized[T: enum](s: Serializer, j: JsonNode, name: string, val: var
         if jN.kind == JString:
             val = parseEnum[T](jN.str)
         else:
-            val = T(jN.getNum().int)
+            val = T(jN.getInt())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var float32) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getFnum()
+        val = jN.getFloat()
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var float) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getFnum()
+        val = jN.getFloat()
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Vector3) =
     let jN = j{name}
     if not jN.isNil:
-        val = newVector3(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum())
+        val = newVector3(jN[0].getFloat(), jN[1].getFloat(), jN[2].getFloat())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Quaternion) =
     let jN = j{name}
     if not jN.isNil:
-        val = newQuaternion(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum(), jN[3].getFnum())
+        val = newQuaternion(jN[0].getFloat(), jN[1].getFloat(), jN[2].getFloat(), jN[3].getFloat())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Rect) =
     let jN = j{name}
     if not jN.isNil:
-        val = newRect(jN[0].getFnum(), jN[1].getFnum(), jN[2].getFnum(), jN[3].getFnum())
+        val = newRect(jN[0].getFloat(), jN[1].getFloat(), jN[2].getFloat(), jN[3].getFloat())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Size) =
     let jN = j{name}
     if not jN.isNil:
-        val = newSize(jN[0].getFnum(), jN[1].getFnum())
+        val = newSize(jN[0].getFloat(), jN[1].getFloat())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Point) =
     let jN = j{name}
     if not jN.isNil:
-        val = newPoint(jN[0].getFnum(), jN[1].getFnum())
+        val = newPoint(jN[0].getFloat(), jN[1].getFloat())
 
 proc toResourcePath(s: Serializer, path: string): string =
     let url = s.toAbsoluteUrl(path)
@@ -132,8 +132,8 @@ proc deserializeImage*(j: JsonNode, s: Serializer): Image {.deprecated.} =
         let sz = j["size"]
         let ss = imageWithResource(s.toResourcePath(realName))
         result = ss.subimageWithTexCoords(
-                        newSize(sz[0].getFNum(), sz[1].getFNum()),
-                        [uv[0].getFNum().float32, uv[1].getFNum(), uv[2].getFNum(), uv[3].getFNum()]
+                        newSize(sz[0].getFloat(), sz[1].getFloat()),
+                        [uv[0].getFloat().float32, uv[1].getFloat(), uv[2].getFloat(), uv[3].getFloat()]
                         )
 
 proc startAsyncOp*(s: Serializer) {.inline.} =
@@ -165,8 +165,8 @@ proc deserializeImage*(j: JsonNode, s: Serializer, clbck: proc(img: Image, err: 
             let uv = j["tex"]
             let sz = j["size"]
             let img = ss.subimageWithTexCoords(
-                        newSize(sz[0].getFNum(), sz[1].getFNum()),
-                        [uv[0].getFNum().float32, uv[1].getFNum(), uv[2].getFNum(), uv[3].getFNum()]
+                        newSize(sz[0].getFloat(), sz[1].getFloat()),
+                        [uv[0].getFloat().float32, uv[1].getFloat(), uv[2].getFloat(), uv[3].getFloat()]
                         )
             clbck(img, err)
             s.endAsyncOp()
@@ -177,7 +177,7 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Image) {
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var bool) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getBVal()
+        val = jN.getBool()
 
 # proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Node) =
 #     let jN = j{name}
@@ -187,11 +187,11 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var bool) =
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Color) =
     let jN = j{name}
     if not jN.isNil:
-        val.r = jN[0].getFNum()
-        val.g = jN[1].getFNum()
-        val.b = jN[2].getFNum()
+        val.r = jN[0].getFloat()
+        val.g = jN[1].getFloat()
+        val.b = jN[2].getFloat()
         if jN.len > 3: #TODO: new format should always have 4 components for color.
-            val.a = jN[3].getFNum()
+            val.a = jN[3].getFloat()
         else:
             val.a = 1.0
 
@@ -199,13 +199,13 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Matrix4)
     let jN = j{name}
     if not jN.isNil:
         for i in 0 ..< jN.len:
-            val[i] = jN[i].getFnum()
+            val[i] = jN[i].getFloat()
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var seq[Glfloat]) =
     let jN = j{name}
     if not jN.isNil:
         for i in 0 ..< jN.len:
-            val.add( jN[i].getFnum() )
+            val.add( jN[i].getFloat() )
 
 proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: var seq[T]) =
     let jN = j{name}
@@ -214,7 +214,7 @@ proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: 
             var seqVal: T
             const vecLen = high(T) + 1
             for j in 0 ..< vecLen:
-                seqVal[j] = jN[i][j].getFnum()
+                seqVal[j] = jN[i][j].getFloat()
 
             val.add( seqVal )
 

@@ -93,15 +93,13 @@ method setAttractor*(pe: ParticleEmitter, pa: ParticleAttractor) {.base.}=
 
 template stop*(e: ParticleEmitter) = e.birthRate = 999999999.0
 
-template pmRandom(r: float): float = random(r * 2) - r
-template randomSign(): float =
-    if random(2) == 1: 1.0 else: -1.0
+template pmRandom(r: float): float = rand(r * 2) - r
 
 template createParticle(p: ParticleEmitter, part: var ParticleData) =
     part.coord = p.node.worldPos
     part.scale = newVector3(1, 1, 1)
     part.rotation = newQuaternion()
-    part.pid = random(1.0)
+    part.pid = rand(1.0)
 
     let velocityLen = p.velocity + p.velocity * pmRandom(p.velocityRandom)
     part.velocity = aroundZ(p.direction + pmRandom(p.directionRandom)) * newVector3(velocityLen, 0, 0)
@@ -136,7 +134,7 @@ template drawParticle(p: ParticleEmitter, part: ParticleData) =
     proto.recursiveUpdate()
     proto.recursiveDraw()
 
-method `oneShot=`*(p:ParticleEmitter, value: bool) {.inline.}=
+method `oneShot=`*(p:ParticleEmitter, value: bool) {.inline, base.}=
     if value != p.oneShot:
         p.oneShot = value
         p.currentParticles = 0

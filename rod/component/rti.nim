@@ -1,13 +1,10 @@
-import json
-import tables
-import math
+import json, tables, math
 
 import nimx.types
 import nimx.context
 import nimx.image
 import nimx.view
 import nimx.property_visitor
-import nimx.system_logger
 import nimx.render_to_image
 import nimx.portable_gl
 

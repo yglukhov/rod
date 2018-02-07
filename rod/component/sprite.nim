@@ -1,7 +1,7 @@
-import nimx / [ types, context, image, animation, property_visitor, system_logger ]
+import nimx / [ types, context, image, animation, property_visitor ]
 import nimx / assets / asset_manager
 
-import json, strutils
+import json, strutils, logging
 
 import rod.rod_types
 import rod.node
@@ -106,8 +106,8 @@ method getBBox*(s: Sprite): BBox =
 method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     var v = j{"alpha"} # Deprecated
     if not v.isNil:
-        s.node.alpha = v.getFNum(1.0)
-        logi "WARNING: Alpha in sprite component deprecated"
+        s.node.alpha = v.getFloat(1.0)
+        warn "Alpha in sprite component deprecated"
 
     when not defined(release):
         s.resourceUrl = serealizer.url
@@ -117,7 +117,7 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
         v = j{"fileNames"}
     if v.isNil:
         s.image = imageWithResource(j["name"].getStr())
-        logi "WARNING: Sprite component format deprecated: ", j["name"].getStr()
+        warn "Sprite component format deprecated: ", j["name"].getStr()
     else:
         s.images = newSeq[Image](v.len)
         for i in 0 ..< s.images.len:
@@ -130,7 +130,7 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     if not v.isNil:
         s.frameOffsets = newSeqOfCap[Point](v.len)
         for p in v:
-            s.frameOffsets.add(newPoint(p[0].getFNum(), p[1].getFNum()))
+            s.frameOffsets.add(newPoint(p[0].getFloat(), p[1].getFloat()))
 
     if s.images.len > 1:
         s.createFrameAnimation()
@@ -140,11 +140,11 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
     v = j{"segments"}
     if not v.isNil and v.len == 4:
         s.segmentsGeometry = newSeq[float32](4)
-        for i in 0 ..< 4: s.segmentsGeometry[i] = v[i].getFNum().float32
+        for i in 0 ..< 4: s.segmentsGeometry[i] = v[i].getFloat().float32
 
     v = j{"size"}
     if not v.isNil:
-        s.size = newSize(v[0].getFNum(), v[1].getFNum())
+        s.size = newSize(v[0].getFloat(), v[1].getFloat())
 
 proc awake(c: Sprite) =
     if c.images.len > 1:

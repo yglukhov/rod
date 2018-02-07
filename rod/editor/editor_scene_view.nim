@@ -1,6 +1,6 @@
-import nimx / [ types, view, event, view_event_handling, view_event_handling_new,
+import nimx / [ types, view, event, view_event_handling, portable_gl, context,
     gesture_detector, drag_and_drop, pasteboard/pasteboard, assets/asset_loading, image,
-    matrixes, clip_view, context, portable_gl ]
+    matrixes, clip_view ]
 
 import rod / editor / [gizmo, gizmo_move]
 import rod / [node, rod_types, edit_view, component, viewport, ray]

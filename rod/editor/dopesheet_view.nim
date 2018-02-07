@@ -1,8 +1,5 @@
-import nimx.view, nimx.context
-import nimx.view_event_handling_new
-
-import animation_editor_types
-import animation_chart_view
+import nimx / [ view, context, view_event_handling ]
+import animation_editor_types, animation_chart_view
 
 type DopesheetView* = ref object of AnimationChartView
     rowHeight*: Coord

@@ -1,4 +1,4 @@
-import nimx/[types, context, image, animation, property_visitor, system_logger]
+import nimx / [ types, context, image, animation, property_visitor ]
 
 import json, strutils, tables, times
 
@@ -139,8 +139,8 @@ method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
         c.markers = @[]
         for k, jm in markers:
             var m: AEMarker
-            m.start = jm["start"].getFNum()
-            m.duration = jm["duration"].getFNum()
+            m.start = jm["start"].getFloat()
+            m.duration = jm["duration"].getFloat()
             m.name = k
             if k == aeAllCompositionAnimation:
                 c.duration = m.duration

@@ -1,8 +1,8 @@
-import nimx / [ text_field, image, view, formatted_text, context, button, render_to_image, window, panel_view, image_preview ]
+import nimx / [ text_field, image, view, formatted_text, context, button,
+                render_to_image, window, panel_view, image_preview,
+                view_event_handling ]
 import nimx.assets.asset_loading
 import tables, os, streams
-import nimx.event
-import nimx.view_event_handling_new
 when not defined(android) and not defined(ios) and not defined(emscripten):
     import os_files.file_info
 

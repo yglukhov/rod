@@ -64,7 +64,7 @@ proc intersectWithAABB*(r: Ray, minCoord, maxCoord: Vector3, distance: var float
     distance = tmin
     return true
 
-proc intersectWithTriangle(r: Ray, v0, v1, v2: Vector3, distance: var float32): bool =
+proc intersectWithTriangle(r: Ray, v0, v1, v2: Vector3, distance: var float32): bool {.used.} =
     let edge1 = v1 - v0
     let edge2 = v2 - v0
     let pvec = cross(r.direction, edge2)

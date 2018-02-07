@@ -35,7 +35,7 @@ proc setSize*(c: CompRef, s: Size)=
 method deserialize*(s: CompRef, j: JsonNode, serializer: Serializer) =
     let v = j{"size"}
     if not v.isNil:
-        s.size = newSize(v[0].getFNum(), v[1].getFNum())
+        s.size = newSize(v[0].getFloat(), v[1].getFloat())
     s.path = j["path"].str
     s.awake()
 

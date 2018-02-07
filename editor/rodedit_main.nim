@@ -1,6 +1,6 @@
 import tables, logging, strutils
 
-import nimx / [ matrixes, system_logger ]
+import nimx / [ matrixes, image, window, autotest ]
 import rod / [ viewport, edit_view, node ]
 import rod.editor.editor_error_handling
 import rod.component.camera
@@ -13,10 +13,6 @@ import rod.component.light
 import rod.component.sprite
 import rod.component
 import rod.scene_composition
-
-import nimx.image
-import nimx.window
-import nimx.autotest
 
 import rod.editor.editor_project_settings
 

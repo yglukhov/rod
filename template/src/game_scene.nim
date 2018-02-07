@@ -10,7 +10,6 @@ import nimx.view
 import nimx.types
 import nimx.button
 import nimx.animation
-import nimx.system_logger
 import nimx.mini_profiler
 import nimx.matrixes
 import nimx.view_event_handling
@@ -80,5 +79,3 @@ method viewOnEnter*(gs: GameScene)=
         logo.scale = interpolate(logoScale, logoScale * 1.1, backEaseInOut(p))
 
     gs.addAnimation(anim)
-
-    logi "GameScene viewOnEnter"

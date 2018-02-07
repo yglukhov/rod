@@ -76,28 +76,28 @@ method init*(c: ChannelLevels) =
 method deserialize*(c: ChannelLevels, j: JsonNode, s: Serializer) =
     var v = j{"inWhiteV"}
     if not v.isNil:
-        c.inWhiteV = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    c.inWhite = j["inWhite"].getFNum()
+        c.inWhiteV = newVector3(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
+    c.inWhite = j["inWhite"].getFloat()
 
     v = j{"inBlackV"}
     if not v.isNil:
-        c.inBlackV = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    c.inBlack = j["inBlack"].getFNum()
+        c.inBlackV = newVector3(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
+    c.inBlack = j["inBlack"].getFloat()
 
     v = j{"inGammaV"}
     if not v.isNil:
-        c.inGammaV = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    c.inGamma = j["inGamma"].getFNum()
+        c.inGammaV = newVector3(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
+    c.inGamma = j["inGamma"].getFloat()
 
     v = j{"outWhiteV"}
     if not v.isNil:
-        c.outWhiteV = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    c.outWhite = j["outWhite"].getFNum()
+        c.outWhiteV = newVector3(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
+    c.outWhite = j["outWhite"].getFloat()
 
     v = j{"outBlackV"}
     if not v.isNil:
-        c.outBlackV = newVector3(v[0].getFNum(), v[1].getFNum(), v[2].getFNum())
-    c.outBlack = j["outBlack"].getFNum()
+        c.outBlackV = newVector3(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
+    c.outBlack = j["outBlack"].getFloat()
 
 method beforeDraw*(c: ChannelLevels, index: int): bool =
     c.active = not c.areValuesNormal()

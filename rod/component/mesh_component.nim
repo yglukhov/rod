@@ -465,7 +465,7 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
         let jNode = j{name}
         if not jNode.isNil:
             for v in jNode:
-                result.add(v.getFNum())
+                result.add(v.getFloat())
 
     var vertCoords = getAttribs("vertex_coords")
     var texCoords = getAttribs("tex_coords")
@@ -476,7 +476,7 @@ method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
     var indices = newSeq[GLushort]()
     if not jNode.isNil:
         for v in jNode:
-            indices.add( GLushort(v.getNum()) )
+            indices.add( GLushort(v.getInt()))
 
     m.vboData.vertInfo = newVertexInfoWithVertexData(vertCoords.len, texCoords.len, normals.len, tangents.len)
 

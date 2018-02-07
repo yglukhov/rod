@@ -62,7 +62,6 @@ proc createPlane(name: string): Node =
     let cube = cubeNode.addComponent(CubeComponent)
     cube.size = newVector3(size, size, 0.1)
     cube.material.diffuse = getAxisColor(name)
-    echo "plane color ", cube.material.diffuse
 
 proc createArrow(name: string): Node =
     result = newNode(name)
