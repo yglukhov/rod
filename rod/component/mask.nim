@@ -21,8 +21,9 @@ import rod.component.camera
 import rod.viewport
 
 const comonSpritePrefix = """
-(sampler2D mask_img, vec4 mask_img_coords, vec4 mask_bounds, mat4 mvp_inv, float msk_alpha) {
-    vec4 pos = mvp_inv * vec4(gl_FragCoord.xyz, 1.0);
+(sampler2D mask_img, vec4 mask_img_coords, vec4 mask_bounds, vec2 vp_size, mat4 mvp_inv, float msk_alpha) {
+    vec2 xy = gl_FragCoord.xy / vp_size;
+    vec4 pos = mvp_inv * vec4(xy, gl_FragCoord.z, 1.0);
     vec2 mskVpos = pos.xy / pos.w;
     vec2 destuv = ( mskVpos - mask_bounds.xy ) / mask_bounds.zw;
     vec2 uv = mask_img_coords.xy + (mask_img_coords.zw - mask_img_coords.xy) * destuv;
@@ -34,8 +35,9 @@ const comonSpritePrefix = """
 """
 
 const comonSolidPrefix = """
-(vec2 mask_size, vec4 mask_color, mat4 mvp_inv, float msk_alpha) {
-    vec4 pos = mvp_inv * vec4(gl_FragCoord.xyz, 1.0);
+(vec2 mask_size, vec4 mask_color, vec2 vp_size, mat4 mvp_inv, float msk_alpha) {
+    vec2 xy = gl_FragCoord.xy / vp_size;
+    vec4 pos = mvp_inv * vec4(xy, gl_FragCoord.z, 1.0);
     vec2 mskVpos = pos.xy / pos.w;
     vec2 b = mask_size.xy / 2.0;
     vec2 dp = mskVpos - b;
@@ -69,7 +71,7 @@ const lumaInvertedPostfix = """
 """
 
 template maskPost(name, src: string): PostEffect =
-    newPostEffect("void " & name & src, name, ["sampler2D", "vec4", "vec4", "mat4", "float"])
+    newPostEffect("void " & name & src, name, ["sampler2D", "vec4", "vec4", "vec2", "mat4", "float"])
 
 var effectSprite = [
     maskPost("maskAlphaEffect", comonSpritePrefix & alphaPostfix), # tmAlpha
@@ -79,7 +81,7 @@ var effectSprite = [
 ]
 
 template maskSolidPost(name, src: string): PostEffect =
-    newPostEffect("void " & name & src, name, ["vec2", "vec4", "mat4", "float"])
+    newPostEffect("void " & name & src, name, ["vec2", "vec4", "vec2", "mat4", "float"])
 
 var effectSolid = [
     maskSolidPost("maskSolidAlphaEffect", comonSolidPrefix & alphaPostfix), # tmAlpha
@@ -111,8 +113,10 @@ proc getInvTransform(n: Node): Matrix4 =
             result.loadIdentity()
         result.scale(newVector3(2.0,2.0,2.0))
         result.translate(newVector3(-0.5, -0.5, -0.5))
-        let glvp = currentContext().gl.getViewport()
-        result.scale(newVector3(1.0/(glvp[2] - glvp[0]).float, 1.0/(glvp[3] - glvp[1]).float, 1.0))
+
+proc getVpSize(): Size =
+    let glvp = currentContext().gl.getViewport()
+    result = newSize((glvp[2] - glvp[0]).float32, (glvp[3] - glvp[1]).float32)
 
 method isMaskAplicable(c: Component): bool {.base.} = false
 method setupMaskPost(c: Component, maskType: MaskType): bool {.base.} = false
@@ -126,12 +130,14 @@ method setupMaskPost(s: Sprite, maskType: MaskType): bool =
         let maskBounds = newRect(s.getOffset(), s.image.size)
         let trInv = s.node.getInvTransform()
         let maskAlpha = s.node.getGlobalAlpha()
-        pushPostEffect(effectSprite[maskType.int-1], tex, maskImgCoords, maskBounds, trInv, maskAlpha)
+        pushPostEffect(effectSprite[maskType.int-1], tex, maskImgCoords, maskBounds, getVpSize(), trInv, maskAlpha)
         return true
 
 method isMaskAplicable(s: Solid): bool = true
 method setupMaskPost(s: Solid, maskType: MaskType): bool =
-    pushPostEffect(effectSolid[maskType.int-1], s.size, s.color, s.node.getInvTransform(), s.node.getGlobalAlpha())
+    let glvp = currentContext().gl.getViewport()
+    let vpSize = newSize( (glvp[2] - glvp[0]).float, (glvp[3] - glvp[1]).float )
+    pushPostEffect(effectSolid[maskType.int-1], s.size, s.color, getVpSize(), s.node.getInvTransform(), s.node.getGlobalAlpha())
     return true
 
 proc setupMaskComponent(msk: Mask, n: Node) =
