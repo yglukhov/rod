@@ -49,7 +49,7 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = nil): Animation
 
-proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): ComposeMarker=
+proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, exceptions: seq[string] = nil): ComposeMarker=
     let lc = cl.node.componentIfAvailable(AEComposition)
     if not lc.isNil:
 
@@ -69,7 +69,7 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker): Compo
             let skip = layerOut - 1.0
             pOut = 1.0 - skip / allp
 
-        let prop = lc.compositionNamed(aeAllCompositionAnimation)
+        let prop = lc.compositionNamed(aeAllCompositionAnimation,exceptions)
 
         prop.loopDuration *= (pOut - pIn) * cl.animScale
         let oldCompAnimate = prop.onAnimate
@@ -94,7 +94,7 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
         if not exceptions.isNil:
             for ael in c.layers:
                 if ael.node.name notin exceptions:
-                    let cm = c.applyLayerSettings(ael, marker)
+                    let cm = c.applyLayerSettings(ael, marker, exceptions)
                     if not cm.isNil:
                         composeMarkers.add(cm)
         else:
