@@ -1,6 +1,6 @@
 import nimx / [ types, context, image, animation, property_visitor ]
 
-import json, strutils, tables, times
+import json, strutils, tables, times, sequtils
 
 import rod/[ rod_types, node, component, viewport ]
 import rod.tools.serializer
@@ -8,6 +8,7 @@ import rod / utils / [property_desc, serialization_codegen, bin_deserializer ]
 import rod.animation.property_animation
 
 const aeAllCompositionAnimation = "aeAllCompositionAnimation"
+const delimiter = "/"
 
 type AEMarker* = object
     start*: float32
@@ -94,7 +95,10 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
         if not exceptions.isNil:
             for ael in c.layers:
                 if ael.node.name notin exceptions:
-                    let cm = c.applyLayerSettings(ael, marker, exceptions)
+                    var innerExceptions = exceptions.filter(proc(s:string):bool = s.startsWith(ael.node.name&delimiter))
+                    innerExceptions.apply(proc(s:var string) = s = s.split(delimiter,1)[1])
+
+                    let cm = c.applyLayerSettings(ael, marker, innerExceptions)
                     if not cm.isNil:
                         composeMarkers.add(cm)
         else:
