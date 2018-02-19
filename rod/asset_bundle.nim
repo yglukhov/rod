@@ -255,7 +255,7 @@ proc downloadedAssetsDir(abd: AssetBundleDescriptor): string =
 proc isDownloaded*(abd: AssetBundleDescriptor): bool =
     when not defined(js) and not defined(emscripten):
         if abd.isDownloadable:
-            result = dirExists(abd.downloadedAssetsDir)
+            result = dirExists(abd.downloadedAssetsDir) and not fileExists(abd.downloadedAssetsDir & ".gz")
 
 var getURLForAssetBundle*: proc(hash: string): string
 
