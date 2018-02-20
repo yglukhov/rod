@@ -603,10 +603,12 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                         shape["shapeType"] = % 2
                         #TODO need support?
                     elif "Stroke " & $(q+1) in name:
-                        var strokeColor = shapePathGroup.property("Color", Vector4).valueAtTime(0)
-                        strokeColor[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
-                        shape["strokeColor"] = % strokeColor
-                        shape["strokeWidth"] = % shapePathGroup.property("Stroke Width", float32).valueAtTime(0)
+                        let stroke = shapeGroup.propertyGroup("Stroke")
+                        if not stroke.isNil and stroke.canSetEnabled and stroke.enabled:
+                            var strokeColor = shapePathGroup.property("Color", Vector4).valueAtTime(0)
+                            strokeColor[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
+                            shape["strokeColor"] = % strokeColor
+                            shape["strokeWidth"] = % shapePathGroup.property("Stroke Width", float32).valueAtTime(0)
                     elif "Fill " & $(q+1) in name:
                         var color = shapePathGroup.property("Color", Vector4).valueAtTime(0)
                         color[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
