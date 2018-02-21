@@ -42,7 +42,8 @@ const comonSolidPrefix = """
     vec2 b = mask_size.xy / 2.0;
     vec2 dp = mskVpos - b;
     vec2 d = abs(dp) - b;
-    float rect_alpha = min(min(max(d.x, d.y), 0.0) + length(max(d, 0.0)), 1.0);
+    float rect_alpha = 1.0 - min(min(max(d.x, d.y), 0.0) + length(max(d, 0.0)), 1.0);
+    rect_alpha = step(0.0000001, rect_alpha);
 """
 
 const alphaPostfix = """
@@ -135,8 +136,6 @@ method setupMaskPost(s: Sprite, maskType: MaskType): bool =
 
 method isMaskAplicable(s: Solid): bool = true
 method setupMaskPost(s: Solid, maskType: MaskType): bool =
-    let glvp = currentContext().gl.getViewport()
-    let vpSize = newSize( (glvp[2] - glvp[0]).float, (glvp[3] - glvp[1]).float )
     pushPostEffect(effectSolid[maskType.int-1], s.size, s.color, getVpSize(), s.node.getInvTransform(), s.node.getGlobalAlpha())
     return true
 
