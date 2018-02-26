@@ -59,8 +59,15 @@ proc `text=`*(t: Text, text: string) =
     if not t.node.isNil and not t.node.sceneView.isNil:
         t.node.sceneView.setNeedsDisplay()
 
+proc `boundingOffset=`*(t: Text, boundingOffset: Point) =
+    t.mBoundingOffset = boundingOffset
+
 proc `boundingSize=`*(t: Text, boundingSize: Size) =
     t.mText.boundingSize = boundingSize
+
+proc `bounds=`*(t: Text, r: Rect) =
+    t.mBoundingOffset = r.origin
+    t.mText.boundingSize = r.size
 
 proc `truncationBehavior=`*(t: Text, b: TruncationBehavior) =
     t.mText.truncationBehavior = b
