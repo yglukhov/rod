@@ -82,7 +82,7 @@ method beforeDraw*(vs: VectorShape, index: int): bool =
     case vs.shapeType:
     of vsRectangle:
         if vs.radius > 0:
-            c.drawRoundedRect(r, vs.radius)
+            c.drawRoundedRect(r, vs.radius + vs.strokeWidth/2.0)
         else:
             c.drawRect(r)
     of vsEllipse:
