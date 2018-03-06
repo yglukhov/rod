@@ -103,8 +103,9 @@ proc draw*(ns: NodeSelector) =
         c.setColorUniform(selectorSharedShader, "uColor", ns.color)
 
         let vp = node.sceneView
-        let mvpMatrix = vp.getViewProjectionMatrix() * modelMatrix
-        gl.uniformMatrix4fv(gl.getUniformLocation(selectorSharedShader, "mvpMatrix"), false, mvpMatrix)
+        if not vp.isNil:
+            let mvpMatrix = vp.getViewProjectionMatrix() * modelMatrix
+            gl.uniformMatrix4fv(gl.getUniformLocation(selectorSharedShader, "mvpMatrix"), false, mvpMatrix)
 
         when not defined(js): glLineWidth(2.0)
         gl.drawElements(gl.LINES, selectorSharedNumberOfIndexes, gl.UNSIGNED_SHORT)
