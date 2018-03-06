@@ -355,6 +355,8 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
 
     var updateAnimation = newAnimation()
     updateAnimation.onAnimate = proc(p: float)=
+        if not editor.mSelectedNode.isNil and editor.mSelectedNode.sceneView.isNil:
+            editor.selectedNode = nil
         for t in editor.workspaceView.tabs:
             t.update()
         for t in editor.workspaceView.compositionEditors:
