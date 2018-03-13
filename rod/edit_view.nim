@@ -355,6 +355,10 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
 
     var updateAnimation = newAnimation()
     updateAnimation.onAnimate = proc(p: float)=
+        if not editor.mSelectedNode.isNil and editor.mSelectedNode.sceneView.isNil:
+            # Ingame editor should consider that nodes could be removed by game's logic.
+            # Should be done differently when proper "observing" is implemented.
+            editor.selectedNode = nil
         for t in editor.workspaceView.tabs:
             t.update()
         for t in editor.workspaceView.compositionEditors:
