@@ -7,7 +7,7 @@ license       = "MIT"
 bin           = @["rod/tools/rodasset/rodasset", "editor/rodedit"]
 
 # Dependencies
-requires "nimx"
+requires "https://github.com/OnsetGame/nimx"
 requires "https://github.com/SSPKrolik/nimasset"
 requires "variant"
 requires "os_files"

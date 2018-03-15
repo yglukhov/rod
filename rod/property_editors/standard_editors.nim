@@ -19,6 +19,7 @@ import rod.viewport
 import rod.quaternion
 import rod.component.mesh_component
 import rod.component.ae_composition
+import rod.component.nine_part
 
 import variant
 
@@ -235,3 +236,112 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
 registerPropertyEditor(newNodePropertyView)
 registerPropertyEditor(newQuaternionPropertyView)
 registerPropertyEditor(newAEMarkerPropertyView)
+
+import logging
+import nimx / [ button, image_preview, view, numeric_text_field, context ]
+type NinePartImagePreview* = ref object of ImagePreview
+    margine*: NinePartMargine
+    onMargineChange: proc()
+
+proc addMargineTextField(v: NinePartImagePreview, r: Rect, value, name: string, cb: proc(val: float32)) =
+    let ll = newLabel(parent = v, position = r.origin, text = name)
+    let l = newNumericTextField(newRect(r.origin.x + 10.0, r.origin.y, 50, 20), 1)
+    l.text = value
+    v.addSubview(l)
+    l.onAction do():
+        cb(l.text.parseFloat())
+        if not v.onMargineChange.isNil:
+            v.onMargineChange()
+
+proc newNinePartImagePreview*(r: Rect, img: Image, margine: NinePartMargine): NinePartImagePreview =
+    result.new()
+    result.image = img
+    result.margine = margine
+    result.init(r)
+
+    let oldBoundsSize = result.bounds.size
+    result.setFrameSize(newSize(oldBoundsSize.width, oldBoundsSize.height + 90))
+
+    let res = result
+    res.addMargineTextField(newRect(5.0, oldBoundsSize.height, 50, 20), $res.margine.left, "l") do(val: float32): res.margine.left = val
+    res.addMargineTextField(newRect(70.0, oldBoundsSize.height, 50, 20), $res.margine.right, "r") do(val: float32): res.margine.right = val
+    res.addMargineTextField(newRect(5.0, oldBoundsSize.height + 25, 50, 20), $res.margine.top, "t") do(val: float32): res.margine.top = val
+    res.addMargineTextField(newRect(70.0, oldBoundsSize.height + 25, 50, 20), $res.margine.bottom, "b") do(val: float32): res.margine.bottom = val
+
+
+method draw*(v: NinePartImagePreview, r: Rect) =
+    procCall v.ImagePreview.draw(r)
+    let c = currentContext()
+
+    var margineRect: Rect
+    margineRect.origin = newPoint(v.imageRect.origin.x + v.margine.left, v.imageRect.origin.y + v.margine.top)
+    margineRect.size = newSize(v.imageRect.origin.x + v.imageRect.size.width - v.margine.right - margineRect.origin.x,
+        v.imageRect.origin.y + v.imageRect.size.height - v.margine.bottom - margineRect.origin.y)
+    c.fillColor = newColor(1.0, 0.0, 0.0, 0.5)
+    c.drawRect(margineRect)
+
+
+proc newNinePartPropertyView(setter: proc(s: NinePart), getter: proc(): NinePart): PropertyEditorView =
+    var ninePart = getter()
+    var pv: PropertyEditorView
+    if not ninePart.image.isNil:
+        let previewSize = 48.0
+        pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight + 6 + previewSize))
+
+        let imgButton = newImageButton(pv, newPoint(0, editorRowHeight + 3), newSize(previewSize, previewSize), ninePart.image)
+        imgButton.onAction do():
+            let imgPreview = newNinePartImagePreview(newRect(0, 0, 200, 200), ninePart.image, ninePart.margine)
+            imgPreview.popupAtPoint(pv, newPoint(-10, 0))
+            imgPreview.onMargineChange = proc() =
+                ninePart.margine = imgPreview.margine
+                setter(ninePart)
+
+        let label = newLabel(newRect(previewSize + 5, editorRowHeight + 5 + editorRowHeight, 100, 15))
+        label.text = "S: " & $int(ninePart.image.size.width) & " x " & $int(ninePart.image.size.height)
+        label.textColor = newGrayColor(0.9)
+        pv.addSubview(label)
+
+        let removeButton = Button.new(newRect(previewSize + 5, editorRowHeight + 3, editorRowHeight, editorRowHeight))
+        removeButton.title = "-"
+        pv.addSubview(removeButton)
+        removeButton.onAction do():
+            setter(nil)
+            if not pv.onChange.isNil:
+                pv.onChange()
+            if not pv.changeInspector.isNil:
+                pv.changeInspector()
+    else:
+        pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
+
+    let b = Button.new(newRect(0, 0, 208, editorRowHeight))
+    b.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+    b.title = "Open image..."
+    b.onAction do():
+        when defined(js):
+            alert("Files can be opened only in native editor version")
+        elif defined(emscripten):
+            discard
+        else:
+            var di: DialogInfo
+            di.title = "Select image"
+            di.kind = dkOpenFile
+            di.filters = @[(name:"PNG", ext:"*.png")]
+            let path = di.show()
+            echo "get path (", path, ")", path.len > 0
+            if path.len > 0:
+
+                try:
+                    ninePart.image = imageWithContentsOfFile(path)
+                except:
+                    info "Image could not be loaded: ", path
+                if not ninePart.image.isNil:
+                    setter(ninePart)
+                    if not pv.onChange.isNil:
+                        pv.onChange()
+                    if not pv.changeInspector.isNil:
+                        pv.changeInspector()
+
+    result = pv
+    result.addSubview(b)
+
+registerPropertyEditor(newNinePartPropertyView)

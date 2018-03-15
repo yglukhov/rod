@@ -101,7 +101,7 @@ when loadingAndSavingAvailable:
     proc openComposition*(e: Editor, p: string)
 
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false) =
-        var newPath: string
+        var newPath = c.path
         if c.path.len == 0 or saveAs:
             var di: DialogInfo
             di.folder = e.currentProject.path
