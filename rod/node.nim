@@ -8,7 +8,7 @@ import quaternion, ray, rod_types
 import rod.tools.serializer
 import rod / utils / [ bin_deserializer, json_serializer ]
 
-import rod / utils / json_deserializer
+import rod / utils / [ json_deserializer, editor_pathes ]
 
 import rod.asset_bundle
 
@@ -685,6 +685,11 @@ proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
     result.loadComposition(url, onComplete)
 
 proc newNodeWithResource*(path: string): Node =
+    if getResourceWorkingDir().len > 0:
+        let respath = getResourceWorkingDir() / path
+        result = newNodeWithURL("file://" & respath)
+        return
+
     let bd = binDeserializerForPath(path)
     if not bd.isNil:
         try:

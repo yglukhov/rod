@@ -280,68 +280,69 @@ method draw*(v: NinePartImagePreview, r: Rect) =
     c.fillColor = newColor(1.0, 0.0, 0.0, 0.5)
     c.drawRect(margineRect)
 
+when not defined(android) and not defined(ios):
+    proc newNinePartPropertyView(setter: proc(s: NinePart), getter: proc(): NinePart): PropertyEditorView =
+        var ninePart = getter()
+        var pv: PropertyEditorView
+        if not ninePart.image.isNil:
+            let previewSize = 48.0
+            pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight + 6 + previewSize))
 
-proc newNinePartPropertyView(setter: proc(s: NinePart), getter: proc(): NinePart): PropertyEditorView =
-    var ninePart = getter()
-    var pv: PropertyEditorView
-    if not ninePart.image.isNil:
-        let previewSize = 48.0
-        pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight + 6 + previewSize))
-
-        let imgButton = newImageButton(pv, newPoint(0, editorRowHeight + 3), newSize(previewSize, previewSize), ninePart.image)
-        imgButton.onAction do():
-            let imgPreview = newNinePartImagePreview(newRect(0, 0, 200, 200), ninePart.image, ninePart.margine)
-            imgPreview.popupAtPoint(pv, newPoint(-10, 0))
-            imgPreview.onMargineChange = proc() =
-                ninePart.margine = imgPreview.margine
-                setter(ninePart)
-
-        let label = newLabel(newRect(previewSize + 5, editorRowHeight + 5 + editorRowHeight, 100, 15))
-        label.text = "S: " & $int(ninePart.image.size.width) & " x " & $int(ninePart.image.size.height)
-        label.textColor = newGrayColor(0.9)
-        pv.addSubview(label)
-
-        let removeButton = Button.new(newRect(previewSize + 5, editorRowHeight + 3, editorRowHeight, editorRowHeight))
-        removeButton.title = "-"
-        pv.addSubview(removeButton)
-        removeButton.onAction do():
-            setter(nil)
-            if not pv.onChange.isNil:
-                pv.onChange()
-            if not pv.changeInspector.isNil:
-                pv.changeInspector()
-    else:
-        pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
-
-    let b = Button.new(newRect(0, 0, 208, editorRowHeight))
-    b.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
-    b.title = "Open image..."
-    b.onAction do():
-        when defined(js):
-            alert("Files can be opened only in native editor version")
-        elif defined(emscripten):
-            discard
-        else:
-            var di: DialogInfo
-            di.title = "Select image"
-            di.kind = dkOpenFile
-            di.filters = @[(name:"PNG", ext:"*.png")]
-            let path = di.show()
-            echo "get path (", path, ")", path.len > 0
-            if path.len > 0:
-
-                try:
-                    ninePart.image = imageWithContentsOfFile(path)
-                except:
-                    info "Image could not be loaded: ", path
-                if not ninePart.image.isNil:
+            let imgButton = newImageButton(pv, newPoint(0, editorRowHeight + 3), newSize(previewSize, previewSize), ninePart.image)
+            imgButton.onAction do():
+                let imgPreview = newNinePartImagePreview(newRect(0, 0, 200, 200), ninePart.image, ninePart.margine)
+                imgPreview.popupAtPoint(pv, newPoint(-10, 0))
+                imgPreview.onMargineChange = proc() =
+                    ninePart.margine = imgPreview.margine
                     setter(ninePart)
-                    if not pv.onChange.isNil:
-                        pv.onChange()
-                    if not pv.changeInspector.isNil:
-                        pv.changeInspector()
 
-    result = pv
-    result.addSubview(b)
+            let label = newLabel(newRect(previewSize + 5, editorRowHeight + 5 + editorRowHeight, 100, 15))
+            label.text = "S: " & $int(ninePart.image.size.width) & " x " & $int(ninePart.image.size.height)
+            label.textColor = newGrayColor(0.9)
+            pv.addSubview(label)
 
-registerPropertyEditor(newNinePartPropertyView)
+            let removeButton = Button.new(newRect(previewSize + 5, editorRowHeight + 3, editorRowHeight, editorRowHeight))
+            removeButton.title = "-"
+            pv.addSubview(removeButton)
+            removeButton.onAction do():
+                setter(nil)
+                if not pv.onChange.isNil:
+                    pv.onChange()
+                if not pv.changeInspector.isNil:
+                    pv.changeInspector()
+        else:
+            pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
+
+        let b = Button.new(newRect(0, 0, 208, editorRowHeight))
+        b.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+        b.title = "Open image..."
+        b.onAction do():
+            when defined(js):
+                alert("Files can be opened only in native editor version")
+            elif defined(emscripten):
+                discard
+            else:
+                var di: DialogInfo
+                di.title = "Select image"
+                di.kind = dkOpenFile
+                di.filters = @[(name:"PNG", ext:"*.png")]
+                let path = di.show()
+                echo "get path (", path, ")", path.len > 0
+                if path.len > 0:
+
+                    try:
+                        ninePart.image = imageWithContentsOfFile(path)
+                    except:
+                        info "Image could not be loaded: ", path
+                    if not ninePart.image.isNil:
+                        setter(ninePart)
+                        if not pv.onChange.isNil:
+                            pv.onChange()
+                        if not pv.changeInspector.isNil:
+                            pv.changeInspector()
+
+        result = pv
+        result.addSubview(b)
+
+    registerPropertyEditor(newNinePartPropertyView)
+

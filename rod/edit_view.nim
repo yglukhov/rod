@@ -10,7 +10,7 @@ import rod_types, node
 import rod.scene_composition
 import rod / editor / [editor_project_settings, editor_tab_registry,
         editor_workspace_view, editor_types]
-import rod.utils.json_serializer
+import rod.utils / [ json_serializer, editor_pathes ]
 export editor_types
 
 import tools.serializer
@@ -90,6 +90,7 @@ proc nodeToJson(n: Node, path: string): JsonNode =
     let s = Serializer.new()
     s.url = "file://" & path
     s.jser = newJsonSerializer()
+    s.jser.resourcePath = path
     result = n.serialize(s)
 
 when loadingAndSavingAvailable:
@@ -118,7 +119,7 @@ when loadingAndSavingAvailable:
                 let compName = splitFile(newPath).name
                 c.rootNode.name = compName
                 let data = nodeToJson(c.rootNode, newPath)
-                writeFile(newPath, $data)
+                writeFile(newPath, $(data.pretty()))
 
                 c.path = newPath
                 e.workspaceView.setTabTitle(c.owner, compName)
@@ -364,6 +365,8 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
         for t in editor.workspaceView.compositionEditors:
             t.update()
     w.addAnimation(updateAnimation)
+
+    setResourceWorkingDir(p.path)
 
 proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Editor =
     var editor = new(Editor)

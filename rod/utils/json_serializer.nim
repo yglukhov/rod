@@ -1,5 +1,5 @@
-import json
-import nimx / [ types, image ]
+import json, strutils, ospaths
+import nimx / [ types, image, pathutils ]
 
 type JsonSerializer* = ref object
     node*: JsonNode
@@ -42,7 +42,11 @@ proc write[T](data: T): JsonNode =
 
 proc visit*(b: JsonSerializer, v: Image, key: string) =
     if not v.isNil:
-        b.node[key] = %filePath(v)
+        var pDir = parentDir(b.resourcePath)
+        var path = relativePathToPath(pDir, filePath(v))
+
+        b.node[key] = %path
+        echo " >> new serializer image path ", path, " origin ", filePath(v)
 
 proc visit*[T](b: JsonSerializer, v: seq[T], key: string) =
     if not v.isNil:
