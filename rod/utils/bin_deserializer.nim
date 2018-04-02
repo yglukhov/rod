@@ -128,8 +128,6 @@ proc hasComposition*(b: BinDeserializer, name: string): bool {.inline.} =
 proc rewindToComposition*(b: BinDeserializer, name: string) =
     let pos = b.offsetToComposition(name)
     if pos == 0:
-        for k in b.compsTable.keys:
-            echo "COMP: ", k
         raise newException(Exception, "Could not rewind to " & name)
     b.stream.setPosition(pos)
 
