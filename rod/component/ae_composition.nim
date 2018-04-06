@@ -126,6 +126,19 @@ proc play*(c: AEComposition, name: string, exceptions: seq[string] = nil): Anima
 proc playAll*(c: AEComposition, exceptions: seq[string] = nil): Animation {.discardable.} =
     result = c.play(aeAllCompositionAnimation)
 
+proc findNodeWithAEComp(node: Node, name: string): Node =
+    ## Using breadth-first searching instead of deep-first to fix issue when
+    ## comps with same name interfere with each other upon animation activation
+    for n in node.children:
+        let comp = n.componentIfAvailable(AEComposition)
+
+        if comp.isNil and n.name == name:
+            return n.findNodeWithAEComp(name)
+        elif n.name == name:
+            return n
+
+    result = node.findNode(name)
+
 method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
     c.layers = @[]
     if "layers" in j:
@@ -175,7 +188,7 @@ method deserialize*(c: AEComposition, b: BinDeserializer) =
     c.layers = @[]
     for i in 0 ..< numLayers:
         let layerName = b.readStr()
-        let ch = c.node.findNode(layerName)
+        let ch = c.node.findNodeWithAEComp(layerName)
         if not ch.isNil:
             let ael = ch.componentIfAvailable(AELayer)
             if not ael.isNil:
