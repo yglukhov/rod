@@ -567,7 +567,7 @@ proc serializeEffectComponents(layer: Layer, result: JsonNode) =
         ael["timeremap"] = %0.0
         ael["timeRemapEnabled"] = %layer.timeRemapEnabled
         ael["_c"] = %"AELayer"
-        
+
         let timeRemap = layer.property("Time Remap", float32)
         if layer.layerIsCompositionRef() and layer.timeRemapEnabled and not timeRemap.isNil:
             let timeRemapDesc = addPropDesc(layer, result.len, "timeremap", timeRemap) do(v: float32) -> JsonNode:
@@ -674,7 +674,7 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                                 result = %[v[0], v[1], v[2], alpha]
 
                             colorDesc.setInitialValueToResult(shape)
-                            
+
                             var strokeWidth = shapePathGroup.property("Stroke Width", float32)
                             let strokeDesc = addPropDesc(layer, compIndex, "strokeWidth", strokeWidth) do(v: float32) -> JsonNode:
                                     %v
@@ -989,7 +989,7 @@ proc `%`(e: KeyframeEase): JsonNode =
         y
     ]
 
-proc getPropertyAnimation(pd: PropertyDescription, marker: Marker): JsonNode =
+proc getPropertyAnimation(pd: PropertyDescription, marker: Marker, fps: float): JsonNode =
     var animationStartTime = marker.time
     var animationEndTime = marker.time + marker.duration;
     #if (pd.property.numKeys > 0) {
@@ -1034,7 +1034,6 @@ proc getPropertyAnimation(pd: PropertyDescription, marker: Marker): JsonNode =
         result["keys"] = keys
 
     when exportSampledAnimations:
-        var fps = 30.0;
         var timeStep = 1.0 / fps;
         var sampledPropertyValues = newJArray()
 
@@ -1093,11 +1092,10 @@ proc sequenceFrameAtTime(layer: Layer, f: FootageItem, t: float, length: int): i
     if result >= length:
         result.dec()
 
-proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
+proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode, fps: float) =
     var animationStartTime = marker.time
     var animationEndTime = marker.time + marker.duration;
 
-    var fps = 30.0;
     var timeStep = 1.0 / fps;
     var sampledPropertyValues = newJArray()
 
@@ -1123,11 +1121,10 @@ proc getSequenceLayerAnimationForMarker(layer: Layer, marker: Marker, result: Js
     var fullyQualifiedPropName = layer.mangledName & ".curFrame"
     result[fullyQualifiedPropName] = anim
 
-proc getLayerActiveAtTimeAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode) =
+proc getLayerActiveAtTimeAnimationForMarker(layer: Layer, marker: Marker, result: JsonNode, fps: float) =
     var animationStartTime = marker.time
     var animationEndTime = marker.time + marker.duration;
 
-    var fps = 30.0;
     var timeStep = 1.0 / fps;
     var sampledPropertyValues = newJArray()
 
@@ -1155,7 +1152,7 @@ proc serializeCompositionBuffers(composition: Composition): JsonNode=
     allCompositionMarker.animation = "aeAllCompositionAnimation"
 
     for pd in gAnimatedProperties:
-        animationsBuffer[pd.fullyQualifiedName] = getPropertyAnimation(pd, allCompositionMarker)
+        animationsBuffer[pd.fullyQualifiedName] = getPropertyAnimation(pd, allCompositionMarker, composition.frameRate)
 
     var aeContainingLayers = newJArray()
 
@@ -1163,9 +1160,19 @@ proc serializeCompositionBuffers(composition: Composition): JsonNode=
         if shouldSerializeLayer(layer):
             aeContainingLayers.add(%layer.mangledName)
             if layer.isSequenceLayer():
-                getSequenceLayerAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
+                getSequenceLayerAnimationForMarker(
+                    layer,
+                    allCompositionMarker,
+                    animationsBuffer,
+                    composition.frameRate
+                )
             if not layer.isTrackMatte:
-                getLayerActiveAtTimeAnimationForMarker(layer, allCompositionMarker, animationsBuffer)
+                getLayerActiveAtTimeAnimationForMarker(
+                    layer,
+                    allCompositionMarker,
+                    animationsBuffer,
+                    composition.frameRate
+                )
 
     for k, v in animationsBuffer:
         var values = v["values"]
@@ -1230,11 +1237,16 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
         logi("Exporting animation: ", m.animation, ": ", epochTime())
 
         for pd in gAnimatedProperties:
-            animations[pd.fullyQualifiedName] = getPropertyAnimation(pd, m)
+            animations[pd.fullyQualifiedName] = getPropertyAnimation(pd, m, composition.frameRate)
 
         for layer in composition.layers:
             if shouldSerializeLayer(layer) and layer.isSequenceLayer():
-                getSequenceLayerAnimationForMarker(layer, m, animations)
+                getSequenceLayerAnimationForMarker(
+                    layer,
+                    m,
+                    animations,
+                    composition.frameRate
+                )
 
         if animations.len > 0:
             result[m.animation] = animations
