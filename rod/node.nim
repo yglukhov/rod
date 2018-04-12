@@ -8,7 +8,7 @@ import quaternion, ray, rod_types
 import rod.tools.serializer
 import rod / utils / [ bin_deserializer, json_serializer ]
 
-import rod / utils / json_deserializer
+import rod / utils / [ json_deserializer, editor_pathes ]
 
 import rod.asset_bundle
 
@@ -664,17 +664,17 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
                 let comp = n.component(k)
                 comp.deserialize(c, s)
 
-    let animations = j{"animations"}
-    if not animations.isNil and animations.len > 0:
-        n.animations = newTable[string, Animation]()
-        for k, v in animations:
-            n.animations[k] = newPropertyAnimation(n, v)
-
     let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         s.startAsyncOp()
         n.loadComposition(s.toAbsoluteUrl(compositionRef)) do():
             s.endAsyncOp()
+
+    let animations = j{"animations"}
+    if not animations.isNil and animations.len > 0:
+        n.animations = newTable[string, Animation]()
+        for k, v in animations:
+            n.animations[k] = newPropertyAnimation(n, v)
 
 proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
@@ -685,6 +685,11 @@ proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
     result.loadComposition(url, onComplete)
 
 proc newNodeWithResource*(path: string): Node =
+    if getResourceWorkingDir().len > 0:
+        let respath = getResourceWorkingDir() / path
+        result = newNodeWithURL("file://" & respath)
+        return
+
     let bd = binDeserializerForPath(path)
     if not bd.isNil:
         try:

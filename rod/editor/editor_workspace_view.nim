@@ -6,6 +6,7 @@ import nimx / [ view, toolbar, editor / tab_view, linear_layout, button,
 
 import rod / [ rod_types, node ]
 import rod / editor / [ editor_types, editor_tab_registry ]
+import rod / utils / editor_pathes
 
 when loadingAndSavingAvailable:
     import rod.editor.editor_open_project_view
@@ -209,6 +210,7 @@ when loadingAndSavingAvailable:
                 openProj.onOpen = proc(p: EditorProject)=
                     openProj.removeFromSuperview()
                     w.editor.currentProject = p
+                    setResourceWorkingDir(p.path)
                     w.removeFromSuperview()
                     w.editor.workspaceView = createWorkspaceLayout(w.editor.window, w.editor)
                     echo "try open project ", p

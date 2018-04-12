@@ -14,8 +14,10 @@ type File = after_effects.File
 
 const exportSampledAnimations = true
 const exportKeyframeAnimations = false
+
 var exportInOut = true
-var cutFloat = false
+var transitiveEffects = false
+var frameLerp = false
 
 const exportedVersion = 1
 
@@ -38,10 +40,7 @@ proc getSelectedCompositions(): seq[Composition] =
     getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
 
 proc cutDecimal(v: float, t: float = 1000.0): float =
-    if cutFloat:
-        result = (v * t).int.float / t
-    else:
-        result = v
+    result = (v * t).int.float / t
 
 proc cutDecimal[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector[I, T] =
     for i in 0 ..< v.len: result[i] = cutDecimal(v[i], t)
@@ -88,7 +87,6 @@ type PropertyDescription = ref object
 var gCompExportPath = ""
 var gExportFolderPath = ""
 var gAnimatedProperties = newSeq[PropertyDescription]()
-var transitiveEffects = false
 
 var layerNames = initTable[int, string]()
 var resourcePaths: seq[string] = @[]
@@ -120,7 +118,7 @@ proc fullyQualifiedPropName(layer: Layer, componentIndex: int, name: string, p: 
 proc isAnimated(p: AbstractProperty): bool =
     p.isTimeVarying and (not p.isSeparationLeader or not p.dimensionsSeparated)
 
-proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription =
+proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T, time:tuple[time:float, key:int]): JsonNode = nil): PropertyDescription =
     if p.isNil:
         return
 
@@ -135,9 +133,9 @@ proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Pro
             % p.keyValue(k)
     else:
         result.valueAtTime = proc(t: float): JsonNode =
-            mapper(p.valueAtTime(t))
+            mapper(p.valueAtTime(t), (time: t, key: -1))
         result.keyValue = proc(k: int): JsonNode =
-            mapper(p.keyValue(k))
+            mapper(p.keyValue(k), (time: -1.0, key: k))
 
     let vat = result.valueAtTime
     result.initialValue = proc(): JsonNode =
@@ -145,8 +143,12 @@ proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Pro
 
     result.fullyQualifiedName = fullyQualifiedPropName(layer, componentIndex, name, p)
 
+proc newPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription =
+    let map = proc(val: T, time: tuple[time:float, key:int]): JsonNode =
+        result = mapper(val)
+    result = newPropDesc(layer, componentIndex, name, p, map)
 
-proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: string, p: seq[Property[T]], mapper: proc(val: seq[T]): JsonNode = nil): PropertyDescription =
+proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: string, p: seq[Property[T]], mapper: proc(val: seq[T], time:tuple[time:float, key:int]): JsonNode = nil): PropertyDescription =
     if p.isNil:
         return
 
@@ -172,12 +174,12 @@ proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: strin
             var args = newSeq[T]()
             for sp in r.separatedProperties:
                 args.add(sp.toPropertyOfType(T).valueAtTime(t))
-            mapper(args)
+            mapper(args, (time: t, key: -1))
         result.keyValue = proc(k: int): JsonNode =
             var args = newSeq[T]()
             for sp in r.separatedProperties:
                 args.add(sp.toPropertyOfType(T).keyValue(k))
-            mapper(args)
+            mapper(args, (time: -1.0, key: k))
 
     let vat = result.valueAtTime
     result.initialValue = proc(): JsonNode =
@@ -185,18 +187,35 @@ proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: strin
 
     result.fullyQualifiedName = fullyQualifiedPropName(layer, componentIndex, name, p[0])
 
-proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
+proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: string, p: seq[Property[T]], mapper: proc(val: seq[T]): JsonNode = nil): PropertyDescription =
+    let map = proc(val: seq[T], time: tuple[time:float, key:int]): JsonNode =
+        result = mapper(val)
+
+    result = newPropDescSeparated(layer, componentIndex, name, p, map)
+
+proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T, time: tuple[time:float, key:int]): JsonNode = nil): PropertyDescription {.discardable.} =
     result = newPropDesc(layer, componentIndex, name, p, mapper)
     if not result.isNil and p.isAnimated:
         gAnimatedProperties.add(result)
 
-proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
+proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
+    let map = proc(val: T, time: tuple[time:float, key:int]): JsonNode =
+        result = mapper(val)
+    result = addPropDesc(layer, componentIndex, name, p, map)
+
+proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T, time: tuple[time:float, key:int]): JsonNode = nil): PropertyDescription {.discardable.} =
     result = addPropDesc(layer, componentIndex, name, p, mapper)
     let vat = result.valueAtTime
     result.initialValue = proc(): JsonNode =
         let v = p.valueAtTime(0)
         if v != defaultValue:
             result = vat(0)
+
+proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], defaultValue: T, mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
+    let map = proc(val: T, time: tuple[time:float, key:int]): JsonNode =
+        result = mapper(val)
+
+    result = addPropDesc(layer, componentIndex, name, p, defaultValue, map)
 
 proc setInitialValueToResult(pd: PropertyDescription, res: JsonNode) =
     let v = pd.initialValue()
@@ -219,6 +238,9 @@ proc isTextMarkerValid(layer: Layer): bool =
 
     if textMarker == textLayer or removeTextAttributes($textMarker) == textLayer:
         return true
+
+proc layerIsCompositionRef(layer: Layer): bool =
+    not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
 proc getText(layer: Layer): string =
     let markerText = layer.property("Marker", MarkerValue).valueAtTime(0).comment
@@ -406,7 +428,7 @@ proc copyAndPrepareFootageItem(footageSource: FootageItem): JsonNode =
 
 proc setTrackMattLayer(layer: Layer) =
     gCurrTrckMatteLayer = layer
-    gTrckMatteLayers[$layer.name] = (layer, layer.enabled)
+    gTrckMatteLayers[$layer.mangledName] = (layer, layer.enabled)
     gCurrTrckMatteLayer.enabled = true
 
 proc newTrackMatteComponent(layer: Layer, name: string): JsonNode =
@@ -526,7 +548,11 @@ proc serializeEffectComponents(layer: Layer, result: JsonNode) =
         if not c.isNil: result.add(c)
 
     if not gCurrTrckMatteLayer.isNil and layer.hasTrackMatte:
-        let traсkMatte = newTrackMatteComponent(layer, $gCurrTrckMatteLayer.name)
+        if not transitiveEffects:
+            logi "\n\nEnable Transitive Effects for export masks!!!\n\n"
+            raise
+
+        let traсkMatte = newTrackMatteComponent(layer, $gCurrTrckMatteLayer.mangledName)
         gCurrTrckMatteLayer = nil
         if not traсkMatte.isNil:
             result.add(traсkMatte)
@@ -538,7 +564,16 @@ proc serializeEffectComponents(layer: Layer, result: JsonNode) =
         ael["scale"] = %cutDecimal(layer.stretch / 100.0)
         ael["startTime"] = %cutDecimal(layer.startTime)
         ael["duration"] = %layer.duration()
+        ael["timeremap"] = %0.0
+        ael["timeRemapEnabled"] = %layer.timeRemapEnabled
         ael["_c"] = %"AELayer"
+        
+        let timeRemap = layer.property("Time Remap", float32)
+        if layer.layerIsCompositionRef() and layer.timeRemapEnabled and not timeRemap.isNil:
+            let timeRemapDesc = addPropDesc(layer, result.len, "timeremap", timeRemap) do(v: float32) -> JsonNode:
+                %(v / layer.duration())
+            timeRemapDesc.setInitialValueToResult(ael)
+
         result.add(ael)
 
 proc isNinePartSprite(layer: Layer): bool =
@@ -587,32 +622,84 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                     let p = shapeGroup.property(i)
                     let shapePathGroup = p.toPropertyGroup()
                     let name = $p.name
+                    let compIndex = result.len
 
                     if "Rectangle Path " & $(q+1) in name:
-                        let size = shapePathGroup.property("Size", Vector2).valueAtTime(0)
-                        let radius = shapePathGroup.property("Roundness", float32).valueAtTime(0)
-                        let minSize = min(size[0], size[1])
-                        let minRadius = min(minSize / 2.0, radius)
-                        shape["size"] = % size
-                        shape["radius"] = % minRadius
+                        let size = shapePathGroup.property("Size", Vector2)
+                        let radius = shapePathGroup.property("Roundness", float32)
                         shape["shapeType"] = % 0
+
+                        let sizeDesc = addPropDesc(layer, compIndex, "size", size) do(v: Vector2) -> JsonNode:
+                            %[v[0], v[1]]
+                        sizeDesc.setInitialValueToResult(shape)
+
+                        let radiusDesc = addPropDesc(layer, compIndex, "radius", radius) do(v: float32, frame: tuple[time: float, key: int]) -> JsonNode:
+                            var minSize: float
+                            var size0: Vector2
+                            if frame.time > -1.0:
+                                size0 = size.valueAtTime(frame.time)
+                            else:
+                                size0 = size.keyValue(frame.key)
+                            minSize = min(size0[0], size0[1])
+                            result = %min(minSize / 2.0, v)
+
+                        radiusDesc.setInitialValueToResult(shape)
+
                     elif "Ellipse Path " & $(q+1) in name:
-                        shape["size"] = %* shapePathGroup.property("Size", Vector2).valueAtTime(0)
+                        let size = shapePathGroup.property("Size", Vector2)
+                        let sizeDesc = addPropDesc(layer, compIndex, "size", size) do(v: Vector2) -> JsonNode:
+                            %[v[0], v[1]]
+                        sizeDesc.setInitialValueToResult(shape)
+
                         shape["shapeType"] = % 1
+
                     elif "Polystar Path " & $(q+1) in name:
                         shape["shapeType"] = % 2
                         #TODO need support?
+
                     elif "Stroke " & $(q+1) in name:
                         let stroke = shapeGroup.propertyGroup("Stroke")
                         if not stroke.isNil and stroke.canSetEnabled and stroke.enabled:
-                            var strokeColor = shapePathGroup.property("Color", Vector4).valueAtTime(0)
-                            strokeColor[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
-                            shape["strokeColor"] = % strokeColor
-                            shape["strokeWidth"] = % shapePathGroup.property("Stroke Width", float32).valueAtTime(0)
+
+                            var color = shapePathGroup.property("Color", Vector4)
+                            var opacity = shapePathGroup.property("Opacity", float32)
+
+                            let colorDesc = addPropDesc(layer, compIndex, "strokeColor", color) do(v: Vector4, frame: tuple[time: float, key: int]) -> JsonNode:
+                                var alpha: float
+                                if frame.time > -1.0:
+                                    alpha = opacity.valueAtTime(frame.time) / 100.0
+                                else:
+                                    alpha = opacity.keyValue(frame.key) / 100.0
+
+                                result = %[v[0], v[1], v[2], alpha]
+
+                            colorDesc.setInitialValueToResult(shape)
+                            
+                            var strokeWidth = shapePathGroup.property("Stroke Width", float32)
+                            let strokeDesc = addPropDesc(layer, compIndex, "strokeWidth", strokeWidth) do(v: float32) -> JsonNode:
+                                    %v
+                            strokeDesc.setInitialValueToResult(shape)
+                        else:
+                            shape["strokeColor"] = %[0.0, 0.0, 0.0, 0.0]
+
                     elif "Fill " & $(q+1) in name:
-                        var color = shapePathGroup.property("Color", Vector4).valueAtTime(0)
-                        color[3] *= shapePathGroup.property("Opacity", float32).valueAtTime(0) / 100.0
-                        shape["color"] = % color
+                        let fill = shapeGroup.propertyGroup("Fill")
+                        if not fill.isNil and fill.canSetEnabled and fill.enabled:
+                            var color = shapePathGroup.property("Color", Vector4)
+                            var opacity = shapePathGroup.property("Opacity", float32)
+
+                            let colorDesc = addPropDesc(layer, compIndex, "color", color) do(v: Vector4, frame: tuple[time: float, key: int]) -> JsonNode:
+                                var alpha: float
+                                if frame.time > -1.0:
+                                    alpha = opacity.valueAtTime(frame.time) / 100.0
+                                else:
+                                    alpha = opacity.keyValue(frame.key) / 100.0
+
+                                result = %[v[0], v[1], v[2], alpha]
+
+                            colorDesc.setInitialValueToResult(shape)
+                        else:
+                            shape["color"] = %[0.0, 0.0, 0.0, 0.0]
 
                 result.add(shape)
 
@@ -708,9 +795,6 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
         of "ADBE Root Vectors Group":
             layer.serializeShape(result)
         else: discard
-
-proc layerIsCompositionRef(layer: Layer): bool =
-    not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
 proc exportPath(c: Item): string =
     result = c.projectPath
@@ -1115,6 +1199,7 @@ proc serializeCompositionBuffers(composition: Composition): JsonNode=
         v["len"] = %valuesLen
         v["cutf"] = %(cutFront - 1)
         v["values"] = cutVals
+        v["frameLerp"] = %frameLerp
 
     var animations = newJObject()
     var animationMarkers = getAnimationMarkers(composition)
@@ -1324,14 +1409,14 @@ proc buildUI(contextObj: ref RootObj) =
     app.settings.saveSetting("rodExport", "exportInOut", inOutCheckBox.value + "");
   }
 
-  var cutFloatsCheckBox = exportInOutGroup.add("checkbox", undefined, "Cut decimal");
-  cutFloatsCheckBox.alignment = ["fill", "bottom"];
-  `cutFloat`[0] = app.settings.haveSetting("rodExport", "cutFloat") &&
-     app.settings.getSetting("rodExport", "cutFloat") == "true";
-  cutFloatsCheckBox.value = `cutFloat`[0];
-  cutFloatsCheckBox.onClick = function(e){
-    `cutFloat`[0] = cutFloatsCheckBox.value;
-    app.settings.saveSetting("rodExport", "cutFloat", cutFloatsCheckBox.value + "");
+  var frameLerpCheckBox = exportInOutGroup.add("checkbox", undefined, "Frame lerp");
+  frameLerpCheckBox.alignment = ["fill", "bottom"];
+  `frameLerp`[0] = app.settings.haveSetting("rodExport", "frameLerp") &&
+     app.settings.getSetting("rodExport", "frameLerp") == "true";
+  frameLerpCheckBox.value = `frameLerp`[0];
+  frameLerpCheckBox.onClick = function(e){
+    `frameLerp`[0] = frameLerpCheckBox.value;
+    app.settings.saveSetting("rodExport", "frameLerp", frameLerpCheckBox.value + "");
   }
 
   var exportButton = topGroup.add("button", undefined,
