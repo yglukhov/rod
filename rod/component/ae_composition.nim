@@ -21,6 +21,8 @@ type AELayer* = ref object of Component
     animScale*: float32
     startTime*: float32
     duration*: float32
+    timeremap*: float32
+    timeRemapEnabled*: bool
 
 type AEComposition* = ref object of Component
     layers*: seq[AELayer]
@@ -36,6 +38,8 @@ AELayer.properties:
         serializationKey: "scale"
     startTime
     duration
+    timeremap
+    timeRemapEnabled
 
 proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     let pStart = m.start / c.duration
@@ -76,7 +80,10 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, except
         let oldCompAnimate = prop.onAnimate
 
         prop.animate prog in pIn..pOut:
-            oldCompAnimate(prog)
+            if cl.timeRemapEnabled:
+                oldCompAnimate(cl.timeremap)
+            else:
+                oldCompAnimate(prog)
 
         result = newComposeMarker(max(0.0, layerIn), min(layerOut, 1.0), prop)
 
@@ -238,10 +245,10 @@ method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "scale", c.animScale)
     serealizer.deserializeValue(j, "startTime", c.startTime)
     serealizer.deserializeValue(j, "duration", c.duration)
+    serealizer.deserializeValue(j, "timeremap", c.timeremap)
+    serealizer.deserializeValue(j, "timeRemapEnabled", c.timeRemapEnabled)
 
 genSerializationCodeForComponent(AELayer)
-
-
 
 method serialize*(c: AELayer, s: Serializer): JsonNode=
     result = newJObject()
@@ -257,6 +264,8 @@ method visitProperties*(t: AELayer, p: var PropertyVisitor) =
     p.visitProperty("animScale",   t.animScale)
     p.visitProperty("startTime", t.startTime)
     p.visitProperty("duration",  t.duration)
+    p.visitProperty("timeremap", t.timeremap)
+    p.visitProperty("timeRemapEnabled", t.timeRemapEnabled)
 
 registerComponent(AELayer, "AE support")
 registerComponent(AEComposition, "AE support")

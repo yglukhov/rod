@@ -62,10 +62,12 @@ proc writeSamplerValues(b: BinSerializer, propName: string, v: JsonNode) =
     of "tX", "tY", "tZ", "sX", "sY", "sZ", "alpha", "inWhite", "inBlack",
             "inGamma", "outWhite", "outBlack", "Tracking Amount", "lightness", "amount",
             "redInGamma", "blueInGamma", "greenInGamma", "redOutWhite", "greenOutWhite",
-            "blueOutWhite", "redInWhite", "greenInWhite", "blueInWhite", "hue":
+            "blueOutWhite", "redInWhite", "greenInWhite", "blueInWhite", "hue", "strokeWidth",
+            "radius", "timeremap":
         b.writeSamplerValues(float32, v)
     of "translation", "scale", "anchor": b.writeSamplerValues(array[3, float32], v)
-    of "rotation", "white", "black": b.writeSamplerValues(array[4, float32], v)
+    of "rotation", "white", "black", "strokeColor", "color": b.writeSamplerValues(array[4, float32], v)
+    of "size": b.writeSamplerValues(array[2, float32], v)
     of "curFrame": b.writeSamplerValues(int16, v)
     of "enabled": b.writeSamplerValues(bool, v)
     else: raise newException(Exception, "Unknown property type: " & propName)

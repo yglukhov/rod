@@ -19,7 +19,7 @@ type VectorShapeType* = enum
 type VectorShape* = ref object of Component
     color*: Color
     strokeColor*: Color
-    size*: Size
+    size*: Vector2
     strokeWidth*: float32
     radius*: float32
     shapeType*: VectorShapeType
@@ -36,7 +36,7 @@ genSerializationCodeForComponent(VectorShape)
 
 method init*(vs: VectorShape) =
     vs.color = whiteColor()
-    vs.size = newSize(100, 100)
+    vs.size = newVector2(100, 100)
     vs.strokeWidth = 0
     vs.strokeColor = whiteColor()
     vs.radius = 0

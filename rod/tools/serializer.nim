@@ -96,6 +96,11 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Vector3)
     if not jN.isNil:
         val = newVector3(jN[0].getFloat(), jN[1].getFloat(), jN[2].getFloat())
 
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Vector2) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newVector2(jN[0].getFloat(), jN[1].getFloat())
+
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Quaternion) =
     let jN = j{name}
     if not jN.isNil:
