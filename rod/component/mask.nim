@@ -194,5 +194,17 @@ proc fromPhantom(msk: Mask, p: object) =
         addNodeRef(p.layerName) do(n: Node):
             msk.maskNode = n
 
+method serialize*(msk: Mask, serealizer: Serializer): JsonNode =
+    result = newJObject()
+    result.add("maskType", serealizer.getValue(msk.maskType))
+    result.add("layerName", serealizer.getValue(msk.maskNode))
+
+method deserialize*(msk: Mask, j: JsonNode, serealizer: Serializer) =
+    serealizer.deserializeValue(j, "maskType", msk.maskType)
+    var layerName: string
+    serealizer.deserializeValue(j, "layerName", layerName)
+    addNodeRef(layerName) do(n: Node):
+        msk.maskNode=n
+
 genSerializationCodeForComponent(Mask)
 registerComponent(Mask, "Effects")
