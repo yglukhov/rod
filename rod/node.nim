@@ -21,6 +21,8 @@ proc isEnabledInTree*(n: Node): bool
 
 import rod.component
 
+var gTotalNodesCount*: int
+
 proc newNode*(name: string = nil): Node =
     result.new()
     result.mScale = newVector3(1, 1, 1)
@@ -332,12 +334,29 @@ iterator allNodes*(n: Node): Node =
         inc i
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
-    if p(n):
-        result = n
+    when defined bfsFind:
+        if p(n):
+            return n
+        else:
+            var gfnc = newSeq[Node]()
+            var nfnc = newSeq[Node]()
+            gfnc.add(n.children)
+            while gfnc.len > 0:
+                for c in gfnc:
+                    if p(c):
+                        return c
+                    else:
+                        nfnc.add(c.children)
+                gfnc.setLen(0)
+                gfnc.add(nfnc)
+                nfnc.setLen(0)
     else:
-        for c in n.children:
-            result = c.findNode(p)
-            if not result.isNil: break
+        if p(n):
+            result = n
+        else:
+            for c in n.children:
+                result = c.findNode(p)
+                if not result.isNil: break
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
@@ -373,6 +392,7 @@ proc resolveNodeRefs(n: Node) =
                 s(foundNode)
 
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
+    dec gTotalNodesCount
     if not n.components.isNil:
         for c in n.components: c.componentNodeWillBeRemovedFromSceneView()
     if not n.children.isNil:
@@ -380,6 +400,7 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
     n.mSceneView = nil
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
+    inc gTotalNodesCount
     if n.mSceneView.isNil:
         n.mSceneView = v
         if not n.components.isNil:

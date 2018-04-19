@@ -559,7 +559,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
     gravity.y *= ps.getGravityYDirection()
 
     let maxParticlesCount = ps.maxParticlesCount
-
+    
     for i in 0 ..< ps.particles.len:
         # if we have dead particle than we create a new one
         if ps.particles[i].lifetime <= 0.0:
@@ -654,7 +654,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         offset += ps.vertexDesc.scaleSize
 
         # color
-        let alpha = ps.particles[i].color.a * ps.node.alpha
+        let alpha = ps.particles[i].color.a * currentContext().alpha
         ps.particlesVertexBuff[v1 + offset] = alpha
         ps.particlesVertexBuff[v2 + offset] = alpha
         ps.particlesVertexBuff[v3 + offset] = alpha

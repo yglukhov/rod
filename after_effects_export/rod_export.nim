@@ -674,7 +674,7 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                                 result = %[v[0], v[1], v[2], alpha]
 
                             colorDesc.setInitialValueToResult(shape)
-
+                            
                             var strokeWidth = shapePathGroup.property("Stroke Width", float32)
                             let strokeDesc = addPropDesc(layer, compIndex, "strokeWidth", strokeWidth) do(v: float32) -> JsonNode:
                                     %v
