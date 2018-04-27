@@ -227,6 +227,13 @@ proc getExportPathFromSourceFile(footageSource: FootageItem, file: File): string
     if path[^1] != '/': path &= "/"
     result = relativePathToPath("/" & gCompExportPath, path & $decodeURIComponent(file.name))
 
+proc isShapeLayer(layer: Layer): bool =
+    for q in 0 ..< layer.numProperties:
+        var p = layer.property(q)
+        case $p.matchName
+        of "ADBE Root Vectors Group":
+            return true
+
 proc isSolidLayer(layer: Layer): bool =
     let source = FootageItem(layer.source)
     result = not layer.nullLayer and not source.mainSource.isNil and
@@ -598,6 +605,32 @@ proc ninePartSpriteGeometry(layer: Layer): array[4, float] =
 
     result = [marginLeft, marginRight, marginTop, marginBottom]
 
+proc extractShapeTransformProp(layer: Layer): tuple[position: Property[Vector2], anchor: Property[Vector2], scale: Property[Vector2]] =
+    let vectorLayer = layer.property("Contents")
+
+    if not vectorLayer.isNil:
+        let shapes = vectorLayer.toPropertyGroup()
+        for q in 0 ..< shapes.numProperties:
+            let shape = shapes.property(q)
+            let name = $shape.name
+
+            if not shape.isNil and shape.isPropertyGroup:
+                let shapeProps = shape.toPropertyGroup()
+                if not shapeProps.isNil:
+                    let transP = shapeProps.property("Transform")
+                    if not transP.isNil:
+                        let trans = transP.toPropertyGroup()
+                        if not trans.isNil:
+                            result = (
+                                position: trans.property("Position", Vector2),
+
+                                anchor: trans.property("Anchor Point", Vector2),
+
+                                scale: trans.property("Scale", Vector2)
+                            )
+                            return
+
+
 proc serializeShape(layer: Layer, result: JsonNode) =
     let vectorLayer = layer.property("Contents")
     if not vectorLayer.isNil:
@@ -653,6 +686,7 @@ proc serializeShape(layer: Layer, result: JsonNode) =
 
                         shape["shapeType"] = % 1
 
+
                     elif "Polystar Path " & $(q+1) in name:
                         shape["shapeType"] = % 2
                         #TODO need support?
@@ -674,7 +708,7 @@ proc serializeShape(layer: Layer, result: JsonNode) =
                                 result = %[v[0], v[1], v[2], alpha]
 
                             colorDesc.setInitialValueToResult(shape)
-                            
+
                             var strokeWidth = shapePathGroup.property("Stroke Width", float32)
                             let strokeDesc = addPropDesc(layer, compIndex, "strokeWidth", strokeWidth) do(v: float32) -> JsonNode:
                                     %v
@@ -789,12 +823,8 @@ proc serializeDrawableComponents(layer: Layer, result: JsonNode) =
         txt["_c"] = %"Text"
         result.add(txt)
 
-    for q in 0 ..< layer.numProperties:
-        var p = layer.property(q)
-        case $p.matchName
-        of "ADBE Root Vectors Group":
-            layer.serializeShape(result)
-        else: discard
+    if layer.isShapeLayer():
+        layer.serializeShape(result)
 
 proc exportPath(c: Item): string =
     result = c.projectPath
@@ -829,16 +859,72 @@ proc serializeLayer(layer: Layer): JsonNode =
 
     let transform = layer.propertyGroup("Transform")
 
-    let position = addPropDesc(layer, -1, "translation", transform.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
-        %cutDecimal(newVector3(v.x, v.y, v.z * -1.0))
-    position.setInitialValueToResult(result)
+    var extraTrans = layer.isShapeLayer()
+    if not extraTrans:
+        let position = addPropDesc(layer, -1, "translation", transform.property("Position", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+            %cutDecimal(newVector3(v.x, v.y, v.z * -1.0))
+        position.setInitialValueToResult(result)
 
-    addPropDesc(layer, -1, "tX", transform.property("X Position", float))
-    addPropDesc(layer, -1, "tY", transform.property("Y Position", float))
+        addPropDesc(layer, -1, "tX", transform.property("X Position", float))
+        addPropDesc(layer, -1, "tY", transform.property("Y Position", float))
 
-    let scale = addPropDesc(layer, -1, "scale", transform.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
-        %cutDecimal(v / 100)
-    scale.setInitialValueToResult(result)
+        let scale = addPropDesc(layer, -1, "scale", transform.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3) -> JsonNode:
+            %cutDecimal(v / 100)
+        scale.setInitialValueToResult(result)
+
+        let anchor = addPropDesc(layer, -1, "anchor", transform.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
+            %cutDecimal(v)
+        anchor.setInitialValueToResult(result)
+
+    else:
+        let props = layer.extractShapeTransformProp()
+        if not props.position.isNil:
+
+            let position = addPropDesc(layer, -1, "translation", transform.property("Position", Vector3), newVector3()) do(v: Vector3, frame: tuple[time: float, key: int]) -> JsonNode:
+                var ep: Vector2
+                if frame.time > -1:
+                    ep = props.position.valueAtTime(frame.time)
+                else:
+                    ep = props.position.keyValue(frame.key)
+
+                let cp = newVector3(v.x, v.y, v.z * -1.0) + newVector3(ep.x, -ep.y)
+
+                %cutDecimal(cp)
+
+            position.setInitialValueToResult(result)
+
+            addPropDesc(layer, -1, "tX", transform.property("X Position", float))
+            addPropDesc(layer, -1, "tY", transform.property("Y Position", float))
+
+            let scale = addPropDesc(layer, -1, "scale", transform.property("Scale", Vector3), newVector3(100, 100, 100)) do(v: Vector3, frame: tuple[time: float, key: int]) -> JsonNode:
+                var es: Vector2
+                if frame.time > -1:
+                    es = props.scale.valueAtTime(frame.time)
+                else:
+                    es = props.scale.keyValue(frame.key)
+
+                es = es / 100
+
+                let cs = (v / 100) * newVector3(es.x, es.y, 1.0)
+                %cutDecimal(cs)
+
+            scale.setInitialValueToResult(result)
+
+            let anchor = addPropDesc(layer, -1, "anchor", transform.property("Anchor Point", Vector3), newVector3()) do(v: Vector3, frame: tuple[time: float, key: int]) -> JsonNode:
+                var ep: Vector2
+                if frame.time > -1:
+                    ep = props.anchor.valueAtTime(frame.time)
+                else:
+                    ep = props.anchor.keyValue(frame.key)
+
+                let val = v + newVector3(ep.x, ep.y)
+                %cutDecimal(val)
+
+            anchor.setInitialValueToResult(result)
+
+        else:
+            raise
+
 
     if layer.threeDLayer:
         let xprop = transform.property("X Rotation", float)
@@ -855,9 +941,7 @@ proc serializeLayer(layer: Layer): JsonNode =
             % cutDecimal(quaternionWithZRotation(v))
         rotation.setInitialValueToResult(result)
 
-    let anchor = addPropDesc(layer, -1, "anchor", transform.property("Anchor Point", Vector3), newVector3()) do(v: Vector3) -> JsonNode:
-        %cutDecimal(v)
-    anchor.setInitialValueToResult(result)
+
 
     let alpha = addPropDesc(layer, -1, "alpha", layer.property("Opacity", float), 100) do(v: float) -> JsonNode:
         %cutDecimal(v / 100.0)
