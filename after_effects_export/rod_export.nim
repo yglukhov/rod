@@ -887,7 +887,7 @@ proc serializeLayer(layer: Layer): JsonNode =
                 else:
                     ep = props.position.keyValue(frame.key)
 
-                let cp = newVector3(v.x, v.y, v.z * -1.0) + newVector3(ep.x, -ep.y)
+                let cp = newVector3(v.x, v.y, v.z * -1.0) + newVector3(ep.x, ep.y)
 
                 %cutDecimal(cp)
 
