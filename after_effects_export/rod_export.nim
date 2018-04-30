@@ -10,16 +10,91 @@ import nimx.matrixes, nimx.pathutils
 import rod.quaternion
 import rod.utils.text_helpers
 
-type File = after_effects.File
-
 const exportSampledAnimations = true
 const exportKeyframeAnimations = false
+
+type File = after_effects.File
+type PropertyDescription = ref object
+    name: string
+    fullyQualifiedName: string
+    property: AbstractProperty
+    valueAtTime: proc(time: float): JsonNode
+    keyValue: proc(k: int): JsonNode
+    initialValue: proc(): JsonNode
+    separatedProperties: seq[AbstractProperty]
+
+type Marker = object
+    time*, duration*: float
+    comment*: string
+    animation*: string
+    loops*: int
+    animation_end*: string
+
+type ExportSettings = ref object
+    layerNames: Table[int, string]
+    trckMatteLayers: Table[string, tuple[layer: Layer, layerEnabled: bool]]
+    currTrckMatteLayer: Layer
+    animatedProperties: seq[PropertyDescription]
+
+var exportSettings: TableRef[string, ExportSettings]
+
+const bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
+var gCompExportPath = ""
+var gExportFolderPath = ""
+var resourcePaths: seq[string] = @[]
 
 var exportInOut = true
 var transitiveEffects = false
 var frameLerp = false
 
+var logTextField: EditText
+
 const exportedVersion = 1
+
+proc logi(args: varargs[string, `$`]) =
+    for i in args:
+        logTextField.text &= i
+    logTextField.text &= "\n"
+
+proc getExportSettings(lay: Layer): ExportSettings =
+    result = exportSettings.getOrDefault($lay.containingComp.name)
+
+proc getExportSettings(comp: Composition): ExportSettings =
+    result = exportSettings.getOrDefault($comp.name)
+
+proc createExportSettings(comp: Composition): ExportSettings =
+    result.new()
+    result.layerNames = initTable[int, string]()
+    result.trckMatteLayers = initTable[string, tuple[layer: Layer, layerEnabled: bool]]()
+    result.animatedProperties = @[]
+
+proc `currTrckMatteLayer=`(lay: Layer | Composition, val: Layer) = 
+    var s = lay.getExportSettings()
+    s.currTrckMatteLayer = val
+
+proc setLayerName(lay: Layer | Composition, key: int, val: string) =
+    var s = lay.getExportSettings()
+    s.layerNames[key] = val
+
+template animatedProperties(lay: Layer | Composition): seq[PropertyDescription] =
+    var s = lay.getExportSettings()
+    s.animatedProperties
+
+proc layerNames(lay: Layer | Composition): Table[int, string] =
+    var s = lay.getExportSettings()
+    s.layerNames
+
+proc trckMatteLayers(lay: Layer | Composition): Table[string, tuple[layer: Layer, layerEnabled: bool]] =
+    var s = lay.getExportSettings()
+    s.trckMatteLayers
+
+proc setTrckMatteLayers(lay: Layer | Composition, k: string, v: tuple[layer: Layer, layerEnabled: bool]) =
+    var s = lay.getExportSettings()
+    s.trckMatteLayers[k] = v
+
+proc currTrckMatteLayer(lay: Layer | Composition): Layer =
+    var s = lay.getExportSettings()
+    s.currTrckMatteLayer
 
 proc duration*(layer: Layer): float =
     var source = layer.source
@@ -36,8 +111,49 @@ proc getObjectsWithTypeFromCollection*(t: typedesc, collection: openarray[Item],
         if i.jsObjectType == typeName:
             result.add(cast[t](i))
 
-proc getSelectedCompositions(): seq[Composition] =
-    getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
+proc isNinePartSprite(layer: Layer): bool =
+    let ch = layer.children
+    ch.len == 1 and ch[0].name == "@NinePartMarker"
+
+proc shouldSerializeLayer(layer: Layer): bool = layer.enabled and ((layer.name.len > 0 and layer.name[0] != '@') or layer.name.len == 0)
+
+proc metadata(layer: Layer): JsonNode =
+    if layer.comment.len > 0:
+        var c = $layer.comment
+        # After effects may insert funny chars instead of quotes.
+        c = c.replace("“", "\"")
+        c = c.replace("”", "\"")
+        try:
+            result = parseJson(c)
+        except:
+            logi "Could not parse layer comment"
+            logi c
+
+proc layerIsCompositionRef(layer: Layer): bool =
+    not layer.source.isNil and layer.source.jsObjectType == "CompItem"
+
+proc hasCompRefComponent(metadata: JsonNode): bool =
+    let comps = metadata{"components"}
+    if not comps.isNil:
+        for c in comps:
+            if c{"_c"}.getStr() == "CompRef": return true
+
+proc childrenCompositions(c: Composition): seq[Composition]=
+    result = @[]
+    for lay in c.layers:
+        if lay.layerIsCompositionRef() and shouldSerializeLayer(lay) and not hasCompRefComponent(lay.metadata): 
+            var c = cast[Composition](lay.source)
+            result.add(c)
+            var chcomps = c.childrenCompositions()
+            result.add(chcomps)
+
+proc getSelectedCompositions(recursive: bool): seq[Composition] =
+    result = getObjectsWithTypeFromCollection(Composition, app.project.selection, "CompItem")
+    if recursive:
+        var chcomps = newSeq[Composition]()
+        for comp in result:
+            chcomps.add(comp.childrenCompositions)
+        result.add(chcomps)
 
 proc cutDecimal(v: float, t: float = 1000.0): float =
     result = (v * t).int.float / t
@@ -48,16 +164,9 @@ proc cutDecimal[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector
 proc cutDecimal(q: Quaternion, t: float = 1000.0): Quaternion =
     cutDecimal(q.Vector4, t).Quaternion
 
-var logTextField: EditText
-
 proc `&=`(s, a: cstring) {.importcpp: "# += #".}
 proc `%`(q: Quaternion): JsonNode =
     `%`(q.Vector4)
-
-proc logi(args: varargs[string, `$`]) =
-    for i in args:
-        logTextField.text &= i
-    logTextField.text &= "\n"
 
 proc printPropertiesTree*(p: PropertyOwner, offset: string = " ") =
     logi offset, "propertyOwner name ", p.name
@@ -68,44 +177,21 @@ proc printPropertiesTree*(p: PropertyOwner, offset: string = " ") =
         else:
             logi offset, "  property name ", prop.name
 
-proc shouldSerializeLayer(layer: Layer): bool = layer.enabled and ((layer.name.len > 0 and layer.name[0] != '@') or layer.name.len == 0)
-
 template quaternionWithZRotation(zAngle: float32): Quaternion = newQuaternion(zAngle, newVector3(0, 0, 1))
 template quaternionWithEulerRotation(euler: Vector3): Quaternion = newQuaternionFromEulerXYZ(euler.x, euler.y, euler.z)
 
-let bannedPropertyNames = ["Time Remap", "Marker", "Checkbox", "Value/Offset/Random Max", "Slider", "Source Text"]
-
-type PropertyDescription = ref object
-    name: string
-    fullyQualifiedName: string
-    property: AbstractProperty
-    valueAtTime: proc(time: float): JsonNode
-    keyValue: proc(k: int): JsonNode
-    initialValue: proc(): JsonNode
-    separatedProperties: seq[AbstractProperty]
-
-var gCompExportPath = ""
-var gExportFolderPath = ""
-var gAnimatedProperties = newSeq[PropertyDescription]()
-
-var layerNames = initTable[int, string]()
-var resourcePaths: seq[string] = @[]
-
-var gTrckMatteLayers = initTable[string, tuple[layer: Layer, layerEnabled: bool]]()
-var gCurrTrckMatteLayer: Layer
-
 proc mangledName(layer: Layer): string =
-    result = layerNames.getOrDefault(layer.index)
+    result = layer.layerNames.getOrDefault(layer.index)
     if result.len == 0:
         result = $layer.name
         if result == $layer.containingComp.name:
             result &= "$" & $layer.index
         else:
-            for v in values(layerNames):
+            for v in values(layer.layerNames):
                 if result == v:
                     result &= "$" & $layer.index
                     break
-        layerNames[layer.index] = result
+        layer.setLayerName(layer.index, result)
 
 proc fullyQualifiedPropName(layer: Layer, componentIndex: int, name: string, p: AbstractProperty): string =
     let layerName = layer.mangledName
@@ -196,7 +282,7 @@ proc newPropDescSeparated[T](layer: Layer, componentIndex: int = -1, name: strin
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T, time: tuple[time:float, key:int]): JsonNode = nil): PropertyDescription {.discardable.} =
     result = newPropDesc(layer, componentIndex, name, p, mapper)
     if not result.isNil and p.isAnimated:
-        gAnimatedProperties.add(result)
+        layer.animatedProperties.add(result)
 
 proc addPropDesc[T](layer: Layer, componentIndex: int = -1, name: string, p: Property[T], mapper: proc(val: T): JsonNode = nil): PropertyDescription {.discardable.} =
     let map = proc(val: T, time: tuple[time:float, key:int]): JsonNode =
@@ -246,8 +332,6 @@ proc isTextMarkerValid(layer: Layer): bool =
     if textMarker == textLayer or removeTextAttributes($textMarker) == textLayer:
         return true
 
-proc layerIsCompositionRef(layer: Layer): bool =
-    not layer.source.isNil and layer.source.jsObjectType == "CompItem"
 
 proc getText(layer: Layer): string =
     let markerText = layer.property("Marker", MarkerValue).valueAtTime(0).comment
@@ -434,9 +518,9 @@ proc copyAndPrepareFootageItem(footageSource: FootageItem): JsonNode =
     result = imageFileRelativeExportPaths
 
 proc setTrackMattLayer(layer: Layer) =
-    gCurrTrckMatteLayer = layer
-    gTrckMatteLayers[$layer.mangledName] = (layer, layer.enabled)
-    gCurrTrckMatteLayer.enabled = true
+    layer.currTrckMatteLayer = layer
+    layer.setTrckMatteLayers($layer.mangledName, (layer, layer.enabled))
+    layer.currTrckMatteLayer.enabled = true
 
 proc newTrackMatteComponent(layer: Layer, name: string): JsonNode =
     result = newJObject()
@@ -554,13 +638,13 @@ proc serializeEffectComponents(layer: Layer, result: JsonNode) =
         let c = serializeEffect(layer, result.len, p)
         if not c.isNil: result.add(c)
 
-    if not gCurrTrckMatteLayer.isNil and layer.hasTrackMatte:
+    if not layer.currTrckMatteLayer.isNil and layer.hasTrackMatte:
         if not transitiveEffects:
             logi "\n\nEnable Transitive Effects for export masks!!!\n\n"
             raise
 
-        let traсkMatte = newTrackMatteComponent(layer, $gCurrTrckMatteLayer.mangledName)
-        gCurrTrckMatteLayer = nil
+        let traсkMatte = newTrackMatteComponent(layer, $layer.currTrckMatteLayer.mangledName)
+        layer.currTrckMatteLayer = nil
         if not traсkMatte.isNil:
             result.add(traсkMatte)
 
@@ -582,10 +666,6 @@ proc serializeEffectComponents(layer: Layer, result: JsonNode) =
             timeRemapDesc.setInitialValueToResult(ael)
 
         result.add(ael)
-
-proc isNinePartSprite(layer: Layer): bool =
-    let ch = layer.children
-    ch.len == 1 and ch[0].name == "@NinePartMarker"
 
 proc ninePartSpriteGeometry(layer: Layer): array[4, float] =
     let mLayer = layer.children[0]
@@ -833,24 +913,6 @@ proc exportPath(c: Item): string =
     else:
         result = result[1 .. ^1]
 
-proc metadata(layer: Layer): JsonNode =
-    if layer.comment.len > 0:
-        var c = $layer.comment
-        # After effects may insert funny chars instead of quotes.
-        c = c.replace("“", "\"")
-        c = c.replace("”", "\"")
-        try:
-            result = parseJson(c)
-        except:
-            logi "Could not parse layer comment"
-            logi c
-
-proc hasCompRefComponent(metadata: JsonNode): bool =
-    let comps = metadata{"components"}
-    if not comps.isNil:
-        for c in comps:
-            if c{"_c"}.getStr() == "CompRef": return true
-
 proc serializeLayer(layer: Layer): JsonNode =
     result = newJObject()
 
@@ -934,7 +996,7 @@ proc serializeLayer(layer: Layer): JsonNode =
         let rotationEuler = newPropDescSeparated(layer, -1, "rotation", @[xprop, yprop, zprop]) do(v: seq[float]) -> JsonNode:
             % cutDecimal(newQuaternionFromEulerYXZ(v[0], v[1], v[2]))
         if not rotationEuler.isNil() and (xprop.isAnimated() or yprop.isAnimated() or zprop.isAnimated()):
-            gAnimatedProperties.add(rotationEuler)
+            layer.animatedProperties.add(rotationEuler)
         rotationEuler.setInitialValueToResult(result)
     else:
         let rotation = addPropDesc(layer, -1, "rotation", transform.property("Rotation", float), 0) do(v: float) -> JsonNode:
@@ -969,7 +1031,7 @@ proc serializeLayer(layer: Layer): JsonNode =
     if not transitiveEffects: result["affectsChildren"] = %false
 
     if layer.isTrackMatte:
-        let lrr = gTrckMatteLayers.getOrDefault($layer.name)
+        let lrr = layer.trckMatteLayers.getOrDefault($layer.name)
         if not lrr.layer.isNil:
             result["enabled"] = %lrr.layerEnabled
 
@@ -991,12 +1053,6 @@ proc serializeLayer(layer: Layer): JsonNode =
 
     if components.len > 0: result["components"] = components
 
-type Marker = object
-    time*, duration*: float
-    comment*: string
-    animation*: string
-    loops*: int
-    animation_end*: string
 
 proc getMarkers(comp: Composition): seq[Marker] =
     result = @[]
@@ -1235,7 +1291,7 @@ proc serializeCompositionBuffers(composition: Composition): JsonNode=
     allCompositionMarker.duration = composition.duration
     allCompositionMarker.animation = "aeAllCompositionAnimation"
 
-    for pd in gAnimatedProperties:
+    for pd in composition.animatedProperties:
         animationsBuffer[pd.fullyQualifiedName] = getPropertyAnimation(pd, allCompositionMarker, composition.frameRate)
 
     var aeContainingLayers = newJArray()
@@ -1320,7 +1376,7 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
         var animations = newJObject()
         logi("Exporting animation: ", m.animation, ": ", epochTime())
 
-        for pd in gAnimatedProperties:
+        for pd in composition.animatedProperties:
             animations[pd.fullyQualifiedName] = getPropertyAnimation(pd, m, composition.frameRate)
 
         for layer in composition.layers:
@@ -1336,7 +1392,6 @@ proc serializeCompositionAnimations(composition: Composition): JsonNode =
             result[m.animation] = animations
 
 proc serializeComposition(composition: Composition): JsonNode =
-    layerNames = initTable[int, string]()
     resourcePaths = @[]
 
     let rootLayer = composition.layer("root")
@@ -1402,14 +1457,23 @@ proc fastJsonStringify(n: JsonNode): cstring =
     let r = replacer(n)
     {.emit: "`result` = JSON.stringify(`r`, null, 2);".}
 
-proc exportSelectedCompositions(exportFolderPath: cstring) =
+proc exportSelectedCompositions(exportFolderPath: cstring, recursive = false) =
     logTextField.text = ""
 
-    let compositions = getSelectedCompositions()
+    let compositions = getSelectedCompositions(recursive)
+    
     gExportFolderPath = $exportFolderPath
-    for c in compositions:
-        gAnimatedProperties.setLen(0)
-        gCompExportPath = c.exportPath
+    exportSettings = newTable[string, ExportSettings]()
+
+    for i in 0 .. compositions.high:
+        let c = compositions[i]
+        let compName = $c.name
+        if compName in exportSettings: 
+            logi("Skiping composition ", compName, ". Already exported.")
+            continue
+
+        gCompExportPath = c.exportPath()
+
         let fullExportPath = gExportFolderPath & "/" & gCompExportPath
 
         try:
@@ -1417,27 +1481,35 @@ proc exportSelectedCompositions(exportFolderPath: cstring) =
                 logi "ERROR: Could not create folder ", fullExportPath
         except:
             discard
-        let filePath = fullExportPath & "/" & $c.name & ".jcomp"
-        logi("Exporting: ", c.name, " to ", filePath)
+        
+        let filePath = fullExportPath & "/" & compName & ".jcomp"
+        logi("Exporting: ", compName, " to ", filePath)
         let file = newFile(filePath)
         file.encoding = "UTF-8"
         file.openForWriting()
         file.lineFeed = lfUnix
         try:
+            exportSettings[compName] = createExportSettings(c)
+
             let serializedComp = serializeComposition(c)
             serializedComp["version"] = %exportedVersion
             file.write(fastJsonStringify(serializedComp))
+
+            for k, v in c.trckMatteLayers:
+                v.layer.enabled = v.layerEnabled
+            exportSettings[compName] = nil
+
         except:
             logi "Exception caught: ", getCurrentExceptionMsg()
             let s = getCurrentException().getStackTrace()
             if not s.isNil: logi s
         file.close()
 
-    for k, v in gTrckMatteLayers:
-        v.layer.enabled = v.layerEnabled
-    gTrckMatteLayers = initTable[string, tuple[layer: Layer, layerEnabled: bool]]()
+        logi "Done: ", compName
 
     logi("Done. ", epochTime())
+    if recursive:
+        logi("Recursive compostions exported ", compositions.len)
 
 
 proc buildUI(contextObj: ref RootObj) =
@@ -1515,13 +1587,22 @@ proc buildUI(contextObj: ref RootObj) =
     app.settings.saveSetting("rodExport", "frameLerp", frameLerpCheckBox.value + "");
   }
 
-  var exportButton = topGroup.add("button", undefined,
-    "Export selected compositions");
-  exportButton.alignment = ["right", "center"];
+  var buttonGroup = topGroup.add("group{orientation:'column'}");
+  buttonGroup.aligment = ["right", "center"]
+
+  var exportButton = buttonGroup.add("button", undefined,
+    "Export");
+  exportButton.alignment = ["right", "top"];
   exportButton.enabled = false;
+
+  var exportRecButton = buttonGroup.add("button", undefined,
+    "Export recursive");
+  exportRecButton.alignment = ["right", "bottom"];
+  exportRecButton.enabled = false;
 
   if (app.settings.haveSetting("rodExport", "outputPath")) {
     exportButton.enabled = true;
+    exportRecButton.enabled = true;
     filePath.text = app.settings.getSetting("rodExport", "outputPath");
   } else {
     filePath.text = "Output: (not specified)";
@@ -1535,15 +1616,21 @@ proc buildUI(contextObj: ref RootObj) =
     var outputFile = Folder.selectDialog("Choose an output folder");
     if (outputFile) {
       exportButton.enabled = true;
+      exportRecButton.enabled = true;
       filePath.text = outputFile.absoluteURI;
       app.settings.saveSetting("rodExport", "outputPath", outputFile.absoluteURI);
     } else {
       exportButton.enabled = false;
+      exportRecButton.enabled = false;
     }
   };
 
   exportButton.onClick = function(e) {
     `exportSelectedCompositions`(filePath.text);
+  };
+  
+  exportRecButton.onClick = function(e) {
+    `exportSelectedCompositions`(filePath.text, true);
   };
 
   mainWindow.addEventListener("resize", function(e) {
