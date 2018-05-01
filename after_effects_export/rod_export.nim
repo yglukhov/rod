@@ -13,6 +13,8 @@ import rod.utils.text_helpers
 const exportSampledAnimations = true
 const exportKeyframeAnimations = false
 
+const exporterDate:string = staticExec("git log -1 --format=%cd")
+
 type File = after_effects.File
 type PropertyDescription = ref object
     name: string
@@ -1424,7 +1426,8 @@ proc serializeComposition(composition: Composition): JsonNode =
     let f = app.project.file
     if not f.isNil:
         result["aep_name"] = % $f.name
-
+        result["export_time"] = %format(local(now()), "d MMMM yyyy HH:mm")
+        result["rod_export_v"] = %exporterDate
 
 proc replacer(n: JsonNode): ref RootObj =
     case n.kind
@@ -1493,6 +1496,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring, recursive = false) =
 
             let serializedComp = serializeComposition(c)
             serializedComp["version"] = %exportedVersion
+
             file.write(fastJsonStringify(serializedComp))
 
             for k, v in c.trckMatteLayers:
