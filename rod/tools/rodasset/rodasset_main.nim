@@ -4,6 +4,7 @@ import settings except hash
 import json except hash
 import tempfile
 import nimx.pathutils
+import libsha / sha1
 
 const rodPluginFile {.strdefine.} = ""
 when rodPluginFile.len != 0:
@@ -133,6 +134,16 @@ proc packSingleAssetBundle(s: Settings, cache: string, onlyCache: bool, src, dst
             moveDir(tmpCacheDir, c) # Newer nim should support it
         else:
             moveFile(tmpCacheDir, c)
+        
+        echo " "
+        echo " "
+        var info = newJObject()
+        for r in walkDirRec(c):
+            info[r.substr(c.len + 1)] = %sha1hexdigest(readFile(r))
+        writeFile(c / ".info", $info)
+        echo info
+        echo " "
+        echo " "
 
     if not onlyCache:
         copyResourcesFromCache(c, h, dst)

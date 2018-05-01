@@ -43,7 +43,11 @@ proc write[T](data: T): JsonNode =
 proc visit*(b: JsonSerializer, v: Image, key: string) =
     if not v.isNil:
         var pDir = parentDir(b.resourcePath)
-        var path = relativePathToPath(pDir, filePath(v))
+
+        var path = filePath(v)
+        if pDir.len > 0:
+            path = relativePathToPath(pDir, filePath(v))
+        # let path = relativePathToPath(pDir, filePath(v))
 
         b.node[key] = %path
         echo " >> new serializer image path ", path, " origin ", filePath(v)

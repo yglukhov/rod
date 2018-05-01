@@ -3,6 +3,7 @@ import nimx.assets.abstract_asset_bundle as nab
 import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager, asset_cache ]
 import nimx / [ image, types ]
 import variant
+import libsha / sha1
 
 when not defined(js):
     import os
@@ -96,7 +97,7 @@ when defined(js) or defined(emscripten):
         result.new()
         result.path = path
         result.hash = hash
-        let href = parentDir(getCurrentHref())
+        let href = getCurrentHref().parentDir()
         if href.find("localhost") != -1 or href.startsWith("file://"):
             result.mBaseUrl = href / "res" / path
         else:
@@ -188,11 +189,32 @@ when defined(android):
     import android.content.context
     import android.extras.pathutils
 
-proc cacheDir(): string {.inline.} =
+proc cacheDir*(): string {.inline.} =
     when defined(android):
         mainActivity().getExternalCacheDir().getAbsolutePath()
     else:
         "/tmp/rodappcache"
+
+proc validateAssetBundle(src: string): bool =
+    if fileExists(src / ".validated"):
+        return true
+
+    var infoFile: JsonNode
+    try:
+        infoFile = parseFile(src / ".info")
+    except:
+        removeDir(src)
+        return false
+    
+    for key, hash in infoFile:
+        let path = src / key
+        if not fileExists(path) or hash.getStr() != sha1hexdigest(readFile(path)):
+            removeDir(src)
+            return false
+    
+    writeFile(src / ".validated", "OK")
+
+    result = true
 
 when not defined(js) and not defined(emscripten) and not defined(windows):
     import os, threadpool, httpclient, net
@@ -202,15 +224,24 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
     type DownloadCtx = ref object
         handler: proc(err: string)
         errorMsg: cstring
+        onProgress: proc(total, progress, speed: BiggestInt)
+        progress: cstring
 
     proc onDownloadComplete(ctx: pointer) {.cdecl.} =
         let ctx = cast[DownloadCtx](ctx)
         GC_unref(ctx)
+        if not ctx.progress.isNil:
+            deallocShared(ctx.progress)
         if ctx.errorMsg.isNil:
             ctx.handler(nil)
         else:
             ctx.handler("Could not download or extract: " & $ctx.errorMsg)
             deallocShared(ctx.errorMsg)
+
+    proc onDownloadProgress(ctx: pointer) {.cdecl.} =
+        let ctx = cast[DownloadCtx](ctx)
+        let args = ($ctx.progress).split(',')
+        ctx.onProgress(args[0].parseBiggestInt(), args[1].parseBiggestInt(), args[2].parseBiggestInt())
 
     proc extractGz(zipFileName, destFolder: string): bool =
         var file = newTarFile(zipFileName)
@@ -219,9 +250,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         removeFile(zipFileName)
         result = true
 
-    proc downloadAndUnzip(url, destPath: string, ctx: pointer) {.used.} =
-        let zipFilePath = destPath & ".gz"
-
+    proc downloadFile(url, destPath: string, ctx: pointer) =
         try:
             when defined(ssl):
                 when defined(windows) or defined(android):
@@ -231,23 +260,65 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
                 let client = newHttpClient(sslContext = sslCtx)
             else:
                 let client = newHttpClient(sslContext = nil)
+            
+            client.onProgressChanged = proc(total, progress, speed: BiggestInt) =
+                let dctx = cast[DownloadCtx](ctx)
+                if not dctx.progress.isNil:
+                    deallocShared(dctx.progress)
+                    
+                var progressMsg = $total & "," & $progress & "," & $speed
+                let cprogressMsg = cast[cstring](allocShared(progressMsg.len + 1))
+                copyMem(cprogressMsg, addr progressMsg[0], progressMsg.len + 1)
+                dctx.progress = cprogressMsg
 
-            client.downloadFile(url, zipFilePath)
+                performOnMainThread(onDownloadProgress, ctx)
+            client.downloadFile(url, destPath)
             client.close()
             when defined(ssl):
                 sslCtx.destroyContext()
-
-            if not extractGz(zipFilePath, destPath):
-                raise newException(Exception, "Could not extract")
         except:
             var errorMsg = "Error downloading " & url & " to " & destPath & ": " & getCurrentExceptionMsg()
             let cerrorMsg = cast[cstring](allocShared(errorMsg.len + 1))
             copyMem(cerrorMsg, addr errorMsg[0], errorMsg.len + 1)
             cast[DownloadCtx](ctx).errorMsg = cerrorMsg
-            removeDir(destPath)
         finally:
-            discard tryRemoveFile(zipFilePath)
             performOnMainThread(onDownloadComplete, ctx)
+
+    proc downloadFile*(url, destPath: string, handler: proc(err: string), onProgress: proc(total, progress, speed: BiggestInt) = nil) =
+        var ctx: DownloadCtx
+        ctx.new()
+        ctx.handler = handler
+        ctx.onProgress = proc(total, progress, speed: BiggestInt) =
+            if not onProgress.isNil:
+                onProgress(total, progress, speed)
+        GC_ref(ctx)
+
+        spawn downloadFile(url, destPath, cast[pointer](ctx))
+
+    proc downloadAndUnzip(url, destPath: string, cb: proc(err: string), onProgress: proc(total, progress, speed: BiggestInt) = nil) {.used.} =
+        let zipFilePath = destPath & ".gz"
+
+        downloadFile(url, zipFilePath,
+            proc(err: string) =
+                if not err.isNil:
+                    cb(err)
+                    return
+
+                if not extractGz(zipFilePath, destPath):
+                    discard tryRemoveFile(zipFilePath)
+                    removeDir(destPath)
+                    cb("Could not extract")
+                    return
+
+                discard tryRemoveFile(zipFilePath)
+                
+                if not validateAssetBundle(destPath):
+                    cb("Assed bundle is invalid")
+                    return
+                
+                cb(nil),
+            onProgress
+        )
 
 proc downloadedAssetsDir(abd: AssetBundleDescriptor): string =
     cacheDir() / abd.hash
@@ -255,11 +326,12 @@ proc downloadedAssetsDir(abd: AssetBundleDescriptor): string =
 proc isDownloaded*(abd: AssetBundleDescriptor): bool =
     when not defined(js) and not defined(emscripten):
         if abd.isDownloadable:
-            result = dirExists(abd.downloadedAssetsDir) and not fileExists(abd.downloadedAssetsDir & ".gz")
+            let path = abd.downloadedAssetsDir
+            result = dirExists(path) and validateAssetBundle(path)
 
 var getURLForAssetBundle*: proc(hash: string): string
 
-proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)) =
+proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string), onProgress: proc(total, progress, speed: BiggestInt) = nil) =
     if abd.isDownloadable:
         if abd.isDownloaded:
             handler(nil)
@@ -267,11 +339,7 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
             when not defined(js) and not defined(emscripten) and not defined(windows) and not defined(rodplugin):
                 assert(not getURLForAssetBundle.isNil)
                 let url = getURLForAssetBundle(abd.hash)
-                var ctx: DownloadCtx
-                ctx.new()
-                ctx.handler = handler
-                GC_ref(ctx)
-                spawn downloadAndUnzip(url, abd.downloadedAssetsDir, cast[pointer](ctx))
+                downloadAndUnzip(url, abd.downloadedAssetsDir, handler, onProgress)
             else:
                 assert(false, "Not supported")
     else:
@@ -289,15 +357,18 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
             else:
                 result = newNativeAssetBundle(abd.path)
 
-proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string)) =
-    abd.downloadAssetBundle() do(err: string):
-        if err.isNil:
-            let ab = newAssetBundle(abd)
-            ab.init() do():
-                handler(abd.path, ab, nil)
-        else:
-            warn "Asset bundle error for ", abd.hash, " (", abd.path, "): " , err
-            handler(abd.path, nil, err)
+proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string), onProgress: proc(total, progress, speed: BiggestInt) = nil) =
+    abd.downloadAssetBundle(
+        proc(err: string) =
+            if err.isNil:
+                let ab = newAssetBundle(abd)
+                ab.init() do():
+                    handler(abd.path, ab, nil)
+            else:
+                warn "Asset bundle error for ", abd.hash, " (", abd.path, "): " , err
+                handler(abd.path, nil, err),
+        onProgress
+    )
 
 proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) {.deprecated.}  =
     let newHandler = proc(mountPaths: string, ab: AssetBundle, err: string) =
@@ -305,24 +376,30 @@ proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: strin
 
     loadAssetBundle(abd, newHandler)
 
-proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle], err: string)) =
-    var mountPaths = newSeq[string](abds.len)
-    var abs = newSeq[AssetBundle](abds.len)
+proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle], err: string), onProgress: proc(items, item: int, total, progress, speed: BiggestInt) = nil) =
+    let len = abds.len
+    var mountPaths = newSeq[string](len)
+    var abs = newSeq[AssetBundle](len)
     let abds = @abds
     var i = 0
 
     proc load() =
-        if i == abds.len:
+        if i == len:
             handler(mountPaths, abs, nil)
         else:
-            abds[i].loadAssetBundle() do(mountPath: string, ab: AssetBundle, err: string):
-                if not err.isNil:
-                    handler(mountPaths, abs, err)
-                else:
-                    abs[i] = ab
-                    mountPaths[i] = mountPath
-                    inc i
-                    load()
+            abds[i].loadAssetBundle(
+                proc(mountPath: string, ab: AssetBundle, err: string) =
+                    if not err.isNil:
+                        handler(mountPaths, abs, err)
+                    else:
+                        abs[i] = ab
+                        mountPaths[i] = mountPath
+                        inc i
+                        load(),
+                proc(total, progress, speed: BiggestInt) =
+                    if not onProgress.isNil:
+                        onProgress(len, i + 1, total, progress, speed)
+            )
     load()
 
 proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle])) {.deprecated.} =
