@@ -78,13 +78,13 @@ proc getBuffer*(b: BinDeserializer, T: typedesc, len: int): BufferView[T] =
 
 proc init(b: BinDeserializer) =
     var strtabLen = b.readInt16()
-    # echo "strtabLen: ", strtabLen
     b.strtab = newSeq[string](strtabLen)
     for i in 0 ..< strtabLen:
         let strLen = b.readInt16()
-        # echo "len:", strLen
+        if strLen == 0: 
+            b.strtab[i] = ""
+            continue
         b.strtab[i] = b.stream.readStr(strLen)
-        # echo "str ", i, ": ", b.strtab[i]
         shallow(b.strtab[i])
 
     b.compsTable = initTable[string, int32]()
