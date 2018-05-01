@@ -253,7 +253,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
     proc downloadFile(url, destPath: string, ctx: pointer) =
         try:
             when defined(ssl):
-                when defined(windows) or defined(android):
+                when defined(windows) or defined(android) or defined(macosx):
                     let sslCtx = newContext(verifyMode = CVerifyNone)
                 else:
                     let sslCtx = newContext()
