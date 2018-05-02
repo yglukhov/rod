@@ -91,23 +91,23 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
 
         for attrType in TextAttributeType.low..TextAttributeType.high:
             let findAttr = strWithAttr.find($attrType & ":")
+
             if findAttr > -1:
                 var index = findAttr + ($attrType).len
-                if index > -1:
-                    var attr: Attribute
-                    var letter: char
+                var attr: Attribute
+                var letter: char
 
-                    attr.value = ""
-                    attr.typ = attrType
+                attr.value = ""
+                attr.typ = attrType
+                index.inc()
+
+                while letter != '\"' and letter != ';' and index < strWithAttr.len:
+                    letter = strWithAttr[index]
+                    attr.value &= letter
                     index.inc()
-                    while letter != '\"' and letter != ';' and index <= strWithAttr.len:
-                        if letter != '\0':
-                            attr.value &= letter
-                        letter = strWithAttr[index]
-                        index.inc()
 
-                    currentAttr.attributes.add(attr)
-                    result = currentAttr
+                currentAttr.attributes.add(attr)
+                result = currentAttr
 
     while str.isStringAttributed():
         let attrs = getTextAttributes(str)
