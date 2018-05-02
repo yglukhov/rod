@@ -101,8 +101,10 @@ proc parseAttributedStr(str: var string): seq[TextAttributes] =
                 attr.typ = attrType
                 index.inc()
 
-                while letter != '\"' and letter != ';' and index < strWithAttr.len:
+                while index < strWithAttr.len:
                     letter = strWithAttr[index]
+                    if letter in "\";": break
+
                     attr.value &= letter
                     index.inc()
 
