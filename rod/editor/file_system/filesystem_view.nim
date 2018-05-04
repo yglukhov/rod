@@ -153,10 +153,6 @@ method init*(v: FileSystemView, r: Rect)=
     v.reloadFileSystem()
 
     v.fileSystemTree = OutlineView.new(newRect(0.0, 0.0, 100.0, v.bounds.height))
-    var fsScroll = newScrollView(v.fileSystemTree)
-    fsScroll.autoresizingMask={afFlexibleMinX, afFlexibleHeight}
-    horLayout.addSubview(fsScroll)
-
     block setupfileSystemTree:
         v.fileSystemTree.numberOfChildrenInItem = proc(item: Variant, indexPath: openarray[int]): int =
             if indexPath.len == 0:
@@ -209,8 +205,13 @@ method init*(v: FileSystemView, r: Rect)=
                     v.fileSystemTree.reloadData()
 
             v.currentPathNode = n
-
+        
         v.fileSystemTree.reloadData()
+
+
+    var fsScroll = newScrollView(v.fileSystemTree)
+    # fsScroll.autoresizingMask={afFlexibleMinX, afFlexibleHeight}
+    horLayout.addSubview(fsScroll)
 
     v.contentView = newAssetContainerView(newRect(0.0, 0.0, v.bounds.width - 300.0, v.bounds.height))
     horLayout.addSubview(v.contentView)
