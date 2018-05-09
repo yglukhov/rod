@@ -391,8 +391,15 @@ proc resolveNodeRefs(n: Node) =
             for s in v:
                 s(foundNode)
 
+proc cleanup(n: Node) =
+    if not n.animations.isNil:
+        for k, v in n.animations:
+            if not v.isNil:
+                v.cancel()
+
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     dec gTotalNodesCount
+    n.cleanup()
     if not n.components.isNil:
         for c in n.components: c.componentNodeWillBeRemovedFromSceneView()
     if not n.children.isNil:
