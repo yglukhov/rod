@@ -397,13 +397,14 @@ proc cleanup(n: Node) =
             if not v.isNil:
                 v.cancel()
 
-proc nodeWillBeRemovedFromSceneView*(n: Node) =
+proc nodeWillBeRemovedFromSceneView*(n: Node, withCleanup = false) =
     dec gTotalNodesCount
-    n.cleanup()
+    if withCleanup:
+        n.cleanup()
     if not n.components.isNil:
         for c in n.components: c.componentNodeWillBeRemovedFromSceneView()
     if not n.children.isNil:
-        for c in n.children: c.nodeWillBeRemovedFromSceneView()
+        for c in n.children: c.nodeWillBeRemovedFromSceneView(withCleanup)
     n.mSceneView = nil
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
@@ -427,23 +428,23 @@ proc removeChild(n, child: Node) =
             n.children.delete(i)
             break
 
-proc removeAllChildren*(n: Node) =
+proc removeAllChildren*(n: Node, withCleanup = true) =
     for c in n.children:
         if not c.mSceneView.isNil:
-            c.nodeWillBeRemovedFromSceneView()
+            c.nodeWillBeRemovedFromSceneView(withCleanup)
         c.parent = nil
     n.children.setLen(0)
 
-proc removeFromParent*(n: Node) =
+proc removeFromParent*(n: Node, withCleanup = true) =
     if not n.parent.isNil:
         if not n.mSceneView.isNil:
-            n.nodeWillBeRemovedFromSceneView()
+            n.nodeWillBeRemovedFromSceneView(withCleanup)
 
         n.parent.removeChild(n)
         n.parent = nil
 
 proc addChild*(n, c: Node) =
-    c.removeFromParent()
+    c.removeFromParent(false)
     n.children.safeAdd(c)
     c.parent = n
     c.setDirty()
@@ -455,7 +456,7 @@ proc newChild*(n: Node, childName: string = nil): Node =
     n.addChild(result)
 
 proc insertChild*(n, c: Node, index: int) =
-    c.removeFromParent()
+    c.removeFromParent(false)
     n.children.insert(c, index)
     c.parent = n
     c.setDirty()
