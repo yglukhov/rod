@@ -70,7 +70,7 @@ proc createExportSettings(comp: Composition): ExportSettings =
     result.trckMatteLayers = initTable[string, tuple[layer: Layer, layerEnabled: bool]]()
     result.animatedProperties = @[]
 
-proc `currTrckMatteLayer=`(lay: Layer | Composition, val: Layer) = 
+proc `currTrckMatteLayer=`(lay: Layer | Composition, val: Layer) =
     var s = lay.getExportSettings()
     s.currTrckMatteLayer = val
 
@@ -143,7 +143,7 @@ proc hasCompRefComponent(metadata: JsonNode): bool =
 proc childrenCompositions(c: Composition): seq[Composition]=
     result = @[]
     for lay in c.layers:
-        if lay.layerIsCompositionRef() and shouldSerializeLayer(lay) and not hasCompRefComponent(lay.metadata): 
+        if lay.layerIsCompositionRef() and shouldSerializeLayer(lay) and not hasCompRefComponent(lay.metadata):
             var c = cast[Composition](lay.source)
             result.add(c)
             var chcomps = c.childrenCompositions()
@@ -158,13 +158,16 @@ proc getSelectedCompositions(recursive: bool): seq[Composition] =
         result.add(chcomps)
 
 proc cutDecimal(v: float, t: float = 1000.0): float =
-    result = (v * t).int.float / t
+    # result = (v * t).int.float / t
+    result = v
 
 proc cutDecimal[I: static[int], T](v: TVector[I, T], t: float = 1000.0): TVector[I, T] =
-    for i in 0 ..< v.len: result[i] = cutDecimal(v[i], t)
+    # for i in 0 ..< v.len: result[i] = cutDecimal(v[i], t)
+    result = v
 
 proc cutDecimal(q: Quaternion, t: float = 1000.0): Quaternion =
-    cutDecimal(q.Vector4, t).Quaternion
+    # cutDecimal(q.Vector4, t).Quaternion
+    result = q
 
 proc `&=`(s, a: cstring) {.importcpp: "# += #".}
 proc `%`(q: Quaternion): JsonNode =
@@ -1464,14 +1467,14 @@ proc exportSelectedCompositions(exportFolderPath: cstring, recursive = false) =
     logTextField.text = ""
 
     let compositions = getSelectedCompositions(recursive)
-    
+
     gExportFolderPath = $exportFolderPath
     exportSettings = newTable[string, ExportSettings]()
 
     for i in 0 .. compositions.high:
         let c = compositions[i]
         let compName = $c.name
-        if compName in exportSettings: 
+        if compName in exportSettings:
             logi("Skiping composition ", compName, ". Already exported.")
             continue
 
@@ -1484,7 +1487,7 @@ proc exportSelectedCompositions(exportFolderPath: cstring, recursive = false) =
                 logi "ERROR: Could not create folder ", fullExportPath
         except:
             discard
-        
+
         let filePath = fullExportPath & "/" & compName & ".jcomp"
         logi("Exporting: ", compName, " to ", filePath)
         let file = newFile(filePath)
@@ -1632,7 +1635,7 @@ proc buildUI(contextObj: ref RootObj) =
   exportButton.onClick = function(e) {
     `exportSelectedCompositions`(filePath.text);
   };
-  
+
   exportRecButton.onClick = function(e) {
     `exportSelectedCompositions`(filePath.text, true);
   };
