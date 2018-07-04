@@ -169,8 +169,8 @@ template `maskNode=`*(msk: Mask, val: Node) =
         msk.mMaskNode = val
     trySetupMask(msk, val)
 
-method componentNodeWillBeRemovedFromSceneView*(msk: Mask) =
-    msk.maskComponent = nil
+#method componentNodeWillBeRemovedFromSceneView*(msk: Mask) =
+#    msk.maskComponent = nil
 
 method beforeDraw*(msk: Mask, index: int): bool =
     if not msk.maskComponent.isNil and msk.maskType != tmNone:
