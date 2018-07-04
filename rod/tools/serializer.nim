@@ -224,6 +224,14 @@ proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: 
 
             val.add( seqVal )
 
+proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: var T)=
+    let jN = j{name}
+    if not jN.isNil:
+        # var r: T
+        for i in 0 ..< jN.len:
+            val[i] = jN[i].getFloat()
+
+
 proc getValue*[T](s: Serializer, v: T): JsonNode =
     when T is enum:
         result = %(int(v))
