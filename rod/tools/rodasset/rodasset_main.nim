@@ -1,4 +1,5 @@
-import os, strutils, times, osproc, sets, logging, macros
+import os, strutils, times, osproc, logging, macros
+import sets except hash
 import imgtool, asset_cache, migrator
 import settings except hash
 import json except hash

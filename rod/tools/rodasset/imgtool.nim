@@ -97,7 +97,7 @@ proc adjustImageNode(tool: ImgTool, im: ImageOccurence) =
 
 proc absImagePath(compPath, imageRelPath: string): string =
     result = compPath.parentDir / imageRelPath
-    result.normalizePath()
+    pathutils.normalizePath(result)
 
 proc checkCompositionRefs(c: JsonNode, compPath, originalResPath: string) =
     var missingRefs = newSeq[string]()
