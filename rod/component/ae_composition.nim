@@ -56,23 +56,22 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
 
 proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, exceptions: seq[string] = nil): ComposeMarker=
     let lc = cl.node.componentIfAvailable(AEComposition)
+
     if not lc.isNil:
 
-        let layerIn = (cl.inPoint - marker.start) / marker.duration
-        let layerOut = ((cl.outPoint - marker.start) * cl.animScale) / marker.duration
+        var layerIn = (cl.inPoint - marker.start) / marker.duration
+        var layerOut = ((cl.outPoint - marker.start) * cl.animScale) / marker.duration
+
         if layerIn >= 1.0 or layerOut <= 0.0:
             return #skip layers from other markers
 
         var allp = abs(layerIn) + layerOut
 
-        var pIn = 0.0
-        if layerIn < 0.0:
-            pIn = abs(layerIn) / allp
+        let startP = max(cl.inPoint, marker.start) #local marker start
+        let endP = min(cl.inPoint + cl.duration, marker.start + marker.duration) #local marker end
 
-        var pOut = 1.0
-        if layerOut > 1.0:
-            let skip = layerOut - 1.0
-            pOut = 1.0 - skip / allp
+        var pIn = max(0.0, (startP - cl.startTime) / cl.duration) #start offset
+        var pOut = min((endP - cl.startTime) / cl.duration, 1.0)
 
         let prop = lc.compositionNamed(aeAllCompositionAnimation,exceptions)
 
