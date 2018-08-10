@@ -241,7 +241,7 @@ proc optimizeSpritesheet(path, category: string) =
         # Otherwise pngcrush will create temp file in current dir and that may
         # cause problems. Originally this bug was observed in docker build image.
         let tmp = quoteShell(path & ".tmp.png")
-        let (_, r) = execCmdEx("pngcrush -q -ow -rem allb -reduce " & qPath & " " & tmp)
+        let (_, r) = execCmdEx("pngcrush -q -ow -rem allb " & qPath & " " & tmp)
         res = r
     except:
         discard
