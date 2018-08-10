@@ -32,12 +32,13 @@ proc `%`*(v: Rect): JsonNode = %[v.x, v.y, v.width, v.height]
 template `%`*(v: Quaternion): JsonNode = %(TVector4[Coord](v))
 
 proc getRelativeResourcePath*(s: Serializer, path: string): string =
-    var resourcePath = path
+    var resourcePath = path.replace("file:///", "")
+    var parentDir = resourcePath
     when not defined(js) and not defined(android) and not defined(ios):
-        resourcePath = parentDir(s.url)
+        parentDir = parentDir(s.url).replace("file:///", "")
 
-    result = relativePathToPath(resourcePath, path)
-    echo "save path = ", resourcePath, "  relative = ", result
+    result = relativePathToPath(parentDir, resourcePath)
+    echo " >> old serializer image path  = ", result, "  url = ", s.url
 
 template isAbsoluteUrl(u: string): bool =
     # TODO: make it smarter
@@ -94,6 +95,11 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Vector3)
     let jN = j{name}
     if not jN.isNil:
         val = newVector3(jN[0].getFloat(), jN[1].getFloat(), jN[2].getFloat())
+
+proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Vector2) =
+    let jN = j{name}
+    if not jN.isNil:
+        val = newVector2(jN[0].getFloat(), jN[1].getFloat())
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Quaternion) =
     let jN = j{name}
@@ -217,6 +223,14 @@ proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: 
                 seqVal[j] = jN[i][j].getFloat()
 
             val.add( seqVal )
+
+proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: var T)=
+    let jN = j{name}
+    if not jN.isNil:
+        # var r: T
+        for i in 0 ..< jN.len:
+            val[i] = jN[i].getFloat()
+
 
 proc getValue*[T](s: Serializer, v: T): JsonNode =
     when T is enum:

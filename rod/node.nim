@@ -8,7 +8,7 @@ import quaternion, ray, rod_types
 import rod.tools.serializer
 import rod / utils / [ bin_deserializer, json_serializer ]
 
-import rod / utils / json_deserializer
+import rod / utils / [ json_deserializer, editor_pathes ]
 
 import rod.asset_bundle
 
@@ -20,6 +20,8 @@ proc worldTransform*(n: Node): Matrix4
 proc isEnabledInTree*(n: Node): bool
 
 import rod.component
+
+var gTotalNodesCount*: int
 
 proc newNode*(name: string = nil): Node =
     result.new()
@@ -332,12 +334,29 @@ iterator allNodes*(n: Node): Node =
         inc i
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
-    if p(n):
-        result = n
+    when defined bfsFind:
+        if p(n):
+            return n
+        else:
+            var gfnc = newSeq[Node]()
+            var nfnc = newSeq[Node]()
+            gfnc.add(n.children)
+            while gfnc.len > 0:
+                for c in gfnc:
+                    if p(c):
+                        return c
+                    else:
+                        nfnc.add(c.children)
+                gfnc.setLen(0)
+                gfnc.add(nfnc)
+                nfnc.setLen(0)
     else:
-        for c in n.children:
-            result = c.findNode(p)
-            if not result.isNil: break
+        if p(n):
+            result = n
+        else:
+            for c in n.children:
+                result = c.findNode(p)
+                if not result.isNil: break
 
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
@@ -372,14 +391,24 @@ proc resolveNodeRefs(n: Node) =
             for s in v:
                 s(foundNode)
 
-proc nodeWillBeRemovedFromSceneView*(n: Node) =
+proc cleanup(n: Node) =
+    if not n.animations.isNil:
+        for k, v in n.animations:
+            if not v.isNil:
+                v.cancel()
+
+proc nodeWillBeRemovedFromSceneView*(n: Node, withCleanup = false) =
+    dec gTotalNodesCount
+    if withCleanup:
+        n.cleanup()
     if not n.components.isNil:
         for c in n.components: c.componentNodeWillBeRemovedFromSceneView()
     if not n.children.isNil:
-        for c in n.children: c.nodeWillBeRemovedFromSceneView()
+        for c in n.children: c.nodeWillBeRemovedFromSceneView(withCleanup)
     n.mSceneView = nil
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
+    inc gTotalNodesCount
     if n.mSceneView.isNil:
         n.mSceneView = v
         if not n.components.isNil:
@@ -399,23 +428,23 @@ proc removeChild(n, child: Node) =
             n.children.delete(i)
             break
 
-proc removeAllChildren*(n: Node) =
+proc removeAllChildren*(n: Node, withCleanup = true) =
     for c in n.children:
         if not c.mSceneView.isNil:
-            c.nodeWillBeRemovedFromSceneView()
+            c.nodeWillBeRemovedFromSceneView(withCleanup)
         c.parent = nil
     n.children.setLen(0)
 
-proc removeFromParent*(n: Node) =
+proc removeFromParent*(n: Node, withCleanup = true) =
     if not n.parent.isNil:
         if not n.mSceneView.isNil:
-            n.nodeWillBeRemovedFromSceneView()
+            n.nodeWillBeRemovedFromSceneView(withCleanup)
 
         n.parent.removeChild(n)
         n.parent = nil
 
 proc addChild*(n, c: Node) =
-    c.removeFromParent()
+    c.removeFromParent(false)
     n.children.safeAdd(c)
     c.parent = n
     c.setDirty()
@@ -427,7 +456,7 @@ proc newChild*(n: Node, childName: string = nil): Node =
     n.addChild(result)
 
 proc insertChild*(n, c: Node, index: int) =
-    c.removeFromParent()
+    c.removeFromParent(false)
     n.children.insert(c, index)
     c.parent = n
     c.setDirty()
@@ -664,17 +693,17 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
                 let comp = n.component(k)
                 comp.deserialize(c, s)
 
-    let animations = j{"animations"}
-    if not animations.isNil and animations.len > 0:
-        n.animations = newTable[string, Animation]()
-        for k, v in animations:
-            n.animations[k] = newPropertyAnimation(n, v)
-
     let compositionRef = j{"compositionRef"}.getStr(nil)
     if not compositionRef.isNil and not n.name.endsWith(".placeholder"):
         s.startAsyncOp()
         n.loadComposition(s.toAbsoluteUrl(compositionRef)) do():
             s.endAsyncOp()
+
+    let animations = j{"animations"}
+    if not animations.isNil and animations.len > 0:
+        n.animations = newTable[string, Animation]()
+        for k, v in animations:
+            n.animations[k] = newPropertyAnimation(n, v)
 
 proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
@@ -685,6 +714,11 @@ proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
     result.loadComposition(url, onComplete)
 
 proc newNodeWithResource*(path: string): Node =
+    if getResourceWorkingDir().len > 0:
+        let respath = getResourceWorkingDir() / path
+        result = newNodeWithURL("file://" & respath)
+        return
+
     let bd = binDeserializerForPath(path)
     if not bd.isNil:
         try:

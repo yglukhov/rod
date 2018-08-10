@@ -21,6 +21,8 @@ type AELayer* = ref object of Component
     animScale*: float32
     startTime*: float32
     duration*: float32
+    timeremap*: float32
+    timeRemapEnabled*: bool
 
 type AEComposition* = ref object of Component
     layers*: seq[AELayer]
@@ -36,6 +38,8 @@ AELayer.properties:
         serializationKey: "scale"
     startTime
     duration
+    timeremap
+    timeRemapEnabled
 
 proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     let pStart = m.start / c.duration
@@ -52,23 +56,22 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
 
 proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, exceptions: seq[string] = nil): ComposeMarker=
     let lc = cl.node.componentIfAvailable(AEComposition)
+
     if not lc.isNil:
 
-        let layerIn = (cl.inPoint - marker.start) / marker.duration
-        let layerOut = ((cl.outPoint - marker.start) * cl.animScale) / marker.duration
+        var layerIn = (cl.inPoint - marker.start) / marker.duration
+        var layerOut = ((cl.outPoint - marker.start) * cl.animScale) / marker.duration
+
         if layerIn >= 1.0 or layerOut <= 0.0:
             return #skip layers from other markers
 
         var allp = abs(layerIn) + layerOut
 
-        var pIn = 0.0
-        if layerIn < 0.0:
-            pIn = abs(layerIn) / allp
+        let startP = max(cl.inPoint, marker.start) #local marker start
+        let endP = min(cl.inPoint + cl.duration, marker.start + marker.duration) #local marker end
 
-        var pOut = 1.0
-        if layerOut > 1.0:
-            let skip = layerOut - 1.0
-            pOut = 1.0 - skip / allp
+        var pIn = max(0.0, (startP - cl.startTime) / cl.duration) #start offset
+        var pOut = min((endP - cl.startTime) / cl.duration, 1.0)
 
         let prop = lc.compositionNamed(aeAllCompositionAnimation,exceptions)
 
@@ -76,7 +79,10 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, except
         let oldCompAnimate = prop.onAnimate
 
         prop.animate prog in pIn..pOut:
-            oldCompAnimate(prog)
+            if cl.timeRemapEnabled:
+                oldCompAnimate(cl.timeremap)
+            else:
+                oldCompAnimate(prog)
 
         result = newComposeMarker(max(0.0, layerIn), min(layerOut, 1.0), prop)
 
@@ -125,6 +131,19 @@ proc play*(c: AEComposition, name: string, exceptions: seq[string] = nil): Anima
 
 proc playAll*(c: AEComposition, exceptions: seq[string] = nil): Animation {.discardable.} =
     result = c.play(aeAllCompositionAnimation)
+
+proc findNodeWithAEComp(node: Node, name: string): Node =
+    ## Using breadth-first searching instead of deep-first to fix issue when
+    ## comps with same name interfere with each other upon animation activation
+    for n in node.children:
+        let comp = n.componentIfAvailable(AEComposition)
+
+        if comp.isNil and n.name == name:
+            return n.findNodeWithAEComp(name)
+        elif n.name == name:
+            return n
+
+    result = node.findNode(name)
 
 method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
     c.layers = @[]
@@ -175,7 +194,7 @@ method deserialize*(c: AEComposition, b: BinDeserializer) =
     c.layers = @[]
     for i in 0 ..< numLayers:
         let layerName = b.readStr()
-        let ch = c.node.findNode(layerName)
+        let ch = c.node.findNodeWithAEComp(layerName)
         if not ch.isNil:
             let ael = ch.componentIfAvailable(AELayer)
             if not ael.isNil:
@@ -225,10 +244,10 @@ method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "scale", c.animScale)
     serealizer.deserializeValue(j, "startTime", c.startTime)
     serealizer.deserializeValue(j, "duration", c.duration)
+    serealizer.deserializeValue(j, "timeremap", c.timeremap)
+    serealizer.deserializeValue(j, "timeRemapEnabled", c.timeRemapEnabled)
 
 genSerializationCodeForComponent(AELayer)
-
-
 
 method serialize*(c: AELayer, s: Serializer): JsonNode=
     result = newJObject()
@@ -244,6 +263,8 @@ method visitProperties*(t: AELayer, p: var PropertyVisitor) =
     p.visitProperty("animScale",   t.animScale)
     p.visitProperty("startTime", t.startTime)
     p.visitProperty("duration",  t.duration)
+    p.visitProperty("timeremap", t.timeremap)
+    p.visitProperty("timeRemapEnabled", t.timeRemapEnabled)
 
 registerComponent(AELayer, "AE support")
 registerComponent(AEComposition, "AE support")

@@ -1,4 +1,4 @@
-import tables, logging, strutils
+import tables, logging, strutils, macros
 
 import nimx / [ matrixes, image, window, autotest ]
 import rod / [ viewport, edit_view, node ]
@@ -18,6 +18,12 @@ import rod.editor.editor_project_settings
 
 when loadingAndSavingAvailable:
     import rod.editor.editor_open_project_view
+
+const rodPluginFile {.strdefine.} = ""
+when rodPluginFile.len != 0:
+    macro doImport(): untyped =
+        newNimNode(nnkImportStmt).add(newLit(rodPluginFile))
+    doImport()
 
 const isMobile = defined(ios) or defined(android)
 

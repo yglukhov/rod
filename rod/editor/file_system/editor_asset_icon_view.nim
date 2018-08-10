@@ -145,7 +145,7 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
             extField.formattedText.horizontalAlignment = haCenter
             extField.formattedText.verticalAlignment = vaCenter
             extField.formattedText.truncationBehavior = tbCut
-            extField.text = sp.ext[1..^1]
+            extField.text = if sp.ext.len > 0: sp.ext[1..^1] else: ""
             extField.formattedText.boundingSize = extField.bounds.size
 
             res.icon.addSubview(extField)

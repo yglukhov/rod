@@ -18,6 +18,7 @@ else:
 task defaultTask, "Build and install":
     direShell nimExe, "js", "--warning[LockLevel]:off", "rod_export.nim"
     direShell nimExe, "js", "--warning[LockLevel]:off", "convert_to_null.nim"
+
     var ok = false
     for sp in searchPaths:
         if dirExists(sp):

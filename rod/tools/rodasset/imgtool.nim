@@ -97,7 +97,7 @@ proc adjustImageNode(tool: ImgTool, im: ImageOccurence) =
 
 proc absImagePath(compPath, imageRelPath: string): string =
     result = compPath.parentDir / imageRelPath
-    result.normalizePath()
+    pathutils.normalizePath(result)
 
 proc checkCompositionRefs(c: JsonNode, compPath, originalResPath: string) =
     var missingRefs = newSeq[string]()
@@ -241,7 +241,7 @@ proc optimizeSpritesheet(path, category: string) =
         # Otherwise pngcrush will create temp file in current dir and that may
         # cause problems. Originally this bug was observed in docker build image.
         let tmp = quoteShell(path & ".tmp.png")
-        let (_, r) = execCmdEx("pngcrush -q -ow -rem allb -reduce " & qPath & " " & tmp)
+        let (_, r) = execCmdEx("pngcrush -q -ow -rem allb -noreduce " & qPath & " " & tmp)
         res = r
     except:
         discard

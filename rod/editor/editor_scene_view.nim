@@ -9,7 +9,9 @@ import rod / component / [ sprite, light, camera ]
 import rod.editor_camera_controller
 import node_selector
 
-import logging, sequtils, algorithm
+import editor_context_menu
+
+import logging, sequtils, algorithm, ospaths
 
 type
     EditorDropDelegate* = ref object of DragDestinationDelegate
@@ -56,10 +58,12 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
     of bsUp:
         v.cameraController.onTapUp(0.0,0.0,e)
     of bsDown:
+        if e.keyCode != VirtualKey.MouseButtonPrimary: 
+            v.showSceneContextMenu(e.localPosition)
+            return true
+
         v.startPoint = e.localPosition
         v.cameraController.onTapDown(e)
-
-        if e.keyCode != VirtualKey.MouseButtonPrimary: return true
 
         if not gizmoTouch:
             var castedNode = v.tryRayCast(e)
@@ -176,7 +180,8 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
                 warn "Can't load image from ", i.data
                 return
 
-            var n = newNode(i.data)
+            let nodeName = splitFile(i.data).name
+            var n = newNode(nodeName)
             n.component(Sprite).image = image
 
             var editorScene = target.EditorSceneView
@@ -185,9 +190,8 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
             else:
                 editorScene.selectedNode.addChild(n)
 
-            editorScene.composition.selectedNode = n
+            # editorScene.composition.selectedNode = n
             editorScene.editor.onCompositionChanged(editorScene.composition)
-            # editorScene.editor.selectedNode = n
     else:
         discard
 

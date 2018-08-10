@@ -169,8 +169,8 @@ template `maskNode=`*(msk: Mask, val: Node) =
         msk.mMaskNode = val
     trySetupMask(msk, val)
 
-method componentNodeWillBeRemovedFromSceneView*(msk: Mask) =
-    msk.maskComponent = nil
+#method componentNodeWillBeRemovedFromSceneView*(msk: Mask) =
+#    msk.maskComponent = nil
 
 method beforeDraw*(msk: Mask, index: int): bool =
     if not msk.maskComponent.isNil and msk.maskType != tmNone:
@@ -193,6 +193,18 @@ proc fromPhantom(msk: Mask, p: object) =
     if p.layerName.len != 0:
         addNodeRef(p.layerName) do(n: Node):
             msk.maskNode = n
+
+method serialize*(msk: Mask, serealizer: Serializer): JsonNode =
+    result = newJObject()
+    result.add("maskType", serealizer.getValue(msk.maskType))
+    result.add("layerName", serealizer.getValue(msk.maskNode))
+
+method deserialize*(msk: Mask, j: JsonNode, serealizer: Serializer) =
+    serealizer.deserializeValue(j, "maskType", msk.maskType)
+    var layerName: string
+    serealizer.deserializeValue(j, "layerName", layerName)
+    addNodeRef(layerName) do(n: Node):
+        msk.maskNode=n
 
 genSerializationCodeForComponent(Mask)
 registerComponent(Mask, "Effects")
