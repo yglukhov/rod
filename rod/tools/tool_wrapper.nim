@@ -5,7 +5,7 @@ import os, osproc, strutils
 proc rodPluginFile(): string =
     result = getCurrentDir() / "rodplugin.nim"
     if fileExists(result): return
-    result = nil
+    result = ""
 
 proc nimblePath(package: string): string =
     var (packageDir, err) = execCmdEx("nimble path " & package)
