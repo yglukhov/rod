@@ -107,7 +107,7 @@ proc newNodePropertyView(editedObject: Variant, setter: proc(s: Node), getter: p
     textField.font = editorFont()
     textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     let n = getter()
-    if n.isNil or n.name.isNil:
+    if n.isNil or n.name.len == 0:
         textField.text = "nil"
     else:
         textField.text = n.name

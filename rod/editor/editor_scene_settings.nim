@@ -85,22 +85,22 @@ proc `inspectedNode=`*(i: SceneSettingsView, n: Node) =
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
 
-        if not n.components.isNil:
-            for v in n.components:
-                closureScope:
-                    expView = newExpandingView(newRect(0, 0, 328, 20.0))
-                    expView.title = v.className
-                    let component = v
-                    expView.expand()
 
-                    let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
-                    removeButton.autoresizingMask = {afFlexibleMinX}
-                    removeButton.onAction do():
-                        n.removeComponent(component)
-                        i.inspectedNode = n
+        for v in n.components:
+            closureScope:
+                expView = newExpandingView(newRect(0, 0, 328, 20.0))
+                expView.title = v.className
+                let component = v
+                expView.expand()
 
-                v.visitProperties(visitor)
-                i.propView.addSubview(expView)
+                let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
+                removeButton.autoresizingMask = {afFlexibleMinX}
+                removeButton.onAction do():
+                    n.removeComponent(component)
+                    i.inspectedNode = n
+
+            v.visitProperties(visitor)
+            i.propView.addSubview(expView)
 
         scrollBar.value = oldPos
         scrollBar.sendAction()
@@ -118,14 +118,12 @@ proc getAllCameras(n: Node): seq[Node]=
     if not n.componentIfAvailable(Camera).isNil:
         result.add(n)
 
-    if not n.children.isNil:
-        for ch in n.children:
-            result.add(ch.getAllCameras)
+    for ch in n.children:
+        result.add(ch.getAllCameras)
 
 proc reloadEditScene(v: SceneSettingsView)=
-    if not v.propView.subviews.isNil:
-        while v.propView.subviews.len > 0:
-            v.propView.subviews[0].removeFromSuperview()
+    while v.propView.subviews.len > 0:
+        v.propView.subviews[0].removeFromSuperview()
 
     var curScene: SceneView
     var root: Node

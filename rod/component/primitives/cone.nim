@@ -116,7 +116,7 @@ proc generateMesh*(c: ConeComponent) =
 
     let stride = int32( mesh.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = c.createVertexData(stride, size, vertCoords, texCoords, normals, nil)
+    var vertexData = c.createVertexData(stride, size, vertCoords, texCoords, normals, @[])
 
     mesh.createVBO(indices, vertexData)
 

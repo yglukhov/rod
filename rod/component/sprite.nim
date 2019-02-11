@@ -42,10 +42,7 @@ proc image*(s: Sprite): Image =
         result = s.images[s.currentFrame]
 
 proc `image=`*(s: Sprite, i: Image) =
-    if s.images.isNil:
-        s.images = newSeq[Image](1)
-    else:
-        s.images.setLen(1)
+    s.images.setLen(1)
     s.images[0] = i
     s.currentFrame = 0
 
@@ -54,7 +51,7 @@ proc getOffset*(s: Sprite): Point =
     if s.frameOffsets.len > s.currentFrame and s.currentFrame >= 0:
         result += s.frameOffsets[s.currentFrame]
 
-template isNinePart(s: Sprite): bool = not s.segmentsGeometry.isNil
+template isNinePart(s: Sprite): bool = s.segmentsGeometry.len > 0
 template marginLeft(s: Sprite): float32 = s.segmentsGeometry[0]
 template marginRight(s: Sprite): float32 = s.segmentsGeometry[1]
 template marginTop(s: Sprite): float32 = s.segmentsGeometry[2]

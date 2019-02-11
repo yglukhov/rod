@@ -239,7 +239,7 @@ proc setupAndDraw*(m: MeshComponent) =
         gl.enable(gl.CULL_FACE)
 
     if not m.skeleton.isNil:
-        if m.boneMap.isNil:
+        if m.boneMap.len == 0:
             m.prepareBoneMap()
 
         m.skeleton.update()

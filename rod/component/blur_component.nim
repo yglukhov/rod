@@ -192,7 +192,7 @@ proc recursiveDrawPost(n: Node) =
     n.getTransform(tr)
     c.withTransform tr:
         var hasPosteffectComponent = false
-        if not n.components.isNil:
+        if n.components.len > 0:
             # for v in values(n.components):
             let v = n.component(MeshComponent)
             if not v.isNil:

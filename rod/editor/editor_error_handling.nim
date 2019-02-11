@@ -7,7 +7,7 @@ method log*(logger: EditorLogger, level: Level, args: varargs[string,`$`])=
     var t = "[" & getClockStr() & "] "
     var msg = ""
     for arg in args:
-        if arg.isNil:
+        if arg.len == 0:
             msg &= "nil"
         else:
             msg &= arg
@@ -25,16 +25,12 @@ method log*(logger: EditorLogger, level: Level, args: varargs[string,`$`])=
         logger.msgDump = newTable[Level, seq[string]]()
 
     var dump = logger.msgDump.getOrDefault(level)
-    if dump.isNil:
-        dump = @[]
-
     dump.add(msg)
     logger.msgDump[level] = dump
 
 proc clear*(logger: EditorLogger, level: Level)=
     var dump = logger.msgDump.getOrDefault(level)
-    if not dump.isNil:
-        dump.setLen(0)
+    dump.setLen(0)
     logger.msgDump[level] = dump
 
 proc clearAll*(logger: EditorLogger)=
@@ -49,8 +45,7 @@ proc dump*(logger: EditorLogger, level: Level):seq[string]=
             result.add(v)
     else:
         var dump = logger.msgDump.getOrDefault(level)
-        if not dump.isNil:
-            result.add(dump)
+        result.add(dump)
 
 var gEditorLogger* = new(EditorLogger)
 

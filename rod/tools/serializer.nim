@@ -55,7 +55,7 @@ proc toAbsoluteUrl*(s: Serializer, relativeOrAbsoluteUrl: string): string =
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getStr(nil)
+        val = jN.getStr()
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int) =
     let jN = j{name}

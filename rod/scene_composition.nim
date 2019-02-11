@@ -102,7 +102,7 @@ proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openar
                     var bData: tuple[bone: string, weight: float32]
                     bData = skinController.boneAndWeightForVertex(vi, j)
 
-                    if not bData.bone.isNil:
+                    if bData.bone.len > 0:
                         boneIDsData.add( Glfloat( skeleton.getBoneIdByName(bData.bone) ) )
                         tempVertexWeights[j] = bData.weight
                         weightAbs += bData.weight
@@ -212,8 +212,6 @@ proc parseArray3(source: string): array[0 .. 2, float32] =
         inc(i)
 
 proc getSkinControllerByName(colladaScene: ColladaScene, name: string): ColladaSkinController =
-    if colladaScene.skinControllers.isNil:
-        return nil
 
     for sc in colladaScene.skinControllers:
         if sc.id.contains(name):
@@ -252,7 +250,7 @@ proc loadBones(bone: var Bone, animDuration: var float, node: var Node,
     boneID.inc()
 
     var invMat = skinController.boneInvMatrix(bone.name)
-    if not invMat.isNil:
+    if invMat.len > 0:
         bone.invMatrix = parseMatrix4( skinController.boneInvMatrix(bone.name) )
         bone.invMatrix.transpose()
         # echo "bone name  ", bone.name,  "inverted matrix  ", bone.invMatrix
@@ -307,7 +305,7 @@ proc loadBones(bone: var Bone, animDuration: var float, node: var Node,
             bone.children.add(b)
 
 proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string) =
-    if cn.matrix != nil:
+    if cn.matrix.len > 0:
         var modelMatrix = parseMatrix4(cn.matrix)
 
         var translation: Vector3
@@ -321,23 +319,23 @@ proc setupNodeFromCollada(node: var Node, cn: ColladaNode, colladaScene: Collada
             node.position = translation
             node.rotation = newQuaternion(rotation[0], rotation[1], rotation[2], rotation[3])
     else:
-        if cn.scale != nil:
+        if cn.scale.len > 0:
             let scale = parseArray3(cn.scale)
             node.scale = newVector3(scale[0], scale[1], scale[2])
 
-        if cn.translation != nil:
+        if cn.translation.len > 0:
             let translation = parseArray3(cn.translation)
             node.position = newVector3(translation[0], translation[1], translation[2])
 
         var finalRotation = newQuaternion(0, 0, 0, 1)
 
-        if cn.rotationX != nil:
+        if cn.rotationX.len > 0:
             let rotationX = parseArray4(cn.rotationX)
             finalRotation *= aroundX(rotationX[3])
-        if cn.rotationY != nil:
+        if cn.rotationY.len > 0:
             let rotationY = parseArray4(cn.rotationY)
             finalRotation *= aroundY(rotationY[3])
-        if cn.rotationZ != nil:
+        if cn.rotationZ.len > 0:
             let rotationZ = parseArray4(cn.rotationZ)
             finalRotation *= aroundZ(rotationZ[3])
 
@@ -380,26 +378,26 @@ proc setupMaterialFromCollada(nodeMesh: var MeshComponent, cm: ColladaMaterial, 
     # add other material texture
     # childMesh.material.falloffTexture = imageWithResource("")
 
-    if cm.diffuseTextureName != nil:
+    if cm.diffuseTextureName.len > 0:
         var texName = colladaScene.getTextureLocationByName(cm.diffuseTextureName)
-        if texName != nil:
+        if texName.len > 0:
             nodeMesh.material.albedoTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
             nodeMesh.material.diffuse = newColor(1.0, 1.0, 1.0, 1.0)
 
-    if cm.reflectiveTextureName != nil:
+    if cm.reflectiveTextureName.len > 0:
         var texName = colladaScene.getTextureLocationByName(cm.reflectiveTextureName)
-        if texName != nil:
+        if texName.len > 0:
             nodeMesh.material.reflectionTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
             nodeMesh.material.reflectionPercent = cm.reflectivity
 
-    if cm.specularTextureName != nil:
+    if cm.specularTextureName.len > 0:
         var texName = colladaScene.getTextureLocationByName(cm.specularTextureName)
-        if texName != nil:
+        if texName.len > 0:
             nodeMesh.material.specularTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
     # normalmap tex seted manually in dae file
-    if cm.normalmapTextureName != nil:
+    if cm.normalmapTextureName.len > 0:
         var texName = colladaScene.getTextureLocationByName(cm.normalmapTextureName)
-        if texName != nil:
+        if texName.len > 0:
             nodeMesh.material.normalTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
 
 proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string): Node =
@@ -418,7 +416,7 @@ proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourceP
 
     node.setupNodeFromCollada(cn, colladaScene, resourcePath)
 
-    if cn.material != nil:
+    if cn.material.len > 0:
         for mat in colladaScene.childNodesMaterial:
             if mat.name.contains(cn.material) or cn.material.contains(mat.name):
                 childColladaMaterial = mat

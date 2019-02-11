@@ -80,7 +80,7 @@ proc `selectedNode=`*(ns: NodeSelector, n: Node) =
 
 proc draw*(ns: NodeSelector) =
     let node = ns.mSelectedNode
-    if not ns.vertexData.isNil and not node.isNil:
+    if ns.vertexData.len > 0 and not node.isNil:
         let c = currentContext()
         let gl = c.gl
         let modelMatrix = node.worldTransform()

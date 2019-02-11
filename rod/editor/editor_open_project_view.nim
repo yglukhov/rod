@@ -134,10 +134,9 @@ method init*(e: EditorOpenProjectView, r: Rect)=
 
     content.addSubview(projView)
 
-    if not settings.projects.isNil:
-        for proj in settings.projects:
-            var projView = createProjectView(newRect(0, 0, r.width - 30.0, 80), proj, false, onOpen)
-            content.addSubview(projView)
+    for proj in settings.projects:
+        var projView = createProjectView(newRect(0, 0, r.width - 30.0, 80), proj, false, onOpen)
+        content.addSubview(projView)
 
 method onKeyDown*(e: EditorOpenProjectView, event: var Event): bool = true
 method onTouchEv*(e: EditorOpenProjectView, event: var Event): bool = true

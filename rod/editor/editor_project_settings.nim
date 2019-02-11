@@ -55,8 +55,7 @@ proc save*(es: EditorSettings)=
 
 proc saveProject*(proj: EditorProject)=
     var es = getEditorSettings()
-    if es.projects.isNil:
-        es.projects = @[]
+    if es.projects.len == 0:
         es.projects.add(proj)
     else:
         var index = 0
@@ -78,14 +77,12 @@ proc saveProject*(proj: EditorProject)=
 
 proc hasProjectAtPath*(p: string): bool =
     var settings = getEditorSettings()
-    if not settings.projects.isNil:
-        for proj in settings.projects:
-            if proj.path == p:
-                return true
+    for proj in settings.projects:
+        if proj.path == p:
+            return true
 
 proc getProjectAtPath*(p: string):EditorProject =
     var settings = getEditorSettings()
-    if not settings.projects.isNil:
-        for proj in settings.projects:
-            if proj.path == p:
-                return proj
+    for proj in settings.projects:
+        if proj.path == p:
+            return proj

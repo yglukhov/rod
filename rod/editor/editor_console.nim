@@ -21,7 +21,7 @@ type EditorConsole* = ref object of EditorTabView
 proc reloadConsole(v: EditorConsole)=
     var msgs = gEditorLogger.dump(v.currentLevel)
 
-    while not v.contentView.subviews.isNil and v.contentView.subviews.len > 0:
+    while v.contentView.subviews.len > 0:
         v.contentView.subviews[0].removeFromSuperView()
 
     var lblText = "\n"

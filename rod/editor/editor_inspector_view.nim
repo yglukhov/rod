@@ -106,39 +106,38 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
 
-        if not n.components.isNil:
-            for v in n.components:
-                closureScope:
-                    expView = newExpandingView(newRect(0, 0, 328, 20.0))
-                    expView.title = v.className
-                    # let class_name = v.className
-                    let component = v
-                    expView.expand()
+        for v in n.components:
+            closureScope:
+                expView = newExpandingView(newRect(0, 0, 328, 20.0))
+                expView.title = v.className
+                # let class_name = v.className
+                let component = v
+                expView.expand()
 
-                    let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
-                    removeButton.autoresizingMask = {afFlexibleMinX}
-                    removeButton.onAction do():
-                        n.removeComponent(component)
-                        i.inspectedNode = n
+                let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
+                removeButton.autoresizingMask = {afFlexibleMinX}
+                removeButton.onAction do():
+                    n.removeComponent(component)
+                    i.inspectedNode = n
 
-                    # let downCompButton = newButton(expView, newPoint(328 - 45, 0), newSize(18.0, 18), "↓")
-                    # downCompButton.autoresizingMask = {afFlexibleMinX}
-                    # downCompButton.onAction do():
-                    #     let compPos = n.componentPosition(component)
-                    #     n.components.delete(compPos)
-                    #     n.insertComponent(component, compPos + 1)
-                    #     i.inspectedNode = n
+                # let downCompButton = newButton(expView, newPoint(328 - 45, 0), newSize(18.0, 18), "↓")
+                # downCompButton.autoresizingMask = {afFlexibleMinX}
+                # downCompButton.onAction do():
+                #     let compPos = n.componentPosition(component)
+                #     n.components.delete(compPos)
+                #     n.insertComponent(component, compPos + 1)
+                #     i.inspectedNode = n
 
-                    # let upCompButton = newButton(expView, newPoint(328 - 65, 0), newSize(18.0, 18), "↑")
-                    # upCompButton.autoresizingMask = {afFlexibleMinX}
-                    # upCompButton.onAction do():
-                    #     let compPos = n.componentPosition(component)
-                    #     n.insertComponent(component, compPos - 1)
-                    #     n.components.delete(compPos + 1)
-                    #     i.inspectedNode = n
+                # let upCompButton = newButton(expView, newPoint(328 - 65, 0), newSize(18.0, 18), "↑")
+                # upCompButton.autoresizingMask = {afFlexibleMinX}
+                # upCompButton.onAction do():
+                #     let compPos = n.componentPosition(component)
+                #     n.insertComponent(component, compPos - 1)
+                #     n.components.delete(compPos + 1)
+                #     i.inspectedNode = n
 
-                v.visitProperties(visitor)
-                i.propView.addSubview(expView)
+            v.visitProperties(visitor)
+            i.propView.addSubview(expView)
 
         let newComponentButtn = Button.new(newRect(0, 30, 0, 20))
         newComponentButtn.title = "New component"

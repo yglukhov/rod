@@ -94,7 +94,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
             b.writeArrayNoLen(data)
 
     elif T is string:
-        if data.isNil:
+        if data.len == 0:
             b.write(int16(-1))
         else:
             b.align(sizeof(int16))

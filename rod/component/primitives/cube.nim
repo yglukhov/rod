@@ -153,7 +153,7 @@ proc generateMesh(c: CubeComponent) =
 
     let stride = int32( mesh.vboData.vertInfo.stride / sizeof(GLfloat) )
     let mSize = int32(vertCoords.len * stride / 3)
-    var vertexData = c.createVertexData(stride, mSize, vertCoords, texCoords, normals, nil)
+    var vertexData = c.createVertexData(stride, mSize, vertCoords, texCoords, normals, @[])
     mesh.createVBO(indices, vertexData)
 
 proc size*(cc: CubeComponent): Vector3 = cc.mSize

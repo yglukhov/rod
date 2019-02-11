@@ -49,10 +49,7 @@ method init*(v: EditorTreeView, r: Rect)=
             result = 1
         else:
             let n = item.get(Node)
-            if n.children.isNil:
-                result = 0
-            else:
-                result = n.children.len
+            result = n.children.len
 
     outlineView.childOfItem = proc(item: Variant, indexPath: openarray[int]): Variant =
         if indexPath.len == 1:
@@ -95,7 +92,7 @@ method init*(v: EditorTreeView, r: Rect)=
         else:
             textField.textColor = newGrayColor(0.0)
 
-        textField.text = if n.name.isNil: "(node)" else: n.name
+        textField.text = if n.name.len == 0: "(node)" else: n.name
 
         # btn.onAction do():
         #     n.enabled = not n.enabled

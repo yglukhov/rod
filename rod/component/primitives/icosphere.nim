@@ -147,7 +147,7 @@ proc genMesh(s: Icosphere)=
     s.vboData.vertInfo = newVertexInfoWithVertexData(vertCoords.len, texCoords.len, normals.len, 0)
     let stride = int32( s.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = s.createVertexData(stride, size, vertCoords, texCoords, normals, nil)
+    var vertexData = s.createVertexData(stride, size, vertCoords, texCoords, normals, @[])
 
     s.createVBO(indices, vertexData)
 

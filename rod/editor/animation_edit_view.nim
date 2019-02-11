@@ -76,7 +76,7 @@ proc updateDopesheetCurves(v: AnimationEditView) =
 proc addEditedProperty(v: AnimationEditView, name: string) =
     var ep: EditedProperty
     var ap: AnimatedProperty
-    ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, nil, -1, name)
+    ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, "", -1, name)
     ep.name = name
     ap.new()
     ap.propName = name

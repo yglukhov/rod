@@ -152,7 +152,6 @@ proc getEnvCt(k: string): string {.compileTime.} =
     else:
         result = staticExec("echo $" & k)
     result.removeSuffix()
-    if result == "": result = nil
 
 proc assetBundleDescriptor*(path: static[string]): AssetBundleDescriptor {.compileTime.} =
     const rabFilePath = path / "config.rab"
@@ -262,7 +261,7 @@ var getURLForAssetBundle*: proc(hash: string): string
 proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)) =
     if abd.isDownloadable:
         if abd.isDownloaded:
-            handler(nil)
+            handler("")
         else:
             when not defined(js) and not defined(emscripten) and not defined(windows) and not defined(rodplugin):
                 assert(not getURLForAssetBundle.isNil)
@@ -275,7 +274,7 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
             else:
                 assert(false, "Not supported")
     else:
-        handler(nil)
+        handler("")
 
 proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
     when defined(js) or defined(emscripten):
@@ -291,13 +290,13 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
 
 proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string)) =
     abd.downloadAssetBundle() do(err: string):
-        if err.isNil:
+        if err.len > 0:
             let ab = newAssetBundle(abd)
             ab.init() do():
-                handler(abd.path, ab, nil)
+                handler(abd.path, ab, "")
         else:
             warn "Asset bundle error for ", abd.hash, " (", abd.path, "): " , err
-            handler(abd.path, nil, err)
+            handler(abd.path, nil, "")
 
 proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) {.deprecated.}  =
     let newHandler = proc(mountPaths: string, ab: AssetBundle, err: string) =
@@ -313,10 +312,10 @@ proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mou
 
     proc load() =
         if i == abds.len:
-            handler(mountPaths, abs, nil)
+            handler(mountPaths, abs, "")
         else:
             abds[i].loadAssetBundle() do(mountPath: string, ab: AssetBundle, err: string):
-                if not err.isNil:
+                if err.len > 0:
                     handler(mountPaths, abs, err)
                 else:
                     abs[i] = ab

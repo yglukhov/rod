@@ -410,7 +410,7 @@ proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
         window.addSubview(w)
         w.editor.mCurrentComposition = compTab.composition
 
-    if w.editor.currentProject.tabs.isNil:
+    if w.editor.currentProject.tabs.len == 0:
         for rt in registeredEditorTabs():
             if rt.name in defaultTabs:
                 w.toggleEditTab(rt)()
