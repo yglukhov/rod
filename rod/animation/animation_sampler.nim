@@ -1,5 +1,5 @@
 import math, algorithm
-import nimx.animation
+import nimx/animation
 import variant
 
 type

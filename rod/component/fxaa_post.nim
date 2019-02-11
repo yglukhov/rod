@@ -1,19 +1,6 @@
-import nimx.context
-import nimx.types
-import nimx.view
-import nimx.matrixes
-import nimx.image
-import nimx.animation
-import nimx.portable_gl
-import nimx.render_to_image
-import nimx.property_visitor
-
-import rod.node
-import rod.viewport
-import rod.quaternion
-import rod.component
-import rod.component.camera
-import rod.component.mesh_component
+import nimx/[context, types, view, matrixes, image, animation, portable_gl, render_to_image, property_visitor]
+import rod/[node, viewport, quaternion, component]
+import rod/component/[camera, mesh_component]
 
 const vertexShader = """
 attribute vec4 aPosition;

@@ -3,17 +3,17 @@ import strutils, json, logging
 import nimx / [ matrixes, button, popup_button, key_commands, animation,
         notification_center, window, view_event_handling ]
 
-import nimx.editor.tab_view
-import nimx.pasteboard.pasteboard
+import nimx/editor/tab_view
+import nimx/pasteboard/pasteboard
 
 import rod_types, node
-import rod.scene_composition
+import rod/scene_composition
 import rod / editor / [editor_project_settings, editor_tab_registry,
         editor_workspace_view, editor_types]
-import rod.utils.json_serializer
+import rod/utils/json_serializer
 export editor_types
 
-import tools.serializer
+import tools/serializer
 
 import ray, viewport
 
@@ -22,8 +22,8 @@ export editor_tab_registry
 import variant
 
 when loadingAndSavingAvailable:
-    import os_files.dialog
-    import rod.editor.editor_open_project_view
+    import os_files/dialog
+    import rod/editor/editor_open_project_view
     import os
 
 proc `selectedNode=`*(e: Editor, n: Node) =
@@ -389,10 +389,9 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
     result = editor
 
 # default tabs hacky registering
-import nimx.assets.asset_loading
-import nimx.assets.json_loading
+import nimx/assets/[asset_loading, json_loading]
 
 registerAssetLoader(["json", "jcomp"]) do(url: string, callback: proc(j: JsonNode)):
     loadJsonFromURL(url, callback)
 
-import rod.editor.editor_default_tabs
+import rod/editor/editor_default_tabs

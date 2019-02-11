@@ -6,7 +6,7 @@ import rod / editor / [gizmo, gizmo_move]
 import rod / [node, rod_types, edit_view, component, viewport, ray]
 import rod / component / [ sprite, light, camera ]
 
-import rod.editor_camera_controller
+import rod/editor_camera_controller
 import node_selector
 
 import logging, sequtils, algorithm

@@ -2,7 +2,7 @@ import nimx / [ view, types, button, scroll_view, text_field, stack_view,
                 animation, abstract_window, view_event_handling ]
 
 import editor_project_settings
-import os_files.dialog
+import os_files/dialog
 
 export editor_project_settings
 

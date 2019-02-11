@@ -1,14 +1,9 @@
-import nimx.types
-import nimx.context
-import nimx.composition
-import nimx.portable_gl
-import nimx.view
-import nimx.property_visitor
-
-import rod.node, rod.viewport, rod.component, rod.tools.serializer, rod.rod_types
+import nimx/[types, context, composition, portable_gl, view, property_visitor]
+import rod/[ node, viewport, component, tools/serializer, rod_types]
 import rod / utils / [ property_desc, serialization_codegen ]
 import json
 import opengl
+
 
 const clippingRectWithScissors = true
 
@@ -37,7 +32,7 @@ when not clippingRectWithScissors:
     }
     """, "clipRect")
 
-import rod.tools.debug_draw
+import rod/tools/debug_draw
 
 proc debugDraw(cl: ClippingRectComponent, rect: Rect) =
     let gl = currentContext().gl

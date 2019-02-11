@@ -1,16 +1,11 @@
+import nimx/[view, text_field, button, popup_button, scroll_view]
 import strutils, tables, logging
-import nimx.view
-import nimx.text_field
-import nimx.button
-import nimx.popup_button
-import nimx.scroll_view
-
+import rod/edit_view
+import rod/editor/editor_error_handling
 import variant
 
 export view
 
-import rod.edit_view
-import rod.editor.editor_error_handling
 
 type EditorConsole* = ref object of EditorTabView
     contentView: View

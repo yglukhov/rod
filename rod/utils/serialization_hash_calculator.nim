@@ -1,6 +1,6 @@
-import hashes
 import nimx / [ types, image ]
-import rod.quaternion
+import rod/quaternion
+import hashes
 
 type SerializationHashCalculator* = ref object
     hash*: Hash

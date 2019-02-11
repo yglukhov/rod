@@ -1,5 +1,3 @@
-
-
 import os, osproc, strutils
 
 proc rodPluginFile(): string =

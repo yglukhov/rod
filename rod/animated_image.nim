@@ -1,9 +1,6 @@
+import nimx/[types, image, animation, portable_gl]
 import math
 
-import nimx.types
-import nimx.image
-import nimx.animation
-import nimx.portable_gl
 
 type AnimatedImage* = ref object of Image
     images*: seq[Image]

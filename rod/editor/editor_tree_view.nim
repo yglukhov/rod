@@ -1,9 +1,8 @@
 import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
     scroll_view, button, event, formatted_text, font]
 
-import rod.edit_view
+import rod / [node, rod_types, edit_view]
 import variant, strutils, tables
-import rod / [node, rod_types]
 
 type EditorTreeView* = ref object of EditorTabView
     outlineView: OutlineView

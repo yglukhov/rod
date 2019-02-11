@@ -1,9 +1,9 @@
 import sha1, os, osproc, algorithm, strutils, times, hashes
+import rod/utils/serialization_hash_calculator
+import nimx/class_registry
+import rod/component
 
 import settings
-import nimx.class_registry
-import rod.component
-import rod.utils.serialization_hash_calculator
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.

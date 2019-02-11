@@ -1,28 +1,18 @@
-import algorithm
-import strutils, tables
-import nimx.view
-import nimx.text_field
-import nimx.button
-import nimx.menu
-import nimx.scroll_view
-import nimx.linear_layout
-import nimx.slider
-import nimx.property_visitor
-import nimx.expanding_view
-import nimx.stack_view
+import nimx/[view, text_field, button, menu,
+    scroll_view, linear_layout, slider, property_visitor,
+    expanding_view, stack_view
+]
 
+import rod/property_editors/[propedit_registry, standard_editors]
+import rod/[node, component, rod_types]
+import rod/edit_view
+
+import algorithm, strutils, tables
 import variant
+
 
 export view
 
-import rod.node
-import rod.component
-import rod.rod_types
-
-import rod.property_editors.propedit_registry
-import rod.property_editors.standard_editors
-# import rod.editor.editor_tab
-import rod.edit_view
 
 const componentsViewSize = newSize(200, 300)
 

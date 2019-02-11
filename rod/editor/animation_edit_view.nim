@@ -1,17 +1,14 @@
 import sequtils, intsets, tables, logging
-import nimx.view, nimx.table_view, nimx.scroll_view, nimx.button, nimx.text_field
-import nimx.popup_button, nimx.window, nimx.linear_layout
-import nimx.menu, nimx.event, nimx.property_visitor
-import variant
+import nimx / [view, table_view, scroll_view,
+    button, text_field, popup_button, window,
+    linear_layout, menu, event, property_visitor
+    ]
+import rod/[node, component, edit_view]
+import rod/animation/[property_animation, animation_sampler]
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view
 import animation_editor_types
-
-import rod.node, rod.component
-import rod.animation.property_animation
-import rod.animation.animation_sampler
-
-import rod.edit_view
+import variant
 
 const leftPaneWidth = 200
 
@@ -100,7 +97,7 @@ proc createAddPropertyButton(v: AnimationEditView): Button =
     b.title = "+"
     b.onAction do():
         if not v.mEditedNode.isNil:
-            var menu : Menu
+            var menu : MenuItem
             menu.new()
             var items = newSeq[MenuItem]()
             let props = @["tX", "tY", "tZ"]

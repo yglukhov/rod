@@ -1,17 +1,7 @@
-import tables, hashes, streams
 import nimx / [ image, context, portable_gl, types, matrixes ]
-
-import rod.node
-import rod.component.mesh_component
-import rod.component.material_shaders
-import rod.component.light
-import rod.component.camera
-import rod.quaternion
-import rod.vertex_data_info
-import rod.viewport
-import rod.postprocess_context
-
-import rod.animated_image
+import rod/[node, quaternion, vertex_data_info, viewport, postprocess_context,animated_image ]
+import rod/component/[mesh_component, material_shaders, light, camera ]
+import tables, hashes, streams
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl

@@ -2,8 +2,9 @@ import json, strutils, tables, parseutils, logging
 import nimx / [ types, matrixes, animation, property_visitor ]
 
 import variant
-import rod.node, rod.component, rod.animation.animation_sampler, rod.quaternion
-import rod.utils.bin_deserializer
+import rod/[node,component, quaternion]
+import rod/animation/animation_sampler
+import rod/utils/bin_deserializer
 
 export animation
 

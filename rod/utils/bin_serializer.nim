@@ -1,6 +1,6 @@
 import tables, streams, json, ospaths, strutils
 import nimx / [image, types, pathutils ]
-import rod.quaternion
+import rod/quaternion
 import serialization_helpers
 
 when not defined(js):

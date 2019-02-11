@@ -5,12 +5,9 @@ import strutils
 
 import variant
 
-import nimasset.collada
+import nimasset/collada
 
-import nimx.animation
-import nimx.types
-import nimx.matrixes
-import nimx.property_visitor
+import nimx/[animation, types, matrixes, property_visitor]
 
 import rod_types
 import node

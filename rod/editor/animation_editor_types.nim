@@ -1,8 +1,7 @@
+import nimx / [ types, matrixes, animation, property_visitor ]
+import rod/animation/animation_sampler, rod/quaternion
 import algorithm
-import nimx.types, nimx.matrixes, nimx.animation, nimx.property_visitor
 import variant
-
-import rod.animation.animation_sampler, rod.quaternion
 
 type
     AbstractAnimationCurve* = ref object of RootObj

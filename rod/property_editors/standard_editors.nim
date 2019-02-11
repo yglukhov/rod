@@ -1,36 +1,22 @@
+import nimx/[view, text_field, matrixes, image, button,
+    font, linear_layout, property_visitor, numeric_text_field,
+    slider, animation, property_editors/standard_editors
+]
+import rod/component/[ae_composition, mesh_component]
+import rod/property_editors/propedit_registry
+import rod/[node, viewport, quaternion]
 import strutils, tables, times
-
-import nimx.view
-import nimx.text_field
-import nimx.matrixes
-import nimx.image
-import nimx.button
-import nimx.font
-import nimx.linear_layout
-import nimx.property_visitor
-import nimx.numeric_text_field
-import nimx.slider
-import nimx.animation
-
-import nimx.property_editors.standard_editors
-import rod.property_editors.propedit_registry
-import rod.node
-import rod.viewport
-import rod.quaternion
-import rod.component.mesh_component
-import rod.component.ae_composition
-
 import variant
 
 when defined(js):
     from dom import alert
 elif not defined(android) and not defined(ios) and not defined(emscripten):
-    import os_files.dialog
+    import os_files/dialog
 
-template toStr(v: SomeReal, precision: uint): string = formatFloat(v, ffDecimal, precision)
+template toStr(v: SomeFloat, precision: uint): string = formatFloat(v, ffDecimal, precision)
 template toStr(v: SomeInteger): string = $v
 
-template fromStr(v: string, t: var SomeReal) = t = v.parseFloat()
+template fromStr(v: string, t: var SomeFloat) = t = v.parseFloat()
 template fromStr(v: string, t: var SomeInteger) = t = v.parseInt()
 
 

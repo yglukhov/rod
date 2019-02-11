@@ -1,25 +1,11 @@
-import times
-import math
-import random
-import json
-
-import nimx.matrixes
-import nimx.animation
-import nimx.types
-import nimx.property_visitor
-import nimx.portable_gl
-import nimx.context
-
-import rod.quaternion
-import rod.component
-import rod.rod_types
-import rod.tools.serializer
+import times, math, random, json
+import nimx/[matrixes, animation, types, property_visitor, portable_gl, context ]
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod.node
-import rod.material.shader
-import rod.tools.debug_draw
-import rod.viewport
-import rod.component.camera
+import rod / [quaternion, component, rod_types, node, viewport]
+import rod/component/camera
+import rod/material/shader
+import rod/tools/[serializer,debug_draw]
+
 
 type
     Particle* = object

@@ -1,5 +1,5 @@
 import os, osproc, json, strutils, times, sequtils, tables, sets, logging
-import nimx.pathutils
+import nimx/pathutils
 
 const multithreaded = compileOption("threads")
 

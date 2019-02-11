@@ -1,6 +1,6 @@
-import nimx.matrixes
-import nimx.types
-import rod.rod_types
+import nimx/matrixes
+import nimx/types
+import rod/rod_types
 
 type RayCastInfo* = object
     node*: Node

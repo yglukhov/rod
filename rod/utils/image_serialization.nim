@@ -1,3 +1,3 @@
 {.deprecated.}
-import rod.tools.serializer
+import rod/tools/serializer
 export deserializeImage

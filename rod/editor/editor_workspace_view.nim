@@ -8,7 +8,7 @@ import rod / [ rod_types, node ]
 import rod / editor / [ editor_types, editor_tab_registry ]
 
 when loadingAndSavingAvailable:
-    import rod.editor.editor_open_project_view
+    import rod/editor/editor_open_project_view
     import os
 
 proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView

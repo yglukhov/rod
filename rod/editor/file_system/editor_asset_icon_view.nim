@@ -1,10 +1,11 @@
 import nimx / [ text_field, image, view, formatted_text, context, button,
                 render_to_image, window, panel_view, image_preview,
                 view_event_handling ]
-import nimx.assets.asset_loading
+import nimx/assets/asset_loading
 import tables, os, streams
+
 when not defined(android) and not defined(ios) and not defined(emscripten):
-    import os_files.file_info
+    import os_files/file_info
 
 type PathNode* = ref object of RootObj
     children*: seq[PathNode]

@@ -1,7 +1,7 @@
 import math
+import nimx/types
+import nimx/matrixes
 
-import nimx.types
-import nimx.matrixes
 
 const ForwardVector* = newVector3(0, 0, -1)
 const UpVector* = newVector3(0, 1, 0)

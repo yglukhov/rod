@@ -1,11 +1,9 @@
 import nimx / [ types, context, image, animation, property_visitor ]
-
-import json, strutils, tables, times, sequtils
-
-import rod/[ rod_types, node, component, viewport ]
-import rod.tools.serializer
 import rod / utils / [property_desc, serialization_codegen, bin_deserializer ]
-import rod.animation.property_animation
+import rod/[ rod_types, node, component, viewport ]
+import rod/animation/property_animation
+import rod/tools/serializer
+import json, strutils, tables, times, sequtils
 
 const aeAllCompositionAnimation = "aeAllCompositionAnimation"
 const delimiter = "/"

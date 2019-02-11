@@ -1,29 +1,11 @@
-import times
-import math
-import random
-import json
-import tables
-
-import rod.quaternion
-
-import rod.node
-import rod.component
-import rod.rod_types
-import rod.viewport
-import rod.component.particle_helpers
-import rod.component.camera
-import rod.material.shader
-import rod.tools.serializer
+import nimx/[matrixes, animation, context, types, portable_gl, view, image, property_visitor]
+import rod/[quaternion, node, component, rod_types, viewport]
+import rod/component/[particle_helpers,camera]
+import rod/material/shader
+import rod/tools/serializer
 import rod / utils / [property_desc, serialization_codegen ]
+import times, math, random, json, tables
 
-import nimx.matrixes
-import nimx.animation
-import nimx.context
-import nimx.types
-import nimx.portable_gl
-import nimx.view
-import nimx.image
-import nimx.property_visitor
 
 const ParticleVertexShader = """
 attribute vec3 aPosition;
@@ -578,10 +560,10 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
         ps.particles[i].normalizedLifeTime = ps.particles[i].lifetime / ps.lifetime
         let oneMinusNormLifeTime = 1.0 - ps.particles[i].normalizedLifeTime
 
-        v1 = vertexSize* (4 * ps.count + 0) # vertexSize (vertexCount * index + vertexNum)
-        v2 = vertexSize* (4 * ps.count + 1)
-        v3 = vertexSize* (4 * ps.count + 2)
-        v4 = vertexSize* (4 * ps.count + 3)
+        v1 = vertexSize * (4 * ps.count + 0) # vertexSize (vertexCount * index + vertexNum)
+        v2 = vertexSize * (4 * ps.count + 1)
+        v3 = vertexSize * (4 * ps.count + 2)
+        v4 = vertexSize * (4 * ps.count + 3)
 
         # positions
         if ps.airDensity != 0.0:

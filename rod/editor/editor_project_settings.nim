@@ -1,11 +1,7 @@
+import nimx/[matrixes, types]
+import rod/utils/[json_serializer, json_deserializer, serialization_codegen, property_desc]
 import json
 import preferences
-import nimx.matrixes
-import nimx.types
-import rod.utils.json_serializer
-import rod.utils.json_deserializer
-import rod.utils.serialization_codegen
-import rod.utils.property_desc
 
 type
     EditorTabSettings* = tuple

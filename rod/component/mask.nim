@@ -1,24 +1,9 @@
+import nimx/[types, context, image, view, matrixes, composition, property_visitor, portable_gl]
+import rod / utils / [ property_desc, serialization_codegen ]
+import rod / [ rod_types, node, component, viewport,tools/serializer ]
+import rod / component / [ sprite, solid, rti, camera ]
 import json, tables, math, logging
 
-import nimx.types
-import nimx.context
-import nimx.image
-import nimx.view
-import nimx.matrixes
-import nimx.composition
-import nimx.property_visitor
-import nimx.portable_gl
-
-import rod.rod_types
-import rod.node
-import rod.tools.serializer
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod.component
-import rod.component.sprite
-import rod.component.solid
-import rod.component.rti
-import rod.component.camera
-import rod.viewport
 
 const comonSpritePrefix = """
 (sampler2D mask_img, vec4 mask_img_coords, vec4 mask_bounds, vec2 vp_size, mat4 mvp_inv, float msk_alpha) {

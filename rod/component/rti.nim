@@ -1,21 +1,10 @@
+import nimx/[types, context, image, view, property_visitor, render_to_image, portable_gl]
+import rod/[viewport, quaternion, rod_types, node, component]
+import rod/component/[camera, clipping_rect_component]
+import rod/tools/serializer
+
 import json, tables, math
 
-import nimx.types
-import nimx.context
-import nimx.image
-import nimx.view
-import nimx.property_visitor
-import nimx.render_to_image
-import nimx.portable_gl
-
-import rod.viewport
-import rod.quaternion
-import rod.rod_types
-import rod.node
-import rod.tools.serializer
-import rod.component
-import rod.component.camera
-import rod.component.clipping_rect_component
 
 const minAlpha = 0.01
 const minScale = 0.01

@@ -1,13 +1,7 @@
-import nimx.types
-import nimx.context
-import nimx.portable_gl
-import opengl
-import json
-import rod.node
-import rod.component
-import rod.postprocess_context
-import rod.tools.serializer
+import nimx/[types, context, portable_gl]
+import rod/[node, component, postprocess_context, tools/serializer]
 import rod / utils / [ property_desc, serialization_codegen ]
+import opengl, json
 
 type BlendMode * = enum
     COLOR_ADD = GL_ONE

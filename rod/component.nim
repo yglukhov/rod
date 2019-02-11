@@ -5,7 +5,7 @@ import nimx / [ types, property_visitor, matrixes, class_registry ]
 import node
 import rod_types
 import ray
-import rod.tools.serializer
+import rod/tools/serializer
 import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
                 json_serializer, serialization_hash_calculator ]
 

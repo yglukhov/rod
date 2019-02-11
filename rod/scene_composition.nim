@@ -1,32 +1,10 @@
-import nimasset.collada
-
-import rod.viewport
-import rod.component.camera
-import rod.node
-
-import rod.component.mesh_component
-import rod.vertex_data_info
-import rod.component.material
-import rod.component.light
-import rod.component
-import rod.rod_types
-import rod.quaternion
-
-import rod.dae_animation
-
-import component.animation.skeleton
-
-import nimx.image
-import nimx.context
-import nimx.portable_gl
-import nimx.window
-import nimx.animation
-import nimx.matrixes
-import nimx.assets.asset_loading
-import nimx.assets.url_stream
-import nimx.assets.asset_manager
-import nimx.pathutils
-
+import nimx/[image, context, portable_gl, window, animation, matrixes, pathutils]
+import nimx/assets/[asset_loading, url_stream, asset_manager]
+import rod/[viewport, node, vertex_data_info,
+    component, rod_types, quaternion, dae_animation
+    ]
+import rod/component/[camera, mesh_component, material, light, animation/skeleton]
+import nimasset/collada
 import streams, strutils, algorithm, tables, hashes, math
 
 proc parseMatrix4(source: openarray[float32]): Matrix4 =

@@ -3,8 +3,8 @@ import nimx / [ context, types, image, render_to_image, portable_gl, window,
 
 import algorithm, logging, times, tables
 import rod_types, node, ray
-import component.camera
-import rod.material.shader
+import component/camera
+import rod/material/shader
 
 export SceneView
 
@@ -198,7 +198,7 @@ proc rayWithScreenCoords*(v: SceneView, coords: Point): Ray =
     if v.camera.projectionMode == cpOrtho:
         var logicalWidth = v.bounds.width / (v.bounds.height / v.camera.viewportSize.height)
         var viewCoords:Vector3
-        viewCoords.x = coords.x / v.bounds.width * logicalWidth  - logicalWidth / 2.0
+        viewCoords.x = coords.x / v.bounds.width * logicalWidth - logicalWidth / 2.0
         viewCoords.y = coords.y / v.bounds.height * v.camera.viewportSize.height - v.camera.viewportSize.height / 2.0
         viewCoords.z = 10.0
 
@@ -250,7 +250,7 @@ proc removeLightSource*(v: SceneView, ls: LightSource) =
     else:
         v.lightSources.del(ls.node.name)
 
-import component.ui_component, algorithm
+import component/ui_component, algorithm
 
 method name*(v: SceneView): string =
     result = "SceneView"
@@ -348,4 +348,4 @@ method resizeSubviews*(v: SceneView, oldSize: Size) =
     procCall v.View.resizeSubviews(oldSize)
     v.viewProjMatrix = v.getViewProjectionMatrix()
 
-import component.all_components
+import component/all_components

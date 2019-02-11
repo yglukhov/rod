@@ -1,12 +1,7 @@
 import nimx / [ types, context, portable_gl, render_to_image, matrixes, view,
     image, property_visitor ]
-
-import rod.node
-import rod.viewport
-import rod.component
-import rod.component.camera
-import rod.component.mesh_component
-import rod.postprocess_context
+import rod / [node, viewport, component, postprocess_context]
+import rod/component/[camera, mesh_component]
 
 type BlurComponent* = ref object of Component
     motionMap: SelfContainedImage

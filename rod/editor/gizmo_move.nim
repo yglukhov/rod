@@ -1,23 +1,7 @@
+import nimx/[context, portable_gl, types, image, matrixes, property_visitor, event]
+import rod/component/[camera, primitives/cone, primitives/cube, mesh_component, material]
+import rod/[node, viewport, quaternion, editor/gizmo]
 import strutils
-
-import nimx.context
-import nimx.portable_gl
-import nimx.types
-import nimx.image
-import nimx.matrixes
-import nimx.property_visitor
-import nimx.event
-
-import rod.component.camera
-import rod.node
-import rod.viewport
-import rod.editor.gizmo
-import rod.component.primitives.cone
-import rod.component.primitives.cube
-import rod.component.mesh_component
-import rod.component.material
-import rod.quaternion
-
 
 type MoveGizmo* = ref object of Gizmo
     screenPoint: Vector3

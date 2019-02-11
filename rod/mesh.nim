@@ -1,9 +1,5 @@
-import nimx.image
-import nimx.resource
-import nimx.context
-import nimx.portable_gl
-import nimx.types
-import nimasset.obj
+import nimx/[image, resource, context, portable_gl, types]
+import nimasset/obj
 import strutils
 
 when not defined(ios) and not defined(android) and not defined(js):

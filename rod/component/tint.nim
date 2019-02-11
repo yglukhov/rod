@@ -1,16 +1,8 @@
-import nimx.types
-import nimx.context
-import nimx.composition
-import nimx.portable_gl
-import nimx.property_visitor
-
+import nimx/[types, context, composition, portable_gl, property_visitor]
+import rod / utils / [ property_desc, serialization_codegen ]
+import rod/[node, viewport, component, tools/serializer]
 import json
 
-import rod.node
-import rod.viewport
-import rod.component
-import rod.tools.serializer
-import rod / utils / [ property_desc, serialization_codegen ]
 
 type Tint* = ref object of Component
     black*: Color

@@ -1,17 +1,8 @@
-import json
-
-import nimx.types
-import nimx.context
-import nimx.image
-import nimx.composition
-import nimx.property_visitor
-
-import rod.rod_types
-import rod.node
-import rod.tools.serializer
+import nimx/[types, context, image, composition, property_visitor]
+import rod/[rod_types, node, viewport, component ]
+import rod/tools/serializer
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod.component
-import rod.viewport
+import json
 
 var blinkComposition = newComposition """
 uniform Image uMask;
@@ -38,7 +29,7 @@ void compose() {
     float rect_alpha = 1.0;
     if (lightuv.x < uLight.texCoords.x || lightuv.x > uLight.texCoords.z || lightuv.y < uLight.texCoords.y || lightuv.y > uLight.texCoords.w) {
         rect_alpha = 0.0;
-    }    
+    }
     vec4 light = texture2D(uLight.tex, lightuv);
 
     gl_FragColor = light;
@@ -81,7 +72,7 @@ method draw*(b: Blink) =
     if b.remainingTime <= 0.0:
         b.remainingTime = b.period
         b.currLightPos = 0.0
-    
+
     blinkComposition.draw r:
         setUniform("uMask", b.mask)
         setUniform("uLight", b.light)

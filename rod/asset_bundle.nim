@@ -1,13 +1,13 @@
-import strutils, ospaths, json, tables, logging, streams
-import nimx.assets.abstract_asset_bundle as nab
-import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager, asset_cache ]
+import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager, asset_cache]
+import nimx / assets / abstract_asset_bundle as nab
 import nimx / [ image, types ]
+import rod/utils/bin_deserializer
+import strutils, ospaths, json, tables, logging, streams
 import variant
 
 when not defined(js):
     import os
 
-import rod.utils.bin_deserializer
 
 type AssetBundle* = ref object of nab.AssetBundle
     path*: string

@@ -1,17 +1,8 @@
-import json
-
-import nimx.view
-import nimx.context
-import nimx.matrixes
-import nimx.composition
-import nimx.portable_gl
-import nimx.property_visitor
-
-import rod.node
-import rod.viewport
-import rod.component
-import rod.tools.serializer
+import nimx/[view, context, matrixes, composition, portable_gl, property_visitor ]
 import rod / utils / [ property_desc, serialization_codegen ]
+import rod/[node, viewport, component, tools/serializer]
+
+import json
 
 var effectLinearLocal = newPostEffect("""
 void grad_fill_effect_linear_local(vec2 gradientStartPos, vec2 gradientEndPos, vec4 startColor, vec4 endColor) {

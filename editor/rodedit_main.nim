@@ -1,23 +1,14 @@
 import tables, logging, strutils
 
 import nimx / [ matrixes, image, window, autotest ]
-import rod / [ viewport, edit_view, node ]
-import rod.editor.editor_error_handling
-import rod.component.camera
+import rod / [ viewport, edit_view, node,component, scene_composition ]
+import rod/editor/editor_error_handling
+import rod/component/[camera, solid, mesh_component, material, light, sprite]
 
-import rod.component.solid
-
-import rod.component.mesh_component
-import rod.component.material
-import rod.component.light
-import rod.component.sprite
-import rod.component
-import rod.scene_composition
-
-import rod.editor.editor_project_settings
+import rod/editor/editor_project_settings
 
 when loadingAndSavingAvailable:
-    import rod.editor.editor_open_project_view
+    import rod/editor/editor_open_project_view
 
 const isMobile = defined(ios) or defined(android)
 

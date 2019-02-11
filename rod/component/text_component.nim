@@ -1,23 +1,8 @@
 import json
-import nimx.types
-import nimx.font
-import nimx.context
-import nimx.view
-import nimx.property_visitor
-import nimx.portable_gl
-import nimx.formatted_text
-import nimx.private.font.font_data
-
-import rod.rod_types
-import rod.node
-import rod.component
-import rod.component.camera
-import rod.viewport
-import rod.tools.serializer
-import rod.tools.debug_draw
-import rod.utils.attributed_text
-import rod / utils / [ property_desc, serialization_codegen ]
-
+import nimx/[types, font, context, view, property_visitor, portable_gl, formatted_text, private/font/font_data]
+import rod / utils / [ property_desc, serialization_codegen, attributed_text ]
+import rod/[rod_types, node, component, viewport, component/camera]
+import rod/tools/[serializer, debug_draw]
 export formatted_text
 
 type

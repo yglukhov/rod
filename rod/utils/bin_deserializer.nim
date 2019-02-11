@@ -1,8 +1,8 @@
-import streams, tables, json, strutils, ospaths
-
 import nimx / [ image, types, assets/asset_manager ]
 import rod / utils / [ property_desc, serialization_helpers ]
-import rod.quaternion
+import rod/quaternion
+import streams, tables, json, strutils, ospaths
+
 type
     BinDeserializer* = ref object
         strtab: seq[string]

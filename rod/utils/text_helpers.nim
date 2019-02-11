@@ -1,5 +1,5 @@
+import nimx/types
 import strutils
-import nimx.types
 
 proc fromHexColor*(clr: string): Color =
     doAssert(clr.len == 8)
