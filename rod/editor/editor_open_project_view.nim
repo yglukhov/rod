@@ -2,7 +2,7 @@ import nimx / [ view, types, button, scroll_view, text_field, stack_view,
                 animation, abstract_window, view_event_handling ]
 
 import editor_project_settings
-import os_files.dialog
+import os_files/dialog
 
 export editor_project_settings
 
@@ -134,10 +134,9 @@ method init*(e: EditorOpenProjectView, r: Rect)=
 
     content.addSubview(projView)
 
-    if not settings.projects.isNil:
-        for proj in settings.projects:
-            var projView = createProjectView(newRect(0, 0, r.width - 30.0, 80), proj, false, onOpen)
-            content.addSubview(projView)
+    for proj in settings.projects:
+        var projView = createProjectView(newRect(0, 0, r.width - 30.0, 80), proj, false, onOpen)
+        content.addSubview(projView)
 
 method onKeyDown*(e: EditorOpenProjectView, event: var Event): bool = true
 method onTouchEv*(e: EditorOpenProjectView, event: var Event): bool = true

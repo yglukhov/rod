@@ -1,5 +1,5 @@
 
-import nimx.naketools
+import nimx/naketools
 
 withDir "..":
     direShell "nimble install -y"

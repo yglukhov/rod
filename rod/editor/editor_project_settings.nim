@@ -1,11 +1,7 @@
+import nimx/[matrixes, types]
+import rod/utils/[json_serializer, json_deserializer, serialization_codegen, property_desc]
 import json
 import preferences
-import nimx.matrixes
-import nimx.types
-import rod.utils.json_serializer
-import rod.utils.json_deserializer
-import rod.utils.serialization_codegen
-import rod.utils.property_desc
 
 type
     EditorTabSettings* = tuple
@@ -55,8 +51,7 @@ proc save*(es: EditorSettings)=
 
 proc saveProject*(proj: EditorProject)=
     var es = getEditorSettings()
-    if es.projects.isNil:
-        es.projects = @[]
+    if es.projects.len == 0:
         es.projects.add(proj)
     else:
         var index = 0
@@ -78,14 +73,12 @@ proc saveProject*(proj: EditorProject)=
 
 proc hasProjectAtPath*(p: string): bool =
     var settings = getEditorSettings()
-    if not settings.projects.isNil:
-        for proj in settings.projects:
-            if proj.path == p:
-                return true
+    for proj in settings.projects:
+        if proj.path == p:
+            return true
 
 proc getProjectAtPath*(p: string):EditorProject =
     var settings = getEditorSettings()
-    if not settings.projects.isNil:
-        for proj in settings.projects:
-            if proj.path == p:
-                return proj
+    for proj in settings.projects:
+        if proj.path == p:
+            return proj

@@ -1,11 +1,5 @@
-import nimx.view
-import nimx.app
-import nimx.scroll_view
-import nimx.table_view
-import nimx.text_field
-import nimx.autotest
-import nimx.window
-import src.game_scene
+import nimx/[view, app, scroll_view, table_view, text_field, autotest, window]
+import src/game_scene
 
 const isMobile = defined(ios) or defined(android)
 

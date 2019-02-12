@@ -1,25 +1,13 @@
+import nimx / [ image, context, portable_gl, types, view, property_visitor, assets/url_stream ]
+import rod/[component, vertex_data_info, node, viewport, ray, rod_types]
+import rod/component/[material, light, camera ]
+import rod/tools/serializer
+import rod/utils/[bin_deserializer,image_serialization]
+import animation/skeleton
 import tables, hashes, strutils, json
 import opengl
+import nimasset/obj
 
-import nimx / [ image, context, portable_gl, types, view, property_visitor ]
-import nimx.assets.url_stream
-
-import nimasset.obj
-
-import rod.component
-import rod.component.material
-import rod.component.light
-import rod.vertex_data_info
-import rod.node
-import rod.component.camera
-import rod.viewport
-import rod.ray
-import rod.rod_types
-import rod.tools.serializer
-import rod.utils.bin_deserializer
-import rod.utils.image_serialization
-
-import animation.skeleton
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
@@ -239,7 +227,7 @@ proc setupAndDraw*(m: MeshComponent) =
         gl.enable(gl.CULL_FACE)
 
     if not m.skeleton.isNil:
-        if m.boneMap.isNil:
+        if m.boneMap.len == 0:
             m.prepareBoneMap()
 
         m.skeleton.update()

@@ -1,6 +1,6 @@
+import nimx/class_registry
 import macros, tables
 import property_desc
-import nimx.class_registry
 
 proc genPhantomTypeSection(typdesc: NimNode): NimNode =
     let fields = newNimNode(nnkRecList)

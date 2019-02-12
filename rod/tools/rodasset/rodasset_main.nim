@@ -3,7 +3,7 @@ import imgtool, asset_cache, migrator
 import settings except hash
 import json except hash
 import tempfile
-import nimx.pathutils
+import nimx/pathutils
 
 const rodPluginFile {.strdefine.} = ""
 when rodPluginFile.len != 0:

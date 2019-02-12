@@ -5,7 +5,7 @@ import nimx / [ types, property_visitor, matrixes, class_registry ]
 import node
 import rod_types
 import ray
-import rod.tools.serializer
+import rod/tools/serializer
 import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
                 json_serializer, serialization_hash_calculator ]
 
@@ -15,15 +15,12 @@ method init*(c: Component) {.base.} = discard
 
 var componentGroupsTable* = initTable[string, seq[string]]()
 
-proc registerComponentGroup(group, component: string) =
+proc registerComponentGroup(group, component: string = "") =
     var validatedGroup = group
-    if validatedGroup.isNil:
+    if validatedGroup.len == 0:
         validatedGroup = "Other"
 
     var g = componentGroupsTable.getOrDefault(validatedGroup)
-    if g.isNil:
-        g = newSeq[string]()
-
     g.add(component)
     componentGroupsTable[validatedGroup] = g
 
@@ -32,11 +29,11 @@ proc registeredComponents*(): seq[string] =
     for c in registeredClassesOfType(Component):
         result.add(c)
 
-template registerComponent*(T: typedesc, group: string = nil ) =
+template registerComponent*(T: typedesc, group: string = "") =
     registerClass(T)
     registerComponentGroup(group, typetraits.name(T))
 
-template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: string = nil ) =
+template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: string = "") =
     registerClass(T, creator)
     registerComponentGroup(group, typetraits.name(T))
 

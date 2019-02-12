@@ -1,17 +1,8 @@
-import nimx.types
-import nimx.context
-import nimx.composition
-import nimx.portable_gl
-import nimx.render_to_image
-import nimx.property_visitor
-
-import json
-
-import rod.node
-import rod.viewport
-import rod.component
-import rod.tools.serializer
+import nimx/[types, context, composition, portable_gl, render_to_image, property_visitor]
 import rod / utils / [ property_desc, serialization_codegen ]
+import rod/[node, viewport, component]
+import rod/tools/serializer
+import json
 
 type ChannelLevels* = ref object of Component
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: Coord

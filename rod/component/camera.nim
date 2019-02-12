@@ -1,16 +1,7 @@
-import math
-
-import nimx.matrixes
-import nimx.types
-import nimx.context
-import nimx.property_visitor
-import nimx.view
-
-import rod.component
-import rod.rod_types
-import rod.viewport
-import rod.node
+import nimx/[matrixes, types, context, property_visitor, view]
+import rod/[component, rod_types, viewport, node]
 import rod / utils / [ property_desc, serialization_codegen ]
+import math
 
 export CameraProjection
 export Camera

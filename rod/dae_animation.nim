@@ -5,12 +5,9 @@ import strutils
 
 import variant
 
-import nimasset.collada
+import nimasset/collada
 
-import nimx.animation
-import nimx.types
-import nimx.matrixes
-import nimx.property_visitor
+import nimx/[animation, types, matrixes, property_visitor]
 
 import rod_types
 import node
@@ -32,7 +29,7 @@ proc findAnimatableProperty(n: Node, propName: string): Variant =
 
     n.visitProperties(visitor)
 
-    if res.isEmpty and not n.components.isNil:
+    if res.isEmpty:
         for k, v in n.components:
             v.visitProperties(visitor)
             if not res.isEmpty: break
@@ -142,7 +139,7 @@ proc animationWithCollada*(root: Node, anim: ColladaAnimation): Animation =
                 echo "Could not find node to attach animation to: $#" % [anim.channel.target]
                 continue
             let progressSetter = animationAttach(nodeToAttach, subanim, animDuration)
-            if not isNil(progressSetter):
+            if progressSetter.len > 0:
                 animProgressSetters.add(progressSetter)
     else:
         if anim.channel.isNil:
@@ -153,12 +150,12 @@ proc animationWithCollada*(root: Node, anim: ColladaAnimation): Animation =
             return
         else:
             let progressSetter = animationAttach(nodeToAttach, anim, animDuration)
-            if not isNil(progressSetter):
+            if progressSetter.len > 0:
                 animProgressSetters.add(progressSetter)
 
     result.onAnimate = proc(progress: float) =
         for ps in animProgressSetters:
-            ps(progress)
+                ps(progress)
 
     if anim.id != "" and not nodeToAttach.isNil:
         # echo "Attaching $# to $#" % [anim.id, nodeToAttach.name]

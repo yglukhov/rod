@@ -8,7 +8,7 @@ import rod / [ rod_types, node ]
 import rod / editor / [ editor_types, editor_tab_registry ]
 
 when loadingAndSavingAvailable:
-    import rod.editor.editor_open_project_view
+    import rod/editor/editor_open_project_view
     import os
 
 proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView
@@ -410,7 +410,7 @@ proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
         window.addSubview(w)
         w.editor.mCurrentComposition = compTab.composition
 
-    if w.editor.currentProject.tabs.isNil:
+    if w.editor.currentProject.tabs.len == 0:
         for rt in registeredEditorTabs():
             if rt.name in defaultTabs:
                 w.toggleEditTab(rt)()

@@ -1,19 +1,9 @@
-import opengl
-import math
-import json
-
-import nimx.matrixes
-import nimx.types
-import nimx.property_visitor
-
-import rod.rod_types
-import rod.node
-import rod.component
-import rod.component.mesh_component
-import rod.component.material
-import rod.vertex_data_info
-import rod.tools.serializer
+import nimx/[matrixes, types, property_visitor]
 import rod / utils / [ property_desc, serialization_codegen ]
+import rod/[rod_types, node, vertex_data_info, component]
+import rod/component/[ mesh_component, material ]
+import rod/tools/serializer
+import opengl, math, json
 
 type SphereComponent* = ref object of MeshComponent
     radius: float32
@@ -100,7 +90,7 @@ proc generateMesh*(c: SphereComponent) =
 
     let stride = int32( mesh.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = c.createVertexData(stride, size, vertCoords, texCoords, normals, nil)
+    var vertexData = c.createVertexData(stride, size, vertCoords, texCoords, normals, @[])
 
     mesh.createVBO(indices, vertexData)
 

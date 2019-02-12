@@ -1,20 +1,6 @@
-import json
-import times
-import math
-import random
-
-import rod.quaternion
-
-import rod.node
-import rod.component
-import rod.rod_types
-import rod.viewport
-
-import nimx.matrixes
-import nimx.animation
-import nimx.context
-import nimx.types
-import nimx.property_visitor
+import nimx/[matrixes, animation, context, types, property_visitor ]
+import rod/[quaternion, node, component, rod_types, viewport]
+import json, times, math, random
 
 type ParticleData* = tuple
     coord: Vector3
@@ -146,9 +132,7 @@ proc recursiveSetViewToPrototype(n: Node, v: SceneView) =
 
 method draw*(p: ParticleEmitter) =
     if p.particlePrototype.isNil: return
-    if p.particles.isNil:
-        p.particles = newSeq[ParticleData](p.numberOfParticles)
-    elif p.particles.len != p.numberOfParticles:
+    if p.particles.len != p.numberOfParticles:
         p.particles.setLen(p.numberOfParticles)
         p.currentParticles = 0
 

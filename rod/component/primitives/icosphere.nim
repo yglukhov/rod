@@ -1,15 +1,9 @@
-import nimx.matrixes
-import nimx.types
-import nimx.property_visitor
-
-import rod.rod_types
-import rod.component
-import rod.component.mesh_component
-import rod.component.material
-import rod.vertex_data_info
-
-import math, tables
-import nimx.portable_gl
+import nimx/[matrixes, types, property_visitor, portable_gl]
+import rod / utils / [ property_desc, serialization_codegen ]
+import rod/[rod_types, node, vertex_data_info, component]
+import rod/component/[ mesh_component, material ]
+import rod/tools/serializer
+import math, json, tables
 
 type MeshInfo = ref object
     vertices: seq[Vector3]
@@ -147,7 +141,7 @@ proc genMesh(s: Icosphere)=
     s.vboData.vertInfo = newVertexInfoWithVertexData(vertCoords.len, texCoords.len, normals.len, 0)
     let stride = int32( s.vboData.vertInfo.stride / sizeof(GLfloat) )
     let size = int32(vertCoords.len * stride / 3)
-    var vertexData = s.createVertexData(stride, size, vertCoords, texCoords, normals, nil)
+    var vertexData = s.createVertexData(stride, size, vertCoords, texCoords, normals, @[])
 
     s.createVBO(indices, vertexData)
 

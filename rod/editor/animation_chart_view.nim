@@ -1,7 +1,7 @@
 import math, strutils
 import nimx / [ view, context, view_event_handling, font, keyboard,
         window_event_handling ]
-import nimx.editor.grid_drawing
+import nimx/editor/grid_drawing
 
 import animation_editor_types
 

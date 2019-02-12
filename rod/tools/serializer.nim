@@ -1,15 +1,8 @@
+import nimx/[image, types, pathutils, matrixes, portable_gl, assets/asset_loading]
+import rod/utils/[json_serializer, json_deserializer]
+import rod/[rod_types, quaternion]
 import json, tables, typetraits, streams, logging, strutils, ospaths
 
-import nimx.image
-import nimx.types
-import nimx.pathutils
-import nimx.matrixes
-import nimx.portable_gl
-import nimx.assets.asset_loading
-
-import rod.rod_types
-import rod.quaternion
-import rod/utils/[json_serializer, json_deserializer]
 
 type Serializer* = ref object
     url*: string
@@ -55,7 +48,7 @@ proc toAbsoluteUrl*(s: Serializer, relativeOrAbsoluteUrl: string): string =
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) =
     let jN = j{name}
     if not jN.isNil:
-        val = jN.getStr(nil)
+        val = jN.getStr()
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var int) =
     let jN = j{name}

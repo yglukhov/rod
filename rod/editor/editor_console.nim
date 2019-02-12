@@ -1,16 +1,11 @@
+import nimx/[view, text_field, button, popup_button, scroll_view]
 import strutils, tables, logging
-import nimx.view
-import nimx.text_field
-import nimx.button
-import nimx.popup_button
-import nimx.scroll_view
-
+import rod/edit_view
+import rod/editor/editor_error_handling
 import variant
 
 export view
 
-import rod.edit_view
-import rod.editor.editor_error_handling
 
 type EditorConsole* = ref object of EditorTabView
     contentView: View
@@ -21,7 +16,7 @@ type EditorConsole* = ref object of EditorTabView
 proc reloadConsole(v: EditorConsole)=
     var msgs = gEditorLogger.dump(v.currentLevel)
 
-    while not v.contentView.subviews.isNil and v.contentView.subviews.len > 0:
+    while v.contentView.subviews.len > 0:
         v.contentView.subviews[0].removeFromSuperView()
 
     var lblText = "\n"

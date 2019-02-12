@@ -1,11 +1,8 @@
+import nimx/[unistring, types, formatted_text, font]
+import rod/utils/text_helpers
 import strutils
 import unicode
 
-import nimx.unistring
-import nimx.types
-import nimx.formatted_text
-import nimx.font
-import rod.utils.text_helpers
 
 type TextAttributeType* {.pure.} = enum
     color

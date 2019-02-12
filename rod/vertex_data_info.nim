@@ -1,4 +1,4 @@
-import nimx.portable_gl
+import nimx/portable_gl
 
 type VertexDataInfo* = object
     numOfCoordPerVert*: GLint

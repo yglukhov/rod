@@ -1,18 +1,5 @@
-import rod.viewport
-import rod.rod_types
-import rod.node
-
-import rod.component
-import rod.component.ui_component
-import rod.edit_view
-
-import nimx.view
-import nimx.types
-import nimx.button
-import nimx.animation
-import nimx.mini_profiler
-import nimx.matrixes
-import nimx.view_event_handling
+import nimx/[view, types, button, animation, mini_profiler, matrixes, view_event_handling]
+import rod/[viewport, rod_types, node, component, component.ui_component, edit_view]
 
 const viewportSize = newSize(1920, 1080)
 

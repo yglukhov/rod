@@ -1,15 +1,8 @@
-import json
-
-import nimx.types
-import nimx.context
-import nimx.matrixes
-import nimx.property_visitor
-
-import rod.node
-import rod.rod_types
-import rod.component
-import rod.tools.serializer
+import nimx/[types, context, matrixes, property_visitor]
 import rod / utils / [ property_desc, serialization_codegen ]
+import rod/[node, rod_types, component]
+import rod/tools/serializer
+import json
 
 type Solid* = ref object of Component
     size*: Size

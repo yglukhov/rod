@@ -2,8 +2,9 @@ import json, strutils, tables, parseutils, logging
 import nimx / [ types, matrixes, animation, property_visitor ]
 
 import variant
-import rod.node, rod.component, rod.animation.animation_sampler, rod.quaternion
-import rod.utils.bin_deserializer
+import rod/[node,component, quaternion]
+import rod/animation/animation_sampler
+import rod/utils/bin_deserializer
 
 export animation
 
@@ -35,7 +36,7 @@ proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, p
     # nodeName.compIndex.propName # looked up only in specified component
     propName = name
     compIndex = -1
-    nodeName = nil
+    nodeName = ""
     let dotIdx2 = name.rfind('.')
     if dotIdx2 != -1:
         propName = name.substr(dotIdx2 + 1)
@@ -173,19 +174,19 @@ proc findAnimatableProperty*(n: Node, propName: string): Variant =
     findAnimatablePropertyAux:
         n.visitProperties(visitor)
 
-        if res.isEmpty and not n.components.isNil:
+        if res.isEmpty:
             for k, v in n.components:
                 v.visitProperties(visitor)
                 if not res.isEmpty: break
 
 proc findAnimatableProperty(n: Node, compIndex: int, propName: string): Variant =
     findAnimatablePropertyAux:
-        if not n.components.isNil and n.components.len > compIndex:
+        if n.components.len > compIndex:
             n.components[compIndex].visitProperties(visitor)
 
 proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int, rawPropName: string): Variant =
     var animatedNode = n
-    if not nodeName.isNil:
+    if nodeName.len > 0:
         animatedNode = n.findNode(nodeName)
         if animatedNode.isNil:
             raise newException(Exception, "Animated node " & nodeName & " not found")

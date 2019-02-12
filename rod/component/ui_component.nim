@@ -108,19 +108,15 @@ proc sceneViewWillMoveToWindow*(c: UIComponent, w: Window) =
 
 method componentNodeWasAddedToSceneView*(ui: UIComponent) =
     let sv = ui.node.sceneView
-    if sv.uiComponents.isNil:
-        sv.uiComponents = @[ui]
-    else:
-        sv.uiComponents.add(ui)
+    sv.uiComponents.add(ui)
 
     ui.updSuperview()
 
 method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
     let sv = ui.node.sceneView
-    if not sv.uiComponents.isNil:
-        let i = sv.uiComponents.find(ui)
-        if i != -1:
-            sv.uiComponents.del(i)
+    let i = sv.uiComponents.find(ui)
+    if i != -1:
+        sv.uiComponents.del(i)
 
     if not ui.view.isNil:
         ui.view.removeFromSuperview()

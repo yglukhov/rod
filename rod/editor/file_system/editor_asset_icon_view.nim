@@ -1,10 +1,11 @@
 import nimx / [ text_field, image, view, formatted_text, context, button,
                 render_to_image, window, panel_view, image_preview,
                 view_event_handling ]
-import nimx.assets.asset_loading
+import nimx/assets/asset_loading
 import tables, os, streams
+
 when not defined(android) and not defined(ios) and not defined(emscripten):
-    import os_files.file_info
+    import os_files/file_info
 
 type PathNode* = ref object of RootObj
     children*: seq[PathNode]
@@ -114,7 +115,7 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
 
     of akContainer:
         let img_data = iconBitmapForFile(p.fullPath, 128, 128)
-        if not img_data.isNil:
+        if img_data.len > 0:
             let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
             let imgView = new(ImageIconView)
             imgView.init(newRect(iconPos, iconSize))
@@ -131,7 +132,7 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
 
     else:
         let img_data = iconBitmapForFile(p.fullPath, 128, 128)
-        if not img_data.isNil:
+        if img_data.len > 0:
             let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
             let imgView = new(ImageIconView)
             imgView.init(newRect(iconPos, iconSize))

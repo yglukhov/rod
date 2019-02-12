@@ -1,7 +1,7 @@
+import nimx / [ image, types, pathutils, assets/asset_manager ]
+import rod/quaternion
 import json, strutils, ospaths, strutils
 
-import nimx / [ image, types, pathutils, assets/asset_manager ]
-import rod.quaternion
 
 type JsonDeserializer* = ref object
     node*: JsonNode
@@ -13,7 +13,7 @@ proc newJsonDeserializer*(): JsonDeserializer =
     result.new()
 
 proc setLenX[T](s: var seq[T], sz: int) =
-    if s.isNil:
+    if s.len == 0:
         s = newSeq[T](sz)
     else:
         s.setLen(sz)
@@ -26,7 +26,7 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
     elif T is int | int32 | int64 | int16:
         v = T(j.getBiggestInt())
     elif T is string:
-        v = if j.kind == JNull: nil else: j.str
+        v = if j.kind == JNull: "" else: j.str
     elif T is Rect:
         v = newRect(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
     elif T is tuple:

@@ -1,13 +1,6 @@
-import tables
-
-import nimx.types
-import nimx.matrixes
-import nimx.animation
-import nimx.view
-import nimx.image
-import nimx.portable_gl
-
+import nimx/[types, matrixes, animation, view, image, portable_gl]
 import quaternion
+import tables
 
 const maxLightsCount* = 8
 

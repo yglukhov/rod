@@ -1,13 +1,6 @@
+import rod/[rod_types, component, viewport, node, tools/serializer]
+import nimx/[types, matrixes, property_visitor]
 import json
-import nimx.types
-import nimx.matrixes
-import nimx.property_visitor
-
-import rod.rod_types
-import rod.component
-import rod.viewport
-import rod.node
-import rod.tools.serializer
 
 export LightSource
 

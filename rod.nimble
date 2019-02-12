@@ -8,7 +8,7 @@ bin           = @["rod/tools/rodasset/rodasset", "editor/rodedit"]
 
 # Dependencies
 requires "nimx"
-requires "https://github.com/SSPKrolik/nimasset"
+requires "https://github.com/SSPKrolik/nimasset#head"
 requires "variant"
 requires "os_files"
 requires "https://github.com/yglukhov/imgtools"
