@@ -1,4 +1,4 @@
-import json, streams, sequtils, sets, algorithm, tables, strutils, parseutils, ospaths
+import json, streams, sequtils, sets, algorithm, tables, strutils, parseutils, os
 import tree_traversal
 
 import nimx / [ types, image, pathutils, class_registry ]
@@ -11,11 +11,11 @@ export bin_serializer
 
 proc toScalarType[T](j: JsonNode, o: var T) {.inline.} =
     when T is float | float32 | float64:
-        o = j.getFNum()
+        o = j.getFloat()
     elif T is int16 | int32 | int64:
-        o = T(j.num)
+        o = T(j.getInt)
     elif T is bool:
-        o = j.bval
+        o = j.getBool()
     else:
         {.error: "Unknown scalar type".}
 
@@ -76,7 +76,7 @@ proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, p
     # nodeName.compIndex.propName # looked up only in specified component
     propName = name
     compIndex = -1
-    nodeName = nil
+    nodeName = ""
     let dotIdx2 = name.rfind('.')
     if dotIdx2 != -1:
         propName = name.substr(dotIdx2 + 1)
@@ -110,7 +110,7 @@ proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name
     for n in nodes:
         let c = n{name}
         if not c.isNil:
-            nodeIds.add(int16(n["_id"].num))
+            nodeIds.add(int16(n["_id"].getInt()))
             var v: T
             toComponentType(c, v)
             components.add(v)
@@ -130,7 +130,7 @@ proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name
             var v: T
             toComponentType(c, v)
             if v != default:
-                nodeIds.add(int16(n["_id"].num))
+                nodeIds.add(int16(n["_id"].getInt()))
                 components.add(v)
 
     b.write($typ)
@@ -143,7 +143,7 @@ proc writeFlagsComponents(b: BinSerializer, nodes: seq[JsonNode]) =
     for n in nodes:
         var flags: uint8 = 0
         for flag in NodeFlags:
-            let val = n{$flag}.getBVal(true).uint8
+            let val = n{$flag}.getBool(true).uint8
             flags = flags or (val shl flag.uint8)
         components.add(flags)
 
@@ -154,11 +154,7 @@ proc writeAlphaComponents(b: BinSerializer, nodes: seq[JsonNode]) =
     var components = newSeqOfCap[uint8](nodes.len)
 
     for n in nodes:
-        let c = n{"alpha"}
-        if c.isNil:
-            components.add(255)
-        else:
-            components.add(uint8(c.getFNum() * 255))
+        components.add(uint8(n{"alpha"}.getFloat(1) * 255))
 
     b.write($bicAlpha)
     b.writeArrayNoLen(components)
@@ -166,11 +162,7 @@ proc writeAlphaComponents(b: BinSerializer, nodes: seq[JsonNode]) =
 proc writeNameComponents(b: BinSerializer, nodes: seq[JsonNode]) =
     b.write($bicName)
     for n in nodes:
-        let name = n{"name"}
-        if name.isNil:
-            b.write(string(nil))
-        else:
-            b.write(name.str)
+        b.write(n{"name"}.getStr())
 
 proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string) =
     var nodeIds = newSeqOfCap[int16](nodes.len)
@@ -179,8 +171,8 @@ proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string
     for n in nodes:
         let c = n{"compositionRef"}
         if not c.isNil:
-            nodeIds.add(int16(n["_id"].num))
-            var p = changeFileExt(parentDir(path) & "/" & c.str, "")
+            nodeIds.add(int16(n["_id"].getInt()))
+            var p = changeFileExt(parentDir(path) & "/" & c.getStr(), "")
             normalizePath(p, false)
             components.add(p)
 
@@ -190,7 +182,7 @@ proc writeCompRefComponents(b: BinSerializer, nodes: seq[JsonNode], path: string
 
 proc imageDesc(b: BinSerializer, path: string): JsonNode =
     for j in b.images:
-        if j["orig"].str == path:
+        if j["orig"].getStr() == path:
             return j
 
     doAssert(false, "Image desc not found: " & path)
@@ -226,7 +218,7 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, comp
                 s(foundNode)
 
     c.serialize(b)
-    n.children = nil # Break cycle to let gc collect it faster
+    n.children = @[] # Break cycle to let gc collect it faster
 
 proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonNode]) =
     let jbufs = j{"buffers"}
@@ -242,9 +234,9 @@ proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonN
             splitPropertyName(k, nodeName, compIdx, propName)
             b.write(nodeName)
             b.write(propName)
-            let frameLerp = v{"frameLerp"}.getBVal(true)
-            let len = v["len"].num
-            let cutf = v["cutf"].num
+            let frameLerp = v{"frameLerp"}.getBool(true)
+            let len = v["len"].getInt()
+            let cutf = v["cutf"].getInt()
             b.write(int8(frameLerp))
             b.write(int16(len))
             b.write(int16(cutf))
@@ -255,8 +247,8 @@ proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonN
     b.write(numMarkers)
     for k, v in j["markers"]:
         b.write(k)
-        b.write(v["start"].getFNum())
-        b.write(v["duration"].getFNum())
+        b.write(v["start"].getFloat())
+        b.write(v["duration"].getFloat())
 
 
     let jlayers = j{"layers"}
@@ -266,7 +258,7 @@ proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonN
     b.write(numLayers)
     if not jlayers.isNil:
         for la in jlayers:
-            b.write(la.str)
+            b.write(la.getStr())
 
 proc writeUnknownComponent(b: BinSerializer, j: JsonNode) =
     # echo j
@@ -299,7 +291,7 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
 
     for n in nodes:
         for s in n.componentNodesOfType(name):
-            nodeIds.add(int16(n["_id"].num))
+            nodeIds.add(int16(n["_id"].getInt()))
             c.add(s)
 
     b.write(nodeIds)
@@ -325,8 +317,8 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
     let propsCount = anim.len
     b.write(int16(propsCount))
     let anyProp = anim.anyValue
-    b.write(anyProp["duration"].getFNum())
-    b.write(anyProp{"numberOfLoops"}.getNum(1).int16)
+    b.write(anyProp["duration"].getFloat())
+    b.write(anyProp{"numberOfLoops"}.getInt(1).int16)
 
     for k, v in anim:
         var nodeName, propName: string
@@ -334,7 +326,7 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
         splitPropertyName(k, nodeName, compIdx, propName)
         b.write(nodeName)
         b.write(propName)
-        let frameLerp = v{"frameLerp"}.getBVal(true)
+        let frameLerp = v{"frameLerp"}.getBool(true)
         b.write(int8(frameLerp))
         let vals = v["values"]
         b.writeSamplerValues(propName, vals)
@@ -410,15 +402,15 @@ proc writeComposition(b: BinSerializer, comp: JsonNode, path: string) =
     var childParentRelations = newSeq[int16](nodesCount - 1)
     for i in 1 ..< nodesCount:
         let n = nodes[i]
-        childParentRelations[i - 1] = int16(n["_pid"].num)
+        childParentRelations[i - 1] = int16(n["_pid"].getInt())
 
     b.write(int16(nodesCount))
     b.writeArrayNoLen(childParentRelations)
-    childParentRelations = nil
+    childParentRelations = @[]
 
     var builtInComponents: set[BuiltInComponentType]
 
-    var allCompNames = initSet[string]()
+    var allCompNames = initHashSet[string]()
     for n in nodes:
         if not isDefault(n, "translation", [0.0, 0, 0]): builtInComponents.incl(bicTranslation)
         if not isDefault(n, "rotation", [0.0, 0, 0, 1.0]): builtInComponents.incl(bicRotation)
@@ -522,7 +514,7 @@ proc writeCompositions(b: BinSerializer, comps: openarray[JsonNode], paths: open
     s.align(4)
     s.write(b.stream.data)
     b.stream = nil
-    b.stringEntries = nil
+    b.stringEntries = @[]
 
 proc writeCompositions*(b: BinSerializer, comps: openarray[JsonNode], paths: openarray[string], file: string, images: JsonNode) =
     let s = newFileStream(file, fmWrite)

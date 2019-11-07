@@ -1,6 +1,6 @@
 import nimx / [ image, types, pathutils, assets/asset_manager ]
 import rod/quaternion
-import json, strutils, ospaths, strutils
+import json, strutils, os, strutils
 
 
 type JsonDeserializer* = ref object

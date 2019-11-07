@@ -1,5 +1,5 @@
 import nimx/[types, context, composition, portable_gl, property_visitor]
-import rod/[node, viewport, component, tools.serializer]
+import rod/[node, viewport, component, tools/serializer]
 import rod / utils / [ property_desc, serialization_codegen ]
 import json
 

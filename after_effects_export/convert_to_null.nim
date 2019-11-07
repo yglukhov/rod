@@ -4,8 +4,8 @@ import times
 import json
 import algorithm
 import strutils
-import nimx.matrixes, nimx.pathutils
-import rod.quaternion
+import nimx/matrixes, nimx/pathutils
+import rod/quaternion
 
 type File = after_effects.File
 

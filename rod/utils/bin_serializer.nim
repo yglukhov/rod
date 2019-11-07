@@ -1,4 +1,4 @@
-import tables, streams, json, ospaths, strutils
+import tables, streams, json, os, strutils
 import nimx / [image, types, pathutils ]
 import rod/quaternion
 import serialization_helpers

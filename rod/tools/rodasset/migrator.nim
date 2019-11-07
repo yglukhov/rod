@@ -65,7 +65,7 @@ proc upgradeAssetBundle*(path: string) =
             try:
                 var j = parseJson(readFile(f))
                 for upgrader in upgraders:
-                    let v = j{"version"}.getNum().int
+                    let v = j{"version"}.getInt()
                     if v < upgrader[0]:
                         let newV = upgrader[1](j)
                         if not newV.isNil:

@@ -4,7 +4,7 @@ import rod / utils / [ bin_deserializer, json_serializer, json_deserializer ]
 import rod/tools/serializer
 import rod/asset_bundle
 import quaternion, ray, rod_types
-import tables, typetraits, json, strutils, math, ospaths
+import tables, typetraits, json, strutils, math, os
 
 export Node
 
@@ -391,7 +391,7 @@ proc removeFromParent*(n: Node) =
 
 proc addChild*(n, c: Node) =
     c.removeFromParent()
-    n.children.safeAdd(c)
+    n.children.add(c)
     c.parent = n
     c.setDirty()
     if not n.mSceneView.isNil:

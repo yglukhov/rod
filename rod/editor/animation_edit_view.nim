@@ -77,7 +77,7 @@ proc addEditedProperty(v: AnimationEditView, name: string) =
     ep.name = name
     ap.new()
     ap.propName = name
-    template createCurve(T: typedesc): typed =
+    template createCurve(T: typedesc) =
         ep.curve = newAnimationCurve[T]()
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
     switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
@@ -125,7 +125,7 @@ proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
             ep.name = ap.propName
             try:
                 ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.nodeName, ap.compIndex, ap.propName)
-                template createCurve(T: typedesc): typed =
+                template createCurve(T: typedesc) =
                     if ap.sampler of BezierKeyFrameAnimationSampler[T]:
                         ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
                     else:

@@ -143,7 +143,7 @@ proc dirHash*(path: string, s: Settings): string {.inline.} =
 #    let startTime = epochTime()
 
     let gdh = gitDirHash(path)
-    if unlikely gdh.isNil:
+    if unlikely gdh.len == 0:
         result = dirHashImplNoGit(path, s)
     else:
         result = dirHashImplGit(path, gdh, s)
@@ -178,7 +178,7 @@ proc copyResourcesFromCache*(cache, cacheHash, dst: string) =
             else:
                 raise newException(Exception, "Couldn't rename $# to $#. Message:\n $#".format(tmp, dst, getCurrentExceptionMsg()))
 
-proc getCache*(cacheOverride: string = nil): string =
+proc getCache*(cacheOverride: string = ""): string =
     if cacheOverride.len > 0: return expandTilde(cacheOverride)
     result = getEnv("ROD_ASSET_CACHE")
     if result.len > 0: return

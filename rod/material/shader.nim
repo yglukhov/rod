@@ -58,7 +58,7 @@ proc newShader*(vs, fs: string, attributes: seq[tuple[index: GLuint, name: strin
     result.fragShader = fs
     result.attributes = attributes
     result.needUpdate = true
-    result.shaderMacroFlags = initSet[string]()
+    result.shaderMacroFlags = initHashSet[string]()
     result.shadersCache = initTable[HashSet[string], tuple[shader: ProgramRef, refCount: int]]()
 
     result.createShader()

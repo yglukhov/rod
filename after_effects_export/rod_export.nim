@@ -6,9 +6,9 @@ import json
 import algorithm
 import strutils
 import sequtils
-import nimx.matrixes, nimx.pathutils
-import rod.quaternion
-import rod.utils.text_helpers
+import nimx/matrixes, nimx/pathutils
+import rod/quaternion
+import rod/utils/text_helpers
 
 type File = after_effects.File
 

@@ -1,10 +1,10 @@
-import nimx.matrixes
-import rod.viewport
-import rod.edit_view
-import rod.component.camera
-import rod.node
+import nimx/matrixes
+import rod/viewport
+import rod/edit_view
+import rod/component/camera
+import rod/node
 
-import rod.component.solid
+import rod/component/solid
 
 when defined js:
     import nimx.js_canvas_window

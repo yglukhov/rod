@@ -2,7 +2,7 @@ import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager,
 import nimx / assets / abstract_asset_bundle as nab
 import nimx / [ image, types ]
 import rod/utils/bin_deserializer
-import strutils, ospaths, json, tables, logging, streams
+import strutils, os, json, tables, logging, streams
 import variant
 
 when not defined(js):
@@ -183,9 +183,9 @@ proc isDownloadable*(abd: AssetBundleDescriptor): bool {.inline.} =
         abd.isExternal
 
 when defined(android):
-    import nimx.utils.android
-    import android.content.context
-    import android.extras.pathutils
+    import nimx/utils/android
+    import android/content/context
+    import android/extras/pathutils
 
 proc cacheDir(): string {.inline.} =
     when defined(android):
@@ -195,7 +195,7 @@ proc cacheDir(): string {.inline.} =
 
 when not defined(js) and not defined(emscripten) and not defined(windows):
     import os, threadpool, httpclient, net
-    import nimx.perform_on_main_thread
+    import nimx/perform_on_main_thread
     import untar
 
     type DownloadCtx = ref object
@@ -206,7 +206,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         let ctx = cast[DownloadCtx](ctx)
         GC_unref(ctx)
         if ctx.errorMsg.isNil:
-            ctx.handler(nil)
+            ctx.handler("")
         else:
             ctx.handler("Could not download or extract: " & $ctx.errorMsg)
             deallocShared(ctx.errorMsg)

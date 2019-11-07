@@ -338,7 +338,6 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     of vaTop: vertAlign = "vaTop"
     of vaCenter: vertAlign = "vaCenter"
     of vaBottom: vertAlign = "vaBottom"
-    else: discard
     result.add("verticalAlignment", s.getValue(vertAlign))
 
 proc toPhantom(c: Text, p: var object) =

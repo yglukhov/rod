@@ -1,7 +1,7 @@
 import nimx / [ image, types, assets/asset_manager ]
 import rod / utils / [ property_desc, serialization_helpers ]
 import rod/quaternion
-import streams, tables, json, strutils, ospaths
+import streams, tables, json, strutils, os
 
 type
     BinDeserializer* = ref object
@@ -13,10 +13,8 @@ type
         curCompPath*: string
         disableAwake*: bool
 
-    UncheckedArr {.unchecked.} [T] = array[0, T]
-
     BufferView*[T] = object
-        mData*: ptr UncheckedArr[T]
+        mData*: ptr UncheckedArray[T]
         len*: int
 
 template `[]`*[T](v: BufferView[T], idx: int): T =
@@ -72,7 +70,7 @@ proc getBuffer*(b: BinDeserializer, T: typedesc, len: int): BufferView[T] =
         let s = StringStream(b.stream)
         let offset = b.getPosition()
         assert(s.data.len > offset + len)
-        result.mData = cast[ptr UncheckedArr[T]](cast[pointer](addr s.data[offset]))
+        result.mData = cast[ptr UncheckedArray[T]](cast[pointer](addr s.data[offset]))
         result.len = len
         b.setPosition(offset + len * sizeof(T))
 

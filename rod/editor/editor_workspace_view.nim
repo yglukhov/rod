@@ -1,4 +1,4 @@
-import math, algorithm, strutils, tables, json, logging, ospaths
+import math, algorithm, strutils, tables, json, logging, os
 
 import nimx / [ view, toolbar, editor / tab_view, linear_layout, button,
     font, popup_button, window, menu, notification_center, mini_profiler,

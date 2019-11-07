@@ -93,7 +93,7 @@ proc newValueSampler[T](b: BinDeserializer, numValues: int16, lerpBetweenFrames:
     let buf = b.getBuffer(T, numValues)
     result = newBufferAnimationSampler[T, BufferView[T]](buf, lerpBetweenFrames, originalLen, cutFront)
 
-template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped): typed =
+template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped) =
     ## This lists all animatable types
     case t:
     of clause(Coord): action(Coord)
