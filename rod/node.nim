@@ -401,6 +401,8 @@ proc newChild*(n: Node, childName: string): Node =
     result = newNode(childName)
     n.addChild(result)
 
+proc newChild*(n: Node): Node {.inline.} = newChild(n, "")
+
 proc insertChild*(n, c: Node, index: int) =
     c.removeFromParent()
     n.children.insert(c, index)

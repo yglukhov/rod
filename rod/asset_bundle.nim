@@ -30,7 +30,7 @@ proc hasAsset*(ab: AssetBundle, path: string): bool =
     # TODO: Everything else
 
 proc realUrlForPath(ab: AssetBundle, path: string): string =
-    ab.mBaseUrl / path
+    ab.mBaseUrl & '/' & path
 
 method urlForPath*(ab: AssetBundle, path: string): string =
     if path in ab.spriteSheets:
@@ -47,7 +47,7 @@ proc init(ab: AssetBundle, handler: proc()) {.inline.} =
             ab.binDeserializer.images = ab.index["packedImages"]
         handler()
 
-    openStreamForUrl(ab.mBaseUrl / "comps.rodpack") do(s: Stream, err: string):
+    openStreamForUrl(ab.mBaseUrl & '/' & "comps.rodpack") do(s: Stream, err: string):
         if not s.isNil:
             var ss = s
             when not defined(js):
@@ -98,9 +98,9 @@ when defined(js) or defined(emscripten):
         result.hash = hash
         let href = parentDir(getCurrentHref())
         if href.find("localhost") != -1 or href.startsWith("file://"):
-            result.mBaseUrl = href / "res" / path
+            result.mBaseUrl = href & "/res/" & path
         else:
-            result.mBaseUrl = href / hash
+            result.mBaseUrl = href & '/' & hash
 
 else:
     import os
@@ -113,16 +113,18 @@ else:
         result.new()
         result.path = abPath
         result.mBaseUrl = fileURL
+        echo "newFileAssetBundle: ", fileURL
 
     proc newNativeAssetBundle(path: string): NativeAssetBundle =
         result.new()
         result.path = path
         when defined(ios):
-            result.mBaseUrl = "file://" & getAppDir() / path
+            result.mBaseUrl = "file://" & getAppDir() & '/' & path
         elif defined(macosx):
-            result.mBaseUrl = "file://" & getAppDir() /../ "Resources" / path
+            result.mBaseUrl = "file://" & getAppDir() & "/../Resources/" path
         else:
-            result.mBaseUrl = "file://" & getAppDir() / "res" / path
+            result.mBaseUrl = "file://" & getAppDir() & "/res/" & path
+        echo "newNativeAssetBundle: ", result.mBaseUrl
 
     when defined(android):
         type AndroidAssetBundle* = ref object of AssetBundle
@@ -202,14 +204,15 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         handler: proc(err: string)
         errorMsg: cstring
 
-    proc onDownloadComplete(ctx: pointer) {.cdecl.} =
+    proc onDownloadComplete(ctx: pointer) {.cdecl, gcsafe.} =
         let ctx = cast[DownloadCtx](ctx)
         GC_unref(ctx)
-        if ctx.errorMsg.isNil:
-            ctx.handler("")
-        else:
-            ctx.handler("Could not download or extract: " & $ctx.errorMsg)
-            deallocShared(ctx.errorMsg)
+        {.gcsafe.}:
+            if ctx.errorMsg.isNil:
+                ctx.handler("")
+            else:
+                ctx.handler("Could not download or extract: " & $ctx.errorMsg)
+                deallocShared(ctx.errorMsg)
 
     proc extractGz(zipFileName, destFolder: string): bool =
         var file = newTarFile(zipFileName)
@@ -218,7 +221,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
         removeFile(zipFileName)
         result = true
 
-    proc downloadAndUnzip(url, destPath: string, ctx: pointer) {.used.} =
+    proc downloadAndUnzip(url, destPath: string, ctx: pointer) {.used, gcsafe.} =
         let zipFilePath = destPath & ".gz"
 
         try:
@@ -274,6 +277,7 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
             else:
                 assert(false, "Not supported")
     else:
+        echo "Not downloading"
         handler("")
 
 proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
@@ -290,13 +294,13 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
 
 proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string)) =
     abd.downloadAssetBundle() do(err: string):
-        if err.len > 0:
+        if err.len == 0:
             let ab = newAssetBundle(abd)
             ab.init() do():
                 handler(abd.path, ab, "")
         else:
             warn "Asset bundle error for ", abd.hash, " (", abd.path, "): " , err
-            handler(abd.path, nil, "")
+            handler(abd.path, nil, err)
 
 proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) {.deprecated.}  =
     let newHandler = proc(mountPaths: string, ab: AssetBundle, err: string) =
@@ -318,6 +322,7 @@ proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mou
                 if err.len > 0:
                     handler(mountPaths, abs, err)
                 else:
+                    assert(not ab.isNil)
                     abs[i] = ab
                     mountPaths[i] = mountPath
                     inc i

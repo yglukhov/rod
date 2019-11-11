@@ -83,11 +83,6 @@ proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var float) =
     if not jN.isNil:
         val = jN.getFloat()
 
-proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Vector3) =
-    let jN = j{name}
-    if not jN.isNil:
-        val = newVector3(jN[0].getFloat(), jN[1].getFloat(), jN[2].getFloat())
-
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var Quaternion) =
     let jN = j{name}
     if not jN.isNil:
@@ -210,6 +205,13 @@ proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: 
                 seqVal[j] = jN[i][j].getFloat()
 
             val.add( seqVal )
+
+proc getDeserialized[T: TVector](s: Serializer, j: JsonNode, name: string, val: var T) =
+    let jN = j{name}
+    if not jN.isNil:
+        # var r: T
+        for i in 0 ..< jN.len:
+            val[i] = jN[i].getFloat()
 
 proc getValue*[T](s: Serializer, v: T): JsonNode =
     when T is enum:

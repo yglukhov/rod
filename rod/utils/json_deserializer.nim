@@ -55,8 +55,11 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
 proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
     case jimage.kind
     of JString:
-        result = b.compPath.parentDir / jimage.str
-        normalizePath(result, false)
+        if jimage.str.len == 0:
+            result = ""
+        else:
+            result = b.compPath.parentDir / jimage.str
+            normalizePath(result, false)
     of JObject: result = jimage["orig"].str
     else: doAssert(false)
 

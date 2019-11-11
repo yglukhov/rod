@@ -1,14 +1,15 @@
-import os, strutils, times, osproc, sets, logging, macros
+import os, strutils, times, osproc, logging, macros
 import imgtool, asset_cache, migrator
 import settings except hash
 import json except hash
+import sets except hash
 import tempfile
 import nimx/pathutils
 
 const rodPluginFile {.strdefine.} = ""
 when rodPluginFile.len != 0:
     macro doImport(): untyped =
-        newNimNode(nnkImportStmt).add(newLit(rodPluginFile))
+        newTree(nnkImportStmt, newLit(rodPluginFile))
     doImport()
 
 template updateSettingsWithCmdLine() =
@@ -49,7 +50,7 @@ proc convertAudio(fromFile, toFile: string, mp3: bool) =
         args.add(["-ac", $numChannels, "-ar", $sampleRate])
 
     args.add(toFile)
-    echo audioConvTool().execProcess(args, options={poStdErrToStdOut})
+    echo audioConvTool().execProcess(args = args, options={poStdErrToStdOut})
 
 proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles: var seq[string]) =
     let isMp3 = audioFmt == "mp3"
