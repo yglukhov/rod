@@ -346,11 +346,12 @@ proc initParticle(ps: ParticleSystem, result: var Particle, index, count: int, d
 
 proc fillIBuffer(ps: ParticleSystem) =
     let gl = currentContext().gl
-    var ib = newSeq[GLushort]()
 
-    ps.indexBufferSize = ps.maxParticlesCount() * 6
+    let count = ps.maxParticlesCount()
+    ps.indexBufferSize = count * 6
+    var ib = newSeqOfCap[GLushort](ps.indexBufferSize)
 
-    for i in 0 ..< ps.indexBufferSize:
+    for i in 0 ..< count:
         let start = GLushort(4 * i)
         ib.add(start + 0)
         ib.add(start + 1)

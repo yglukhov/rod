@@ -126,16 +126,8 @@ proc hasComposition*(b: BinDeserializer, name: string): bool {.inline.} =
 proc rewindToComposition*(b: BinDeserializer, name: string) =
     let pos = b.offsetToComposition(name)
     if pos == 0:
-        for k in b.compsTable.keys:
-            echo "COMP: ", k
         raise newException(Exception, "Could not rewind to " & name)
     b.stream.setPosition(pos)
-
-proc setLenX[T](s: var seq[T], sz: int) =
-    if s.len == 0:
-        s = newSeq[T](sz)
-    else:
-        s.setLen(sz)
 
 proc readUint8*(b: BinDeserializer): uint8 {.inline.} =
     cast[uint8](b.stream.readInt8())
@@ -192,7 +184,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
     elif T is seq:
         let sz = b.readInt16()
         if sz > 0:
-            data.setLenX(sz)
+            data.setLen(sz)
             b.read(openarray[type(data[0])](data))
 
     elif T is string:
@@ -239,8 +231,8 @@ proc visit*(b: BinDeserializer, v: var Image) =
 
 proc visit*(b: BinDeserializer, images: var seq[Image], frameOffsets: var seq[Point]) =
     let sz = b.readInt16()
-    images.setLenX(sz)
-    frameOffsets.setLenX(sz)
+    images.setLen(sz)
+    frameOffsets.setLen(sz)
     let buf = b.getBuffer(int16, sz)
     for i in 0 ..< sz:
         b.getImageForIndex(buf[i], images[i], frameOffsets[i])

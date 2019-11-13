@@ -129,11 +129,7 @@ proc packSingleAssetBundle(s: Settings, cache: string, onlyCache: bool, src, dst
             "files": %copiedFiles,
         }
         writeFile(tmpCacheDir / "index.rodpack", index.pretty().replace(" \n", "\n"))
-
-        when declared(moveDir):
-            moveDir(tmpCacheDir, c) # Newer nim should support it
-        else:
-            moveFile(tmpCacheDir, c)
+        moveDir(tmpCacheDir, c)
 
     if not onlyCache:
         copyResourcesFromCache(c, h, dst)

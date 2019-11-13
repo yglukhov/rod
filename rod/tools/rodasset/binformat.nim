@@ -82,7 +82,7 @@ proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, p
     let dotIdx2 = name.rfind('.')
     if dotIdx2 != -1:
         propName = name.substr(dotIdx2 + 1)
-        let dotIdx1 = name.rfind('.', dotIdx2 - 1)
+        let dotIdx1 = name.rfind('.', 0, dotIdx2 - 1)
         if dotIdx1 == -1:
             nodeName = name.substr(0, dotIdx2 - 1)
         elif name[dotIdx1 + 1].isDigit:
@@ -190,7 +190,6 @@ proc imageDesc(b: BinSerializer, path: string): JsonNode =
     doAssert(false, "Image desc not found: " & path)
 
 proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, compPath: string) =
-    echo "writeSingleComponent: ", className, ": ", compPath
     let n = newNode()
     let c = n.addComponent(className)
     let s = newJsonDeserializer()
@@ -199,7 +198,6 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, comp
     s.compPath = relativePathToPath(b.assetBundlePath, compPath)
 
     s.getImageForPath = proc(path: string, offset: var Point): Image =
-        echo "getImageForPath: ", path
         let desc = b.imageDesc(path)
         let sz = desc["size"]
         let joff = desc{"off"}

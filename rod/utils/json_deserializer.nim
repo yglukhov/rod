@@ -12,12 +12,6 @@ type JsonDeserializer* = ref object
 proc newJsonDeserializer*(): JsonDeserializer =
     result.new()
 
-proc setLenX[T](s: var seq[T], sz: int) =
-    if s.len == 0:
-        s = newSeq[T](sz)
-    else:
-        s.setLen(sz)
-
 proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image
 
 proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
@@ -26,7 +20,7 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
     elif T is int | int32 | int64 | int16:
         v = T(j.getBiggestInt())
     elif T is string:
-        v = if j.kind == JNull: "" else: j.str
+        v = j.getStr()
     elif T is Rect:
         v = newRect(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
     elif T is tuple:
@@ -46,7 +40,7 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
         v = parseEnum[T](j.str)
 
     elif T is seq:
-        v.setLenX(j.len)
+        v.setLen(j.len)
         for i in 0 ..< j.len:
             b.get(j[i], v[i])
     else:
@@ -131,8 +125,8 @@ proc visit*(b: JsonDeserializer, v: var Image, key: string) =
 proc visit*(b: JsonDeserializer, images: var seq[Image], imagesKey: string, frameOffsets: var seq[Point], frameOffsetsKey: string) =
     let jimages = b.node[imagesKey]
     let sz = jimages.len
-    images.setLenX(sz)
-    frameOffsets.setLenX(sz)
+    images.setLen(sz)
+    frameOffsets.setLen(sz)
 
     for i in 0 ..< sz:
         images[i] = b.deserializeImage(jimages[i], frameOffsets[i])
@@ -141,7 +135,7 @@ proc visit*[T](b: JsonDeserializer, v: var seq[T], key: string) =
     let j = b.node{key}
     if not j.isNil:
         let sz = j.len
-        v.setLenX(sz)
+        v.setLen(sz)
         for i in 0 ..< sz:
             b.get(j[i], v[i])
 

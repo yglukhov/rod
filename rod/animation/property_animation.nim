@@ -40,7 +40,7 @@ proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, p
     let dotIdx2 = name.rfind('.')
     if dotIdx2 != -1:
         propName = name.substr(dotIdx2 + 1)
-        let dotIdx1 = name.rfind('.', dotIdx2 - 1)
+        let dotIdx1 = name.rfind('.', 0, dotIdx2 - 1)
         if dotIdx1 == -1:
             nodeName = name.substr(0, dotIdx2 - 1)
         elif name[dotIdx1 + 1].isDigit:
