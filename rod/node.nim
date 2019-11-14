@@ -796,18 +796,24 @@ proc getTreeDistance*(x, y: Node): int =
     result = iy - ix
 
 proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
-    for name, component in n.components:
-        var distance: float32
-        let res = component.rayCast(r, distance)
+    if n.getGlobalAlpha() < 0.01 or not n.isEnabledInTree():
+        return
 
-        if res:
-            var castInfo: RayCastInfo
-            castInfo.node = n
-            castInfo.distance = distance
-            castResult.add(castInfo)
+    var inv_mat: Matrix4
+    if tryInverse(n.worldTransform(), inv_mat):
+        let localRay = r.transform(inv_mat)
+        for name, component in n.components:
+            var distance: float32
+            let res = component.rayCast(localRay, distance)
 
-    for c in n.children:
-        c.rayCast(r, castResult)
+            if res:
+                var castInfo: RayCastInfo
+                castInfo.node = n
+                castInfo.distance = distance
+                castResult.add(castInfo)
+
+        for c in n.children:
+            c.rayCast(r, castResult)
 
 # Debugging
 proc recursiveChildrenCount*(n: Node): int =
