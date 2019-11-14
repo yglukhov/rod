@@ -125,12 +125,4 @@ method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
     if bbox.isEmpty:
         return false
 
-    var inv_mat: Matrix4
-    if tryInverse(c.node.worldTransform(), inv_mat) == false:
-        return false
-
-    let localRay = r.transform(inv_mat)
-    if c.node.getGlobalAlpha() < 0.01 or not c.node.isEnabledInTree():
-        result = false
-    else:
-        result = localRay.intersectWithAABB(bbox.minPoint, bbox.maxPoint, distance)
+    result = r.intersectWithAABB(bbox.minPoint, bbox.maxPoint, distance)
