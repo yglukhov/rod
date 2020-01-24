@@ -355,9 +355,12 @@ method init(attr: PSModifierRandWind) =
 
 method updateParticle*(attr: PSModifierRandWind, part: var Particle) =
     var force: Vector3
-    force.x = rand(-attr.force.x .. attr.force.x)
-    force.y = rand(-attr.force.y .. attr.force.y)
-    force.z = rand(-attr.force.z .. attr.force.z)
+    proc r(v: float32): float32 {.inline.} =
+        let a = abs(v)
+        rand(-a .. a)
+    force.x = r(attr.force.x)
+    force.y = r(attr.force.y)
+    force.z = r(attr.force.z)
     part.velocity += force / 60.0
 
 method deserialize*(attr: PSModifierRandWind, j: JsonNode, s: Serializer) =
