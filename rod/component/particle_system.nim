@@ -283,7 +283,7 @@ ParticleSystem.properties:
 
 # -------------------- Particle System --------------------------
 proc randomBetween(fromV, toV: float32): float32 {.inline.} =
-    result = rand(fromV .. toV)
+    result = rand(min(fromV, toV) .. max(fromV, toV))
 
 proc randomBetween(fromV, toV: Vector3): Vector3 =
     result.x = randomBetween(fromV.x, toV.x)
