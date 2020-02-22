@@ -611,8 +611,7 @@ proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
 import rod/animation/property_animation
 
 proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
-    if n.name.len > 0:
-        s.deserializeValue(j, "name", n.name)
+    s.deserializeValue(j, "name", n.name)
     s.deserializeValue(j, "translation", n.position)
     s.deserializeValue(j, "scale", n.mScale)
     s.deserializeValue(j, "rotation", n.mRotation)

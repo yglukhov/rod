@@ -70,6 +70,7 @@ proc `view=`*(c: UIComponent, v: View) =
     c.mView = cv
     c.enabled = true
     cv.uiCompSubview = v
+    v.name = c.node.name
     c.updSuperview()
 
 proc moveToWindow(v: View, w: Window) =

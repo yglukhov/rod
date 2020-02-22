@@ -31,11 +31,7 @@ proc compileRealBin(bin, toolName, mainNim: string) =
     if startProcess(nim, args = args, options = {poParentStreams}).waitForExit != 0:
         raise newException(Exception, toolName & " compilation failed")
 
-proc runWrapper*(toolName, pathToToolMainNim: string) =
-    let tmp = getTempDir()
-    let cd = getCurrentDir()
-    let projName = splitPath(cd).tail
-    let bin = tmp / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
+proc wrapperAUX(bin, toolName, pathToToolMainNim: string) =
     var needsCompile = not fileExists(bin)
     var passArgs = newSeq[string]()
 
@@ -53,3 +49,17 @@ proc runWrapper*(toolName, pathToToolMainNim: string) =
     # Run the tool
     if startProcess(bin, args = passArgs, options = {poParentStreams}).waitForExit != 0:
         raise newException(Exception, toolName & " failed")
+
+
+proc runWrapper*(toolName, pathToToolMainNim: string) =
+    let tmp = getTempDir()
+    let cd = getCurrentDir()
+    let projName = splitPath(cd).tail
+    let bin = tmp / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
+    wrapperAUX(bin, toolName, pathToToolMainNim)
+
+
+proc runEditorWrapper*(toolName, pathToToolMainNim: string) =
+    let cd = getCurrentDir()
+    let bin = cd / splitPath(cd).tail & "_" & toolName & (when defined(windows): ".exe" else: "")
+    wrapperAUX(bin, toolName, pathToToolMainNim)

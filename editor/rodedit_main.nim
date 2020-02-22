@@ -1,4 +1,4 @@
-import tables, logging, strutils
+import tables, logging, strutils, macros
 
 import nimx / [ matrixes, image, window, autotest ]
 import rod / [ viewport, edit_view, node,component, scene_composition ]
@@ -7,12 +7,16 @@ import rod/component/[camera, solid, mesh_component, material, light, sprite]
 
 import rod/editor/editor_project_settings
 
+const rodPluginFile {.strdefine.} = ""
+when rodPluginFile.len != 0:
+    macro doImport(): untyped =
+        newTree(nnkImportStmt, newLit(rodPluginFile))
+    doImport()
+
 when loadingAndSavingAvailable:
     import rod/editor/editor_open_project_view
 
 const isMobile = defined(ios) or defined(android)
-
-type EditView = ref object of SceneView
 
 proc runAutoTestsIfNeeded() =
     uiTest generalUITest:
@@ -24,23 +28,7 @@ proc runAutoTestsIfNeeded() =
         startRegisteredTests()
 
 proc switchToEditView(w: Window, proj: EditorProject)=
-    # let editView = EditView.new(w.bounds)
-
-    # editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    # editView.rootNode = newNode("(root)")
-    # let cameraNode = editView.rootNode.newChild("camera")
-    # discard cameraNode.component(Camera)
-    # cameraNode.positionZ = 100
-
-    # let light = editView.rootNode.newChild("point_light")
-    # light.position = newVector3(-100,100,100)
-    # let lightSource = light.component(LightSource)
-    # lightSource.setDefaultLightSource()
-
-    # w.addSubview(editView)
-
-    var editor = w.startEditorForProject(proj)
-    # editor.startEditingNodeInView(nil, w, false)
+    discard w.startEditorForProject(proj)
 
 proc startApplication() =
     when isMobile or defined(js):
