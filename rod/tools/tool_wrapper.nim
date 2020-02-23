@@ -15,12 +15,13 @@ proc nimblePath(package: string): string =
     if result.len == 0:
         raise newException(Exception, "Package " & package & " not found in nimble packages")
 
-proc compileRealBin(bin, toolName, mainNim: string) =
+proc compileRealBin(bin, toolName, mainNim: string, cflags: seq[string]) =
     createDir(bin.parentDir())
     var args = @["c", "--threads:on", "-d:release",
         "--stackTrace:on", "--lineTrace:on",
-        "-d:rodplugin",
-        "--out:" & bin]
+        "-d:rodplugin"]
+    args.add(cflags)
+    args.add("--out:" & bin)
     let plug = rodPluginFile()
     if plug.len != 0:
         args.add("-d:rodPluginFile=" & plug)
@@ -31,11 +32,7 @@ proc compileRealBin(bin, toolName, mainNim: string) =
     if startProcess(nim, args = args, options = {poParentStreams}).waitForExit != 0:
         raise newException(Exception, toolName & " compilation failed")
 
-proc runWrapper*(toolName, pathToToolMainNim: string) =
-    let tmp = getTempDir()
-    let cd = getCurrentDir()
-    let projName = splitPath(cd).tail
-    let bin = tmp / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
+proc wrapperAUX(bin, toolName, pathToToolMainNim: string, cflags: seq[string] = @[]) =
     var needsCompile = not fileExists(bin)
     var passArgs = newSeq[string]()
 
@@ -48,8 +45,22 @@ proc runWrapper*(toolName, pathToToolMainNim: string) =
 
     if needsCompile:
         echo "Compiling ", toolName
-        compileRealBin(bin, toolName, pathToToolMainNim)
+        compileRealBin(bin, toolName, pathToToolMainNim, cflags)
 
     # Run the tool
     if startProcess(bin, args = passArgs, options = {poParentStreams}).waitForExit != 0:
         raise newException(Exception, toolName & " failed")
+
+
+proc runWrapper*(toolName, pathToToolMainNim: string) =
+    let tmp = getTempDir()
+    let cd = getCurrentDir()
+    let projName = splitPath(cd).tail
+    let bin = tmp / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
+    wrapperAUX(bin, toolName, pathToToolMainNim)
+
+
+proc runEditorWrapper*(toolName, pathToToolMainNim: string) =
+    let cd = getCurrentDir()
+    let bin = cd / splitPath(cd).tail & "_" & toolName & (when defined(windows): ".exe" else: "")
+    wrapperAUX(bin, toolName, pathToToolMainNim, @["-d:rodedit"])
