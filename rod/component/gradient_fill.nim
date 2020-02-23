@@ -75,6 +75,7 @@ method serialize*(gf: GradientFill, serealizer: Serializer): JsonNode =
     result.add("startColor", serealizer.getValue(gf.startColor))
     result.add("endColor", serealizer.getValue(gf.endColor))
     result.add("shape", serealizer.getValue(gf.shape))
+    result.add("localCoords", serealizer.getValue(gf.localCoords))
 
 method deserialize*(gf: GradientFill, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "startPoint", gf.startPoint)
@@ -82,6 +83,7 @@ method deserialize*(gf: GradientFill, j: JsonNode, serealizer: Serializer) =
     serealizer.deserializeValue(j, "startColor", gf.startColor)
     serealizer.deserializeValue(j, "endColor", gf.endColor)
     serealizer.deserializeValue(j, "shape", gf.shape)
+    serealizer.deserializeValue(j, "localCoords", gf.localCoords)
 
 method beforeDraw*(gf: GradientFill, index: int): bool =
     var tlp: Point

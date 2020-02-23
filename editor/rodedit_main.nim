@@ -14,6 +14,7 @@ when rodPluginFile.len != 0:
     doImport()
 
 when loadingAndSavingAvailable:
+    import os
     import rod/editor/editor_open_project_view
 
 const isMobile = defined(ios) or defined(android)
@@ -36,9 +37,14 @@ proc startApplication() =
     else:
         var mainWindow = newWindow(newRect(40, 40, 1200, 600))
     when loadingAndSavingAvailable:
-        let settings = getEditorSettings()
+        var settings = getEditorSettings()
         if settings.lastProject.len > 0:
-            var proj = getProjectAtPath(settings.lastProject)
+            when defined(rodedit):
+                var proj: EditorProject
+                proj.name = "rodedit"
+                proj.path = getAppDir()
+            else:
+                var proj = getProjectAtPath(settings.lastProject)
             mainWindow.title = "Project " & proj.name
             mainWindow.switchToEditView(proj)
         else:

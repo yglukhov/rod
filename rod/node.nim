@@ -348,8 +348,12 @@ proc resolveNodeRefs(n: Node) =
                 s(foundNode)
 
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
-    for c in n.components:
-        c.componentNodeWillBeRemovedFromSceneView()
+    block components:
+        var ci = 0
+        while ci < n.components.len:
+            n.components[ci].componentNodeWillBeRemovedFromSceneView()
+            inc ci
+
     for c in n.children:
         c.nodeWillBeRemovedFromSceneView()
     n.mSceneView = nil
@@ -357,8 +361,12 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
     if n.mSceneView.isNil:
         n.mSceneView = v
-        for c in n.components:
-            c.componentNodeWasAddedToSceneView()
+        block components:
+            let size = n.components.len
+            var ci = 0
+            while ci < size:
+                n.components[ci].componentNodeWasAddedToSceneView()
+                inc ci
         for c in n.children:
             c.nodeWasAddedToSceneView(v)
     else:
