@@ -5,6 +5,7 @@ description   = "Graphics engine"
 license       = "MIT"
 
 bin           = @["rod/tools/rodasset/rodasset", "editor/rodedit"]
+installExt    = @["nim"]
 
 # Dependencies
 requires "nimx"
