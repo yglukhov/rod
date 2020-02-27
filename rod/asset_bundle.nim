@@ -121,7 +121,7 @@ else:
         when defined(ios):
             result.mBaseUrl = "file://" & getAppDir() & '/' & path
         elif defined(macosx):
-            result.mBaseUrl = "file://" & getAppDir() & "/../Resources/" path
+            result.mBaseUrl = "file://" & getAppDir() & "/../Resources/" & path
         else:
             result.mBaseUrl = "file://" & getAppDir() & "/res/" & path
         echo "newNativeAssetBundle: ", result.mBaseUrl
