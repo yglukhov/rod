@@ -15,13 +15,19 @@ when rodPluginFile.len != 0:
 template updateSettingsWithCmdLine() =
     s.graphics.downsampleRatio *= downsampleRatio
     s.graphics.compressToPVR = compressToPVR
+    s.graphics.useWebp = useWebp
+    s.graphics.webpQuality = webpQuality
+    s.graphics.webpLossless = webpLossless
     if platform in ["js", "emscripten", "wasm"]:
         s.audio.extension = "mp3"
     else:
         s.audio.extension = "ogg"
 
+    echo "updateSettingsWithCmdLine ", s.graphics
+
 proc hash(platform: string = "", downsampleRatio: float = 1.0,
-        compressToPVR: bool = false, path: string) =
+        compressToPVR: bool = false, useWebp: bool = false,
+        webpQuality = 60.0, webpLossless: bool = false, path: string) =
     let s = parseConfig(path / "config.rab")
     updateSettingsWithCmdLine()
     echo dirHash(path, s)
@@ -76,7 +82,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles:
                 else:
                     convertAudio(r, dest, false)
             of ".json", ".jcomp":
-                doIndex = not tool.packCompositions
+                doIndex = not tool.settings.graphics.packCompositions
             of ".rab":
                 discard
             else:
@@ -105,18 +111,13 @@ proc packSingleAssetBundle(s: Settings, cache: string, onlyCache: bool, src, dst
                 normalizePath(tp, false)
                 tool.compositionPaths.add(tp)
 
-        tool.noquant = s.graphics.quantizeExceptions
-        tool.noposterize = s.graphics.posterizeExceptions
+        tool.settings = s
+
         tool.originalResPath = src
         tool.resPath = tmpCacheDir
         tool.outPrefix = "p"
-        tool.compressOutput = s.graphics.compressOutput
-        tool.compressToPVR = s.graphics.compressToPVR
-        tool.downsampleRatio = s.graphics.downsampleRatio
-        tool.extrusion = s.graphics.extrusion
-        tool.disablePotAdjustment = s.graphics.disablePotAdjustment
         tool.packUnreferredImages = true
-        tool.packCompositions = s.graphics.packCompositions
+
         let startTime = epochTime()
         tool.run()
         echo "Done. Time: ", epochTime() - startTime
@@ -144,6 +145,8 @@ proc pack(cache: string = "", platform: string = "",
         downsampleRatio: float = 1.0, compressToPVR: bool = false,
         onlyCache: bool = false,
         debug: bool = false,
+        useWebp: bool = false, webpQuality = 60.0,
+        webpLossless: bool = false,
         src, dst: string) =
     #addHandler(newConsoleLogger()) # Disable logger for now, because nimx provides its own. This will likely be changed.
     let src = expandTilde(src)
@@ -172,7 +175,8 @@ proc ls(debug: bool = false, androidExternal: bool = false, resDir: string) =
         if shouldList: echo path
 
 proc jsonmap(platform: string = "", downsampleRatio: float = 1.0,
-        compressToPVR: bool = false, resDir: string, output: string) =
+        compressToPVR: bool = false, useWebp: bool = false, webpQuality = 60.0,
+        webpLossless: bool = false, resDir: string, output: string) =
     var j = newJObject()
     for path, s in assetBundles(resDir, true):
         updateSettingsWithCmdLine()
