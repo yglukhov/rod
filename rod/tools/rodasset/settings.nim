@@ -12,6 +12,9 @@ type GraphicsSettings* = object
     packCompositions*: bool
     quantizeExceptions*: seq[string]
     posterizeExceptions*: seq[string]
+    useWebp*: bool
+    webpQuality*: float
+    webpLossless*: bool
 
 type Settings* = ref object
     graphics*: GraphicsSettings
@@ -24,7 +27,8 @@ proc init(g: var GraphicsSettings) {.inline.} =
     g.compressOutput = true
     g.compressToPVR = false
     g.extrusion = 1
-    g.disablePotAdjustment = false
+    g.disablePotAdjustment = true
+    g.webpLossless = true
     g.quantizeExceptions = @[]
     g.posterizeExceptions = @[]
 
@@ -81,3 +85,7 @@ proc parseConfig*(rabFilePath: string, fast: bool = false): Settings =
             result.graphics.packCompositions = parseBool(val)
         of "androidExternal":
             result.androidExternal = parseBool(val)
+        of "quality":
+            result.graphics.webpQuality = parseFloat(val)
+        of "webpLossless":
+            result.graphics.webpLossless = parseBool(val)

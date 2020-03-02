@@ -335,7 +335,7 @@ proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mou
 
     loadAssetBundles(abds, newHandler)
 
-registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tga"]) do(url, path: string, cache: AssetCache, handler: proc()):
+registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tga", "webp"]) do(url, path: string, cache: AssetCache, handler: proc()):
     const prefix = "rod_ss://"
     let resPath = url.substr(prefix.len)
     let am = sharedAssetManager()

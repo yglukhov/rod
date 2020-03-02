@@ -1,4 +1,4 @@
-import os, osproc, json, strutils, times, sequtils, tables, sets, logging
+import os, osproc, json, strutils, times, settings, tables, sets, logging
 import nimx/pathutils
 
 const multithreaded = compileOption("threads")
@@ -32,21 +32,14 @@ type ImgTool* = ref object
     originalResPath*: string #
     resPath*: string #
     compressOutput*: bool
-    compressToPVR*: bool
-    downsampleRatio*: float
-    disablePotAdjustment*: bool # If true, do not resize images to power of 2
     packUnreferredImages*: bool
-    extrusion*: int
     processedImages*: HashSet[string]
-    noquant*: seq[string]
-    noposterize*: seq[string]
     index*: JsonNode
-    packCompositions*: bool
+    settings*: Settings
 
 proc newImgTool*(): ImgTool =
     result.new()
-    result.downsampleRatio = 1.0
-    result.extrusion = 1
+    result.settings = newSettings()
     result.compositionPaths = @[]
 
 proc destPath(tool: ImgTool, origPath: string): string =
@@ -68,11 +61,11 @@ proc pathToPVR(path: string): string {.inline.} =
 proc adjustImageNode(tool: ImgTool, im: ImageOccurence) =
     # Fixup the fileName node to contain spritesheet filename and texCoords
     var ssPath = im.spriteSheet.path
-    if tool.compressToPVR:
+    if tool.settings.graphics.compressToPVR:
         ssPath = ssPath.pathToPVR()
 
     let result = im.serializedImage(relativePathToPath(tool.destPath(im.info.compPath).parentDir(), ssPath))
-    if tool.packCompositions:
+    if tool.settings.graphics.packCompositions:
         result["orig"] = %relativePathToPath(tool.originalResPath, im.path) #im.path
     doAssert(not im.spriteSheet.isNil)
 
@@ -128,9 +121,9 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
             result.add(ImageOccurence(
                 path: ap,
                 info: ioinfo,
-                extrusion: tool.extrusion,
-                downsampleRatio: tool.downsampleRatio,
-                disablePotAdjustment: tool.disablePotAdjustment,
+                extrusion: tool.settings.graphics.extrusion,
+                downsampleRatio: tool.settings.graphics.downsampleRatio,
+                disablePotAdjustment: tool.settings.graphics.disablePotAdjustment,
                 allowAlphaCrop: alphaCrop
             ))
 
@@ -170,16 +163,16 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
                 if p notin referredImages:
                     result.add(ImageOccurence(
                         path: p,
-                        extrusion: tool.extrusion,
-                        downsampleRatio: tool.downsampleRatio,
-                        disablePotAdjustment: tool.disablePotAdjustment
+                        extrusion: tool.settings.graphics.extrusion,
+                        downsampleRatio: tool.settings.graphics.downsampleRatio,
+                        disablePotAdjustment: tool.settings.graphics.disablePotAdjustment
                     ))
 
 proc createIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
     let idx = newJArray()
     for im in occurences:
         var ssPath = im.spriteSheet.path.extractFilename()
-        if tool.compressToPVR:
+        if tool.settings.graphics.compressToPVR:
             ssPath = ssPath.pathToPVR()
         let ji = im.serializedImage(ssPath)
         ji["orig"] = %relativePathToPath(tool.originalResPath, im.path)
@@ -190,8 +183,8 @@ proc createIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
 proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
     for o in oc.mitems:
         let name = splitFile(o.path).name
-        let doQuant = not tool.noquant.contains(name)
-        let doPosterize = not tool.noposterize.contains(name)
+        let doQuant = not tool.settings.graphics.quantizeExceptions.contains(name)
+        let doPosterize = not tool.settings.graphics.posterizeExceptions.contains(name)
 
         if doQuant:
             o.category = "quant"
@@ -256,12 +249,14 @@ proc run*(tool: ImgTool) =
     tool.setCategories(occurences)
 
     let packer = newSpriteSheetPacker(tool.resPath & "/" & tool.outPrefix)
+    packer.useWebp = tool.settings.graphics.useWebp
+    packer.webpQuality = tool.settings.graphics.webpQuality
     packer.pack(occurences)
 
-    if tool.compressToPVR:
+    if tool.settings.graphics.compressToPVR:
         for ss in packer.spriteSheets:
             spawnX convertSpritesheetToPVR(ss.path)
-    else:
+    elif not tool.settings.graphics.useWebp:
         for ss in packer.spriteSheets:
             info "Optimizing ss: ", ss.path
             spawnX optimizeSpritesheet(ss.path, ss.category)
@@ -276,7 +271,7 @@ proc run*(tool: ImgTool) =
         tool.processedImages.incl(o.path)
 
     # Write all composisions to single file
-    if tool.packCompositions:
+    if tool.settings.graphics.packCompositions:
         # let allComps = newJObject()
         for i, c in tool.compositions:
             # if "aep_name" in c: c.delete("aep_name")
@@ -300,7 +295,7 @@ proc run*(tool: ImgTool) =
 
     tool.createIndex(occurences)
 
-    if tool.packCompositions:
+    if tool.settings.graphics.packCompositions:
         let b = newBinSerializer()
         b.assetBundlePath = tool.originalResPath.substr("res/".len)
         b.writeCompositions(tool.compositions, tool.compositionPaths, tool.resPath / "comps.rodpack", tool.index)
@@ -308,6 +303,7 @@ proc run*(tool: ImgTool) =
 
     sync() # Wait until spritesheet optimizations complete
 
+#not used????
 proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefix: string, compressOutput: bool = true) =
     var tool = newImgTool()
 
