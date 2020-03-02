@@ -23,7 +23,6 @@ template updateSettingsWithCmdLine() =
     else:
         s.audio.extension = "ogg"
 
-    echo "updateSettingsWithCmdLine ", s.graphics
 
 proc hash(platform: string = "", downsampleRatio: float = 1.0,
         compressToPVR: bool = false, useWebp: bool = false,
