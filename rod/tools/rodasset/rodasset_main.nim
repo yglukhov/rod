@@ -38,12 +38,14 @@ proc audioConvTool(): string =
         gAudioConvTool = findExe("ffmpeg")
         if gAudioConvTool.len == 0:
             gAudioConvTool = findExe("avconv")
+            if gAudioConvTool.len == 0:
+                raise newException(Exception, "Audio conversion tool not found (ffmpeg or avconv)")
     result = gAudioConvTool
 
 let compressAudio = false
 
 proc convertAudio(fromFile, toFile: string, mp3: bool) =
-    var args = @["-i", fromFile, "-y", "-loglevel", "warning"]
+    var args = @["-i", fromFile, "-y", "-loglevel", "error"]
     if mp3:
         args.add(["-acodec", "libmp3lame", "-write_xing", "0"])
     else: # ogg
@@ -55,7 +57,8 @@ proc convertAudio(fromFile, toFile: string, mp3: bool) =
         args.add(["-ac", $numChannels, "-ar", $sampleRate])
 
     args.add(toFile)
-    echo audioConvTool().execProcess(args = args, options={poStdErrToStdOut})
+    let o = audioConvTool().execProcess(args = args, options={poStdErrToStdOut}).strip()
+    if o.len != 0: echo o
 
 proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles: var seq[string]) =
     let isMp3 = audioFmt == "mp3"
@@ -76,10 +79,7 @@ proc copyRemainingAssets(tool: ImgTool, src, dst, audioFmt: string, copiedFiles:
                 reldst = reldst.changeFileExt(audioFmt)
                 doIndex = true
                 echo "Converting/compressing audio ", r
-                if isMp3:
-                    convertAudio(r, dest, true)
-                else:
-                    convertAudio(r, dest, false)
+                convertAudio(r, dest, isMp3)
             of ".json", ".jcomp":
                 doIndex = not tool.settings.graphics.packCompositions
             of ".rab":
