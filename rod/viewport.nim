@@ -231,10 +231,24 @@ proc rayCastFirstNode*(v: SceneView, node: Node, coords: Point): Node =
 
 import opengl
 
-proc addAnimation*(v: SceneView, a: Animation) =
-    v.animationRunner.pushAnimation(a)
+proc addAnimation*(v: SceneView, a: Animation) = v.animationRunners[0].pushAnimation(a)
 
-proc removeAnimation*(v: SceneView, a: Animation) = v.animationRunner.removeAnimation(a)
+proc removeAnimation*(v: SceneView, a: Animation) = v.animationRunners[0].removeAnimation(a)
+
+proc addAnimationRunner*(v: SceneView, ar: AnimationRunner) =
+    if ar notin v.animationRunners:
+        v.animationRunners.add(ar)
+
+        if not v.window.isNil:
+            v.window.addAnimationRunner(ar)
+
+proc removeAnimationRunner*(v: SceneView, ar: AnimationRunner) =
+    if (let idx = v.animationRunners.find(ar); idx != -1):
+        v.animationRunners.del(idx)
+
+        if not v.window.isNil:
+            v.window.removeAnimationRunner(ar)
+
 
 proc addLightSource*(v: SceneView, ls: LightSource) =
     if v.lightSources.isNil():
@@ -315,14 +329,17 @@ method viewDidMoveToWindow*(v:SceneView)=
     procCall v.View.viewDidMoveToWindow()
     if not v.editing and not v.window.isNil:
         v.viewOnEnter()
-    v.window.addAnimationRunner(v.animationRunner)
+
+    for ar in v.animationRunners:
+        v.window.addAnimationRunner(ar)
 
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
     if not v.editing and w.isNil:
         v.viewOnExit()
 
     if not v.window.isNil:
-        v.window.removeAnimationRunner(v.animationRunner)
+        for ar in v.animationRunners:
+            v.window.removeAnimationRunner(ar)
 
     procCall v.View.viewWillMoveToWindow(w)
     for c in v.uiComponents:
@@ -330,7 +347,7 @@ method viewWillMoveToWindow*(v: SceneView, w: Window) =
 
 method init*(v: SceneView, frame: Rect) =
     procCall v.View.init(frame)
-    v.animationRunner = newAnimationRunner()
+    v.addAnimationRunner(newAnimationRunner())
 
     v.deltaTimeAnimation = newAnimation()
     v.deltaTimeAnimation.tag = "deltaTimeAnimation"

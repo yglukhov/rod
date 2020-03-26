@@ -38,6 +38,9 @@ type
     Component* = ref object of RootRef
         node*: Node
 
+    AnimationRunnerComponent* = ref object of Component
+        runner*: AnimationRunner
+
     PostprocessContext* = ref object
         shader*: ProgramRef
         setupProc*: proc(c: Component)
@@ -50,7 +53,7 @@ type
         viewProjMatrix*: Matrix4
         mCamera*: Camera
         mRootNode*: Node
-        animationRunner*: AnimationRunner
+        animationRunners*: seq[AnimationRunner]
         deltaTimeAnimation*: Animation
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]

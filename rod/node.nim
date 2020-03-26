@@ -15,6 +15,14 @@ proc isEnabledInTree*(n: Node): bool
 
 import rod/component
 
+proc animationRunner(n: Node): AnimationRunnerComponent
+
+proc addAnimation*(n: Node, a: Animation) =
+    n.animationRunner.runner.pushAnimation(a)
+
+proc removeAnimation*(n: Node, a: Animation) =
+    n.animationRunner.runner.removeAnimation(a)
+
 proc newNode*(name: string = ""): Node =
     result.new()
     result.mScale = newVector3(1, 1, 1)
@@ -192,6 +200,9 @@ proc removeComponent*(n: Node, name: string) =
     n.removeComponent(c)
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
+
+proc animationRunner(n: Node): AnimationRunnerComponent =
+    result = n.component(AnimationRunnerComponent)
 
 proc update(n: Node) =
     for k, v in n.components:

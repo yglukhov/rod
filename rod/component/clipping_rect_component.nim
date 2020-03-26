@@ -68,7 +68,7 @@ method draw*(cl: ClippingRectComponent) =
         var y = GLint((b.height - brp.y) * pr)
         var w = GLsizei((brp.x - tlp.x) * pr)
         var h = GLSizei((brp.y - tlp.y) * pr)
-        if w > 0 and h > 0:
+        if w >= 0 and h >= 0:
             gl.scissor(x, y, w, h)
 
         for c in cl.node.children: c.recursiveDraw()
