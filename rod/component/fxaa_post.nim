@@ -113,11 +113,8 @@ proc checkResolution*(r: FXAAPost) =
         r.resolution = newVector3(currWidth, currHeight, 0.0)
 
         if not r.image.isNil and not r.fixedSize:
-            let c = currentContext()
-            let gl = c.gl
-            gl.deleteFramebuffer(r.image.framebuffer)
+            let gl = currentContext().gl
             gl.deleteTexture(r.image.texture)
-            r.image.framebuffer = invalidFrameBuffer
             r.image.texture = invalidTexture
             r.image = nil
 
