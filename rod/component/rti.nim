@@ -24,6 +24,7 @@ type RTI* = ref object of Component
 
     bbx*: BBox
     image*: SelfContainedImage
+    imageRenderTarget: ImageRenderTarget
     aspect*: float32
     bBlendOne*: bool
     bFreezeBounds*: bool
@@ -108,6 +109,9 @@ proc setupImageWithBBXSize(rti: RTI) =
         else:
             if rti.image.size != newSz:
                 rti.image.resetToSize(newSz, currentContext().gl)
+        if rti.imageRenderTarget.isNil:
+            rti.imageRenderTarget = newImageRenderTarget()
+        rti.imageRenderTarget.setImage(rti.image)
 
 proc compareBoundsWithViewport(rti: RTI, minP: var Vector3, maxP: var Vector3) =
     let vp = rti.node.sceneView
@@ -239,13 +243,12 @@ method getBBox*(rti: RTI): BBox =
 method componentNodeWillBeRemovedFromSceneView*(rti: RTI) =
     if not rti.image.isNil:
         let gl = currentContext().gl
-        gl.deleteFramebuffer(rti.image.framebuffer)
-        gl.deleteRenderbuffer(rti.image.renderbuffer)
         gl.deleteTexture(rti.image.texture)
-        rti.image.framebuffer = invalidFrameBuffer
-        rti.image.renderbuffer = invalidRenderBuffer
         rti.image.texture = invalidTexture
         rti.image = nil
+    if not rti.imageRenderTarget.isNil:
+        rti.imageRenderTarget.dispose()
+        rti.imageRenderTarget = nil
 
 method beforeDraw*(rti: RTI, index: int): bool =
     result = true
@@ -268,7 +271,7 @@ method beforeDraw*(rti: RTI, index: int): bool =
             rti.mOldVPMat = rti.node.sceneView.viewProjMatrix
             rti.node.sceneView.viewProjMatrix = rti.getTransitionProjMat() * rti.getTransitionViewMat()
 
-            rti.image.beginDraw(rti.mGfs)
+            rti.imageRenderTarget.beginDraw(rti.mGfs)
 
             result = false
 
@@ -280,7 +283,7 @@ method afterDraw*(rti: RTI, index: int) =
 
             rti.mDrawInImage = false
 
-            rti.image.endDraw(rti.mGfs)
+            rti.imageRenderTarget.endDraw(rti.mGfs)
             if not rti.image.flipped:
                 rti.image.flipVertically()
 
