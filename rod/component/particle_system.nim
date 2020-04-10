@@ -402,6 +402,7 @@ proc initSystem(ps: ParticleSystem) =
 
 proc cleanup*(ps: ParticleSystem) =
     let c = currentContext()
+    if c.isNil: return
     let gl = c.gl
     if ps.indexBuffer != invalidBuffer:
         gl.deleteBuffer(ps.indexBuffer)

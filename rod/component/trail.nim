@@ -360,6 +360,7 @@ template setColorUniform(c: GraphicsContext, t: Trail, name: cstring, col: Color
 
 proc cleanup(b: var Buffer) =
     let c = currentContext()
+    if c.isNil: return
     let gl = c.gl
     if b.indexBuffer != invalidBuffer:
         gl.deleteBuffer(b.indexBuffer)

@@ -100,7 +100,8 @@ when defined(js) or defined(emscripten):
         if href.find("localhost") != -1 or href.startsWith("file://"):
             result.mBaseUrl = href & "/res/" & path
         else:
-            result.mBaseUrl = href & '/' & hash
+            let hash = when defined(rodNoExternalAssetsForEmscripten): "res/" & path else: hash
+            result.mBaseUrl = href & "/" & hash
 
 else:
     import os
