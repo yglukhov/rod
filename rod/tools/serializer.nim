@@ -27,7 +27,7 @@ template `%`*(v: Quaternion): JsonNode = %(TVector4[Coord](v))
 proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path
     when not defined(js) and not defined(android) and not defined(ios):
-        resourcePath = parentDir(s.url)
+        resourcePath = urlParentDir(s.url)
 
     result = relativePathToPath(resourcePath, path)
     echo "save path = ", resourcePath, "  relative = ", result
@@ -42,7 +42,7 @@ proc toAbsoluteUrl*(s: Serializer, relativeOrAbsoluteUrl: string): string =
 
     if isAbsoluteUrl(relativeOrAbsoluteUrl): return relativeOrAbsoluteUrl
 
-    result = parentDir(s.url) & '/' & relativeOrAbsoluteUrl
+    result = urlParentDir(s.url) & '/' & relativeOrAbsoluteUrl
     normalizePath(result, false)
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) =
