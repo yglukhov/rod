@@ -37,6 +37,7 @@ type
 
 proc cleanup*(t: Tracer) =
     let c = currentContext()
+    if c.isNil: return
     let gl = c.gl
     if t.indexBuffer != invalidBuffer:
         gl.deleteBuffer(t.indexBuffer)
