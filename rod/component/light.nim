@@ -1,8 +1,22 @@
-import rod/[rod_types, component, viewport, node, tools/serializer]
+import rod/[rod_types, component, node, tools/serializer]
 import nimx/[types, matrixes, property_visitor]
-import json
+import json, tables, logging
 
 export LightSource
+
+proc addLightSource*(v: SceneView, ls: LightSource) =
+    if v.lightSources.isNil():
+        v.lightSources = newTable[string, LightSource]()
+    if v.lightSources.len() < rod_types.maxLightsCount:
+        v.lightSources[ls.node.name] = ls
+    else:
+        warn "Count of light sources is limited. Current count: ", rod_types.maxLightsCount
+
+proc removeLightSource*(v: SceneView, ls: LightSource) =
+    if v.lightSources.isNil() or v.lightSources.len() <= 0:
+        info "Current light sources count equals 0."
+    else:
+        v.lightSources.del(ls.node.name)
 
 proc `lightAmbient=`*(ls: LightSource, val: Coord) =
     ls.mLightAmbient = val

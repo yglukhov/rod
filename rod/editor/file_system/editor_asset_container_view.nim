@@ -1,10 +1,5 @@
 import nimx / [ view, collection_view, types, context, view_event_handling,
-                drag_and_drop, text_field, pasteboard/pasteboard_item,
-                view_render_to_image ]
-
-import os
-
-import editor_asset_icon_view
+                text_field, pasteboard/pasteboard_item ]
 
 export collection_view
 

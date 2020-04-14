@@ -1,7 +1,5 @@
-import nimx/[context, portable_gl, types, image, matrixes, property_visitor, event]
+import nimx/[context, portable_gl, types, matrixes, event]
 import rod/[node, viewport]
-import rod/component/camera
-import strutils
 
 type Gizmo* = ref object of RootObj
     gizmoNode*: Node

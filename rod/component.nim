@@ -1,11 +1,7 @@
-import typetraits, tables, sequtils, json
-
+import typetraits, tables, json
 import nimx / [ types, property_visitor, matrixes, class_registry ]
-
-import node
-import rod_types
-import ray
-import rod/tools/serializer
+import rod / [ rod_types, ray]
+import rod / tools / serializer
 import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
                 json_serializer, serialization_hash_calculator ]
 

@@ -1,7 +1,5 @@
 import math, tables, hashes, sets, variant
 import nimx/[types, portable_gl, context]
-import rod/rod_types
-
 
 type Shader* = ref object
     vertShader*, fragShader*: string

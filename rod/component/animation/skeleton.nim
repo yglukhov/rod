@@ -1,5 +1,5 @@
-import nimx / [matrixes, types, context, portable_gl, property_visitor]
-import rod/[component, rod_types, node]
+import nimx / [matrixes, types, context, portable_gl]
+import rod/[ rod_types, node ]
 import rod/material/shader
 import rod/tools/serializer
 import times, tables, hashes, json

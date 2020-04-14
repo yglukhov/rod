@@ -1,15 +1,14 @@
 import nimx / [ types, view, event, view_event_handling, portable_gl, context,
-    gesture_detector, drag_and_drop, pasteboard/pasteboard, assets/asset_loading, image,
-    matrixes, clip_view ]
+    pasteboard/pasteboard, assets/asset_loading, image, matrixes, clip_view ]
 
 import rod / editor / [gizmo, gizmo_move]
-import rod / [node, rod_types, edit_view, component, viewport, ray]
-import rod / component / [ sprite, light, camera ]
+import rod / [node, rod_types, edit_view, viewport]
+import rod / component / [ sprite, camera ]
 
 import rod/editor_camera_controller
 import node_selector
 
-import logging, sequtils, algorithm
+import logging
 
 type
     EditorDropDelegate* = ref object of DragDestinationDelegate

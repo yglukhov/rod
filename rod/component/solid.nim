@@ -1,6 +1,6 @@
 import nimx/[types, context, matrixes, property_visitor]
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod/[node, rod_types, component]
+import rod/[rod_types, component]
 import rod/tools/serializer
 import json
 

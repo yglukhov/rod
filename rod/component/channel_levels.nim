@@ -1,7 +1,7 @@
-import nimx/[types, context, composition, portable_gl, render_to_image, property_visitor]
+import nimx / [types, context, composition, portable_gl, property_visitor]
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod/[node, viewport, component]
-import rod/tools/serializer
+import rod / component
+import rod / tools / serializer
 import json
 
 type ChannelLevels* = ref object of Component

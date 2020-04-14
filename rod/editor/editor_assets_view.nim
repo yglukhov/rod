@@ -1,12 +1,12 @@
-import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
+import nimx / [types, matrixes, view, table_view_cell, text_field,
     scroll_view, button, event, linear_layout, collection_view, formatted_text, image,
     context, drag_and_drop, pasteboard / pasteboard_item, view_render_to_image,
     segmented_control ]
 
 import file_system / [ filesystem_view ]
-import variant, strutils, tables
-import rod / [node, rod_types, edit_view]
-import os, algorithm, sequtils, times, hashes
+import variant, tables
+import rod / [edit_view]
+import times
 
 type EditorAssetsView* = ref object of EditorTabView
     fileSystemView: FileSystemView

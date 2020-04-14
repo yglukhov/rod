@@ -1,13 +1,13 @@
 import nimx/[view, text_field, button, popup_button,
-    menu, scroll_view, linear_layout, slider,
-    property_visitor, expanding_view, stack_view
+    scroll_view, linear_layout, slider,
+    property_visitor, expanding_view
 ]
 import rod/[node, component, rod_types, viewport]
 import rod/property_editors/[propedit_registry, standard_editors]
 import rod/component/camera
 import rod/edit_view
 
-import algorithm, strutils, tables
+import tables
 import variant
 
 export view
@@ -64,7 +64,7 @@ proc `inspectedNode=`*(i: SceneSettingsView, n: Node) =
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeSceneSettingsView)
+            let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, nil, changeSceneSettingsView)
             propView.autoresizingMask = {afFlexibleWidth}
             let propHolder = newView(propView.frame)
             propHolder.addSubview(propView)

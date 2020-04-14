@@ -1,5 +1,5 @@
 import nimx/[types, composition, portable_gl, matrixes]
-import rod/[node, component]
+import rod / component
 
 type Overlay* = ref object of Component
 

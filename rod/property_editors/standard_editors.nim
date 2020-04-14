@@ -1,9 +1,10 @@
 import nimx/[view, text_field, matrixes, image, button,
-    font, linear_layout, property_visitor, numeric_text_field,
-    slider, animation, property_editors/standard_editors
+    linear_layout, property_visitor, numeric_text_field,
+    slider, animation
 ]
-import rod/component/[ae_composition, mesh_component]
+import rod/component/[ae_composition]
 import rod/property_editors/propedit_registry
+import nimx/property_editors/standard_editors #used
 import rod/[node, viewport, quaternion]
 import strutils, tables, times
 import variant

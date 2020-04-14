@@ -1,6 +1,6 @@
 import nimx / [ image, context, portable_gl, types, view, property_visitor, assets/url_stream ]
-import rod/[component, vertex_data_info, node, viewport, ray, rod_types]
-import rod/component/[material, light, camera ]
+import rod/[component, vertex_data_info, node, ray, rod_types]
+import rod/component/[material ]
 import rod/tools/serializer
 import rod/utils/[bin_deserializer,image_serialization]
 import animation/skeleton
@@ -367,13 +367,6 @@ proc extractTangents*(c: MeshComponent, data: seq[float32]): seq[float32] {.proc
     let offset = (int32)c.vboData.vertInfo.numOfCoordPerVert + c.vboData.vertInfo.numOfCoordPerTexCoord + c.vboData.vertInfo.numOfCoordPerNormal
     result = c.extractVertexData(size, offset, data)
 
-method rayCast*(ns: MeshComponent, r: Ray, distance: var float32): bool =
-    let distToCam = (ns.node.worldPos - ns.node.sceneView.camera.node.worldPos).length()
-    if distToCam < 0.1:
-        return false
-
-    result = procCall ns.Component.rayCast(r, distance)
-
 proc createVertexData*(m: MeshComponent, stride, size: int32, vertCoords, texCoords, normals, tangents: seq[float32]): seq[GLfloat] =
     result = newSeq[GLfloat](size)
     for i in 0 ..< int32(vertCoords.len / 3):
@@ -620,3 +613,12 @@ method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
         p.visitProperty("debugSkeleton", m.debugSkeleton)
 
 registerComponent(MeshComponent)
+
+import rod / viewport
+method rayCast*(ns: MeshComponent, r: Ray, distance: var float32): bool =
+    let distToCam = (ns.node.worldPos - ns.node.sceneView.camera.node.worldPos).length()
+    if distToCam < 0.1:
+        return false
+
+    result = procCall ns.Component.rayCast(r, distance)
+

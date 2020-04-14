@@ -3,7 +3,6 @@ import strutils, json, logging
 import nimx / [ matrixes, button, popup_button, key_commands, animation,
         notification_center, window, view_event_handling ]
 
-import nimx/editor/tab_view
 import nimx/pasteboard/pasteboard
 
 import rod_types, node
@@ -14,8 +13,6 @@ import rod/utils/json_serializer
 export editor_types
 
 import tools/serializer
-
-import ray, viewport
 
 export editor_tab_registry
 

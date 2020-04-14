@@ -3,7 +3,7 @@ import nimx / [view, table_view, scroll_view,
     button, text_field, popup_button, window,
     linear_layout, menu, event, property_visitor
     ]
-import rod/[node, component, edit_view]
+import rod/[node, edit_view]
 import rod/animation/[property_animation, animation_sampler]
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view

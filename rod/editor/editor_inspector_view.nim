@@ -1,4 +1,4 @@
-import nimx/[view, text_field, button, menu,
+import nimx/[view, text_field, button, 
     scroll_view, linear_layout, slider, property_visitor,
     expanding_view, stack_view
 ]
@@ -7,7 +7,7 @@ import rod/property_editors/[propedit_registry, standard_editors]
 import rod/[node, component, rod_types]
 import rod/edit_view
 
-import algorithm, strutils, tables
+import algorithm, tables
 import variant
 
 
@@ -87,7 +87,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
         visitor.requireGetter = true
         visitor.flags = { pfEditable }
         visitor.commit = proc() =
-            let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, visitor.onChangeCallback, changeInspectorView)
+            let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, nil, changeInspectorView)
             propView.autoresizingMask = {afFlexibleWidth}
             let propHolder = newView(propView.frame)
             propHolder.addSubview(propView)
@@ -143,18 +143,18 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
 
 
 proc createComponentButtons(inspector: InspectorView, components_list: seq[string]): StackView =
-        var menu = newStackView(newRect(0, 0, componentsViewSize.width, 100))
-        var components = components_list
-        sort(components, system.cmp)
-        for i, c in components:
-            closureScope:
-                let compName = c
-                let createButton = newButton(menu, newPoint(0, 0), newSize(componentsViewSize.width - 20.0, 16), compName)
-                createButton.onAction do():
-                    discard inspector.currNode.addComponent(compName)
-                    inspector.inspectedNode = inspector.currNode
+    var menu = newStackView(newRect(0, 0, componentsViewSize.width, 100))
+    var components = components_list
+    sort(components, system.cmp)
+    for i, c in components:
+        closureScope:
+            let compName = c
+            let createButton = newButton(menu, newPoint(0, 0), newSize(componentsViewSize.width - 20.0, 16), compName)
+            createButton.onAction do():
+                discard inspector.currNode.addComponent(compName)
+                inspector.inspectedNode = inspector.currNode
 
-        result = menu
+    result = menu
 
 proc createComponentsView(inspector: InspectorView, n: Node) =
     let stackView = newStackView(newRect(0, 20, componentsViewSize.width, 400))

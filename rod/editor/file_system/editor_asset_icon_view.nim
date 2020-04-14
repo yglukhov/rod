@@ -1,6 +1,5 @@
 import nimx / [ text_field, image, view, formatted_text, context, button,
-                render_to_image, window, panel_view, image_preview,
-                view_event_handling ]
+                render_to_image, window ]
 import nimx/assets/asset_loading
 import tables, os, streams
 
@@ -79,17 +78,18 @@ method draw*(v: ImageIconView, r: Rect)=
             c.drawImage(v.image, newRect(orig, v.image.size))
 
 proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
-    result.new()
+    let sp = result.path.splitFile()
+    
+    result = FilePreview(kind: 
+        if p.hasContent:
+            akContainer
+        else:
+            filesExtensions.getOrDefault(sp.ext)
+    )
     result.init(r)
     result.path = p.fullPath
     # result.pathNode = p
     result.isCompact = compact
-
-    let sp = result.path.splitFile()
-    if p.hasContent:
-        result.kind = akContainer
-    else:
-        result.kind = filesExtensions.getOrDefault(sp.ext)
 
     const icoset = 25.0
 

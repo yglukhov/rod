@@ -1,4 +1,4 @@
-import nimx/[types, image, render_to_image, portable_gl]
+import nimx/[types, portable_gl]
 import rod/component
 import rod_types
 
