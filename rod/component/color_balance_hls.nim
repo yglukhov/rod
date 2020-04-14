@@ -1,6 +1,6 @@
-import nimx/[types, context, composition, portable_gl, property_visitor]
+import nimx / [types, context, composition, portable_gl, property_visitor]
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod/ [node, viewport, component, tools/serializer]
+import rod / [ component, tools/serializer ]
 import json
 
 type ColorBalanceHLS* = ref object of Component

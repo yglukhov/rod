@@ -1,5 +1,5 @@
 import nimx/[types, context, portable_gl]
-import rod/[node, component, postprocess_context, tools/serializer]
+import rod/[component, tools/serializer]
 import rod / utils / [ property_desc, serialization_codegen ]
 import opengl, json
 

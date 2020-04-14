@@ -1,7 +1,7 @@
 import nimx / [view, types, outline_view, linear_layout,
     scroll_view, table_view_cell, text_field, button, timer]
 import editor_asset_icon_view, editor_asset_container_view
-import os, algorithm, sequtils, hashes, times, tables
+import os, algorithm, hashes, tables, times
 import variant
 
 export editor_asset_icon_view
@@ -88,8 +88,8 @@ proc directoryContent(v: FileSystemView, path: string, hashstr: var string): Pat
 
     result.contentHash = hashstr
 
-proc buildResourceTree(v: FileSystemView, hashstr: var string): PathNode {.deprecated.} =
-    discard
+# proc buildResourceTree(v: FileSystemView, hashstr: var string): PathNode {.deprecated.} =
+#     discard
     # result = new(PathNode)
     # result.name = v.rootName
     # result.fullPath = v.rootPath
@@ -310,38 +310,38 @@ proc createFSView*(rootPath: string, r: Rect):FileSystemView=
 proc reloadIfNeeded*(v: FileSystemView)=
     if true: return # todo: refactor this
 
-    let ct = epochTime()
-    if ct - v.lastFSReload > 15.0:
-        v.lastFSReload = ct
-        var hashstr = ""
-        var tmpRoot = v.buildResourceTree(hashstr)
-        if hashstr != v.lastFSHash:
-            var prevRoot = v.resourceRoot
-            var curPath = v.mCurrentPathNode.outLinePath
-            var curNode = tmpRoot
-            for i, op in curPath:
-                if i == 0: continue
-                if op < curNode.children.len:
-                    var nchild = curNode.children[op]
-                    var ochild = prevRoot.children[op]
-                    if nchild.name == ochild.name:
-                        prevRoot = ochild
-                        curNode = nchild
-                        continue
+    # let ct = epochTime()
+    # if ct - v.lastFSReload > 15.0:
+    #     v.lastFSReload = ct
+    #     var hashstr = ""
+    #     var tmpRoot = v.buildResourceTree(hashstr)
+    #     if hashstr != v.lastFSHash:
+    #         var prevRoot = v.resourceRoot
+    #         var curPath = v.mCurrentPathNode.outLinePath
+    #         var curNode = tmpRoot
+    #         for i, op in curPath:
+    #             if i == 0: continue
+    #             if op < curNode.children.len:
+    #                 var nchild = curNode.children[op]
+    #                 var ochild = prevRoot.children[op]
+    #                 if nchild.name == ochild.name:
+    #                     prevRoot = ochild
+    #                     curNode = nchild
+    #                     continue
 
-                for ch in curNode.children:
-                    if ch.name == prevRoot.children[op].name:
-                        curNode = ch
-                        prevRoot = prevRoot.children[op]
-                        break
+    #             for ch in curNode.children:
+    #                 if ch.name == prevRoot.children[op].name:
+    #                     curNode = ch
+    #                     prevRoot = prevRoot.children[op]
+    #                     break
 
-            v.lastFSHash = hashstr
-            v.resourceRoot = tmpRoot
-            v.cachedResources.clear()
-            v.currentPathNode=curNode
-            v.fileSystemTree.reloadData()
+    #         v.lastFSHash = hashstr
+    #         v.resourceRoot = tmpRoot
+    #         v.cachedResources.clear()
+    #         v.currentPathNode=curNode
+    #         v.fileSystemTree.reloadData()
 
-            var path = v.mCurrentPathNode.outLinePath
-            if path.len > 1:
-                path = path[0..^1]
-                v.fileSystemTree.selectItemAtIndexPath(path)
+    #         var path = v.mCurrentPathNode.outLinePath
+    #         if path.len > 1:
+    #             path = path[0..^1]
+    #             v.fileSystemTree.selectItemAtIndexPath(path)

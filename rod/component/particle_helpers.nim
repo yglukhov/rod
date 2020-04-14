@@ -2,8 +2,8 @@ import times, math, random, json
 import nimx/[matrixes, animation, types, property_visitor, portable_gl, context ]
 import rod / utils / [ property_desc, serialization_codegen ]
 import rod / [quaternion, component, rod_types, node, viewport]
-import rod/component/camera
-import rod/material/shader
+# import rod/component/camera
+# import rod/material/shader
 import rod/tools/[serializer,debug_draw]
 
 

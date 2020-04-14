@@ -1,6 +1,5 @@
 import tables
 import math
-import sequtils
 import strutils
 
 import variant

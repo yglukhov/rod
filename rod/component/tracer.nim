@@ -1,6 +1,5 @@
-import nimx/[context, portable_gl, types, image, matrixes, property_visitor]
-import rod/component/[mesh_component, material, light, camera, sprite ]
-import rod/[component, quaternion, node, viewport ]
+import nimx/[context, portable_gl, types, matrixes, property_visitor]
+import rod/[component, node, viewport ]
 
 
 const vertexShader = """

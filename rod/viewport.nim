@@ -1,5 +1,5 @@
-import nimx / [ context, types, image, render_to_image, portable_gl, window,
-                view, view_event_handling, animation, notification_center ]
+import nimx / [ context, types, image, portable_gl, window,
+                view, view_event_handling, animation ]
 
 import algorithm, logging, times, tables
 import rod_types, node, ray
@@ -229,8 +229,6 @@ proc rayCastFirstNode*(v: SceneView, node: Node, coords: Point): Node =
 
         result = castResult[^1].node
 
-import opengl
-
 proc addAnimation*(v: SceneView, a: Animation) = v.animationRunners[0].pushAnimation(a)
 
 proc removeAnimation*(v: SceneView, a: Animation) = v.animationRunners[0].removeAnimation(a)
@@ -248,21 +246,6 @@ proc removeAnimationRunner*(v: SceneView, ar: AnimationRunner) =
 
         if not v.window.isNil:
             v.window.removeAnimationRunner(ar)
-
-
-proc addLightSource*(v: SceneView, ls: LightSource) =
-    if v.lightSources.isNil():
-        v.lightSources = newTable[string, LightSource]()
-    if v.lightSources.len() < rod_types.maxLightsCount:
-        v.lightSources[ls.node.name] = ls
-    else:
-        warn "Count of light sources is limited. Current count: ", rod_types.maxLightsCount
-
-proc removeLightSource*(v: SceneView, ls: LightSource) =
-    if v.lightSources.isNil() or v.lightSources.len() <= 0:
-        info "Current light sources count equals 0."
-    else:
-        v.lightSources.del(ls.node.name)
 
 import component/ui_component, algorithm
 

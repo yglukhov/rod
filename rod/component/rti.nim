@@ -1,9 +1,9 @@
 import nimx/[types, context, image, view, property_visitor, render_to_image, portable_gl]
 import rod/[viewport, quaternion, rod_types, node, component]
-import rod/component/[camera, clipping_rect_component]
+import rod/component/[clipping_rect_component]
 import rod/tools/serializer
 
-import json, tables, math
+import json, tables
 
 
 const minAlpha = 0.01

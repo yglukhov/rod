@@ -1,8 +1,8 @@
 import nimx/[types, context, image, view, matrixes, composition, property_visitor, portable_gl]
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod / [ rod_types, node, component, viewport,tools/serializer ]
-import rod / component / [ sprite, solid, rti, camera ]
-import json, tables, math, logging
+import rod / [ rod_types, node, component, viewport ]
+import rod / component / [ sprite, solid, rti ]
+import json, tables, logging
 
 
 const comonSpritePrefix = """

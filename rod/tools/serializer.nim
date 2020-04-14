@@ -1,7 +1,7 @@
 import nimx/[image, types, pathutils, matrixes, portable_gl, assets/asset_loading]
 import rod/utils/[json_serializer, json_deserializer]
 import rod/[rod_types, quaternion]
-import json, tables, typetraits, streams, logging, strutils, os
+import json, tables, typetraits, streams, strutils, os
 
 
 type Serializer* = ref object

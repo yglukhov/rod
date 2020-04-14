@@ -1,6 +1,6 @@
 import nimx/[context, portable_gl, types, image, matrixes, property_visitor, view]
 import rod/[component, quaternion, node, viewport, tools/serializer]
-import rod/component/[mesh_component, material, light, camera, sprite]
+import rod/component/[material, camera]
 import rod / utils / [property_desc, serialization_codegen ]
 import math, opengl, json
 

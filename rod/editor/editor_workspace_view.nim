@@ -1,10 +1,10 @@
-import math, algorithm, strutils, tables, json, logging, os
+import strutils, tables, logging, os
 
 import nimx / [ view, toolbar, editor / tab_view, linear_layout, button,
     font, popup_button, window, menu, notification_center, mini_profiler,
     color_picker, view_event_handling ]
 
-import rod / [ rod_types, node ]
+import rod / [ node ]
 import rod / editor / [ editor_types, editor_tab_registry ]
 
 when loadingAndSavingAvailable:

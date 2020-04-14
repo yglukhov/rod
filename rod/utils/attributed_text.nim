@@ -1,4 +1,4 @@
-import nimx/[unistring, types, formatted_text, font]
+import nimx/[types, formatted_text, font]
 import rod/utils/text_helpers
 import strutils
 import unicode

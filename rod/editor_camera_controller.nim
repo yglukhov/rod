@@ -1,7 +1,5 @@
-import nimx/[matrixes, types, event, gesture_detector, view]
+import nimx/[matrixes, types, event, view]
 import rod/[viewport, rod_types, node, quaternion ]
-import rod/component/camera
-
 
 type EditorCameraController* = ref object
     camera*: Node

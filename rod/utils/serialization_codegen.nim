@@ -45,7 +45,7 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
 
     var paramTyp = typdesc
 
-    let impl = getImpl(typdesc.symbol)
+    let impl = getImpl(typdesc)
 
     # echo treeRepr(getImpl(typdesc.symbol))
 
@@ -64,7 +64,7 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
             result.body.add(newCall("toPhantom", v, phantomIdent))
 
     for p in typdesc.serializablePropertyDescs:
-        let visitCall = newCall(!"visit", s, actualReference(p))
+        let visitCall = newCall(ident("visit"), s, actualReference(p))
         if keyed: visitCall.add(p.serializationKey())
 
         if p.hasAttr("combinedWith"):
@@ -130,7 +130,7 @@ template genSerializationCodeForComponent*(c: typed) =
         deserializeAux(cm, b)
 
 template genJsonSerializationrFor*(c: typed) =
-    import rod / utils / [ json_deserializer, json_serializer, serialization_hash_calculator ]
+    import rod / utils / [ json_deserializer, json_serializer ]
 
     genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
     genSerializerProc(c, serializeAux, JsonSerializer, true, true, false, false)

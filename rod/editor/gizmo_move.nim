@@ -1,5 +1,5 @@
-import nimx/[context, portable_gl, types, image, matrixes, property_visitor, event]
-import rod/component/[camera, primitives/cone, primitives/cube, mesh_component, material]
+import nimx/[context, portable_gl, types, matrixes, event]
+import rod/component/[primitives/cone, primitives/cube, mesh_component, material]
 import rod/[node, viewport, quaternion, editor/gizmo]
 import strutils
 

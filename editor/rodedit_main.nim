@@ -1,9 +1,9 @@
-import tables, logging, strutils, macros
+import tables, logging, strutils
 
-import nimx / [ matrixes, image, window, autotest ]
-import rod / [ viewport, edit_view, node,component, scene_composition ]
+import nimx / [ matrixes, window, autotest ]
+import rod / [ edit_view ]
 import rod/editor/editor_error_handling
-import rod/component/[camera, solid, mesh_component, material, light, sprite]
+import rod/component/all_components
 
 import rod/editor/editor_project_settings
 

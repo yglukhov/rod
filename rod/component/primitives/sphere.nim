@@ -1,9 +1,9 @@
 import nimx/[matrixes, types, property_visitor]
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod/[rod_types, node, vertex_data_info, component]
+import rod/[vertex_data_info, component]
 import rod/component/[ mesh_component, material ]
 import rod/tools/serializer
-import opengl, math, json
+import opengl, json
 
 type SphereComponent* = ref object of MeshComponent
     radius: float32
