@@ -9,6 +9,7 @@ import rod/editor/editor_project_settings
 
 const rodPluginFile {.strdefine.} = ""
 when rodPluginFile.len != 0:
+    import macros
     macro doImport(): untyped =
         newTree(nnkImportStmt, newLit(rodPluginFile))
     doImport()
