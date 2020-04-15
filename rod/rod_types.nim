@@ -23,9 +23,10 @@ type
         isEnabled*: bool
         mAnchorPoint*: Vector3
         affectsChildren*: bool # Should posteffects affect only this node or its children as well
-
-    Node2D* {.deprecated.} = Node
-    Node3D* {.deprecated.} = Node
+        
+        when defined(rodedit):
+            composition*: Composition
+        
 
     BBox* = object
         minPoint*: Vector3
@@ -60,6 +61,13 @@ type
         postprocessContext*: PostprocessContext
         editing*: bool
         afterDrawProc*: proc() # PRIVATE DO NOT USE!!!
+
+    Composition* = ref object
+        name*: string
+        node*: Node
+        
+        when defined(rodedit):
+            path*: string
 
     CameraProjection* = enum
         cpOrtho,
