@@ -28,6 +28,8 @@ type AEComposition* = ref object of Component
     duration*: float32
     buffers: JsonNode
     allCompAnim: Animation
+    when defined(rodedit):
+        jLayers: JsonNode
 
 AELayer.properties:
     inPoint
@@ -152,6 +154,8 @@ method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
                     c.layers.add(ael)
             else:
                 echo "AEComposition : ", jln.str , " not found in ", c.node.name, " !!!"
+        when defined(rodedit):
+            c.jLayers = j["layers"]
 
     if "markers" in j:
         let markers = j["markers"]
@@ -213,10 +217,13 @@ method serialize*(c: AEComposition, s: Serializer): JsonNode=
 
     result["markers"] = markers
 
-    let layers = newJArray()
-    for l in c.layers:
-        layers.add(%l.node.name)
-    result["layers"] = layers
+    when defined(rodedit):
+        result["layers"] = c.jLayers
+    else:
+        let layers = newJArray()
+        for l in c.layers:
+            layers.add(%l.node.name)
+        result["layers"] = layers
 
 method componentNodeWasAddedToSceneView*(c: AEComposition) =
     if c.allCompAnim.isNil:

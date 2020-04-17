@@ -59,6 +59,12 @@ method init*(i: InspectorView, r: Rect) =
 
 proc createComponentsView(inspector: InspectorView, n: Node)
 
+
+proc visitProperties*(i: InspectorView, c: Composition, p: var PropertyVisitor) =
+    var url = relativeUrl(c.url, i.editor.currentProjectPath())
+    p.visitProperty("url", url)
+
+
 proc `inspectedNode=`*(i: InspectorView, n: Node) =
     # TODO: This is a hacky hardcode! Here we assume that inspector can have either
     # 2 subviews (no node edited) or 3 subviews, first of which is the scrollview
@@ -78,8 +84,6 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             i.inspectedNode = n
 
         var expView= newExpandingView(newRect(0, 20, 328, 20.0))
-        expView.title = "Node"
-        expView.expand()
 
         var visitor : PropertyVisitor
         visitor.requireName = true
@@ -92,6 +96,24 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             let propHolder = newView(propView.frame)
             propHolder.addSubview(propView)
             expView.addContent(propHolder)
+
+        if not n.composition.isNil:
+            expView.title = "Composition"
+            expView.expand()
+            i.visitProperties(n.composition, visitor)
+            
+            var openComp = newButton(expView, newPoint(328 - 50, 0), newSize(50.0, 18), "open")
+            openComp.autoresizingMask = {afFlexibleMinX}
+            openComp.onAction do():
+                i.editor.openComposition(n.composition.url)
+                echo "open comp ", n.composition.url
+
+            i.propView.addSubview(expView)
+
+            expView= newExpandingView(newRect(0, 20, 328, 20.0))
+        
+        expView.title = "Node"
+        expView.expand()
 
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
@@ -109,22 +131,6 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
                 removeButton.onAction do():
                     n.removeComponent(component)
                     i.inspectedNode = n
-
-                # let downCompButton = newButton(expView, newPoint(328 - 45, 0), newSize(18.0, 18), "↓")
-                # downCompButton.autoresizingMask = {afFlexibleMinX}
-                # downCompButton.onAction do():
-                #     let compPos = n.componentPosition(component)
-                #     n.components.delete(compPos)
-                #     n.insertComponent(component, compPos + 1)
-                #     i.inspectedNode = n
-
-                # let upCompButton = newButton(expView, newPoint(328 - 65, 0), newSize(18.0, 18), "↑")
-                # upCompButton.autoresizingMask = {afFlexibleMinX}
-                # upCompButton.onAction do():
-                #     let compPos = n.componentPosition(component)
-                #     n.insertComponent(component, compPos - 1)
-                #     n.components.delete(compPos + 1)
-                #     i.inspectedNode = n
 
             v.visitProperties(visitor)
             i.propView.addSubview(expView)

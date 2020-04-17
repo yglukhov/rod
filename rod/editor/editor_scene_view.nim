@@ -63,6 +63,14 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
         if not gizmoTouch:
             var castedNode = v.tryRayCast(e)
             if not castedNode.isNil:
+
+                var p = castedNode.parent
+                while not p.isNil and p.composition.isNil:
+                    p = p.parent
+
+                if castedNode != p and p != v.composition.rootNode:    
+                    castedNode = p
+
                 v.editor.selectedNode = castedNode
             else:
                 v.editor.selectedNode = nil
@@ -154,21 +162,23 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     target.backgroundColor.a = 0.0
     case i.kind:
     of rodPbComposition:
-        var n = try: newNodeWithURL("file://" & i.data) except: nil
-        if not n.isNil:
-            var editorScene = target.EditorSceneView
-            if editorScene.selectedNode.isNil:
-                editorScene.rootNode.addChild(n)
-            else:
-                editorScene.selectedNode.addChild(n)
+        try:
+            var n: Node
+            n = newNodeWithURL("file://" & i.data) do():
+                if not n.isNil:
+                    var editorScene = target.EditorSceneView
+                    if editorScene.selectedNode.isNil:
+                        editorScene.rootNode.addChild(n)
+                    else:
+                        editorScene.selectedNode.addChild(n)
 
-            editorScene.composition.selectedNode = n
-            editorScene.editor.onCompositionChanged(editorScene.composition)
+                    editorScene.composition.selectedNode = n
+                    editorScene.editor.onCompositionChanged(editorScene.composition)
 
-            discard target.makeFirstResponder()
-        else:
-            warn "Can't deserialize ", i.data
-
+                    discard target.makeFirstResponder()
+        except:
+            warn "Can't deserialize ", i.data, " ", getCurrentExceptionMsg()
+    
     of rodPbSprite:
         loadAsset[Image]("file://" & i.data) do(image: Image, err: string):
             if image.isNil:

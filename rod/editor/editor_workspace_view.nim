@@ -335,11 +335,8 @@ proc createSceneMenu(w: WorkspaceView) =
         if w.editor.startFromGame:
             let m = makeMenu("Scene"):
                 - "Load":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeLoad)
-
-                - "Save":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeSave)
-
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionOpen)
+                    
             w.addToolbarMenu(m)
         else:
             let m = makeMenu("Scene"):
@@ -357,13 +354,6 @@ proc createSceneMenu(w: WorkspaceView) =
                 - "Save comp as ...":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionSaveAs)
 
-                - "Load node":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeLoad)
-
-                - "Save node":
-                    w.editor.notifCenter.postNotification(RodEditorNotif_onNodeSave)
-                    # if not e.selectedNode.isNil:
-                    #     e.saveNode(e.selectedNode)
             w.addToolbarMenu(m)
 
 proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =

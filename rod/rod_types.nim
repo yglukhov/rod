@@ -4,6 +4,9 @@ import tables
 
 const maxLightsCount* = 8
 
+when defined(rodedit):
+    import json
+
 type
     Node* = ref object
         mTranslation*: Vector3
@@ -23,9 +26,10 @@ type
         isEnabled*: bool
         mAnchorPoint*: Vector3
         affectsChildren*: bool # Should posteffects affect only this node or its children as well
-
-    Node2D* {.deprecated.} = Node
-    Node3D* {.deprecated.} = Node
+        composition*: Composition
+        
+        when defined(rodedit):
+            jAnimations*: JsonNode
 
     BBox* = object
         minPoint*: Vector3
@@ -60,6 +64,12 @@ type
         postprocessContext*: PostprocessContext
         editing*: bool
         afterDrawProc*: proc() # PRIVATE DO NOT USE!!!
+
+    Composition* = ref object
+        url*: string
+        node*: Node
+        when defined(rodedit):
+            originalUrl*: string # used in editor to restore url
 
     CameraProjection* = enum
         cpOrtho,

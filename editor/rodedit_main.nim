@@ -14,8 +14,10 @@ when rodPluginFile.len != 0:
         newTree(nnkImportStmt, newLit(rodPluginFile))
     doImport()
 
-when loadingAndSavingAvailable:
+when defined(rodedit):
     import os
+
+when loadingAndSavingAvailable:
     import rod/editor/editor_open_project_view
 
 const isMobile = defined(ios) or defined(android)
@@ -38,25 +40,27 @@ proc startApplication() =
     else:
         var mainWindow = newWindow(newRect(40, 40, 1200, 600))
     when loadingAndSavingAvailable:
-        var settings = getEditorSettings()
-        if settings.lastProject.len > 0:
-            when defined(rodedit):
-                var proj: EditorProject
-                proj.name = "rodedit"
-                proj.path = getAppDir()
-            else:
-                var proj = getProjectAtPath(settings.lastProject)
+        when defined(rodedit):
+            var proj: EditorProject
+            proj.name = getAppDir().lastPathPart
+            proj.path = getAppDir()
             mainWindow.title = "Project " & proj.name
             mainWindow.switchToEditView(proj)
         else:
-            var openProjView = new(EditorOpenProjectView)
-            openProjView.init(mainWindow.bounds)
-            mainWindow.addSubView(openProjView)
+            var settings = getEditorSettings()
+            if settings.lastProject.len > 0:
+                var proj = getProjectAtPath(settings.lastProject)
+                mainWindow.title = "Project " & proj.name
+                mainWindow.switchToEditView(proj)
+            else:
+                var openProjView = new(EditorOpenProjectView)
+                openProjView.init(mainWindow.bounds)
+                mainWindow.addSubView(openProjView)
 
-            openProjView.onOpen = proc(p: EditorProject) =
-                openProjView.removeFromSuperview()
-                mainWindow.title = "Project " & p.name
-                mainWindow.switchToEditView(p)
+                openProjView.onOpen = proc(p: EditorProject) =
+                    openProjView.removeFromSuperview()
+                    mainWindow.title = "Project " & p.name
+                    mainWindow.switchToEditView(p)
     else:
         var proj: EditorProject
         mainWindow.title = "Rod"

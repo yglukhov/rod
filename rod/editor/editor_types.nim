@@ -75,8 +75,6 @@ method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base
     discard
 
 # Notifications
-const RodEditorNotif_onNodeLoad* = "RodEditorNotif_onNodeLoad"
-const RodEditorNotif_onNodeSave* = "RodEditorNotif_onNodeSave"
 const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
 const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
 const RodEditorNotif_onCompositionSaveAs* = "RodEditorNotif_onCompositionSaveAs"

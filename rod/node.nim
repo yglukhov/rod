@@ -551,7 +551,7 @@ proc isEnabledInTree*(n: Node): bool =
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
-proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
+proc loadNodeFromJson(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
     let serializer = Serializer.new()
     serializer.url = url
     serializer.jdeser = newJsonDeserializer()
@@ -584,27 +584,32 @@ proc binDeserializerForPath(path: string): BinDeserializer =
 
 proc newNode*(b: BinDeserializer, compName: string): Node
 
-proc fixupCompositionUrlExtension(url: string): string =
+proc fixupCompositionUrlExtension(url: var string)=
     ## Makes sure the extension is jcomp
-    result = url
-    if result.endsWith(".json"):
-        result = result.changeFileExt("jcomp")
-    elif not result.endsWith(".jcomp"):
-        result &= ".jcomp"
+    if url.endsWith(".json"):
+        url = url.changeFileExt("jcomp")
+    elif not url.endsWith(".jcomp"):
+        url &= ".jcomp"
 
-proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
+proc newComposition*(url: string, n: Node = nil): Composition =
+    result.new()
+    result.url = url
+    result.node = if not n.isNil: n else: newNode()
+    result.node.composition = result
+
+proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
     const prefix = "res://"
-    if url.startsWith(prefix):
-        let path = url.substr(prefix.len)
+    if comp.url.startsWith(prefix):
+        let path = comp.url.substr(prefix.len)
         let bd = binDeserializerForPath(path)
         if not bd.isNil:
             try:
                 let theNode = newNode(bd, path)
-                n[] = theNode[]
-                for c in n.children:
-                    c.parent = n
-                for c in n.components:
-                    c.node = n
+                comp.node[] = theNode[]
+                for c in comp.node.children:
+                    c.parent = comp.node
+                for c in comp.node.components:
+                    c.node = comp.node
 
                 if not onComplete.isNil:
                     onComplete()
@@ -615,15 +620,14 @@ proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
         else:
             echo "No BinDeserializer for ", path
 
-    let url = fixupCompositionUrlExtension(url)
-
-    loadAsset(url) do(j: JsonNode, err: string):
+    fixupCompositionUrlExtension(comp.url)
+    loadAsset(comp.url) do(j: JsonNode, err: string):
         assert err.len == 0, err
 
         try:
-            n.loadComposition(j, url, onComplete)
+            comp.node.loadNodeFromJson(j, comp.url, onComplete)
         except:
-            echo "Could not deserialize ", url, ": ", getCurrentExceptionMsg()
+            echo "Could not deserialize ", comp.url, ": ", getCurrentExceptionMsg()
             echo getCurrentException().getStackTrace()
             raise
 
@@ -662,43 +666,57 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     let compositionRef = j{"compositionRef"}.getStr()
     if compositionRef.len != 0 and not n.name.endsWith(".placeholder"):
         s.startAsyncOp()
-        n.loadComposition(s.toAbsoluteUrl(compositionRef)) do():
+        let oldName = n.name
+        newComposition(s.toAbsoluteUrl(compositionRef), n).loadComposition() do():
+            n.name = oldName
             s.endAsyncOp()
 
-    let animations = j{"animations"}
-    if not animations.isNil and animations.len > 0:
-        n.animations = newTable[string, Animation]()
-        for k, v in animations:
-            n.animations[k] = newPropertyAnimation(n, v)
+    proc cb()=
+        let animations = j{"animations"}
+        if not animations.isNil and animations.len > 0:
+            n.animations = newTable[string, Animation]()
+            for k, v in animations:
+                n.animations[k] = newPropertyAnimation(n, v)
+
+        when defined(rodedit):
+            n.jAnimations = animations
+
+    if s.isAsyncOperation:
+        let oldCb = s.onComplete
+        s.onComplete = proc()=
+            cb()
+            if not oldCb.isNil:
+                oldCb()
+    else:
+        cb()
 
 proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
     result.deserialize(j, s)
 
-proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
-    result = newNode()
-    result.loadComposition(url, onComplete)
+proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node {.deprecated.} =
+    let c = newComposition(url)
+    c.loadComposition(onComplete)
+    result = c.node
 
 proc newNodeWithResource*(path: string): Node =
     let bd = binDeserializerForPath(path)
     if not bd.isNil:
         try:
-            return newNode(bd, path)
+            return newComposition(path, newNode(bd, path)).node
         except:
             echo "Error: could not deserialize ", path
             raise
     else:
         echo "No BinDeserializer for ", path
 
+    let c = newComposition("res://" & path)
     var done = false
-    result = newNodeWithUrl("res://" & path) do():
+    c.loadComposition() do():
         done = true
-    if not done:
+    if not done: 
         raise newException(Exception, "newNodeWithResource(" & path & ") could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
-
-proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
-    result = newNode()
-    result.loadComposition("compositions/" & name)
+    result = c.node
 
 proc serialize*(n: Node, s: Serializer): JsonNode =
     result = newJObject()
@@ -712,6 +730,17 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
     result.add("affectsChildren", s.getValue(n.affectsChildren))
     result.add("enabled", s.getValue(n.enabled))
 
+    if not n.composition.isNil:
+        result.add("compositionRef", s.getValue(n.composition.url))
+        let aeLayer = n.componentIfAvailable("AELayer")
+        if not aeLayer.isNil:
+            var jcomp = aeLayer.serialize(s)
+            if not jcomp.isNil:
+                jcomp.add("_c", %aeLayer.className())
+                result["componets"] = newJArray()
+                result["componets"].add(jcomp)
+        return
+    
     if n.components.len > 0:
         var componentsNode = newJArray()
         result.add("components", componentsNode)
@@ -730,6 +759,10 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
         for child in n.children:
             childsNode.add(child.serialize(s))
 
+    when defined(rodedit):
+        if not n.jAnimations.isNil:
+            result.add("animations", n.jAnimations)
+
 proc serialize*(n: Node, s: JsonSerializer) =
     s.visit(n.name, "name")
     s.visit(n.position, "translation")
@@ -741,6 +774,18 @@ proc serialize*(n: Node, s: JsonSerializer) =
     s.visit(n.affectsChildren, "affectsChildren")
     s.visit(n.enabled, "enabled")
 
+    if not n.composition.isNil:
+        s.visit(n.composition.url, "compositionRef")
+        let aeLayer = n.componentIfAvailable("AELayer")
+        if not aeLayer.isNil:
+            let jn = s.node
+            jn["components"] = newJArray()
+            s.node = newJObject()
+            aeLayer.serialize(s)
+            jn["components"].add(s.node)
+            s.node = jn
+        return
+    
     if n.components.len > 0:
         let jn = s.node
         let jcomps = newJArray()
@@ -760,6 +805,11 @@ proc serialize*(n: Node, s: JsonSerializer) =
             child.serialize(s)
             jchildren.add(s.node)
         s.node = jn
+
+        
+    when defined(rodedit):
+        if not n.jAnimations.isNil:
+            s.node["animations"] = n.jAnimations
 
 proc getDepth*(n: Node): int =
     result = 0

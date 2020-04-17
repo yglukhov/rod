@@ -89,6 +89,41 @@ proc nodeToJson(n: Node, path: string): JsonNode =
     s.jser = newJsonSerializer()
     result = n.serialize(s)
 
+proc relativeUrl*(url: string, base: string): string =
+    result = url
+    result.removePrefix("file://")
+    result = relativePath(result, base).replace("\\", "/")
+
+when defined(rodedit):
+    proc makeCompositionRefsRelative(e: Editor, n: Node, path: string) =
+        var children = n.children
+        var nextChildren: seq[Node]
+
+        while children.len > 0:
+            nextChildren.setLen(0)
+            for ch in children:
+                if not ch.composition.isNil:
+                    ch.composition.originalUrl = ch.composition.url
+                    ch.composition.url = relativeUrl(ch.composition.url, path.parentDir()).replace(".jcomp", "")
+                    echo "fix compref ", ch.composition.originalUrl, " >> ", ch.composition.url, " base ", path
+                else:
+                    nextChildren.add(ch.children)
+            children = nextChildren
+
+    proc revertComposotionRef(e: Editor, n: Node) =
+        var children = n.children
+        var nextChildren: seq[Node]
+
+        while children.len > 0:
+            nextChildren.setLen(0)
+            for ch in children:
+                if not ch.composition.isNil:
+                    ch.composition.url = ch.composition.originalUrl
+                    ch.composition.originalUrl.setLen(0)
+                else:
+                    nextChildren.add(ch.children)
+            children = nextChildren
+
 when loadingAndSavingAvailable:
     proc currentProjectPath*(e: Editor): string =
         result = e.currentProject.path
@@ -98,7 +133,7 @@ when loadingAndSavingAvailable:
     proc openComposition*(e: Editor, p: string)
 
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false) =
-        var newPath: string
+        var newPath = c.path
         if c.path.len == 0 or saveAs:
             var di: DialogInfo
             di.folder = e.currentProject.path
@@ -114,8 +149,18 @@ when loadingAndSavingAvailable:
             if newPath.len > 0:
                 let compName = splitFile(newPath).name
                 c.rootNode.name = compName
+                
+                when defined(rodedit):
+                    e.makeCompositionRefsRelative(c.rootNode, newPath)
+                    var composition = c.rootNode.composition
+                    if not c.rootNode.composition.isNil:
+                        c.rootNode.composition = nil # hack to serialize content 
+
                 let data = nodeToJson(c.rootNode, newPath)
-                writeFile(newPath, $data)
+                writeFile(newPath, data.pretty())
+                when defined(rodedit):
+                    e.revertComposotionRef(c.rootNode)
+                    c.rootNode.composition = composition
 
                 c.path = newPath
                 e.workspaceView.setTabTitle(c.owner, compName)
@@ -129,78 +174,36 @@ when loadingAndSavingAvailable:
         try:
             if e.startFromGame:
                 return
+            
+            var p = p
+            if p.find("file://") == -1:
+                p = "file://" & p
+            
+            var n: Node
+            n = newNodeWithUrl(p) do():
+                var c:CompositionDocument
 
-            var n = newNodeWithUrl("file://" & p)
-            var c:CompositionDocument
+                for tb in e.workspaceView.compositionEditors:
+                    if tb.composition.path == p:
+                        c = tb.composition
+                        c.rootNode = n
+                        tb.onCompositionChanged(c)
+                        e.workspaceView.selectTab(tb)
+                        return
 
-            for tb in e.workspaceView.compositionEditors:
-                if tb.composition.path == p:
-                    c = tb.composition
-                    c.rootNode = n
-                    tb.onCompositionChanged(c)
-                    e.workspaceView.selectTab(tb)
-                    return
-
-            c = new(CompositionDocument)
-            c.path = p
-            c.rootNode = n
-            var tbv = e.workspaceView.createCompositionEditor(c)
-            if not tbv.isNil:
-                tbv.name = splitFile(p).name
-                e.workspaceView.addTab(tbv)
-                e.workspaceView.selectTab(tbv)
+                c = new(CompositionDocument)
+                c.path = p
+                c.path.removePrefix("file://")
+                c.rootNode = n
+                var tbv = e.workspaceView.createCompositionEditor(c)
+                if not tbv.isNil:
+                    tbv.name = splitFile(p).name
+                    e.workspaceView.addTab(tbv)
+                    e.workspaceView.selectTab(tbv)
         except:
             error "Can't load composition at ", p
             error "Exception caught: ", getCurrentExceptionMsg()
             error "stack trace: ", getCurrentException().getStackTrace()
-
-    proc saveNode(editor: Editor, selectedNode: Node) =
-        var di: DialogInfo
-        di.folder = editor.currentProject.path
-        di.extension = "jcomp"
-        di.kind = dkSaveFile
-        di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
-        di.title = "Save composition"
-        let path = di.show()
-        if path.len != 0:
-            try:
-                let sData = nodeToJson(selectedNode, path)
-                writeFile(path, sData.pretty())
-            except:
-                error "Exception caught: ", getCurrentExceptionMsg()
-                error "stack trace: ", getCurrentException().getStackTrace()
-
-
-    proc loadNode(editor: Editor) =
-        var di: DialogInfo
-        di.folder = editor.currentProject.path
-        di.kind = dkOpenFile
-        di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json"), (name:"DAE", ext:"*.dae")]
-        di.title = "Load composition or dae"
-        let path = di.show()
-        if path.len != 0:
-            try:
-                if path.endsWith(".dae"):
-                    var p = if not editor.selectedNode.isNil: editor.selectedNode
-                            else: editor.rootNode
-
-                    loadSceneAsync path, proc(n: Node) =
-                        p.addChild(n)
-                        editor.selectedNode = n
-
-                elif path.endsWith(".json") or path.endsWith(".jcomp"):
-
-                    let ln = newNodeWithURL("file://" & path)
-                    if not editor.selectedNode.isNil:
-                        editor.selectedNode.addChild(ln)
-                    else:
-                        editor.rootNode.addChild(ln)
-
-                editor.sceneTreeDidChange()
-            except:
-                error "Can't load composition at ", path
-                error "Exception caught: ", getCurrentExceptionMsg()
-                error "stack trace: ", getCurrentException().getStackTrace()
 
 else:
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)= discard
@@ -258,7 +261,7 @@ proc pasteNode*(e: Editor, n: Node = nil)=
     if not pbi.isNil:
         let j = parseJson(pbi.data)
         let pn = newNode()
-        pn.loadComposition(j, "file:///j")
+        # pn.loadComposition(j, "file:///j") #todo: wtf?
 
         var cn = n
         if cn.isNil:
@@ -277,25 +280,10 @@ proc onFirstResponderChanged(e: Editor, fr: View)=
             e.currentComposition = t.composition
             e.sceneView = t.rootNode.sceneView # todo: fix this
             break
-#[
-    const RodEditorNotif_onNodeLoad* = "RodEditorNotif_onNodeLoad"
-    const RodEditorNotif_onNodeSave* = "RodEditorNotif_onNodeSave"
-    const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
-    const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
-    const RodEditorNotif_onCompositionNew* = "RodEditorNotif_onCompositionNew"
-]#
+
 proc initNotifHandlers(e: Editor)=
     e.notifCenter = newNotificationCenter()
-    e.notifCenter.addObserver(RodEditorNotif_onNodeLoad, e) do(args: Variant):
-        when loadingAndSavingAvailable:
-            e.loadNode()
-        else: discard
-
-    e.notifCenter.addObserver(RodEditorNotif_onNodeSave, e) do(args: Variant):
-        when loadingAndSavingAvailable:
-            e.saveNode(e.selectedNode)
-        else: discard
-
+    
     e.notifCenter.addObserver(RodEditorNotif_onCompositionSave, e) do(args: Variant):
         when loadingAndSavingAvailable:
             e.saveComposition(e.mCurrentComposition)
