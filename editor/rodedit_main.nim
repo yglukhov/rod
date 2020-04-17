@@ -38,7 +38,7 @@ proc startApplication() =
     when isMobile or defined(js):
         var mainWindow = newFullscreenWindow()
     else:
-        var mainWindow = newWindow(newRect(40, 40, 1200, 600))
+        var mainWindow = newWindow(newRect(140, 40, 1600, 1000))
     when loadingAndSavingAvailable:
         when defined(rodedit):
             var proj: EditorProject

@@ -132,10 +132,13 @@ method applyValueAtPosToSetter*[T](c: AnimationCurve[T], pos: float, sng: Varian
     sng.get(SetterAndGetter[T]).setter(c.sampler.sample(pos))
 
 method addKeyAtPosWithValueFromGetter*(c: AbstractAnimationCurve, pos: float, sng: Variant) {.base.} = discard
-method addKeyAtPosWithValueFromGetter*[T](c: AnimationCurve[T], pos: float, sng: Variant) =
+method addKeyAtPosWithValueFromGetter*[T](c: AnimationCurve[T], pos: float, sngv: Variant) =
     var k: BezierKeyFrame[T]
     k.p = pos
-    k.v = sng.get(SetterAndGetter[T]).getter()
+    
+    let sng = sngv.get(SetterAndGetter[T])
+    echo "addKeyAtPos has valid type ", sngv.ofType(SetterAndGetter[T]), " isnil ", sng.getter.isnil, " T ", T
+    k.v = sng.getter()
     k.inX = -0.5
     k.inY = 50
     k.outX = 0.5

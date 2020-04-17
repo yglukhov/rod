@@ -11,6 +11,10 @@ const loadingAndSavingAvailable* = not defined(android) and not defined(ios) and
     not defined(emscripten) and not defined(js)
 
 type
+    EditMode* = enum
+        emScene
+        emAnimation
+
     EditorTabAnchor* = enum
         etaLeft
         etaRight
@@ -29,6 +33,7 @@ type
         owner*: EditorTabView
 
     Editor* = ref object
+        mode*: EditMode
         sceneInput*: bool
         currentProject*: EditorProject
         mCurrentComposition*: CompositionDocument
@@ -74,6 +79,8 @@ method onSceneChanged*(v: EditorTabView) {.base, deprecated.}=
 method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base.}=
     discard
 
+method onEditModeChanged*(v: EditorTabView, mode: EditMode) {.base.} = discard
+
 # Notifications
 const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
 const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
@@ -92,7 +99,7 @@ const EditorCameraNodeName3D* = "[EditorCamera3D]"
 const EditorRootNodeName* = "[EditorRoot]"
 
 # Default open tabs
-const defaultTabs* = ["Inspector", "Tree", "EditScene Settings"]
+const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Animation", "Assets" ]
 
 # Other
 const EditorViewportSize* = newSize(1920.0, 1080.0)

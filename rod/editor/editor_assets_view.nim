@@ -68,7 +68,7 @@ method init*(v: EditorAssetsView, r: Rect)=
             v.editor.openComposition(item.path)
 
 method tabSize*(v: EditorAssetsView, bounds: Rect): Size=
-    result = newSize(bounds.width, 250.0)
+    result = newSize(bounds.width, 450.0)
 
 method tabAnchor*(v: EditorAssetsView): EditorTabAnchor =
     result = etaBottom

@@ -77,6 +77,11 @@ proc updateCameraSelector(e: Editor) = discard #todo: fix this!
     # e.cameraSelector.items = items
     # e.cameraSelector.selectedIndex = selectedIndex
 
+proc onEditModeChanged*(e: Editor, m: EditMode) =
+    e.mode = m
+    for t in e.workspaceView.tabs:
+        t.onEditModeChanged(m)
+
 proc sceneTreeDidChange*(e: Editor) =
     e.updateCameraSelector()
 
@@ -94,6 +99,8 @@ when loadingAndSavingAvailable:
         result = url
         result.removePrefix("file://")
         result = relativePath(result, base).replace("\\", "/")
+else:
+    proc relativeUrl*(url: string, base: string): string = url
 
 when defined(rodedit):
     proc makeCompositionRefsRelative(e: Editor, n: Node, path: string) =
@@ -207,6 +214,7 @@ when loadingAndSavingAvailable:
             error "stack trace: ", getCurrentException().getStackTrace()
 
 else:
+    proc currentProjectPath*(e: Editor): string = discard
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)= discard
     proc openComposition*(e: Editor, p: string) = discard
 

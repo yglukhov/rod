@@ -113,6 +113,8 @@ proc newBezierKeyFrameAnimationSampler*[T](keys: seq[BezierKeyFrame[T]]): Bezier
     let r = cast[AnimationSampler[T]](result)
     r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
         let s = cast[BezierKeyFrameAnimationSampler[T]](sampler)
+        if s.keys.len == 0: return 
+        
         if p < 0:
             return s.keys[0].v
         elif p > 1:

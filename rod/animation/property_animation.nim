@@ -159,13 +159,11 @@ template findAnimatablePropertyAux(body: untyped) =
     var res {.inject.} : Variant
     var visitor {.inject.} : PropertyVisitor
     visitor.requireName = true
-    visitor.requireSetter = true
     visitor.flags = { pfAnimatable }
     visitor.commit = proc() =
         if res.isEmpty:
             if visitor.name == propName:
                 res = visitor.setterAndGetter
-
     body
 
     result = res
@@ -183,6 +181,25 @@ proc findAnimatableProperty(n: Node, compIndex: int, propName: string): Variant 
     findAnimatablePropertyAux:
         if n.components.len > compIndex:
             n.components[compIndex].visitProperties(visitor)
+
+# proc findAnimatablePropertiesForNode*(n: Node): Table[string, Variant] =
+#     var visitor : PropertyVisitor
+#     visitor.requireName = true
+#     visitor.requireSetter = true
+#     visitor.flags = { pfAnimatable }
+    
+#     var animProps = initTable[string, Variant]()
+#     var context = ""
+#     visitor.commit = proc() =
+#         animProps[context & "." & visitor.name] = visitor.setterAndGetter
+
+#     n.visitProperties(visitor)
+    
+#     for i, c in n.components:
+#         context = "." & $i
+#         c.visitProperties(visitor)
+
+#     result = animProps
 
 proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int, rawPropName: string): Variant =
     var animatedNode = n
