@@ -137,6 +137,8 @@ proc finish*(s: Serializer) =
     if s.asyncOps == 0 and not s.onComplete.isNil:
         s.onComplete()
 
+proc isAsyncOperation*(s: Serializer): bool = s.asyncOps != 0
+
 proc deserializeImage*(j: JsonNode, s: Serializer, clbck: proc(img: Image, err: string)) =
     if j.isNil:
         discard

@@ -745,16 +745,29 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     let compositionRef = j{"compositionRef"}.getStr()
     if compositionRef.len != 0 and not n.name.endsWith(".placeholder"):
         s.startAsyncOp()
-        echo "load compRef ", compositionRef
+        let oldName = n.name
         newComposition(s.toAbsoluteUrl(compositionRef), n).loadComposition() do():
-            echo "done ", compositionRef
+            n.name = oldName
             s.endAsyncOp()
 
-    let animations = j{"animations"}
-    if not animations.isNil and animations.len > 0:
-        n.animations = newTable[string, Animation]()
-        for k, v in animations:
-            n.animations[k] = newPropertyAnimation(n, v)
+    proc cb()=
+        let animations = j{"animations"}
+        if not animations.isNil and animations.len > 0:
+            n.animations = newTable[string, Animation]()
+            for k, v in animations:
+                n.animations[k] = newPropertyAnimation(n, v)
+
+        when defined(rodedit):
+            n.jAnimations = animations
+
+    if s.isAsyncOperation:
+        let oldCb = s.onComplete
+        s.onComplete = proc()=
+            cb()
+            if not oldCb.isNil:
+                oldCb()
+    else:
+        cb()
 
 proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
     result = newNode()
@@ -784,10 +797,6 @@ proc newNodeWithResource*(path: string): Node =
         raise newException(Exception, "newNodeWithResource(" & path & ") could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
     result = c.node
 
-# proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
-#     result = newNode()
-#     result.loadComposition("compositions/" & name)
-
 proc serialize*(n: Node, s: Serializer): JsonNode =
     result = newJObject()
     result.add("name", s.getValue(n.name))
@@ -802,6 +811,13 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
 
     if not n.composition.isNil:
         result.add("compositionRef", s.getValue(n.composition.url))
+        let aeLayer = n.componentIfAvailable("AELayer")
+        if not aeLayer.isNil:
+            var jcomp = aeLayer.serialize(s)
+            if not jcomp.isNil:
+                jcomp.add("_c", %aeLayer.className())
+                result["componets"] = newJArray()
+                result["componets"].add(jcomp)
         return
     
     if n.components.len > 0:
@@ -822,6 +838,10 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
         for child in n.children:
             childsNode.add(child.serialize(s))
 
+    when defined(rodedit):
+        if not n.jAnimations.isNil:
+            result.add("animations", n.jAnimations)
+
 proc serialize*(n: Node, s: JsonSerializer) =
     s.visit(n.name, "name")
     s.visit(n.position, "translation")
@@ -835,6 +855,14 @@ proc serialize*(n: Node, s: JsonSerializer) =
 
     if not n.composition.isNil:
         s.visit(n.composition.url, "compositionRef")
+        let aeLayer = n.componentIfAvailable("AELayer")
+        if not aeLayer.isNil:
+            let jn = s.node
+            jn["components"] = newJArray()
+            s.node = newJObject()
+            aeLayer.serialize(s)
+            jn["components"].add(s.node)
+            s.node = jn
         return
     
     if n.components.len > 0:
@@ -856,6 +884,11 @@ proc serialize*(n: Node, s: JsonSerializer) =
             child.serialize(s)
             jchildren.add(s.node)
         s.node = jn
+
+        
+    when defined(rodedit):
+        if not n.jAnimations.isNil:
+            s.node["animations"] = n.jAnimations
 
 type
     BuiltInComponentType* = enum # This is a copypaste from binformat. TODO: Remove

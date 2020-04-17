@@ -104,7 +104,7 @@ when defined(rodedit):
             for ch in children:
                 if not ch.composition.isNil:
                     ch.composition.originalUrl = ch.composition.url
-                    ch.composition.url = e.relativeUrl(ch.composition.url, path.parentDir())
+                    ch.composition.url = e.relativeUrl(ch.composition.url, path.parentDir()).replace(".jcomp", "")
                     echo "fix compref ", ch.composition.originalUrl, " >> ", ch.composition.url, " base ", path
                 else:
                     nextChildren.add(ch.children)
@@ -157,7 +157,7 @@ when loadingAndSavingAvailable:
                         c.rootNode.composition = nil # hack to serialize content 
 
                 let data = nodeToJson(c.rootNode, newPath)
-                writeFile(newPath, $data)
+                writeFile(newPath, data.pretty())
                 when defined(rodedit):
                     e.revertComposotionRef(c.rootNode)
                     c.rootNode.composition = composition
@@ -178,25 +178,28 @@ when loadingAndSavingAvailable:
             var p = p
             if p.find("file://") == -1:
                 p = "file://" & p
-            var n = newNodeWithUrl(p)
-            var c:CompositionDocument
+            
+            var n: Node
+            n = newNodeWithUrl(p) do():
+                var c:CompositionDocument
 
-            for tb in e.workspaceView.compositionEditors:
-                if tb.composition.path == p:
-                    c = tb.composition
-                    c.rootNode = n
-                    tb.onCompositionChanged(c)
-                    e.workspaceView.selectTab(tb)
-                    return
+                for tb in e.workspaceView.compositionEditors:
+                    if tb.composition.path == p:
+                        c = tb.composition
+                        c.rootNode = n
+                        tb.onCompositionChanged(c)
+                        e.workspaceView.selectTab(tb)
+                        return
 
-            c = new(CompositionDocument)
-            c.path = p
-            c.rootNode = n
-            var tbv = e.workspaceView.createCompositionEditor(c)
-            if not tbv.isNil:
-                tbv.name = splitFile(p).name
-                e.workspaceView.addTab(tbv)
-                e.workspaceView.selectTab(tbv)
+                c = new(CompositionDocument)
+                c.path = p
+                c.path.removePrefix("file://")
+                c.rootNode = n
+                var tbv = e.workspaceView.createCompositionEditor(c)
+                if not tbv.isNil:
+                    tbv.name = splitFile(p).name
+                    e.workspaceView.addTab(tbv)
+                    e.workspaceView.selectTab(tbv)
         except:
             error "Can't load composition at ", p
             error "Exception caught: ", getCurrentExceptionMsg()
