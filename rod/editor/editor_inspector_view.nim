@@ -61,7 +61,10 @@ proc createComponentsView(inspector: InspectorView, n: Node)
 
 
 proc visitProperties*(i: InspectorView, c: Composition, p: var PropertyVisitor) =
-    var url = relativeUrl(c.url, i.editor.currentProjectPath())
+    when loadingAndSavingAvailable:
+        var url = relativeUrl(c.url, i.editor.currentProjectPath())
+    else:
+        var url = c.url
     p.visitProperty("url", url)
 
 
