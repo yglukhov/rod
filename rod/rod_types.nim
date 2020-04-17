@@ -24,8 +24,7 @@ type
         mAnchorPoint*: Vector3
         affectsChildren*: bool # Should posteffects affect only this node or its children as well
         
-        when defined(rodedit):
-            composition*: Composition
+        composition*: Composition
         
 
     BBox* = object
@@ -63,11 +62,10 @@ type
         afterDrawProc*: proc() # PRIVATE DO NOT USE!!!
 
     Composition* = ref object
-        name*: string
+        url*: string
         node*: Node
-        
         when defined(rodedit):
-            path*: string
+            originalUrl*: string # used in editor to restore url
 
     CameraProjection* = enum
         cpOrtho,

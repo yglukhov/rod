@@ -329,35 +329,6 @@ proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
         n.name == name
 
-type
-    NodeRefResolveProc* = proc(nodeValue: Node)
-    NodeRefTable = TableRef[string, seq[NodeRefResolveProc]]
-
-var nodeLoadRefTable*: NodeRefTable
-
-proc addNodeRef*(name: string, refProc: proc(n: Node)) =
-    assert(not nodeLoadRefTable.isNil)
-    if name in nodeLoadRefTable:
-        nodeLoadRefTable[name].add(refProc)
-    else:
-        nodeLoadRefTable[name] = @[refProc]
-
-template addNodeRef*(refNode: var Node, name: string) {.deprecated.} =
-    addNodeRef(name) do(n: Node):
-        refNode = n
-
-template addNodeRef*(name: string, refNode: var Node) =
-    addNodeRef(name) do(n: Node):
-        refNode = n
-
-proc resolveNodeRefs(n: Node) =
-    assert(not nodeLoadRefTable.isNil)
-    for k, v in nodeLoadRefTable:
-        let foundNode = n.findNode(k)
-        if not foundNode.isNil:
-            for s in v:
-                s(foundNode)
-
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     block components:
         var ci = 0
@@ -547,220 +518,6 @@ proc isEnabledInTree*(n: Node): bool =
     return true
     # return n.enabled and (n.parent.isNil or n.parent.isNodeEnabledInTree())
 
-# Serialization
-proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
-proc deserialize*(n: Node, j: JsonNode, s: Serializer)
-
-proc loadComposition*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
-    let serializer = Serializer.new()
-    serializer.url = url
-    serializer.jdeser = newJsonDeserializer()
-    serializer.jdeser.getImageForPath = proc(path: string, off: var Point): Image =
-        const prefix = "file://"
-        doAssert(url.startsWith(prefix), "Internal error")
-        var p = url[prefix.len .. ^1]
-        p = p.parentDir / path
-        normalizePath(p, false)
-        when not defined(js) and not defined(emscripten):
-            # TODO: We have to figure out smth about js...
-            result = imageWithContentsOfFile(p)
-
-    serializer.onComplete = onComplete
-    let oldNodeRefTab = nodeLoadRefTable
-    nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
-    defer: nodeLoadRefTable = oldNodeRefTab
-
-    n.deserialize(j, serializer)
-    n.resolveNodeRefs()
-    serializer.finish()
-
-proc binDeserializerForPath(path: string): BinDeserializer =
-    let am = sharedAssetManager()
-    let ab = am.assetBundleForPath(path)
-    var rab: AssetBundle
-    if ab of AssetBundle: rab = AssetBundle(ab)
-    if not rab.isNil:
-        return rab.binDeserializer
-
-proc newNode*(b: BinDeserializer, compName: string): Node
-
-proc fixupCompositionUrlExtension(url: string): string =
-    ## Makes sure the extension is jcomp
-    result = url
-    if result.endsWith(".json"):
-        result = result.changeFileExt("jcomp")
-    elif not result.endsWith(".jcomp"):
-        result &= ".jcomp"
-
-proc loadComposition*(n: Node, url: string, onComplete: proc() = nil) =
-    const prefix = "res://"
-    if url.startsWith(prefix):
-        let path = url.substr(prefix.len)
-        let bd = binDeserializerForPath(path)
-        if not bd.isNil:
-            try:
-                let theNode = newNode(bd, path)
-                n[] = theNode[]
-                for c in n.children:
-                    c.parent = n
-                for c in n.components:
-                    c.node = n
-
-                if not onComplete.isNil:
-                    onComplete()
-                return
-            except:
-                echo "Error: could not deserialize ", path
-                raise
-        else:
-            echo "No BinDeserializer for ", path
-
-    let url = fixupCompositionUrlExtension(url)
-
-    loadAsset(url) do(j: JsonNode, err: string):
-        assert err.len == 0, err
-
-        try:
-            n.loadComposition(j, url, onComplete)
-        except:
-            echo "Could not deserialize ", url, ": ", getCurrentExceptionMsg()
-            echo getCurrentException().getStackTrace()
-            raise
-
-import rod/animation/property_animation
-
-proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
-    s.deserializeValue(j, "name", n.name)
-    s.deserializeValue(j, "translation", n.position)
-    s.deserializeValue(j, "scale", n.mScale)
-    s.deserializeValue(j, "rotation", n.mRotation)
-    s.deserializeValue(j, "anchor", n.anchor)
-    s.deserializeValue(j, "alpha", n.alpha)
-    s.deserializeValue(j, "layer", n.layer)
-    s.deserializeValue(j, "enabled", n.enabled)
-    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
-
-    var v = j{"children"}
-    if not v.isNil:
-        for i in 0 ..< v.len:
-            n.addChild(newNodeFromJson(v[i], s))
-
-    v = j{"components"}
-    if not v.isNil:
-        if v.kind == JArray:
-            for i in 0 ..< v.len:
-                var className: string
-                s.deserializeValue(v[i], "_c", className)
-                let comp = n.addComponent(className)
-                comp.deserialize(v[i], s)
-        else:
-            # Deprecated. Old save format support
-            for k, c in v:
-                let comp = n.component(k)
-                comp.deserialize(c, s)
-
-    let compositionRef = j{"compositionRef"}.getStr()
-    if compositionRef.len != 0 and not n.name.endsWith(".placeholder"):
-        s.startAsyncOp()
-        n.loadComposition(s.toAbsoluteUrl(compositionRef)) do():
-            s.endAsyncOp()
-
-    let animations = j{"animations"}
-    if not animations.isNil and animations.len > 0:
-        n.animations = newTable[string, Animation]()
-        for k, v in animations:
-            n.animations[k] = newPropertyAnimation(n, v)
-
-proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
-    result = newNode()
-    result.deserialize(j, s)
-
-proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node =
-    result = newNode()
-    result.loadComposition(url, onComplete)
-
-proc newNodeWithResource*(path: string): Node =
-    let bd = binDeserializerForPath(path)
-    if not bd.isNil:
-        try:
-            return newNode(bd, path)
-        except:
-            echo "Error: could not deserialize ", path
-            raise
-    else:
-        echo "No BinDeserializer for ", path
-
-    var done = false
-    result = newNodeWithUrl("res://" & path) do():
-        done = true
-    if not done:
-        raise newException(Exception, "newNodeWithResource(" & path & ") could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
-
-proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
-    result = newNode()
-    result.loadComposition("compositions/" & name)
-
-proc serialize*(n: Node, s: Serializer): JsonNode =
-    result = newJObject()
-    result.add("name", s.getValue(n.name))
-    result.add("translation", s.getValue(n.position))
-    result.add("scale", s.getValue(n.scale))
-    result.add("rotation", s.getValue(n.rotation))
-    result.add("anchor", s.getValue(n.anchor))
-    result.add("alpha", s.getValue(n.alpha))
-    result.add("layer", s.getValue(n.layer))
-    result.add("affectsChildren", s.getValue(n.affectsChildren))
-    result.add("enabled", s.getValue(n.enabled))
-
-    if n.components.len > 0:
-        var componentsNode = newJArray()
-        result.add("components", componentsNode)
-
-        for value in n.components:
-            var jcomp: JsonNode
-            jcomp = value.serialize(s)
-
-            if not jcomp.isNil:
-                jcomp.add("_c", %value.className())
-                componentsNode.add(jcomp)
-
-    if n.children.len > 0:
-        var childsNode = newJArray()
-        result.add("children", childsNode)
-        for child in n.children:
-            childsNode.add(child.serialize(s))
-
-proc serialize*(n: Node, s: JsonSerializer) =
-    s.visit(n.name, "name")
-    s.visit(n.position, "translation")
-    s.visit(n.scale, "scale")
-    s.visit(n.rotation, "rotation")
-    s.visit(n.anchor, "anchor")
-    s.visit(n.alpha, "alpha")
-    s.visit(n.layer, "layer")
-    s.visit(n.affectsChildren, "affectsChildren")
-    s.visit(n.enabled, "enabled")
-
-    if n.components.len > 0:
-        let jn = s.node
-        let jcomps = newJArray()
-        jn["components"] = jcomps
-        for c in n.components:
-            s.node = newJObject()
-            c.serialize(s)
-            jcomps.add(s.node)
-        s.node = jn
-
-    if n.children.len > 0:
-        let jn = s.node
-        let jchildren = newJArray()
-        jn["children"] = jchildren
-        for child in n.children:
-            s.node = newJObject()
-            child.serialize(s)
-            jchildren.add(s.node)
-        s.node = jn
-
 proc getDepth*(n: Node): int =
     result = 0
 
@@ -838,6 +595,267 @@ proc recursiveChildrenCount*(n: Node): int =
     result = n.children.len
     for c in n.children:
         result += c.recursiveChildrenCount
+
+type
+    NodeRefResolveProc* = proc(nodeValue: Node)
+    NodeRefTable = TableRef[string, seq[NodeRefResolveProc]]
+
+var nodeLoadRefTable*: NodeRefTable
+
+proc addNodeRef*(name: string, refProc: proc(n: Node)) =
+    assert(not nodeLoadRefTable.isNil)
+    if name in nodeLoadRefTable:
+        nodeLoadRefTable[name].add(refProc)
+    else:
+        nodeLoadRefTable[name] = @[refProc]
+
+template addNodeRef*(refNode: var Node, name: string) {.deprecated.} =
+    addNodeRef(name) do(n: Node):
+        refNode = n
+
+template addNodeRef*(name: string, refNode: var Node) =
+    addNodeRef(name) do(n: Node):
+        refNode = n
+
+proc resolveNodeRefs(n: Node) =
+    assert(not nodeLoadRefTable.isNil)
+    for k, v in nodeLoadRefTable:
+        let foundNode = n.findNode(k)
+        if not foundNode.isNil:
+            for s in v:
+                s(foundNode)
+
+
+# Serialization
+proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
+proc deserialize*(n: Node, j: JsonNode, s: Serializer)
+
+proc loadNodeFromJson(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
+    let serializer = Serializer.new()
+    serializer.url = url
+    serializer.jdeser = newJsonDeserializer()
+    serializer.jdeser.getImageForPath = proc(path: string, off: var Point): Image =
+        const prefix = "file://"
+        doAssert(url.startsWith(prefix), "Internal error")
+        var p = url[prefix.len .. ^1]
+        p = p.parentDir / path
+        normalizePath(p, false)
+        when not defined(js) and not defined(emscripten):
+            # TODO: We have to figure out smth about js...
+            result = imageWithContentsOfFile(p)
+
+    serializer.onComplete = onComplete
+    let oldNodeRefTab = nodeLoadRefTable
+    nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
+    defer: nodeLoadRefTable = oldNodeRefTab
+
+    n.deserialize(j, serializer)
+    n.resolveNodeRefs()
+    serializer.finish()
+
+proc binDeserializerForPath(path: string): BinDeserializer =
+    let am = sharedAssetManager()
+    let ab = am.assetBundleForPath(path)
+    var rab: AssetBundle
+    if ab of AssetBundle: rab = AssetBundle(ab)
+    if not rab.isNil:
+        return rab.binDeserializer
+
+proc newNode*(b: BinDeserializer, compName: string): Node
+
+template fixupCompositionUrlExtension(url: string)=
+    ## Makes sure the extension is jcomp
+    if url.endsWith(".json"):
+        url = url.changeFileExt("jcomp")
+    elif not url.endsWith(".jcomp"):
+        url &= ".jcomp"
+
+proc newComposition*(url: string, n: Node = nil): Composition =
+    result.new()
+    result.url = url
+    result.node = if not n.isNil: n else: newNode()
+    result.node.composition = result
+
+proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
+    const prefix = "res://"
+    if comp.url.startsWith(prefix):
+        let path = comp.url.substr(prefix.len)
+        let bd = binDeserializerForPath(path)
+        if not bd.isNil:
+            try:
+                let theNode = newNode(bd, path)
+                comp.node[] = theNode[]
+                for c in comp.node.children:
+                    c.parent = comp.node
+                for c in comp.node.components:
+                    c.node = comp.node
+
+                if not onComplete.isNil:
+                    onComplete()
+                return
+            except:
+                echo "Error: could not deserialize ", path
+                raise
+        else:
+            echo "No BinDeserializer for ", path
+
+    fixupCompositionUrlExtension(comp.url)
+    loadAsset(comp.url) do(j: JsonNode, err: string):
+        assert err.len == 0, err
+
+        try:
+            comp.node.loadNodeFromJson(j, comp.url, onComplete)
+        except:
+            echo "Could not deserialize ", comp.url, ": ", getCurrentExceptionMsg()
+            echo getCurrentException().getStackTrace()
+            raise
+
+import rod/animation/property_animation
+
+proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
+    s.deserializeValue(j, "name", n.name)
+    s.deserializeValue(j, "translation", n.position)
+    s.deserializeValue(j, "scale", n.mScale)
+    s.deserializeValue(j, "rotation", n.mRotation)
+    s.deserializeValue(j, "anchor", n.anchor)
+    s.deserializeValue(j, "alpha", n.alpha)
+    s.deserializeValue(j, "layer", n.layer)
+    s.deserializeValue(j, "enabled", n.enabled)
+    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
+
+    var v = j{"children"}
+    if not v.isNil:
+        for i in 0 ..< v.len:
+            n.addChild(newNodeFromJson(v[i], s))
+
+    v = j{"components"}
+    if not v.isNil:
+        if v.kind == JArray:
+            for i in 0 ..< v.len:
+                var className: string
+                s.deserializeValue(v[i], "_c", className)
+                let comp = n.addComponent(className)
+                comp.deserialize(v[i], s)
+        else:
+            # Deprecated. Old save format support
+            for k, c in v:
+                let comp = n.component(k)
+                comp.deserialize(c, s)
+
+    let compositionRef = j{"compositionRef"}.getStr()
+    if compositionRef.len != 0 and not n.name.endsWith(".placeholder"):
+        s.startAsyncOp()
+        echo "load compRef ", compositionRef
+        newComposition(s.toAbsoluteUrl(compositionRef), n).loadComposition() do():
+            echo "done ", compositionRef
+            s.endAsyncOp()
+
+    let animations = j{"animations"}
+    if not animations.isNil and animations.len > 0:
+        n.animations = newTable[string, Animation]()
+        for k, v in animations:
+            n.animations[k] = newPropertyAnimation(n, v)
+
+proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
+    result = newNode()
+    result.deserialize(j, s)
+
+proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node {.deprecated.} =
+    let c = newComposition(url)
+    c.loadComposition(onComplete)
+    result = c.node
+
+proc newNodeWithResource*(path: string): Node =
+    let bd = binDeserializerForPath(path)
+    if not bd.isNil:
+        try:
+            return newComposition(path, newNode(bd, path)).node
+        except:
+            echo "Error: could not deserialize ", path
+            raise
+    else:
+        echo "No BinDeserializer for ", path
+
+    let c = newComposition("res://" & path)
+    var done = false
+    c.loadComposition() do():
+        done = true
+    if not done: 
+        raise newException(Exception, "newNodeWithResource(" & path & ") could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
+    result = c.node
+
+# proc newNodeWithCompositionName*(name: string): Node {.deprecated.} =
+#     result = newNode()
+#     result.loadComposition("compositions/" & name)
+
+proc serialize*(n: Node, s: Serializer): JsonNode =
+    result = newJObject()
+    result.add("name", s.getValue(n.name))
+    result.add("translation", s.getValue(n.position))
+    result.add("scale", s.getValue(n.scale))
+    result.add("rotation", s.getValue(n.rotation))
+    result.add("anchor", s.getValue(n.anchor))
+    result.add("alpha", s.getValue(n.alpha))
+    result.add("layer", s.getValue(n.layer))
+    result.add("affectsChildren", s.getValue(n.affectsChildren))
+    result.add("enabled", s.getValue(n.enabled))
+
+    if not n.composition.isNil:
+        result.add("compositionRef", s.getValue(n.composition.url))
+        return
+    
+    if n.components.len > 0:
+        var componentsNode = newJArray()
+        result.add("components", componentsNode)
+
+        for value in n.components:
+            var jcomp: JsonNode
+            jcomp = value.serialize(s)
+
+            if not jcomp.isNil:
+                jcomp.add("_c", %value.className())
+                componentsNode.add(jcomp)
+
+    if n.children.len > 0:
+        var childsNode = newJArray()
+        result.add("children", childsNode)
+        for child in n.children:
+            childsNode.add(child.serialize(s))
+
+proc serialize*(n: Node, s: JsonSerializer) =
+    s.visit(n.name, "name")
+    s.visit(n.position, "translation")
+    s.visit(n.scale, "scale")
+    s.visit(n.rotation, "rotation")
+    s.visit(n.anchor, "anchor")
+    s.visit(n.alpha, "alpha")
+    s.visit(n.layer, "layer")
+    s.visit(n.affectsChildren, "affectsChildren")
+    s.visit(n.enabled, "enabled")
+
+    if not n.composition.isNil:
+        s.visit(n.composition.url, "compositionRef")
+        return
+    
+    if n.components.len > 0:
+        let jn = s.node
+        let jcomps = newJArray()
+        jn["components"] = jcomps
+        for c in n.components:
+            s.node = newJObject()
+            c.serialize(s)
+            jcomps.add(s.node)
+        s.node = jn
+
+    if n.children.len > 0:
+        let jn = s.node
+        let jchildren = newJArray()
+        jn["children"] = jchildren
+        for child in n.children:
+            s.node = newJObject()
+            child.serialize(s)
+            jchildren.add(s.node)
+        s.node = jn
 
 type
     BuiltInComponentType* = enum # This is a copypaste from binformat. TODO: Remove

@@ -1,5 +1,5 @@
 import nimx / [ view, collection_view, types, context, view_event_handling,
-                text_field, pasteboard/pasteboard_item ]
+                text_field, pasteboard/pasteboard_item, keyboard ]
 
 export collection_view
 
@@ -19,6 +19,7 @@ type AssetContainerView* = ref object of CollectionView
     onItemsDragStart*: proc(item: seq[int])
     onItemRenamed*: proc(item:int)
     mIsCompact: bool
+
 
 proc newAssetContainerView*(r: Rect): AssetContainerView=
     result = new(AssetContainerView)

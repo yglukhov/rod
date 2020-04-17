@@ -48,7 +48,10 @@ method init*(v: EditorTreeView, r: Rect)=
             result = 1
         else:
             let n = item.get(Node)
-            result = n.children.len
+            if not n.composition.isNil and n != v.rootNode:
+                result = 0
+            else:
+                result = n.children.len
 
     outlineView.childOfItem = proc(item: Variant, indexPath: openarray[int]): Variant =
         if indexPath.len == 1:
@@ -86,7 +89,13 @@ method init*(v: EditorTreeView, r: Rect)=
 
         # var btn = Button(cell.subviews[1])
         # btn.value = n.enabled.int8
-        if not n.isEnabledInTree():
+        if not n.composition.isNil and n != v.rootNode:
+            if n.isEnabledInTree():
+                textField.textColor = newColor(1.0, 0.5, 0.2, 1.0)
+            else:
+                textField.textColor = newColor(1.0, 0.5, 0.2, 0.7)
+
+        elif not n.isEnabledInTree():
             textField.textColor = newColor(0.3, 0.3, 0.3, 1.0)
         else:
             textField.textColor = newGrayColor(0.0)
@@ -279,9 +288,10 @@ method setEditedNode*(v: EditorTreeView, n: Node)=
     if not n.isNil:
         v.getTreeViewIndexPathForNode(n, indexPath)
 
-        v.outlineView.expandBranch(indexPath[0..^2])
-
         if indexPath.len > 0: # todo: check this!
+            echo "path ", indexPath
+            v.outlineView.expandBranch(indexPath[0..^2])
+            echo "path2 ", indexPath
             v.outlineView.selectItemAtIndexPath(indexPath)
     else:
         v.outlineView.selectItemAtIndexPath(indexPath)

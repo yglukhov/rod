@@ -63,6 +63,14 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
         if not gizmoTouch:
             var castedNode = v.tryRayCast(e)
             if not castedNode.isNil:
+
+                var p = castedNode.parent
+                while not p.isNil and p.composition.isNil:
+                    p = p.parent
+
+                if castedNode != p and p != v.composition.rootNode:    
+                    castedNode = p
+
                 v.editor.selectedNode = castedNode
             else:
                 v.editor.selectedNode = nil
