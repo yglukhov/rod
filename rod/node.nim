@@ -584,7 +584,7 @@ proc binDeserializerForPath(path: string): BinDeserializer =
 
 proc newNode*(b: BinDeserializer, compName: string): Node
 
-template fixupCompositionUrlExtension(url: string)=
+proc fixupCompositionUrlExtension(url: var string)=
     ## Makes sure the extension is jcomp
     if url.endsWith(".json"):
         url = url.changeFileExt("jcomp")
