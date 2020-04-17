@@ -89,10 +89,11 @@ proc nodeToJson(n: Node, path: string): JsonNode =
     s.jser = newJsonSerializer()
     result = n.serialize(s)
 
-proc relativeUrl*(url: string, base: string): string =
-    result = url
-    result.removePrefix("file://")
-    result = relativePath(result, base).replace("\\", "/")
+when loadingAndSavingAvailable:
+    proc relativeUrl*(url: string, base: string): string =
+        result = url
+        result.removePrefix("file://")
+        result = relativePath(result, base).replace("\\", "/")
 
 when defined(rodedit):
     proc makeCompositionRefsRelative(e: Editor, n: Node, path: string) =
