@@ -289,9 +289,7 @@ method setEditedNode*(v: EditorTreeView, n: Node)=
         v.getTreeViewIndexPathForNode(n, indexPath)
 
         if indexPath.len > 0: # todo: check this!
-            echo "path ", indexPath
             v.outlineView.expandBranch(indexPath[0..^2])
-            echo "path2 ", indexPath
             v.outlineView.selectItemAtIndexPath(indexPath)
     else:
         v.outlineView.selectItemAtIndexPath(indexPath)

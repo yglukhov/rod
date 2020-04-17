@@ -329,6 +329,35 @@ proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
         n.name == name
 
+type
+    NodeRefResolveProc* = proc(nodeValue: Node)
+    NodeRefTable = TableRef[string, seq[NodeRefResolveProc]]
+
+var nodeLoadRefTable*: NodeRefTable
+
+proc addNodeRef*(name: string, refProc: proc(n: Node)) =
+    assert(not nodeLoadRefTable.isNil)
+    if name in nodeLoadRefTable:
+        nodeLoadRefTable[name].add(refProc)
+    else:
+        nodeLoadRefTable[name] = @[refProc]
+
+template addNodeRef*(refNode: var Node, name: string) {.deprecated.} =
+    addNodeRef(name) do(n: Node):
+        refNode = n
+
+template addNodeRef*(name: string, refNode: var Node) =
+    addNodeRef(name) do(n: Node):
+        refNode = n
+
+proc resolveNodeRefs(n: Node) =
+    assert(not nodeLoadRefTable.isNil)
+    for k, v in nodeLoadRefTable:
+        let foundNode = n.findNode(k)
+        if not foundNode.isNil:
+            for s in v:
+                s(foundNode)
+
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     block components:
         var ci = 0
@@ -517,114 +546,6 @@ proc isEnabledInTree*(n: Node): bool =
         p = p.parent
     return true
     # return n.enabled and (n.parent.isNil or n.parent.isNodeEnabledInTree())
-
-proc getDepth*(n: Node): int =
-    result = 0
-
-    var p = n.parent
-    while not p.isNil:
-        inc result
-        p = p.parent
-
-proc printParents(n: Node, indent: var string) =
-    echo "" & indent & " name ", n.name
-    indent = indent & "+"
-    if not n.parent.isNil:
-        n.parent.printParents(indent)
-
-proc getTreeDistance*(x, y: Node): int =
-    assert(x != y)
-
-    let xxLevel = x.getDepth()
-    let yyLevel = y.getDepth()
-    var xLevel = xxLevel
-    var yLevel = yyLevel
-    var px = x
-    var py = y
-
-    while xLevel > yLevel:
-        dec xLevel
-        px = px.parent
-    while yLevel > xLevel:
-        dec yLevel
-        py = py.parent
-
-    if px == py:
-        # One node is child of another
-        if xxLevel > yyLevel:
-            return -1
-        else:
-            return 1
-
-    var cx, cy : Node
-    while px != py:
-        cx = px
-        cy = py
-        px = px.parent
-        py = py.parent
-
-    assert(not cx.isNil and not cy.isNil)
-
-    let ix = px.children.find(cx)
-    let iy = px.children.find(cy)
-
-    result = iy - ix
-
-proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
-    if n.getGlobalAlpha() < 0.01 or not n.isEnabledInTree():
-        return
-
-    var inv_mat: Matrix4
-    if tryInverse(n.worldTransform(), inv_mat):
-        let localRay = r.transform(inv_mat)
-        for name, component in n.components:
-            var distance: float32
-            let res = component.rayCast(localRay, distance)
-
-            if res:
-                var castInfo: RayCastInfo
-                castInfo.node = n
-                castInfo.distance = distance
-                castResult.add(castInfo)
-
-        for c in n.children:
-            c.rayCast(r, castResult)
-
-# Debugging
-proc recursiveChildrenCount*(n: Node): int =
-    result = n.children.len
-    for c in n.children:
-        result += c.recursiveChildrenCount
-
-type
-    NodeRefResolveProc* = proc(nodeValue: Node)
-    NodeRefTable = TableRef[string, seq[NodeRefResolveProc]]
-
-var nodeLoadRefTable*: NodeRefTable
-
-proc addNodeRef*(name: string, refProc: proc(n: Node)) =
-    assert(not nodeLoadRefTable.isNil)
-    if name in nodeLoadRefTable:
-        nodeLoadRefTable[name].add(refProc)
-    else:
-        nodeLoadRefTable[name] = @[refProc]
-
-template addNodeRef*(refNode: var Node, name: string) {.deprecated.} =
-    addNodeRef(name) do(n: Node):
-        refNode = n
-
-template addNodeRef*(name: string, refNode: var Node) =
-    addNodeRef(name) do(n: Node):
-        refNode = n
-
-proc resolveNodeRefs(n: Node) =
-    assert(not nodeLoadRefTable.isNil)
-    for k, v in nodeLoadRefTable:
-        let foundNode = n.findNode(k)
-        if not foundNode.isNil:
-            for s in v:
-                s(foundNode)
-
 
 # Serialization
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
@@ -889,6 +810,84 @@ proc serialize*(n: Node, s: JsonSerializer) =
     when defined(rodedit):
         if not n.jAnimations.isNil:
             s.node["animations"] = n.jAnimations
+
+proc getDepth*(n: Node): int =
+    result = 0
+
+    var p = n.parent
+    while not p.isNil:
+        inc result
+        p = p.parent
+
+proc printParents(n: Node, indent: var string) =
+    echo "" & indent & " name ", n.name
+    indent = indent & "+"
+    if not n.parent.isNil:
+        n.parent.printParents(indent)
+
+proc getTreeDistance*(x, y: Node): int =
+    assert(x != y)
+
+    let xxLevel = x.getDepth()
+    let yyLevel = y.getDepth()
+    var xLevel = xxLevel
+    var yLevel = yyLevel
+    var px = x
+    var py = y
+
+    while xLevel > yLevel:
+        dec xLevel
+        px = px.parent
+    while yLevel > xLevel:
+        dec yLevel
+        py = py.parent
+
+    if px == py:
+        # One node is child of another
+        if xxLevel > yyLevel:
+            return -1
+        else:
+            return 1
+
+    var cx, cy : Node
+    while px != py:
+        cx = px
+        cy = py
+        px = px.parent
+        py = py.parent
+
+    assert(not cx.isNil and not cy.isNil)
+
+    let ix = px.children.find(cx)
+    let iy = px.children.find(cy)
+
+    result = iy - ix
+
+proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
+    if n.getGlobalAlpha() < 0.01 or not n.isEnabledInTree():
+        return
+
+    var inv_mat: Matrix4
+    if tryInverse(n.worldTransform(), inv_mat):
+        let localRay = r.transform(inv_mat)
+        for name, component in n.components:
+            var distance: float32
+            let res = component.rayCast(localRay, distance)
+
+            if res:
+                var castInfo: RayCastInfo
+                castInfo.node = n
+                castInfo.distance = distance
+                castResult.add(castInfo)
+
+        for c in n.children:
+            c.rayCast(r, castResult)
+
+# Debugging
+proc recursiveChildrenCount*(n: Node): int =
+    result = n.children.len
+    for c in n.children:
+        result += c.recursiveChildrenCount
 
 type
     BuiltInComponentType* = enum # This is a copypaste from binformat. TODO: Remove
