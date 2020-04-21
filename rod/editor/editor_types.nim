@@ -1,7 +1,7 @@
-
 import nimx / [view, button, editor/tab_view, linear_layout, popup_button,
-    toolbar, notification_center, event ]
+    toolbar, notification_center, event, animation ]
 import rod / [node, viewport, editor/editor_project_settings]
+import rod / editor / animation / animation_editor_types
 
 export notification_center
 
@@ -25,12 +25,15 @@ type
         rootNode*: Node
         editor*: Editor
         composition*: CompositionDocument
-
+    
     CompositionDocument* = ref object
         path*: string
         rootNode*: Node
         selectedNode*: Node
         owner*: EditorTabView
+
+        animations*: seq[EditedAnimation]
+        currentAnimation*: EditedAnimation
 
     Editor* = ref object
         mode*: EditMode

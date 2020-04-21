@@ -44,6 +44,24 @@ proc currentLeftPaneView(v: AnimationEditView): AnimationChartView =
     else:
         v.dopesheetView
 
+proc foo*(v: AnimationEditView) = 
+    echo "AnimationEditView: foo"
+
+
+
+# template addAnimatedProperty*(v: AnimationEditView, name: string, sng: untyped) = 
+#     var ep: EditedProperty
+#     ep.sng = sng
+#     ep.name = name
+#     template createCurve(T: typedesc) =
+#         ep.curve = newAnimationCurve[T]()
+#     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+#     switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
+#     v.editedProperties.add(ep)
+#     v.propertyTableView.reloadData()
+#     v.updateDopesheetCurves()
+
+
 template curveEditingMode(v: AnimationEditView): bool = v.mCurveEditingMode
 proc `curveEditingMode=`(v: AnimationEditView, flag: bool) =
     if v.mCurveEditingMode != flag:

@@ -62,6 +62,11 @@ proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
         focusNode.position.z + distance
     )
 
+proc getEditorTab*[T](e: Editor): T =
+    for t in e.workspaceView.tabs:
+        if t of T:
+            return t.T
+
 proc updateCameraSelector(e: Editor) = discard #todo: fix this!
     # var items = newSeq[string]()
     # var i = 0

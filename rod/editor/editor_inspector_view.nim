@@ -6,7 +6,7 @@ import nimx/[view, text_field, button,
 import rod/property_editors/[propedit_registry, standard_editors]
 import rod/[node, component, rod_types]
 import rod/edit_view
-
+import rod/editor/animation/editor_animation_view
 import algorithm, tables
 import variant
 
@@ -92,12 +92,29 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
         visitor.requireName = true
         visitor.requireSetter = true
         visitor.requireGetter = true
-        visitor.flags = { pfEditable }
+        if i.editor.mode == emAnimation:
+            visitor.flags = { pfAnimatable }
+        else:
+            visitor.flags = { pfEditable }
         visitor.commit = proc() =
             let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, nil, changeInspectorView)
             propView.autoresizingMask = {afFlexibleWidth}
             let propHolder = newView(propView.frame)
             propHolder.addSubview(propView)
+            
+            if i.editor.mode == emAnimation:
+                var btn = newButton(propView, newPoint(100 - 17, 1), newSize(16, 16), "a")
+                btn.autoresizingMask = {afFlexibleMinX}
+
+                let propName = visitor.name
+                let sng = visitor.setterAndGetter
+                let typId = sng.typeId
+                btn.onAction do():
+                    echo "hi ", propName
+                    let animEditor = getEditorTab[AnimationEditView](i.editor)
+                    if not animEditor.isNil:
+                        animEditor.foo()
+
             expView.addContent(propHolder)
 
         if not n.composition.isNil:

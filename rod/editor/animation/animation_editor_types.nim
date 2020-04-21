@@ -1,11 +1,32 @@
 import nimx / [ types, matrixes, animation, property_visitor ]
 import rod/animation/animation_sampler, rod/quaternion
 import algorithm
-import variant
+import variant, tables
 
 type
+    EAnimationTimeFunc* = ref array[4, float]
+
+    EAnimationKey* = ref object
+        property*: EditedProperty2
+        time*: float
+        value*: Variant
+        timeFunc*: EAnimationTimeFunc
+
+    EditedProperty2* = ref object
+        name*: string
+        node*: string
+        component*: string
+        sng*: Variant
+        keys*: seq[EAnimationKey]
+
+    EditedAnimation* = ref object 
+        name*: string
+        duration*: float
+        properties*: seq[EditedProperty2]
+
     AbstractAnimationCurve* = ref object of RootObj
         color*: Color
+
     AnimationCurve*[T] = ref object of AbstractAnimationCurve
         sampler*: BezierKeyFrameAnimationSampler[T]
 
@@ -15,18 +36,18 @@ method getSampler*[T](a: AnimationCurve[T]): AbstractAnimationSampler = a.sample
 method numberOfKeys*(c: AbstractAnimationCurve): int {.base.} = 0
 method numberOfKeys*[T](c: AnimationCurve[T]): int = c.sampler.keys.len
 
-method numberOfDimensions*(c: AbstractAnimationCurve): int {.base.} = 0
-method numberOfDimensions*[T](c: AnimationCurve[T]): int =
-    when T is Coord | int | int16 | bool:
-        1
-    elif T is Vector2:
-        2
-    elif T is Vector3:
-        3
-    elif T is Vector4 | Color | Quaternion:
-        4
-    else:
-        {.error: "Unknown type".}
+# method numberOfDimensions*(c: AbstractAnimationCurve): int {.base.} = 0
+# method numberOfDimensions*[T](c: AnimationCurve[T]): int =
+#     when T is Coord | int | int16 | bool:
+#         1
+#     elif T is Vector2:
+#         2
+#     elif T is Vector3:
+#         3
+#     elif T is Vector4 | Color | Quaternion:
+#         4
+#     else:
+#         {.error: "Unknown type".}
 
 method keyTime*(c: AbstractAnimationCurve, i: int): float {.base.} = 0
 method keyTime*[T](c: AnimationCurve[T], i: int): float = c.sampler.keys[i].p
