@@ -111,9 +111,9 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
                 let typId = sng.typeId
                 btn.onAction do():
                     echo "hi ", propName
-                    let animEditor = getEditorTab[AnimationEditView](i.editor)
-                    if not animEditor.isNil:
-                        animEditor.foo()
+                    # let animEditor = getEditorTab[AnimationEditView](i.editor)
+                    # if not animEditor.isNil:
+                    #     animEditor.foo()
 
             expView.addContent(propHolder)
 

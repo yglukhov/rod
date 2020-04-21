@@ -14,20 +14,20 @@ import variant
 const leftPaneWidth = 200
 
 type
-    # EditedProperty* = object
-    #     name: string
-    #     curve: AbstractAnimationCurve
-    #     sng: Variant
+    EditedProperty* = object
+        name: string
+        curve: AbstractAnimationCurve
+        sng: Variant
 
     AnimationEditView* = ref object of EditorTabView
         curveEditView: AnimationCurvesEditView
         dopesheetView: DopesheetView
         propertyTableView: TableView
-        # editedProperties: seq[EditedProperty]
+        editedProperties: seq[EditedProperty]
         mCurveEditingMode: bool
         mEditedNode: Node
         animationSelector*: PopupButton
-        # mEditedAnimation*: PropertyAnimation
+        mEditedAnimation*: PropertyAnimation
 
 proc `editedNode=`*(v: AnimationEditView, n: Node) =
     v.mEditedNode = n
@@ -43,6 +43,11 @@ proc currentLeftPaneView(v: AnimationEditView): AnimationChartView =
         v.curveEditView
     else:
         v.dopesheetView
+
+proc foo*(v: AnimationEditView) = 
+    echo "AnimationEditView: foo"
+
+
 
 # template addAnimatedProperty*(v: AnimationEditView, name: string, sng: untyped) = 
 #     var ep: EditedProperty
@@ -79,36 +84,32 @@ let colors = [
     newColor(1, 0, 1)
 ]
 
-proc updateDopesheetCurves(v: AnimationEditView) = discard
-    # var curves = newSeq[AbstractAnimationCurve]()
-    # for p in v.editedProperties: curves.add(p.curve)
-    # v.dopesheetView.curves = curves
+proc updateDopesheetCurves(v: AnimationEditView) =
+    var curves = newSeq[AbstractAnimationCurve]()
+    for p in v.editedProperties: curves.add(p.curve)
+    v.dopesheetView.curves = curves
 
-proc reload(v: AnimationEditView) = 
+proc addEditedProperty(v: AnimationEditView, name: string) =
+    var ep: EditedProperty
+    var ap: AnimatedProperty
+    ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, "", -1, name)
+    ep.name = name
+    a p.new()
+    ap.propName = name
+    template createCurve(T: typedesc) =
+        ep.curve = newAnimationCurve[T]()
+    template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+    switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
+    
+    ap.sampler = ep.curve.getSampler()
+    ap.progressSetter = makeProgressSetter(ep.sng, ap.sampler)
+
+    ep.curve.color = colors[v.editedProperties.len mod colors.len]
+    v.editedProperties.add(ep)
+    if not v.mEditedAnimation.isNil:
+        v.mEditedAnimation.animatedProperties.add(ap)
     v.propertyTableView.reloadData()
     v.updateDopesheetCurves()
-
-# proc addEditedProperty(v: AnimationEditView, name: string) =
-#     var ep: EditedProperty
-#     var ap: AnimatedProperty
-#     ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, "", -1, name)
-#     ep.name = name
-#     a p.new()
-#     ap.propName = name
-#     template createCurve(T: typedesc) =
-#         ep.curve = newAnimationCurve[T]()
-#     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
-#     switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
-    
-#     ap.sampler = ep.curve.getSampler()
-#     ap.progressSetter = makeProgressSetter(ep.sng, ap.sampler)
-
-#     ep.curve.color = colors[v.editedProperties.len mod colors.len]
-#     v.editedProperties.add(ep)
-#     if not v.mEditedAnimation.isNil:
-#         v.mEditedAnimation.animatedProperties.add(ap)
-#     v.propertyTableView.reloadData()
-#     v.updateDopesheetCurves()
 
 # proc createAddPropertyButton(v: AnimationEditView): Button =
 #     let b = Button.new(zeroRect)
@@ -132,30 +133,29 @@ proc reload(v: AnimationEditView) =
 #     result = b
 
 proc onCursorPosChange(v: AnimationEditView, pos: float) =
-    discard
-    # for ep in v.editedProperties:
-    #     ep.curve.applyValueAtPosToSetter(pos, ep.sng)
+    for ep in v.editedProperties:
+        ep.curve.applyValueAtPosToSetter(pos, ep.sng)
 
 proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
-    # v.mEditedAnimation = a
-    # v.editedProperties = @[]
-    # if not a.isNil:
-    #     for ap in a.animatedProperties:
-    #         var ep: EditedProperty
-    #         ep.name = ap.propName
-    #         try:
-    #             ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.nodeName, ap.compIndex, ap.propName)
-    #             template createCurve(T: typedesc) =
-    #                 if ap.sampler of BezierKeyFrameAnimationSampler[T]:
-    #                     ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
-    #                 else:
-    #                     ep.curve = newAnimationCurve[T]()
-    #             template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
-    #             switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
-    #             ep.curve.color = colors[v.editedProperties.len mod colors.len]
-    #             v.editedProperties.add(ep)
-    #         except:
-    #             error "Could not attach animatable property: ", getCurrentExceptionMsg()
+    v.mEditedAnimation = a
+    v.editedProperties = @[]
+    if not a.isNil:
+        for ap in a.animatedProperties:
+            var ep: EditedProperty
+            ep.name = ap.propName
+            try:
+                ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.nodeName, ap.compIndex, ap.propName)
+                template createCurve(T: typedesc) =
+                    if ap.sampler of BezierKeyFrameAnimationSampler[T]:
+                        ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
+                    else:
+                        ep.curve = newAnimationCurve[T]()
+                template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+                switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
+                ep.curve.color = colors[v.editedProperties.len mod colors.len]
+                v.editedProperties.add(ep)
+            except:
+                error "Could not attach animatable property: ", getCurrentExceptionMsg()
     v.propertyTableView.reloadData()
     v.updateDopesheetCurves()
 
@@ -184,7 +184,7 @@ proc createPlayButton(v: AnimationEditView): Button =
 
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
-    # v.editedProperties = @[]
+    v.editedProperties = @[]
 
     let mainSplitView = newHorizontalLayout(v.bounds)
     mainSplitView.userResizeable = true
@@ -216,21 +216,19 @@ method init*(v: AnimationEditView, r: Rect) =
     mainSplitView.addSubview(leftPaneView)
 
     v.propertyTableView.numberOfRows = proc(): int =
-        0
-        # v.editedProperties.len
+        v.editedProperties.len
 
     v.propertyTableView.createCell = proc (): TableViewCell =
         result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
     v.propertyTableView.configureCell = proc (c: TableViewCell) =
-        discard
-        # TextField(c.subviews[0]).text = v.editedProperties[c.row].name
+        TextField(c.subviews[0]).text = v.editedProperties[c.row].name
 
     v.propertyTableView.onSelectionChange = proc() =
         let selectedRows = toSeq(items(v.propertyTableView.selectedRows))
-        # if selectedRows.len > 0:
-        #     v.curveEditView.curves = @[v.editedProperties[selectedRows[0]].curve]
-        # else:
-        v.curveEditView.curves = @[]
+        if selectedRows.len > 0:
+            v.curveEditView.curves = @[v.editedProperties[selectedRows[0]].curve]
+        else:
+            v.curveEditView.curves = @[]
 
     v.propertyTableView.defaultRowHeight = 20
 
@@ -279,16 +277,16 @@ method viewWillMoveToWindow*(v: AnimationEditView, w: Window) =
 
 method acceptsFirstResponder*(v: AnimationEditView): bool = true
 
-# proc insertKeyframeAtCurPos(v: AnimationEditView) =
-#     let cursorPos = v.currentLeftPaneView.cursorPos
-#     for ep in v.editedProperties:
-#         echo "addKey ", ep.name, " cp ", cursorPos
-#         ep.curve.addKeyAtPosWithValueFromGetter(cursorPos, ep.sng)
-#     v.setNeedsDisplay()
+proc insertKeyframeAtCurPos(v: AnimationEditView) =
+    let cursorPos = v.currentLeftPaneView.cursorPos
+    for ep in v.editedProperties:
+        echo "addKey ", ep.name, " cp ", cursorPos
+        ep.curve.addKeyAtPosWithValueFromGetter(cursorPos, ep.sng)
+    v.setNeedsDisplay()
 
 method onKeyDown*(v: AnimationEditView, e: var Event): bool =
     if e.keyCode == VirtualKey.K:
-        # v.insertKeyframeAtCurPos()
+        v.insertKeyframeAtCurPos()
         result = true
 
 method tabSize*(v: AnimationEditView, bounds: Rect): Size=
@@ -299,14 +297,5 @@ method tabAnchor*(v: AnimationEditView): EditorTabAnchor =
 
 method setEditedNode*(v: AnimationEditView, n: Node)=
     v.editedNode = n
-
-method onCompositionChanged*(v: AnimationEditView, comp: CompositionDocument) =
-    procCall v.EditorTabView.onCompositionChanged(comp)
-    v.reload()
-
-
-#[
-    composition
-]#
 
 registerEditorTab("Animation", AnimationEditView)

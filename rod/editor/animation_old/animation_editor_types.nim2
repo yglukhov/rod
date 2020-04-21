@@ -7,12 +7,12 @@ type
     EAnimationTimeFunc* = ref array[4, float]
 
     EAnimationKey* = ref object
-        property*: EditedProperty
+        property*: EditedProperty2
         time*: float
         value*: Variant
         timeFunc*: EAnimationTimeFunc
 
-    EditedProperty* = ref object
+    EditedProperty2* = ref object
         name*: string
         node*: string
         component*: string
@@ -22,7 +22,7 @@ type
     EditedAnimation* = ref object 
         name*: string
         duration*: float
-        properties*: seq[EditedProperty]
+        properties*: seq[EditedProperty2]
 
     AbstractAnimationCurve* = ref object of RootObj
         color*: Color

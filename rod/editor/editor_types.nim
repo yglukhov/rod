@@ -79,8 +79,8 @@ method onEditorTouchDown*(v: EditorTabView, e: var Event) {.base.}=
 method onSceneChanged*(v: EditorTabView) {.base, deprecated.}=
     discard
 
-method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base.}=
-    discard
+method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base.} =
+    v.composition = comp
 
 method onEditModeChanged*(v: EditorTabView, mode: EditMode) {.base.} = discard
 
