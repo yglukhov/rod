@@ -9,7 +9,7 @@ import rod/animation/[property_animation, animation_sampler]
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view
 import animation_editor_types
-import variant, json, algorithm
+import variant, json, algorithm, unicode
 
 const leftPaneWidth = 200
 
@@ -31,8 +31,11 @@ proc editedAnimation(v: AnimationEditView): EditedAnimation =
     if not currComp.isNil:
         result = currComp.currentAnimation
 
+proc reload(v: AnimationEditView)
+
 proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
     v.dopesheetView.editedAnimation = val
+    v.reload()
 
 proc `editedNode=`*(v: AnimationEditView, n: Node) =
     v.mEditedNode = n
@@ -154,6 +157,44 @@ proc onRemoveKeys(v: AnimationEditView, keys: seq[DopesheetSelectedKey])=
 
     v.rebuildAnimation()
 
+proc createBottomPanel(v: AnimationEditView, r: Rect): View =
+    result = new(View, r)
+    result.backgroundColor = newColor(1.0, 0.0, 0.4, 1.0)
+    let bh = r.height - 2
+    let bw = bh
+    let lw = 100
+    
+    var w = 1.0
+    var toStartButton = newButton(newRect(w, 1, bw, bh))
+    toStartButton.title = "|<" #$Rune(0x000023F9) #\u23F9
+    w += bw + 1
+    result.addSubview(toStartButton)
+    
+    var playButton = newButton(newRect(w, 1, bw, bh))
+    playButton.title = "P" #$Rune(0x000023F9) #\u23F9
+    w += bw + 1
+    result.addSubview(playButton)
+
+    var stopButton = newButton(newRect(w, 1, bw, bh))
+    stopButton.title = "S" #$Rune(0x000023F9) #\u23F9
+    w += bw + 1
+    result.addSubview(stopButton)
+    
+    var toEndButton = newButton(newRect(w, 1, bw, bh))
+    toEndButton.title = ">|" #$Rune(0x000023F9) #\u23F9
+    w += bw + 1
+    result.addSubview(toEndButton)
+
+    
+
+
+    # var tt = newTextField(newRect(w, 1, 100, bh))
+    # tt.text = $Rune(0x000023F9)
+    # w += bw + 101
+    # result.addSubview(tt)
+    # 0x000023F3 
+    
+
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
     # v.editedProperties = @[]
@@ -161,16 +202,18 @@ method init*(v: AnimationEditView, r: Rect) =
     let mainSplitView = newHorizontalLayout(v.bounds)
     mainSplitView.userResizeable = true
     mainSplitView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    
+    mainSplitView.padding = 4.0
+    v.addSubview(mainSplitView)
 
     let leftPaneView = View.new(newRect(0, 0, leftPaneWidth, v.bounds.height))
     let playButton = v.createPlayButton()
     leftPaneView.addSubview(playButton)
     leftPaneView.autoresizingMask = { afFlexibleMaxX, afFlexibleHeight }
 
-    v.animationSelector = PopupButton.new(newRect(52, 0, leftPaneView.bounds.width - 52, topPanelHeight))
-    v.animationSelector.autoresizingMask = { afFlexibleWidth, afFlexibleMaxY }
-    leftPaneView.addSubview(v.animationSelector)
+    # v.animationSelector = PopupButton.new(newRect(52, 0, leftPaneView.bounds.width - 52, topPanelHeight))
+    # v.animationSelector.autoresizingMask = { afFlexibleWidth, afFlexibleMaxY }
+    # leftPaneView.addSubview(v.animationSelector)
+
     # v.animationSelector.onAction do():
     #     if v.animationSelector.selectedIndex >= 0:
     #         let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
@@ -186,6 +229,14 @@ method init*(v: AnimationEditView, r: Rect) =
     v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
     let s = newScrollView(v.propertyTableView)
     leftPaneView.addSubview(s)
+    
+    # leftPaneView.bounds.maxY - bottomPanelHeight
+    # s.bounds.maxY
+
+    var vv = v.createBottomPanel(newRect(0, leftPaneView.bounds.maxY - bottomPanelHeight, leftPaneView.bounds.width, bottomPanelHeight))
+    vv.autoresizingMask = {afFlexibleWidth, afFlexibleMinY}
+    leftPaneView.addSubview(vv)
+
     mainSplitView.addSubview(leftPaneView)
 
     v.propertyTableView.numberOfRows = proc(): int =
@@ -245,14 +296,18 @@ method init*(v: AnimationEditView, r: Rect) =
     v.dopesheetView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     v.dopesheetView.onCursorPosChange = proc() =
         v.onCursorPosChange(v.dopesheetView.cursorPos)
-    # v.dopesheetView.onKeysChanged = proc(pi, ki: int) =
+    v.dopesheetView.onKeysChanged = proc(keys: seq[DopesheetSelectedKey]) =
+        let a = v.editedAnimation
+        for k in keys:
+            a.propertyAtIndex(k.pi).sortKeys()
+        v.rebuildAnimation()
     #     if pi != -1 and ki != -1:
     #         let p = 
     #         v.onRemoveKey(pi, ki)
     # let toView = v.currentLeftPaneView
     # toView.setFrame(newRect(leftPaneWidth, 0, mainSplitView.bounds.width - leftPaneWidth, mainSplitView.bounds.height))
     mainSplitView.addSubview(v.dopesheetView)
-    v.addSubview(mainSplitView)
+    mainSplitView.setDividerPosition(200.0, 0)
 
 method viewWillMoveToWindow*(v: AnimationEditView, w: Window) =
     echo "AnimationEditView ", v.editor.isNil
@@ -321,11 +376,13 @@ proc addEditedProperty*(v: AnimationEditView, node: Node, prop: string, sng: Var
                 ep = p
                 break reuseProperty
 
-        template createCurve(T: typedesc) =
-            discard newAnimationCurve[T]()
-        template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+        
         try: #incompatible type for animation should throw exception
+            template createCurve(T: typedesc) =
+                discard
+            template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
             switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
+
             currComp.currentAnimation.properties.add(ep)
         except:
             echo "Can't add edited property"

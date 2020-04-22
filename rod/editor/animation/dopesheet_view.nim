@@ -12,6 +12,7 @@ type
         selectionOrigin: Point
         rowHeight*: Coord
         mSelectedKeys: HashSet[DopesheetSelectedKey]
+        selectedKeysWasChanged: bool
         draggedKey: DopesheetSelectedKey
         selectedCurve*: int
         selectedKey*: int
@@ -126,9 +127,7 @@ proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
                     let k = v.editedAnimation.keyAtIndex(sel.pi, sel.ki)
                     if not k.isNil:
                         k.position -= diff
-
-                if not v.onKeysChanged.isNil:
-                    v.onKeysChanged(v.selectedKeys)
+                        v.selectedKeysWasChanged = true
             else:
                 let orig = v.selectionOrigin
                 var topLeft = newPoint(0.0, 0.0)
@@ -164,7 +163,9 @@ proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
             # else:
             v.draggedKey = (pi: -1, ki: -1)
             v.selectionRect = zeroRect
-
+            if v.selectedKeysWasChanged and not v.onKeysChanged.isNil:
+                v.onKeysChanged(v.selectedKeys)
+            v.selectedKeysWasChanged = false
 
 method onTouchEv*(v: DopesheetView, e: var Event): bool =
     if e.buttonState == bsDown:
