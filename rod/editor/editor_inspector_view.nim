@@ -86,8 +86,8 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
         proc changeInspectorView() =
             i.inspectedNode = n
 
+        var editedPropertyName = ""
         var expView= newExpandingView(newRect(0, 20, 328, 20.0))
-
         var visitor : PropertyVisitor
         visitor.requireName = true
         visitor.requireSetter = true
@@ -96,6 +96,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             visitor.flags = { pfAnimatable }
         else:
             visitor.flags = { pfEditable }
+        
         visitor.commit = proc() =
             let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, nil, changeInspectorView)
             propView.autoresizingMask = {afFlexibleWidth}
@@ -106,13 +107,13 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
                 var btn = newButton(propView, newPoint(100 - 17, 1), newSize(16, 16), "a")
                 btn.autoresizingMask = {afFlexibleMinX}
 
-                let propName = visitor.name
                 let sng = visitor.setterAndGetter
-                let typId = sng.typeId
+                let propName = visitor.name
+                let epn = editedPropertyName
                 btn.onAction do():
-                    echo "hi ", propName
-                    # let animEditor = getEditorTab[AnimationEditView](i.editor)
-                    # if not animEditor.isNil:
+                    let animEditor = getEditorTab[AnimationEditView](i.editor)
+                    if not animEditor.isNil:
+                        animEditor.addEditedProperty(n, epn & "." & propName, sng)
                     #     animEditor.foo()
 
             expView.addContent(propHolder)
@@ -138,7 +139,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
 
-        for v in n.components:
+        for idx, v in n.components:
             closureScope:
                 expView = newExpandingView(newRect(0, 0, 328, 20.0))
                 expView.title = v.className
@@ -151,7 +152,8 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
                 removeButton.onAction do():
                     n.removeComponent(component)
                     i.inspectedNode = n
-
+            
+            editedPropertyName = "." & $idx
             v.visitProperties(visitor)
             i.propView.addSubview(expView)
 

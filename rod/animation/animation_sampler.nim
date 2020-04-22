@@ -1,5 +1,5 @@
 import math, algorithm
-import nimx/animation
+import nimx/[ animation, matrixes, types ]
 import variant
 
 type
@@ -158,7 +158,7 @@ proc newBezierKeyFrameAnimationSampler*[T](keys: seq[BezierKeyFrame[T]]): Bezier
         #                     normalizedP)
         # result = s.keys[a].v + resp * spacialLength
         # echo "result: ", result
-        result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)
+        # result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)
 
 
 

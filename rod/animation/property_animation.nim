@@ -129,21 +129,29 @@ proc newValueSampler(t: TypeId, j:JsonNode, lerpBetweenFrames: bool, originalLen
 
     switchAnimatableTypeId(t, getTypeId, makeSampler)
 
-proc newKeyframeSampler[T](j: JsonNode): BezierKeyFrameAnimationSampler[T] {.inline.} =
-    var keys = newSeq[BezierKeyFrame[T]](j.len)
+# proc newKeyframeSampler[T](j: JsonNode): BezierKeyFrameAnimationSampler[T] {.inline.} =
+proc newKeyframeSampler[T](j: JsonNode): LinearKeyFrameAnimationSampler[T] {.inline.} =
+    # var keys = newSeq[BezierKeyFrame[T]](j.len)
+    var keys = newSeq[LinearKeyFrame[T]](j.len)
     shallow(keys)
     var i = 0
     for v in j:
         keys[i].v = elementFromJson(T, v["v"])
         keys[i].p = v["p"].getFloat()
-        let ie = v["ie"]
-        keys[i].inX = ie[0].getFloat()
-        keys[i].inY = ie[1].getFloat()
-        let oe = v["oe"]
-        keys[i].outX = oe[0].getFloat()
-        keys[i].outY = oe[1].getFloat()
         inc i
-    result = newBezierKeyFrameAnimationSampler[T](keys)
+    result = newLinearKeyFrameAnimationSampler[T](keys)
+    # LinearKeyFrameAnimationSampler
+    # for v in j:
+    #     keys[i].v = elementFromJson(T, v["v"])
+    #     keys[i].p = v["p"].getFloat()
+    #     let ie = v["ie"]
+    #     keys[i].inX = ie[0].getFloat()
+    #     keys[i].inY = ie[1].getFloat()
+    #     let oe = v["oe"]
+    #     keys[i].outX = oe[0].getFloat()
+    #     keys[i].outY = oe[1].getFloat()
+    #     inc i
+    # result = newBezierKeyFrameAnimationSampler[T](keys)
 
 proc newKeyframeSampler(t: TypeId, j: JsonNode): AbstractAnimationSampler =
     template makeSampler(T: typedesc) =
@@ -159,10 +167,13 @@ template findAnimatablePropertyAux(body: untyped) =
     var res {.inject.} : Variant
     var visitor {.inject.} : PropertyVisitor
     visitor.requireName = true
+    visitor.requireSetter = true
     visitor.flags = { pfAnimatable }
     visitor.commit = proc() =
         if res.isEmpty:
+            # echo "tryfind ", propName
             if visitor.name == propName:
+                # echo "found ", visitor.name
                 res = visitor.setterAndGetter
     body
 
@@ -182,25 +193,6 @@ proc findAnimatableProperty(n: Node, compIndex: int, propName: string): Variant 
         if n.components.len > compIndex:
             n.components[compIndex].visitProperties(visitor)
 
-# proc findAnimatablePropertiesForNode*(n: Node): Table[string, Variant] =
-#     var visitor : PropertyVisitor
-#     visitor.requireName = true
-#     visitor.requireSetter = true
-#     visitor.flags = { pfAnimatable }
-    
-#     var animProps = initTable[string, Variant]()
-#     var context = ""
-#     visitor.commit = proc() =
-#         animProps[context & "." & visitor.name] = visitor.setterAndGetter
-
-#     n.visitProperties(visitor)
-    
-#     for i, c in n.components:
-#         context = "." & $i
-#         c.visitProperties(visitor)
-
-#     result = animProps
-
 proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int, rawPropName: string): Variant =
     var animatedNode = n
     if nodeName.len > 0:
@@ -214,26 +206,27 @@ proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int
         result = findAnimatableProperty(animatedNode, compIndex, rawPropName)
     if result.isEmpty:
         raise newException(Exception, "Animated property not found: " & nodeName & "." & $compIndex & "." & rawPropName)
-
+ 
 proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: float) =
     template makeSetter(T: typedesc) =
         let setter = sng.get(SetterAndGetter[T]).setter
         let sampler = AnimationSampler[T](s)
         result = proc(p: float) =
+            # echo "setter ", setter.isNil, " sampler ", sampler.isNil
             setter(sampler.sample(p))
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
     switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, makeSetter)
 
 proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
-    result.new()
-    result.init()
-    result.animatedProperties = @[]
-    shallow(result.animatedProperties)
+    var r = new(PropertyAnimation)
+    r.init()
+    r.animatedProperties = @[]
+    shallow(r.animatedProperties)
 
-    result.loopDuration = 0.0 # TODO: Hack - remove
+    r.loopDuration = 0.0 # TODO: Hack - remove
     for k, jp in j:
-        result.loopDuration = max(jp["duration"].getFloat(), result.loopDuration) # TODO: Hack - remove
-        result.numberOfLoops = jp{"numberOfLoops"}.getInt(1) # TODO: Hack - remove
+        r.loopDuration = max(jp["duration"].getFloat(), r.loopDuration) # TODO: Hack - remove
+        r.numberOfLoops = jp{"numberOfLoops"}.getInt(1) # TODO: Hack - remove
         var animScale = 1.0
         if "animScale" in jp:
             animScale = 1.0 / jp["animScale"].getFloat()
@@ -269,11 +262,11 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
 
         ap.progressSetter = makeProgressSetter(sng, ap.sampler)
 
-        result.animatedProperties.add(ap)
+        r.animatedProperties.add(ap)
 
-    let res = result
+    result = r
     result.onAnimate = proc(p: float) =
-        for ap in res.animatedProperties:
+        for ap in r.animatedProperties:
             ap.progressSetter(p * ap.scale)
 
 proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyAnimation =

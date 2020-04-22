@@ -9,16 +9,11 @@ import rod/animation/[property_animation, animation_sampler]
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view
 import animation_editor_types
-import variant
+import variant, json, algorithm
 
 const leftPaneWidth = 200
 
 type
-    # EditedProperty* = object
-    #     name: string
-    #     curve: AbstractAnimationCurve
-    #     sng: Variant
-
     AnimationEditView* = ref object of EditorTabView
         curveEditView: AnimationCurvesEditView
         dopesheetView: DopesheetView
@@ -27,35 +22,26 @@ type
         mCurveEditingMode: bool
         mEditedNode: Node
         animationSelector*: PopupButton
+        selectedProperties: seq[int]
+        cachedAnimation: PropertyAnimation
         # mEditedAnimation*: PropertyAnimation
+
+proc editedAnimation(v: AnimationEditView): EditedAnimation =
+    var currComp = v.editor.currentComposition
+    if not currComp.isNil:
+        result = currComp.currentAnimation
+
+proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
+    v.dopesheetView.editedAnimation = val
 
 proc `editedNode=`*(v: AnimationEditView, n: Node) =
     v.mEditedNode = n
-    var items = newSeq[string]()
-    if not v.mEditedNode.isNil and not v.mEditedNode.animations.isNil:
-        for k, v in v.mEditedNode.animations:
-            items.add(k)
-    v.animationSelector.items = items
-    v.animationSelector.sendAction()
 
 proc currentLeftPaneView(v: AnimationEditView): AnimationChartView =
     if v.mCurveEditingMode:
         v.curveEditView
     else:
         v.dopesheetView
-
-# template addAnimatedProperty*(v: AnimationEditView, name: string, sng: untyped) = 
-#     var ep: EditedProperty
-#     ep.sng = sng
-#     ep.name = name
-#     template createCurve(T: typedesc) =
-#         ep.curve = newAnimationCurve[T]()
-#     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
-#     switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
-#     v.editedProperties.add(ep)
-#     v.propertyTableView.reloadData()
-#     v.updateDopesheetCurves()
-
 
 template curveEditingMode(v: AnimationEditView): bool = v.mCurveEditingMode
 proc `curveEditingMode=`(v: AnimationEditView, flag: bool) =
@@ -79,85 +65,42 @@ let colors = [
     newColor(1, 0, 1)
 ]
 
-proc updateDopesheetCurves(v: AnimationEditView) = discard
-    # var curves = newSeq[AbstractAnimationCurve]()
-    # for p in v.editedProperties: curves.add(p.curve)
-    # v.dopesheetView.curves = curves
+proc rebuildAnimation(v: AnimationEditView) =
+    v.cachedAnimation = nil
+    if v.editedAnimation.isNil: return
+    var janim = %v.editedAnimation
+    var comp = v.editor.currentComposition
+    if comp.isNil: return
+    try:
+        v.cachedAnimation = newPropertyAnimation(comp.rootNode, janim)
+    except:
+        v.cachedAnimation = nil
+        echo janim
+        echo getStackTrace(getCurrentException())
+        echo getCurrentExceptionMsg()
+
+proc playEditedAnimation(v: AnimationEditView) =
+    v.rebuildAnimation()
+    if not v.cachedAnimation.isNil:
+        v.window.addAnimation(v.cachedAnimation)
 
 proc reload(v: AnimationEditView) = 
     v.propertyTableView.reloadData()
-    v.updateDopesheetCurves()
-
-# proc addEditedProperty(v: AnimationEditView, name: string) =
-#     var ep: EditedProperty
-#     var ap: AnimatedProperty
-#     ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, "", -1, name)
-#     ep.name = name
-#     a p.new()
-#     ap.propName = name
-#     template createCurve(T: typedesc) =
-#         ep.curve = newAnimationCurve[T]()
-#     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
-#     switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
-    
-#     ap.sampler = ep.curve.getSampler()
-#     ap.progressSetter = makeProgressSetter(ep.sng, ap.sampler)
-
-#     ep.curve.color = colors[v.editedProperties.len mod colors.len]
-#     v.editedProperties.add(ep)
-#     if not v.mEditedAnimation.isNil:
-#         v.mEditedAnimation.animatedProperties.add(ap)
-#     v.propertyTableView.reloadData()
-#     v.updateDopesheetCurves()
-
-# proc createAddPropertyButton(v: AnimationEditView): Button =
-#     let b = Button.new(zeroRect)
-#     b.title = "+"
-#     b.onAction do():
-#         if not v.mEditedNode.isNil:
-#             var animatableProps = v.mEditedNode.findAnimatablePropertiesForNode()
-#             var menu : MenuItem
-#             menu.new()
-#             var items = newSeq[MenuItem]()
-#             let props = toSeq(animatableProps.keys()) # @["tX", "tY", "tZ"]
-#             for i, p in props:
-#                 closureScope:
-#                     let prop = p
-#                     let menuItem = newMenuItem(prop)
-#                     menuItem.action = proc() =
-#                         v.addEditedProperty(prop)
-#                     items.add(menuItem)
-#             menu.items = items
-#             menu.popupAtPoint(b, newPoint(0, 27))
-#     result = b
+    v.rebuildAnimation()
+    # v.updateDopesheetCurves()
 
 proc onCursorPosChange(v: AnimationEditView, pos: float) =
-    discard
-    # for ep in v.editedProperties:
-    #     ep.curve.applyValueAtPosToSetter(pos, ep.sng)
+    if v.cachedAnimation.isNil:
+        v.rebuildAnimation()
+    
+    echo "v.cachedAnimation.isNil ", v.cachedAnimation.isNil
+    if not v.cachedAnimation.isNil:
+        try:
+            v.cachedAnimation.onProgress(pos)
+        except: 
+            echo getStackTrace(getCurrentException())
+            echo getCurrentExceptionMsg()
 
-proc `editedAnimation=`(v: AnimationEditView, a: PropertyAnimation) =
-    # v.mEditedAnimation = a
-    # v.editedProperties = @[]
-    # if not a.isNil:
-    #     for ap in a.animatedProperties:
-    #         var ep: EditedProperty
-    #         ep.name = ap.propName
-    #         try:
-    #             ep.sng = findAnimatablePropertyForSubtree(v.mEditedNode, ap.nodeName, ap.compIndex, ap.propName)
-    #             template createCurve(T: typedesc) =
-    #                 if ap.sampler of BezierKeyFrameAnimationSampler[T]:
-    #                     ep.curve = newAnimationCurve[T](BezierKeyFrameAnimationSampler[T](ap.sampler))
-    #                 else:
-    #                     ep.curve = newAnimationCurve[T]()
-    #             template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
-    #             switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
-    #             ep.curve.color = colors[v.editedProperties.len mod colors.len]
-    #             v.editedProperties.add(ep)
-    #         except:
-    #             error "Could not attach animatable property: ", getCurrentExceptionMsg()
-    v.propertyTableView.reloadData()
-    v.updateDopesheetCurves()
 
 const topPanelHeight = 25
 const bottomPanelHeight = 25
@@ -168,19 +111,48 @@ proc createPlayButton(v: AnimationEditView): Button =
     var currentlyPlayingAnimation: Animation
     let b = result
     result.onAction do():
-        if not currentlyPlayingAnimation.isNil:
-            currentlyPlayingAnimation.cancel()
-            currentlyPlayingAnimation = nil
-            b.title = "Play"
-        elif v.animationSelector.selectedIndex >= 0 and not v.mEditedNode.isNil:
-            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
-            if not a.isNil:
-                currentlyPlayingAnimation = a
-                a.onComplete do():
-                    b.title = "Play"
-                    currentlyPlayingAnimation = nil
-                v.window.addAnimation(a)
-                b.title = "Stop"
+        v.playEditedAnimation()
+        # if not currentlyPlayingAnimation.isNil:
+        #     currentlyPlayingAnimation.cancel()
+        #     currentlyPlayingAnimation = nil
+        #     b.title = "Play"
+        # elif v.animationSelector.selectedIndex >= 0 and not v.mEditedNode.isNil:
+        #     let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
+        #     if not a.isNil:
+        #         currentlyPlayingAnimation = a
+        #         a.onComplete do():
+        #             b.title = "Play"
+        #             currentlyPlayingAnimation = nil
+        #         v.window.addAnimation(a)
+        #         b.title = "Stop"
+
+proc onRemoveProperty(v: AnimationEditView, pi: int) =
+    echo "onRemoveProperty ", pi
+    let curAnim = v.editedAnimation
+    if not curAnim.isNil:
+        curAnim.properties.del(pi)
+    v.rebuildAnimation()
+
+proc onSetEnabledProperty(v: AnimationEditView, pi: int, val: bool) =
+    echo "onSetEnabledProperty ", pi, " val ", val
+    let curAnim = v.editedAnimation
+    if not curAnim.isNil and pi < curAnim.properties.len:
+        curAnim.properties[pi].enabled = val
+    v.rebuildAnimation()
+
+proc onRemoveKeys(v: AnimationEditView, keys: seq[DopesheetSelectedKey])=
+    var keys = keys
+    # echo "k ", keys
+    keys.sort() do(a,b: DopesheetSelectedKey) -> int:
+        result = cmp(a.pi, b.pi)
+        if result == 0:
+            result = cmp(b.ki, a.ki) #del from the end of seq
+    
+    for k in keys:
+        if k.pi < v.editedAnimation.properties.len:
+            v.editedAnimation.properties[k.pi].keys.del(k.ki)
+
+    v.rebuildAnimation()
 
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
@@ -189,7 +161,7 @@ method init*(v: AnimationEditView, r: Rect) =
     let mainSplitView = newHorizontalLayout(v.bounds)
     mainSplitView.userResizeable = true
     mainSplitView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    v.addSubview(mainSplitView)
+    
 
     let leftPaneView = View.new(newRect(0, 0, leftPaneWidth, v.bounds.height))
     let playButton = v.createPlayButton()
@@ -199,75 +171,88 @@ method init*(v: AnimationEditView, r: Rect) =
     v.animationSelector = PopupButton.new(newRect(52, 0, leftPaneView.bounds.width - 52, topPanelHeight))
     v.animationSelector.autoresizingMask = { afFlexibleWidth, afFlexibleMaxY }
     leftPaneView.addSubview(v.animationSelector)
-    v.animationSelector.onAction do():
-        if v.animationSelector.selectedIndex >= 0:
-            let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
-            if a of PropertyAnimation:
-                v.editedAnimation = PropertyAnimation(a)
-            else:
-                v.editedAnimation = nil
-        else:
-            v.editedAnimation = nil
+    # v.animationSelector.onAction do():
+    #     if v.animationSelector.selectedIndex >= 0:
+    #         let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
+    #         if a of PropertyAnimation:
+    #             v.editedAnimation = PropertyAnimation(a)
+    #         else:
+    #             v.editedAnimation = nil
+    #     else:
+    #         v.editedAnimation = nil
 
     v.propertyTableView = TableView.new(newRect(0, topPanelHeight, leftPaneWidth, leftPaneView.bounds.height - topPanelHeight - bottomPanelHeight))
+    # v.propertyTableView.selectionMode = smMultipleSelection
     v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
     let s = newScrollView(v.propertyTableView)
     leftPaneView.addSubview(s)
     mainSplitView.addSubview(leftPaneView)
 
     v.propertyTableView.numberOfRows = proc(): int =
-        0
+        if v.editedAnimation.isNil: 0 else: v.editedAnimation.properties.len
+    v.propertyTableView.numberOfColumns = 3
+        # 0
         # v.editedProperties.len
 
-    v.propertyTableView.createCell = proc (): TableViewCell =
-        result = newTableViewCell(newLabel(newRect(0, 0, 100, 20)))
+    v.propertyTableView.createCell = proc (col: int): TableViewCell =
+        if col == 0:
+            result = newTableViewCell(newCheckbox(newRect(0, 0, 20, 20)))
+        elif col == 1:
+
+            result = newTableViewCell(newButton(newRect(0, 0, 20, 20)))
+        else:
+            result = newTableViewCell(newLabel(newRect(0, 0, 200, 20)))
     v.propertyTableView.configureCell = proc (c: TableViewCell) =
-        discard
-        # TextField(c.subviews[0]).text = v.editedProperties[c.row].name
+        case c.col:
+        of 0:
+            let en = Button(c.subviews[0])
+            en.onAction do():
+                # progress.indeterminate = en.boolValue
+                v.onSetEnabledProperty(c.row, en.boolValue)
+            
+            let curAnim = v.editedAnimation
+            if not curAnim.isNil and c.row < curAnim.properties.len:
+                en.value = curAnim.properties[c.row].enabled.int8
+            
+            # en.value = true.int8
+        of 1:
+            let rem = Button(c.subviews[0])
+            rem.title = "D"
+            rem.onAction do():
+                v.onRemoveProperty(c.row)
+        of 2:
+            TextField(c.subviews[0]).text = v.editedAnimation.properties[c.row].name
+        else: discard
 
     v.propertyTableView.onSelectionChange = proc() =
-        let selectedRows = toSeq(items(v.propertyTableView.selectedRows))
-        # if selectedRows.len > 0:
-        #     v.curveEditView.curves = @[v.editedProperties[selectedRows[0]].curve]
-        # else:
-        v.curveEditView.curves = @[]
+        v.selectedProperties = toSeq(items(v.propertyTableView.selectedRows))
 
     v.propertyTableView.defaultRowHeight = 20
 
-    # let addPropertyButton = v.createAddPropertyButton()
-    # addPropertyButton.setFrame(newRect(0, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
-    # addPropertyButton.autoresizingMask = { afFlexibleMaxX, afFlexibleMinY }
-    # leftPaneView.addSubview(addPropertyButton)
+    # let toggleCurveModeButton = Button.new(newRect(leftPaneView.bounds.maxX - 25, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
+    # toggleCurveModeButton.title = "o"
+    # toggleCurveModeButton.autoresizingMask = { afFlexibleMinX, afFlexibleMinY }
+    # leftPaneView.addSubview(toggleCurveModeButton)
+    # toggleCurveModeButton.onAction do():
+    #     v.curveEditingMode = not v.curveEditingMode
 
-    # let removePropertyButton = Button.new(newRect(25, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
-    # removePropertyButton.title = "-"
-    # removePropertyButton.autoresizingMask = { afFlexibleMaxX, afFlexibleMinY }
-    # removePropertyButton.onAction do():
-    #     let selectedRows = toSeq(items(v.propertyTableView.selectedRows))
-    #     if selectedRows.len > 0:
-    #         v.editedProperties.delete(selectedRows[0])
-    #         v.propertyTableView.reloadData()
+    # v.curveEditView = AnimationCurvesEditView.new(newRect(0, 0, 100, 100))
+    # v.curveEditView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    # v.curveEditView.onCursorPosChange = proc() =
+    #     v.onCursorPosChange(v.curveEditView.cursorPos)
 
-    # leftPaneView.addSubview(removePropertyButton)
-
-    let toggleCurveModeButton = Button.new(newRect(leftPaneView.bounds.maxX - 25, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
-    toggleCurveModeButton.title = "o"
-    toggleCurveModeButton.autoresizingMask = { afFlexibleMinX, afFlexibleMinY }
-    leftPaneView.addSubview(toggleCurveModeButton)
-    toggleCurveModeButton.onAction do():
-        v.curveEditingMode = not v.curveEditingMode
-
-    v.curveEditView = AnimationCurvesEditView.new(newRect(0, 0, 100, 100))
-    v.curveEditView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    v.curveEditView.onCursorPosChange = proc() =
-        v.onCursorPosChange(v.curveEditView.cursorPos)
-    v.dopesheetView = DopesheetView.new(newRect(0, 0, 100, 100))
+    v.dopesheetView = DopesheetView.new(newRect(leftPaneWidth, 0, mainSplitView.bounds.width - leftPaneWidth, mainSplitView.bounds.height))
     v.dopesheetView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     v.dopesheetView.onCursorPosChange = proc() =
         v.onCursorPosChange(v.dopesheetView.cursorPos)
-
-    v.mCurveEditingMode = true
-    v.curveEditingMode = false
+    # v.dopesheetView.onKeysChanged = proc(pi, ki: int) =
+    #     if pi != -1 and ki != -1:
+    #         let p = 
+    #         v.onRemoveKey(pi, ki)
+    # let toView = v.currentLeftPaneView
+    # toView.setFrame(newRect(leftPaneWidth, 0, mainSplitView.bounds.width - leftPaneWidth, mainSplitView.bounds.height))
+    mainSplitView.addSubview(v.dopesheetView)
+    v.addSubview(mainSplitView)
 
 method viewWillMoveToWindow*(v: AnimationEditView, w: Window) =
     echo "AnimationEditView ", v.editor.isNil
@@ -279,17 +264,32 @@ method viewWillMoveToWindow*(v: AnimationEditView, w: Window) =
 
 method acceptsFirstResponder*(v: AnimationEditView): bool = true
 
-# proc insertKeyframeAtCurPos(v: AnimationEditView) =
-#     let cursorPos = v.currentLeftPaneView.cursorPos
-#     for ep in v.editedProperties:
+proc insertKeyframeAtCurPos(v: AnimationEditView) =
+    let cursorPos = v.currentLeftPaneView.cursorPos
+    echo "cursorPos ", cursorPos
+    let curAnim = v.editedAnimation
+    if curAnim.isNil: return
+
+    for i in v.selectedProperties:
+        if i >= curAnim.properties.len: continue
+        let p = curAnim.properties[i]
+        p.addKeyAtPosition(cursorPos)
+
+    v.rebuildAnimation()
+    # for ep in v.editedProperties:
 #         echo "addKey ", ep.name, " cp ", cursorPos
 #         ep.curve.addKeyAtPosWithValueFromGetter(cursorPos, ep.sng)
 #     v.setNeedsDisplay()
 
 method onKeyDown*(v: AnimationEditView, e: var Event): bool =
     if e.keyCode == VirtualKey.K:
-        # v.insertKeyframeAtCurPos()
+        v.insertKeyframeAtCurPos()
         result = true
+    elif e.keyCode == VirtualKey.Delete:
+        v.onRemoveKeys(v.dopesheetView.selectedKeys)
+        v.dopesheetView.clearSelection()
+        result = true
+    v.setNeedsDisplay()
 
 method tabSize*(v: AnimationEditView, bounds: Rect): Size=
     result = newSize(bounds.width, 450.0)
@@ -302,9 +302,38 @@ method setEditedNode*(v: AnimationEditView, n: Node)=
 
 method onCompositionChanged*(v: AnimationEditView, comp: CompositionDocument) =
     procCall v.EditorTabView.onCompositionChanged(comp)
+    v.editedNode = comp.rootNode
+    echo "onCompositionChanged "
     v.reload()
 
+proc addEditedProperty*(v: AnimationEditView, node: Node, prop: string, sng: Variant) = 
+    var currComp = v.editor.currentComposition
 
+    if currComp.currentAnimation.isNil:
+        echo "currentAnimation nil "
+        currComp.currentAnimation = new(EditedAnimation)
+        v.editedAnimation = currComp.currentAnimation
+
+    var ep = newEditedProperty(node, prop, sng)
+    block reuseProperty:
+        for p in currComp.currentAnimation.properties:
+            if ep.name == p.name:
+                ep = p
+                break reuseProperty
+
+        template createCurve(T: typedesc) =
+            discard newAnimationCurve[T]()
+        template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+        try: #incompatible type for animation should throw exception
+            switchAnimatableTypeId(ep.sng.typeId, getSetterAndGetterTypeId, createCurve)
+            currComp.currentAnimation.properties.add(ep)
+        except:
+            echo "Can't add edited property"
+            echo getCurrentExceptionMsg()
+
+    # ep.sng = sng
+
+    v.reload()
 #[
     composition
 ]#
