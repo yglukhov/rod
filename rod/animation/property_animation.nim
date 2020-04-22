@@ -225,6 +225,7 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
 
     r.loopDuration = 0.0 # TODO: Hack - remove
     for k, jp in j:
+        if k == "rodedit$metadata": continue
         r.loopDuration = max(jp["duration"].getFloat(), r.loopDuration) # TODO: Hack - remove
         r.numberOfLoops = jp{"numberOfLoops"}.getInt(1) # TODO: Hack - remove
         var animScale = 1.0

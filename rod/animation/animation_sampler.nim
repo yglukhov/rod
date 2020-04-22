@@ -82,6 +82,7 @@ proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): Linear
     let r = cast[AnimationSampler[T]](result)
     r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
         let s = cast[LinearKeyFrameAnimationSampler[T]](sampler)
+        if s.keys.len == 0: return
         if p < 0:
             return s.keys[0].v
         elif p > 1:
@@ -91,6 +92,8 @@ proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): Linear
         k.p = p
         let lb = lowerBound(s.keys, k) do(a, b: LinearKeyFrame[T]) -> int:
             cmp(a.p, b.p)
+        
+        if lb == s.keys.len: return s.keys[^1].v
 
         var a, b : int
         if p < s.keys[lb].p:
@@ -101,6 +104,8 @@ proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): Linear
             b = lb + 1
         else:
             return s.keys[lb].v
+        
+        if a == -1 or b == -1: return s.keys[0].v
 
         let normalizedP = (p - s.keys[a].p) / (s.keys[b].p - s.keys[a].p)
         result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)

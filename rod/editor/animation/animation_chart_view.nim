@@ -14,9 +14,16 @@ type AnimationChartView* = ref object of View
     cursorPos*: Coord
     gridSize*: Size
     gridColor*: Color
-    sampleRate*: int
+    mSampleRate: int
     mouseTrackingHandler*: proc(e: Event): bool
     onCursorPosChange*: proc()
+
+proc `sampleRate=`*(v: AnimationChartView, s: int) =
+    v.mSampleRate = s
+    v.gridSize = newSize(1.0 / float(v.mSampleRate), 100)
+
+proc sampleRate*(v: AnimationChartView): int = 
+    v.mSampleRate
 
 method init*(v: AnimationChartView, r: Rect) =
     procCall v.View.init(r)

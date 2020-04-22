@@ -1,4 +1,3 @@
-import sequtils, intsets, tables, logging
 import nimx / [view, table_view, scroll_view,
     button, text_field, popup_button, window,
     linear_layout, menu, event, property_visitor,
@@ -9,7 +8,8 @@ import rod/animation/[property_animation, animation_sampler]
 
 import animation_chart_view, animation_curves_edit_view, dopesheet_view
 import animation_editor_types
-import variant, json, algorithm, unicode
+import variant, json, algorithm, parseutils,
+    sequtils, intsets, tables, logging
 
 const leftPaneWidth = 200
 
@@ -27,9 +27,14 @@ type
         # editedProperties: seq[EditedProperty]
         mCurveEditingMode: bool
         mEditedNode: Node
-        animationSelector*: PopupButton
+        animationSelector: PopupButton
         selectedProperties: seq[int]
         cachedAnimation: PropertyAnimation
+        nameField: TextField
+        fpsField: TextField
+        durationField: TextField
+
+        # onAnimationChanged: proc()
         # mEditedAnimation*: PropertyAnimation
 
 proc editedAnimation(v: AnimationEditView): EditedAnimation =
@@ -40,8 +45,38 @@ proc editedAnimation(v: AnimationEditView): EditedAnimation =
 proc reload(v: AnimationEditView)
 
 proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
-    v.dopesheetView.editedAnimation = val
+    if val != nil:
+        v.dopesheetView.editedAnimation = val
+        v.dopesheetView.sampleRate = v.editedAnimation.sampleRate()
+        v.nameField.text = val.name
+        v.fpsField.text = $val.fps
+        v.durationField.text = $val.duration
+        
+    else:
+        v.dopesheetView.editedAnimation = nil
+        v.nameField.text = ""
+        v.fpsField.text = ""
+        v.durationField.text = ""
     v.reload()
+
+proc newEditedAnimation(v: AnimationEditView) =
+    var currComp = v.editor.currentComposition
+    if not currComp.isNil:
+        var a = new(EditedAnimation)
+        a.fps = 25
+        a.duration = 1.0
+        a.name = "myanim"
+        currComp.animations.add(a)
+        currComp.currentAnimation = a
+        v.editedAnimation = a
+
+proc deleteEditedAnimation(v: AnimationEditView)=
+    var currComp = v.editor.currentComposition
+    if not currComp.isNil:
+        let i = currComp.animations.find(currComp.currentAnimation)
+        if i != -1:
+            currComp.animations.del(i)
+        v.editedAnimation = nil
 
 proc `editedNode=`*(v: AnimationEditView, n: Node) =
     v.mEditedNode = n
@@ -75,6 +110,8 @@ let colors = [
 ]
 
 proc rebuildAnimation(v: AnimationEditView) =
+    if not v.cachedAnimation.isNil:
+        v.cachedAnimation.cancel()
     v.cachedAnimation = nil
     if v.editedAnimation.isNil: return
     var janim = %v.editedAnimation
@@ -96,13 +133,19 @@ proc playEditedAnimation(v: AnimationEditView) =
 proc reload(v: AnimationEditView) = 
     v.propertyTableView.reloadData()
     v.rebuildAnimation()
+    var currComp = v.editor.currentComposition
+    if not currComp.isNil:
+        var items: seq[string]
+        for a in currComp.animations:
+            items.add(a.name)
+        v.animationSelector.items = items
+
     # v.updateDopesheetCurves()
 
 proc onCursorPosChange(v: AnimationEditView, pos: float) =
     if v.cachedAnimation.isNil:
         v.rebuildAnimation()
     
-    echo "v.cachedAnimation.isNil ", v.cachedAnimation.isNil
     if not v.cachedAnimation.isNil:
         try:
             v.cachedAnimation.onProgress(pos)
@@ -171,24 +214,65 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
     
     var w = 1.0
     var toStartButton = newButton(newRect(w, 1, bw, bh))
-    toStartButton.title = "B" #$Rune(0x000023F9) #\u23F9
+    toStartButton.title = "B" 
+    toStartButton.onAction do():
+        if not v.cachedAnimation.isNil:
+            v.cachedAnimation.cancel()
+            v.cachedAnimation.onProgress(0.0)
     w += bw + 1
     result.addSubview(toStartButton)
     
     var playButton = newButton(newRect(w, 1, bw, bh))
-    playButton.title = "P" #$Rune(0x000023F9) #\u23F9
+    playButton.title = "P" 
+    playButton.onAction do():
+        if not v.cachedAnimation.isNil:
+            v.cachedAnimation.cancel()
+            v.window.addAnimation(v.cachedAnimation)
     w += bw + 1
     result.addSubview(playButton)
 
     var stopButton = newButton(newRect(w, 1, bw, bh))
-    stopButton.title = "S" #$Rune(0x000023F9) #\u23F9
+    stopButton.title = "S" 
+    stopButton.onAction do():
+        if not v.cachedAnimation.isNil:
+            v.cachedAnimation.cancel()
     w += bw + 1
     result.addSubview(stopButton)
     
     var toEndButton = newButton(newRect(w, 1, bw, bh))
-    toEndButton.title = "E" #$Rune(0x000023F9) #\u23F9
-    w += bw + 10
+    toEndButton.title = "E" 
+    toEndButton.onAction do():
+        if not v.cachedAnimation.isNil:
+            v.cachedAnimation.cancel()
+            v.cachedAnimation.onProgress(1.0)
+    w += bw + 20
     result.addSubview(toEndButton)
+
+    var addButton = newButton(newRect(w, 1, bw, bh))
+    addButton.title = "A" 
+    addButton.onAction do():
+        v.newEditedAnimation()
+    w += bw + 10
+    result.addSubview(addButton)
+
+    var delButton = newButton(newRect(w, 1, bw, bh))
+    delButton.title = "D" 
+    delButton.onAction do():
+        v.deleteEditedAnimation()
+    w += bw + 10
+    result.addSubview(delButton)
+
+    v.animationSelector = PopupButton.new(newRect(w, 1, r.width - w, bh))
+    v.animationSelector.autoresizingMask = { afFlexibleWidth, afFlexibleMaxY }
+    v.animationSelector.onAction do():
+        var currComp = v.editor.currentComposition
+        let i = v.animationSelector.selectedIndex
+        if not currComp.isNil and i >= 0 and i < currComp.animations.len:
+            v.editedAnimation = currComp.animations[i]
+        else:
+            v.editedAnimation = nil
+
+    result.addSubview(v.animationSelector)
 
 proc createBottomPanel(v: AnimationEditView, r: Rect): View =
     result = new(View, r)
@@ -197,25 +281,38 @@ proc createBottomPanel(v: AnimationEditView, r: Rect): View =
     let lw = 100.0
     
     var w = 1.0
-    var nameTf = newTextField(newRect(w, 1, lw, lh))
+    v.nameField = newTextField(newRect(w, 1, lw, lh))
+    v.nameField.onAction do():
+        if v.editedAnimation.isNil: return
+        v.editedAnimation.name = v.nameField.text
     w += lw + 10
-    result.addSubview(nameTf)
+    result.addSubview(v.nameField)
 
     var durLbl = newLabel(newRect(w, 1, lw * 0.5, lh))
     durLbl.text = "dur:"
     result.addSubview(durLbl)
 
-    var durationTf = newTextField(newRect(w + lw * 0.5, 1, lw * 0.5, lh))
+    v.durationField = newTextField(newRect(w + lw * 0.5, 1, lw * 0.5, lh))
+    v.durationField.onAction do():
+        if v.editedAnimation.isNil: return
+        if parseFloat(v.durationField.text, v.editedAnimation.duration) != 0:
+            v.dopesheetView.sampleRate = v.editedAnimation.sampleRate()
+            v.rebuildAnimation()
     w += lw
-    result.addSubview(durationTf)
+    result.addSubview(v.durationField)
 
     var fpsLbl = newLabel(newRect(w, 1, lw * 0.5, lh))
     fpsLbl.text = "fps:"
     result.addSubview(fpsLbl)
     
-    var fpsTf = newTextField(newRect(w + lw * 0.5, 1, lw * 0.5, lh))
+    v.fpsField = newTextField(newRect(w + lw * 0.5, 1, lw * 0.5, lh))
+    v.fpsField.onAction do():
+        if v.editedAnimation.isNil: return
+        if parseInt(v.fpsField.text, v.editedAnimation.fps) != 0:
+            v.dopesheetView.sampleRate = v.editedAnimation.sampleRate()
+            v.rebuildAnimation()
     w += lw
-    result.addSubview(fpsTf)
+    result.addSubview(v.fpsField)
 
 
 method init*(v: AnimationEditView, r: Rect) =
@@ -358,7 +455,7 @@ method acceptsFirstResponder*(v: AnimationEditView): bool = true
 
 proc insertKeyframeAtCurPos(v: AnimationEditView) =
     let cursorPos = v.currentLeftPaneView.cursorPos
-    echo "cursorPos ", cursorPos
+    # echo "cursorPos ", cursorPos
     let curAnim = v.editedAnimation
     if curAnim.isNil: return
 
@@ -403,9 +500,7 @@ proc addEditedProperty*(v: AnimationEditView, node: Node, prop: string, sng: Var
     var currComp = v.editor.currentComposition
 
     if currComp.currentAnimation.isNil:
-        echo "currentAnimation nil "
-        currComp.currentAnimation = new(EditedAnimation)
-        v.editedAnimation = currComp.currentAnimation
+        v.newEditedAnimation()
 
     var ep = newEditedProperty(node, prop, sng)
     block reuseProperty:

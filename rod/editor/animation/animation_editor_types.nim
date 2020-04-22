@@ -1,7 +1,7 @@
 import nimx / [ types, matrixes, animation, property_visitor ]
 import rod/animation/[animation_sampler, property_animation], rod / [ quaternion, rod_types ]
 import algorithm
-import variant, tables, json
+import variant, tables, json, math
 
 type
     EInterpolation* = enum
@@ -31,7 +31,7 @@ type
         keys*: seq[EditedKey]
 
     EditedAnimation* = ref object 
-        fps: int
+        fps*: int
         name*: string
         duration*: float
         properties*: seq[EditedProperty]
@@ -110,7 +110,13 @@ proc `%`(q: Color): JsonNode =
     result.add(%q.a)
 
 proc `%`*(a: EditedAnimation): JsonNode = 
-    result = newJobject()
+    result = newJObject()
+    var meta = newJObject()
+
+    meta["duration"] = %a.duration
+    meta["name"] = %a.name
+    meta["fps"] = %a.fps
+    result["rodedit$metadata"] = meta
     # result["name"] = %a.name
     # result["duration"] = %a.duration
     for prop in a.properties:
@@ -128,4 +134,24 @@ proc `%`*(a: EditedAnimation): JsonNode =
 
         jp["keys"] = keys
         result[prop.name] = jp
+
+proc sampleRate*(a: EditedAnimation): int =
+    ceil(a.fps.float * a.duration).int
+
+# proc toEditedProperty(n:string, j: JsonNode): EditedProperty =
+#     var p = newEditedProperty(n)
+#     if "keys" in j:
+
+
+# proc toEditedAnimation*(n: Node, j: JsonNode): EditedAnimation =
+#     var a = new(EditedAnimation)
+#     for k, v in j:
+#         if k == "rodedit$metadata":
+#             a.fps = v{"fps"}.getInt(25)
+#             a.name = v{"name"}.getStr("")
+#             a.duration = v{"duration"}.getFloat(1.0)
+#             continue
+        
+#         a.properties.add(toEditedProperty(k, v))
+
 

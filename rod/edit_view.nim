@@ -8,7 +8,7 @@ import nimx/pasteboard/pasteboard
 import rod_types, node
 import rod/scene_composition
 import rod / editor / [editor_project_settings, editor_tab_registry,
-        editor_workspace_view, editor_types]
+        editor_workspace_view, editor_types, animation/animation_editor_types]
 import rod/utils/json_serializer
 export editor_types
 
@@ -170,6 +170,11 @@ when loadingAndSavingAvailable:
                         c.rootNode.composition = nil # hack to serialize content 
 
                 let data = nodeToJson(c.rootNode, newPath)
+                if c.animations.len > 0:
+                    let janims = newJObject()
+                    for a in c.animations:
+                        janims[a.name] = %a
+                    data["animations"] = janims
                 writeFile(newPath, data.pretty())
                 when defined(rodedit):
                     e.revertComposotionRef(c.rootNode)
