@@ -61,7 +61,7 @@ method draw*(cl: ClippingRectComponent) =
         if sv.window.isNil:
             b = sv.bounds
         else:
-            pr = sv.window.pixelRatio
+            pr = sv.window.viewportPixelRatio
             b = sv.window.bounds
 
         var x = GLint(tlp.x * pr)
