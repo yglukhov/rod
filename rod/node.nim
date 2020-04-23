@@ -634,15 +634,6 @@ proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
 import rod/animation/property_animation
 
 proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
-    s.deserializeValue(j, "name", n.name)
-    s.deserializeValue(j, "translation", n.position)
-    s.deserializeValue(j, "scale", n.mScale)
-    s.deserializeValue(j, "rotation", n.mRotation)
-    s.deserializeValue(j, "anchor", n.anchor)
-    s.deserializeValue(j, "alpha", n.alpha)
-    s.deserializeValue(j, "layer", n.layer)
-    s.deserializeValue(j, "enabled", n.enabled)
-    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
 
     var v = j{"children"}
     if not v.isNil:
@@ -664,12 +655,21 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
                 comp.deserialize(c, s)
 
     let compositionRef = j{"compositionRef"}.getStr()
-    if compositionRef.len != 0 and not n.name.endsWith(".placeholder"):
+    if compositionRef.len != 0: # and not n.name.endsWith(".placeholder"):
         s.startAsyncOp()
-        let oldName = n.name
         newComposition(s.toAbsoluteUrl(compositionRef), n).loadComposition() do():
-            n.name = oldName
             s.endAsyncOp()
+
+    s.deserializeValue(j, "name", n.name)
+    s.deserializeValue(j, "translation", n.position)
+    s.deserializeValue(j, "scale", n.mScale)
+    s.deserializeValue(j, "rotation", n.mRotation)
+    s.deserializeValue(j, "anchor", n.anchor)
+    s.deserializeValue(j, "alpha", n.alpha)
+    s.deserializeValue(j, "layer", n.layer)
+    s.deserializeValue(j, "enabled", n.enabled)
+    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
+
 
     proc cb()=
         let animations = j{"animations"}

@@ -7,7 +7,7 @@ import rod / component / [ sprite, camera ]
 
 import rod/editor_camera_controller
 import node_selector
-
+import os
 import logging
 
 type
@@ -63,13 +63,13 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
         if not gizmoTouch:
             var castedNode = v.tryRayCast(e)
             if not castedNode.isNil:
+                when defined(rodedit):
+                    var p = castedNode.parent
+                    while not p.isNil and p.composition.isNil:
+                        p = p.parent
 
-                var p = castedNode.parent
-                while not p.isNil and p.composition.isNil:
-                    p = p.parent
-
-                if castedNode != p and p != v.composition.rootNode:    
-                    castedNode = p
+                    if castedNode != p and p != v.composition.rootNode:    
+                        castedNode = p
 
                 v.editor.selectedNode = castedNode
             else:
@@ -167,12 +167,17 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
             n = newNodeWithURL("file://" & i.data) do():
                 if not n.isNil:
                     var editorScene = target.EditorSceneView
-                    if editorScene.selectedNode.isNil:
-                        editorScene.rootNode.addChild(n)
+                    var cs = editorScene.selectedNode
+                    if cs.isNil:
+                        cs = editorScene.rootNode
                     else:
-                        editorScene.selectedNode.addChild(n)
-
-                    editorScene.composition.selectedNode = n
+                        if not cs.composition.isNil and cs != editorScene.composition.rootNode:
+                            cs = editorScene.selectedNode.parent
+                        if cs.isNil:
+                            raise newException(Exception, "Can't attach to prefab. Attaching to prafab parent failed, parent is nil")
+                    
+                    cs.addChild(n)
+                    editorScene.composition.selectedNode = cs
                     editorScene.editor.onCompositionChanged(editorScene.composition)
 
                     discard target.makeFirstResponder()
@@ -184,8 +189,9 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
             if image.isNil:
                 warn "Can't load image from ", i.data
                 return
-
-            var n = newNode(i.data)
+            
+            var spName = splitFile(i.data)
+            var n = newNode(spName.name)
             n.component(Sprite).image = image
 
             var editorScene = target.EditorSceneView
