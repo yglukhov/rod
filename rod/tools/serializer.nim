@@ -28,6 +28,7 @@ proc getRelativeResourcePath*(s: Serializer, path: string): string =
     var resourcePath = path
     when not defined(js) and not defined(android) and not defined(ios):
         resourcePath = urlParentDir(s.url)
+        resourcePath.removePrefix("file://")
 
     result = relativePathToPath(resourcePath, path)
     echo "save path = ", resourcePath, "  relative = ", result
