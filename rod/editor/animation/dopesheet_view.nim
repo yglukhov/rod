@@ -178,7 +178,19 @@ method onTouchEv*(v: DopesheetView, e: var Event): bool =
     result = procCall v.AnimationChartView.onTouchEv(e)
 
 method onScroll*(v: DopesheetView, e: var Event): bool =
-    v.processZoomEvent(e, true, false)
+    if e.modifiers.anyShift():
+        var dst = sgn(e.offset.y).Coord * 0.1
+        if v.fromX + dst < 0.0:
+            dst = -v.fromX
+        elif v.toX + dst > 1.0:
+            dst = 1.0 - v.toX
+        v.fromX += dst
+        v.toX += dst
+    else:
+        let allowZoom = e.offset.y > 0 or v.localGridSize().width * 3 < v.bounds.width
+        v.processZoomEvent(e, allowZoom, false)
+        v.toX = clamp(v.toX, 0.0, 1.0)
+
     result = true
 
 method acceptsFirstResponder*(v: DopesheetView): bool = true
