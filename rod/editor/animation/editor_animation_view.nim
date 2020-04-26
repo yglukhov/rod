@@ -6,8 +6,8 @@ import nimx / [view, table_view, scroll_view,
 import rod/[node, edit_view]
 import rod/animation/[property_animation, animation_sampler]
 
-import animation_chart_view, animation_curves_edit_view, dopesheet_view
-import animation_editor_types
+import animation_chart_view, dopesheet_view
+import animation_editor_types, animation_key_inspector
 import variant, json, algorithm, parseutils,
     sequtils, intsets, tables, logging
 
@@ -21,14 +21,16 @@ type
         pcKey
 
     AnimationEditView* = ref object of EditorTabView
-        curveEditView: AnimationCurvesEditView
+        # curveEditView: AnimationCurvesEditView
         dopesheetView: DopesheetView
         propertyTableView: TableView
         # editedProperties: seq[EditedProperty]
-        mCurveEditingMode: bool
-        mEditedNode: Node
+        # mCurveEditingMode: bool
+        # mEditedNode: NodeKeyFrameAnimationSampler
         animationSelector: PopupButton
         selectedProperties: seq[int]
+
+        keysInspector: AnimatioKeyInspectorView
         cachedAnimation: PropertyAnimation
         nameField: TextField
         fpsField: TextField
@@ -78,28 +80,28 @@ proc deleteEditedAnimation(v: AnimationEditView)=
             currComp.animations.del(i)
         v.editedAnimation = nil
 
-proc `editedNode=`*(v: AnimationEditView, n: Node) =
-    v.mEditedNode = n
+# proc `editedNode=`*(v: AnimationEditView, n: Node) =
+#     v.mEditedNode = n
 
-proc currentLeftPaneView(v: AnimationEditView): AnimationChartView =
-    if v.mCurveEditingMode:
-        v.curveEditView
-    else:
-        v.dopesheetView
+# proc currentLeftPaneView(v: AnimationEditView): AnimationChartView =
+#     if v.mCurveEditingMode:
+#         v.curveEditView
+#     else:
+#         v.dopesheetView
 
-template curveEditingMode(v: AnimationEditView): bool = v.mCurveEditingMode
-proc `curveEditingMode=`(v: AnimationEditView, flag: bool) =
-    if v.mCurveEditingMode != flag:
-        let fromView = v.currentLeftPaneView
-        fromView.removeFromSuperview()
-        v.mCurveEditingMode = flag
-        let splitView = v.subviews[0]
-        let toView = v.currentLeftPaneView
-        toView.setFrame(newRect(leftPaneWidth, 0, splitView.bounds.width - leftPaneWidth, splitView.bounds.height))
-        toView.fromX = fromView.fromX
-        toView.toX = fromView.toX
-        toView.cursorPos = fromView.cursorPos
-        splitView.addSubview(toView)
+# template curveEditingMode(v: AnimationEditView): bool = v.mCurveEditingMode
+# proc `curveEditingMode=`(v: AnimationEditView, flag: bool) =
+#     if v.mCurveEditingMode != flag:
+#         let fromView = v.currentLeftPaneView
+#         fromView.removeFromSuperview()
+#         v.mCurveEditingMode = flag
+#         let splitView = v.subviews[0]
+#         let toView = v.currentLeftPaneView
+#         toView.setFrame(newRect(leftPaneWidth, 0, splitView.bounds.width - leftPaneWidth, splitView.bounds.height))
+#         toView.fromX = fromView.fromX
+#         toView.toX = fromView.toX
+#         toView.cursorPos = fromView.cursorPos
+#         splitView.addSubview(toView)
 
 let colors = [
     newColor(1, 0, 0),
@@ -119,6 +121,7 @@ proc rebuildAnimation(v: AnimationEditView) =
     if comp.isNil: return
     try:
         v.cachedAnimation = newPropertyAnimation(comp.rootNode, janim)
+        echo janim
     except:
         v.cachedAnimation = nil
         echo janim
@@ -208,7 +211,6 @@ proc onRemoveKeys(v: AnimationEditView, keys: seq[DopesheetSelectedKey])=
 
 proc createTopPanel(v: AnimationEditView, r: Rect): View =
     result = new(View, r)
-    result.backgroundColor = newColor(1.0, 0.4, 0.0, 1.0)
     let bh = r.height - 2
     let bw = bh
     
@@ -276,7 +278,6 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
 
 proc createBottomPanel(v: AnimationEditView, r: Rect): View =
     result = new(View, r)
-    result.backgroundColor = newColor(1.0, 0.0, 0.4, 1.0)
     let lh = r.height - 2
     let lw = 100.0
     
@@ -317,7 +318,6 @@ proc createBottomPanel(v: AnimationEditView, r: Rect): View =
 
 method init*(v: AnimationEditView, r: Rect) =
     procCall v.View.init(r)
-    # v.editedProperties = @[]
 
     let mainSplitView = newHorizontalLayout(v.bounds)
     mainSplitView.name = "test"
@@ -328,44 +328,16 @@ method init*(v: AnimationEditView, r: Rect) =
 
     let leftPaneView = View.new(newRect(0, 0, leftPaneWidth, v.bounds.height))
     leftPaneView.autoresizingMask = { afFlexibleMaxX, afFlexibleHeight }
-
-    # let playButton = v.createPlayButton()
-    # leftPaneView.addSubview(playButton)
-    # v.animationSelector = PopupButton.new(newRect(52, 0, leftPaneView.bounds.width - 52, topPanelHeight))
-    # v.animationSelector.autoresizingMask = { afFlexibleWidth, afFlexibleMaxY }
-    # leftPaneView.addSubview(v.animationSelector)
-
-    # v.animationSelector.onAction do():
-    #     if v.animationSelector.selectedIndex >= 0:
-    #         let a = v.mEditedNode.animationNamed(v.animationSelector.selectedItem, true)
-    #         if a of PropertyAnimation:
-    #             v.editedAnimation = PropertyAnimation(a)
-    #         else:
-    #             v.editedAnimation = nil
-    #     else:
-    #         v.editedAnimation = nil
+ 
 
     v.propertyTableView = TableView.new(newRect(0, topPanelHeight, leftPaneWidth, leftPaneView.bounds.height - topPanelHeight - bottomPanelHeight))
-    # v.propertyTableView.selectionMode = smMultipleSelection
-    v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
+    v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}    
+    v.propertyTableView.numberOfColumns = 4
     let s = newScrollView(v.propertyTableView)
     leftPaneView.addSubview(s)
-
-    var tv = v.createTopPanel(newRect(1, 1, leftPaneWidth, topPanelHeight))
-    tv.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
-    leftPaneView.addSubview(tv)
-
-    var bv = v.createBottomPanel(newRect(1, leftPaneView.bounds.maxY - bottomPanelHeight, leftPaneView.bounds.width, bottomPanelHeight))
-    bv.autoresizingMask = {afFlexibleWidth, afFlexibleMinY}
-    leftPaneView.addSubview(bv)
-    mainSplitView.addSubview(leftPaneView)
     
-
     v.propertyTableView.numberOfRows = proc(): int =
         if v.editedAnimation.isNil: 0 else: v.editedAnimation.properties.len
-    v.propertyTableView.numberOfColumns = 4
-        # 0
-        # v.editedProperties.len
 
     v.propertyTableView.createCell = proc (col: int): TableViewCell =
         case col.PropertyControls
@@ -382,14 +354,11 @@ method init*(v: AnimationEditView, r: Rect) =
         of pcEnable:
             let en = Button(c.subviews[0])
             en.onAction do():
-                # progress.indeterminate = en.boolValue
                 v.onSetEnabledProperty(c.row, en.boolValue)
             
             let curAnim = v.editedAnimation
             if not curAnim.isNil and c.row < curAnim.properties.len:
                 en.value = curAnim.properties[c.row].enabled.int8
-            
-            # en.value = true.int8
         of pcName:
             TextField(c.subviews[0]).text = v.editedAnimation.properties[c.row].name
         of pcKey:
@@ -398,7 +367,7 @@ method init*(v: AnimationEditView, r: Rect) =
             key.onAction do():
                 let p = v.editedAnimation.propertyAtIndex(c.row)
                 if not p.isNil:
-                    let cursorPos = v.currentLeftPaneView.cursorPos
+                    let cursorPos = v.dopesheetView.cursorPos
                     p.addKeyAtPosition(cursorPos)
                     v.rebuildAnimation()
         of pcDelete:
@@ -406,12 +375,20 @@ method init*(v: AnimationEditView, r: Rect) =
             rem.title = "D"
             rem.onAction do():
                 v.onRemoveProperty(c.row)
-        # else: discard
 
     v.propertyTableView.onSelectionChange = proc() =
         v.selectedProperties = toSeq(items(v.propertyTableView.selectedRows))
 
     v.propertyTableView.defaultRowHeight = 20
+    
+    var tv = v.createTopPanel(newRect(1, 1, leftPaneWidth, topPanelHeight))
+    tv.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+    leftPaneView.addSubview(tv)
+
+    var bv = v.createBottomPanel(newRect(1, leftPaneView.bounds.maxY - bottomPanelHeight, leftPaneView.bounds.width, bottomPanelHeight))
+    bv.autoresizingMask = {afFlexibleWidth, afFlexibleMinY}
+    leftPaneView.addSubview(bv)
+    mainSplitView.addSubview(leftPaneView)
 
     # let toggleCurveModeButton = Button.new(newRect(leftPaneView.bounds.maxX - 25, leftPaneView.bounds.maxY - bottomPanelHeight, 25, bottomPanelHeight))
     # toggleCurveModeButton.title = "o"
@@ -429,18 +406,30 @@ method init*(v: AnimationEditView, r: Rect) =
     v.dopesheetView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     v.dopesheetView.onCursorPosChange = proc() =
         v.onCursorPosChange(v.dopesheetView.cursorPos)
-    v.dopesheetView.onKeysChanged = proc(keys: seq[DopesheetSelectedKey]) =
+    v.dopesheetView.onKeysChanged = proc(arr: seq[DopesheetSelectedKey]) =
         let a = v.editedAnimation
-        for k in keys:
+        for k in arr:
             a.propertyAtIndex(k.pi).sortKeys()
         v.rebuildAnimation()
-    #     if pi != -1 and ki != -1:
-    #         let p = 
-    #         v.onRemoveKey(pi, ki)
-    # let toView = v.currentLeftPaneView
-    # toView.setFrame(newRect(leftPaneWidth, 0, mainSplitView.bounds.width - leftPaneWidth, mainSplitView.bounds.height))
+    
+    v.dopesheetView.onKeysSelected = proc(arr: seq[DopesheetSelectedKey]) =
+        var keys: seq[EditedKey]
+        for e in arr:
+            let k = v.editedAnimation.keyAtIndex(e.pi, e.ki)
+            if k.isNil: continue
+            keys.add(k)
+        v.keysInspector.inspectedKeys = keys
+
     mainSplitView.addSubview(v.dopesheetView)
     mainSplitView.setDividerPosition(350.0, 0)
+
+    v.keysInspector = AnimatioKeyInspectorView.new(newRect(0, 0, 100, 100))
+    v.keysInspector.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    v.keysInspector.onKeyChanged = proc(k: EditedKey) =
+        v.rebuildAnimation()
+    mainSplitView.addSubview(v.keysInspector)
+
+
 
 method viewWillMoveToWindow*(v: AnimationEditView, w: Window) =
     procCall v.View.viewWillMoveToWindow(w)
@@ -454,7 +443,7 @@ method viewWillMoveToWindow*(v: AnimationEditView, w: Window) =
 method acceptsFirstResponder*(v: AnimationEditView): bool = true
 
 proc insertKeyframeAtCurPos(v: AnimationEditView) =
-    let cursorPos = v.currentLeftPaneView.cursorPos
+    let cursorPos = v.dopesheetView.cursorPos
     # echo "cursorPos ", cursorPos
     let curAnim = v.editedAnimation
     if curAnim.isNil: return
@@ -487,12 +476,12 @@ method tabSize*(v: AnimationEditView, bounds: Rect): Size=
 method tabAnchor*(v: AnimationEditView): EditorTabAnchor =
     result = etaBottom
 
-method setEditedNode*(v: AnimationEditView, n: Node)=
-    v.editedNode = n
+# method setEditedNode*(v: AnimationEditView, n: Node)=
+#     v.editedNode = n
 
 method onCompositionChanged*(v: AnimationEditView, comp: CompositionDocument) =
     procCall v.EditorTabView.onCompositionChanged(comp)
-    v.editedNode = comp.rootNode
+    # v.editedNode = comp.rootNode
     echo "onCompositionChanged "
     v.reload()
 

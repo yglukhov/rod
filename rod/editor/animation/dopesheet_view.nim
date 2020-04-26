@@ -163,8 +163,13 @@ proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
             # else:
             v.draggedKey = (pi: -1, ki: -1)
             v.selectionRect = zeroRect
+
+            if not v.onKeysSelected.isNil:
+                v.onKeysSelected(v.selectedKeys)
+
             if v.selectedKeysWasChanged and not v.onKeysChanged.isNil:
                 v.onKeysChanged(v.selectedKeys)
+
             v.selectedKeysWasChanged = false
 
 method onTouchEv*(v: DopesheetView, e: var Event): bool =
@@ -179,7 +184,7 @@ method onTouchEv*(v: DopesheetView, e: var Event): bool =
 
 method onScroll*(v: DopesheetView, e: var Event): bool =
     if e.modifiers.anyShift():
-        var dst = sgn(e.offset.y).Coord * 0.1
+        var dst = sgn(e.offset.y).Coord * 0.01
         if v.fromX + dst < 0.0:
             dst = -v.fromX
         elif v.toX + dst > 1.0:

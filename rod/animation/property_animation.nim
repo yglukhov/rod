@@ -130,28 +130,22 @@ proc newValueSampler(t: TypeId, j:JsonNode, lerpBetweenFrames: bool, originalLen
     switchAnimatableTypeId(t, getTypeId, makeSampler)
 
 # proc newKeyframeSampler[T](j: JsonNode): BezierKeyFrameAnimationSampler[T] {.inline.} =
-proc newKeyframeSampler[T](j: JsonNode): LinearKeyFrameAnimationSampler[T] {.inline.} =
+proc newKeyframeSampler[T](j: JsonNode): KeyFrameAnimationSampler[T] {.inline.} =
     # var keys = newSeq[BezierKeyFrame[T]](j.len)
-    var keys = newSeq[LinearKeyFrame[T]](j.len)
+    var keys = newSeq[KeyFrame[T]](j.len)
     shallow(keys)
     var i = 0
     for v in j:
+        # echo "parse key ", v
         keys[i].v = elementFromJson(T, v["v"])
         keys[i].p = v["p"].getFloat()
+        if v{"i"}.getStr("") == "eiBezier":
+            var points = v["f"].to(array[4, float])
+            # echo "parse bezier ", points
+            # keys[i].tf = cast[proc(p: float)](bezierTimingFunction(points[0], points[1], points[2], points[3]))
+            keys[i].tf = bezierTimingFunction(points[0], points[1], points[2], points[3])
         inc i
-    result = newLinearKeyFrameAnimationSampler[T](keys)
-    # LinearKeyFrameAnimationSampler
-    # for v in j:
-    #     keys[i].v = elementFromJson(T, v["v"])
-    #     keys[i].p = v["p"].getFloat()
-    #     let ie = v["ie"]
-    #     keys[i].inX = ie[0].getFloat()
-    #     keys[i].inY = ie[1].getFloat()
-    #     let oe = v["oe"]
-    #     keys[i].outX = oe[0].getFloat()
-    #     keys[i].outY = oe[1].getFloat()
-    #     inc i
-    # result = newBezierKeyFrameAnimationSampler[T](keys)
+    result = newKeyFrameAnimationSampler[T](keys)
 
 proc newKeyframeSampler(t: TypeId, j: JsonNode): AbstractAnimationSampler =
     template makeSampler(T: typedesc) =

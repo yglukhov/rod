@@ -4,16 +4,16 @@ import algorithm
 import variant, tables, json, math
 
 type
-    EInterpolation* = enum
+    EInterpolationKind* = enum
         eiLinear
         eiBezier
-        eiDiscrete
+        # eiDiscrete #should be in property
         eiPresampled
 
-    EAnimationTimeFunc* = ref object
-        case kind*: EInterpolation
+    EInterpolation* = object
+        case kind*: EInterpolationKind
         of eiBezier:
-            points: array[4, float]
+            points*: array[4, float]
         else:
             discard
 
@@ -21,7 +21,7 @@ type
         property*: EditedProperty
         position*: Coord
         value*: Variant
-        timeFunc*: EAnimationTimeFunc
+        interpolation*: EInterpolation
 
     EditedProperty* = ref object
         enabled*: bool
@@ -35,12 +35,6 @@ type
         name*: string
         duration*: float
         properties*: seq[EditedProperty]
-
-    AbstractAnimationCurve* = ref object of RootObj
-        color*: Color
-
-    AnimationCurve*[T] = ref object of AbstractAnimationCurve
-        sampler*: BezierKeyFrameAnimationSampler[T]
 
 proc name*(e: EditedProperty): string =
     if not e.node.isNil:
@@ -62,13 +56,10 @@ proc addKeyAtPosition*(p: EditedProperty, pos: Coord) =
     var k = new(EditedKey)
     k.property = p
     k.position = pos
-    # k.value = value
 
     template getKeyValue(T: typedesc) =
         let val = p.sng.get(SetterAndGetter[T]).getter()
         k.value = newVariant(val)
-        # echo "value is ", val, " at pos ", pos
-
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
     switchAnimatableTypeId(p.sng.typeId, getSetterAndGetterTypeId, getKeyValue)
     p.keys.add(k)
@@ -117,22 +108,40 @@ proc `%`*(a: EditedAnimation): JsonNode =
     meta["name"] = %a.name
     meta["fps"] = %a.fps
     result["rodedit$metadata"] = meta
-    # result["name"] = %a.name
-    # result["duration"] = %a.duration
+
     for prop in a.properties:
         if not prop.enabled: continue
         var jp = newJObject()
-        jp["duration"] = %a.duration #stupid?
+        jp["duration"] = %a.duration
         var keys = newJArray()
-        for k in prop.keys:
-            var jk = newJobject()
-            jk["p"] = %k.position
-            k.keyValue:
-                jk["v"] = %value
-            # jk["i"] = k.
-            keys.add(jk)
+        
+        # dye to backward compatibility
+        # we should save presampled buffers
+        # by `values` key
+        var isPresampled: bool 
+        for k in prop.keys: 
+            if k.interpolation.kind == eiPresampled:
+                isPresampled = true
+                break
+        
+        if not isPresampled:
+            for k in prop.keys:
+                var jk = newJobject()
+                jk["p"] = %k.position
+                k.keyValue:
+                    jk["v"] = %value
+                jk["i"] = %($k.interpolation.kind)
+                if k.interpolation.kind == eiBezier:
+                    jk["f"] = %k.interpolation.points
+                keys.add(jk)
 
-        jp["keys"] = keys
+            jp["keys"] = keys
+        else:
+            var values = newJArray()
+            for k in prop.keys:
+                k.keyValue:
+                    values.add(%value)
+            jp["values"] = values
         result[prop.name] = jp
 
 proc sampleRate*(a: EditedAnimation): int =

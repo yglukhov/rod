@@ -95,6 +95,7 @@ const rodPbComposition* = "rod.composition"
 const rodPbSprite* = "rod.sprite"
 const rodPbFiles* = "rod.files"
 const NodePboardKind* = "io.github.yglukhov.rod.node"
+const BezierPboardKind* = "io.github.yglukhov.rod.bezier"
 
 # Editor's nodes
 const EditorCameraNodeName2D* = "[EditorCamera2D]"

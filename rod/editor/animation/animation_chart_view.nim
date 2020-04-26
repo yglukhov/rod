@@ -139,6 +139,7 @@ proc cursorTrackingHandler*(v: AnimationChartView): proc(e: Event): bool =
         if not v.onCursorPosChange.isNil:
             v.onCursorPosChange()
         v.setNeedsDisplay()
+        # echo "cursorPos ", v.cursorPos
         result = e.buttonState != bsUp
 
 method onTouchEv*(v: AnimationChartView, e: var Event): bool =

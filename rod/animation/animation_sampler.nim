@@ -14,14 +14,10 @@ type
 
     ArrayAnimationSampler*[T] = BufferAnimationSampler[T, seq[T]]
 
-    LinearKeyFrame*[T] = tuple[p: float, v: T]
-    BezierKeyFrame*[T] = tuple[p: float, inX, inY, outX, outY: float, v: T]
-
-    LinearKeyFrameAnimationSampler*[T] = ref object of AnimationSampler[T]
-        keys*: seq[LinearKeyFrame[T]]
-
-    BezierKeyFrameAnimationSampler*[T] = ref object of AnimationSampler[T]
-        keys*: seq[BezierKeyFrame[T]]
+    KeyFrame*[T] = tuple[p: float, v: T, tf: proc(p:float):float]
+    
+    KeyFrameAnimationSampler*[T] = ref object of AnimationSampler[T]
+        keys*: seq[KeyFrame[T]]
 
 proc newBufferAnimationSampler*[T, B](values: B, lerpBetweenFrames = true, originalLen: int = -1, cutFront: int = 0): BufferAnimationSampler[T, B] =
     result.new()
@@ -74,23 +70,23 @@ proc newBufferAnimationSampler*[T, B](values: B, lerpBetweenFrames = true, origi
 proc newArrayAnimationSampler*[T](values: seq[T], lerpBetweenFrames = true, originalLen: int = -1, cutFront: int = 0): ArrayAnimationSampler[T] =
     newBufferAnimationSampler[T, seq[T]](values, lerpBetweenFrames, originalLen, cutFront)
 
-proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): LinearKeyFrameAnimationSampler[T] =
+proc newKeyFrameAnimationSampler*[T](keys: seq[KeyFrame[T]]): KeyFrameAnimationSampler[T] =
     result.new()
     result.keys = keys
     result.valueType = getTypeId(T)
 
     let r = cast[AnimationSampler[T]](result)
     r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
-        let s = cast[LinearKeyFrameAnimationSampler[T]](sampler)
+        let s = cast[KeyFrameAnimationSampler[T]](sampler)
         if s.keys.len == 0: return
         if p < 0:
             return s.keys[0].v
         elif p > 1:
             return s.keys[^1].v
 
-        var k : LinearKeyFrame[T]
+        var k : KeyFrame[T]
         k.p = p
-        let lb = lowerBound(s.keys, k) do(a, b: LinearKeyFrame[T]) -> int:
+        let lb = lowerBound(s.keys, k) do(a, b: KeyFrame[T]) -> int:
             cmp(a.p, b.p)
         
         if lb == s.keys.len: return s.keys[^1].v
@@ -108,89 +104,10 @@ proc newLinearKeyFrameAnimationSampler*[T](keys: seq[LinearKeyFrame[T]]): Linear
         if a == -1 or b == -1: return s.keys[0].v
 
         let normalizedP = (p - s.keys[a].p) / (s.keys[b].p - s.keys[a].p)
-        result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)
-
-proc newBezierKeyFrameAnimationSampler*[T](keys: seq[BezierKeyFrame[T]]): BezierKeyFrameAnimationSampler[T] =
-    result.new()
-    result.keys = keys
-    result.valueType = getTypeId(T)
-
-    let r = cast[AnimationSampler[T]](result)
-    r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
-        let s = cast[BezierKeyFrameAnimationSampler[T]](sampler)
-        if s.keys.len == 0: return 
-        
-        if p < 0:
-            return s.keys[0].v
-        elif p > 1:
-            return s.keys[^1].v
-
-        var k : BezierKeyFrame[T]
-        k.p = p
-        let lb = lowerBound(s.keys, k) do(a, b: BezierKeyFrame[T]) -> int:
-            cmp(a.p, b.p)
-
-        if lb >= s.keys.len: return s.keys[^1].v
-
-        var a, b : int
-        if p < s.keys[lb].p:
-            if lb == 0: return s.keys[0].v
-            a = lb - 1
-            b = lb
-        elif p > s.keys[lb].p:
-            a = lb
-            b = lb + 1
+        if not s.keys[a].tf.isNil:
+            result = interpolate(s.keys[a].v, s.keys[b].v, s.keys[a].tf(normalizedP))
         else:
-            return s.keys[lb].v
-
-        let temporalLength = s.keys[b].p - s.keys[a].p
-        let normalizedP = (p - s.keys[a].p) / temporalLength
-
-        #let spacialLength = abs(s.keys[b].v - s.keys[a].v)
-        # let spacialLength = 300.Coord
-
-
-        # echo "a: ", s.keys[a].v
-        # echo "b: ", s.keys[b].v
-        # echo "len: ", spacialLength
-        # echo "1: ", s.keys[a].outTangent.x / temporalLength, ", ", s.keys[a].outTangent.y / spacialLength
-        # echo "2: ", -s.keys[b].inTangent.x / temporalLength, ", ", s.keys[b].inTangent.y / spacialLength
-        # echo "p: ", normalizedP
-        # let resp = bezierXForProgress(s.keys[a].outX / temporalLength,
-        #                     s.keys[a].outY / spacialLength,
-        #                     -s.keys[b].inX / temporalLength,
-        #                     s.keys[b].inY / spacialLength,
-        #                     normalizedP)
-        # result = s.keys[a].v + resp * spacialLength
-        # echo "result: ", result
-        # result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)
-
-
-
-
-        # let s = cast[BezierKeyFrameAnimationSampler[T]](sampler)
-        # if p < 0:
-        #     return s.keys[0].v
-        # elif p > 1:
-        #     return s.keys[^1].v
-
-        # var k : BezierKeyFrame[T]
-        # k.p = p
-        # let lb = lowerBound(s.keys, k) do(a, b: BezierKeyFrame[T]) -> int:
-        #     cmp(a.p, b.p)
-
-        # var a, b : int
-        # if p < s.keys[lb].p:
-        #     a = lb - 1
-        #     b = lb
-        # elif p > s.keys[lb].p:
-        #     a = lb
-        #     b = lb + 1
-        # else:
-        #     return s.keys[lb].v
-
-        # let normalizedP = (p - s.keys[a].p) / (s.keys[b].p - s.keys[a].p)
-        # result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)
+            result = interpolate(s.keys[a].v, s.keys[b].v, normalizedP)
 
 {.push stackTrace: off, noInit.}
 proc sample*[TSampler](a: TSampler, p: float): auto {.inline.} = a.sampleImpl(a, float(p))
@@ -221,7 +138,7 @@ when isMainModule:
         doAssert(s.sample(1.5) ==~ 5.0)
 
     block: # Test keyframe sampler (lerp)
-        let s = newLinearKeyFrameAnimationSampler(@[(0.0, 1.0), (0.5, 2.0), (1.0, 4.0)])
+        let s = newKeyFrameAnimationSampler(@[(0.0, 1.0, nil), (0.5, 2.0, nil), (1.0, 4.0, nil)])
         doAssert(s.sample(-0.5) ==~ 1.0)
         doAssert(s.sample(0) ==~ 1.0)
         doAssert(s.sample(0.25) ==~ 1.5) # Lerp here
