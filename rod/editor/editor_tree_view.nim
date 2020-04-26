@@ -48,10 +48,10 @@ method init*(v: EditorTreeView, r: Rect)=
             result = 1
         else:
             let n = item.get(Node)
-            if not n.composition.isNil and n != v.rootNode:
-                result = 0
-            else:
-                result = n.children.len
+            result = n.children.len
+            when defined(rodedit):
+                if not n.composition.isNil and n != v.rootNode:
+                    result = 0
 
     outlineView.childOfItem = proc(item: Variant, indexPath: openarray[int]): Variant =
         if indexPath.len == 1:
