@@ -6,7 +6,7 @@ import ../../utils/[ bin_serializer, json_deserializer ]
 import ../../node
 import ../../component
 import ../../component/all_components
-
+import ../../animation/property_animation
 export bin_serializer
 
 proc toScalarType[T](j: JsonNode, o: var T) {.inline.} =
@@ -77,40 +77,6 @@ proc writeSamplerValues(b: BinSerializer, propName: string, v: JsonNode) =
     template writeValues(T: typedesc) =
         writeSamplerValues(b, T, v)
     typeOfProperty(propName, writeValues)
-
-# todo: use from property_animation?
-proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) = 
-    # A property name can one of the following:
-    # nodeName.propName # looked up in node first, then in first met component
-    # nodeName.compIndex.propName # looked up only in specified component
-    propName = name
-    compIndex = -1
-    nodeName = ""
-    let dotIdx2 = name.rfind('.')
-    if dotIdx2 != -1:
-        propName = name.substr(dotIdx2 + 1)
-        let dotIdx1 = name.rfind('.', 0, dotIdx2 - 1)
-        if dotIdx1 == -1:
-            nodeName = name.substr(0, dotIdx2 - 1)
-        elif name[dotIdx1 + 1].isDigit:
-            discard parseInt(name, compIndex, dotIdx1 + 1)
-            nodeName = name.substr(0, dotIdx1 - 1)
-        else:
-            nodeName = name.substr(0, dotIdx2 - 1)
-
-    propName = case propName
-    of "Rotation": "rotation"
-    of "X Position": "tX"
-    of "Y Position": "tY"
-    of "Position": "translation"
-    of "Scale": "scale"
-    of "Opacity": "alpha"
-    of "Input White": "inWhite"
-    of "Input Black": "inBlack"
-    of "Gamma": "inGamma"
-    of "Output White": "outWhite"
-    of "Output Black": "outBlack"
-    else: propName
 
 proc writeBuiltInComponents[T](b: BinSerializer, typ: BuiltInComponentType, name: string, nodes: seq[JsonNode]) =
     var nodeIds = newSeqOfCap[int16](nodes.len)
@@ -355,9 +321,9 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
                     b.write(v)
                 typeOfProperty(propName, writeValues)
 
-                let inter = k["i"].getStr("")
+                let inter = parseEnum[KeyInterpolationKind](k["i"].getStr(""))
                 b.write(inter)
-                if inter == "eiBezier":
+                if inter == KeyInterpolationKind.eiBezier:
                     if k["f"].len != 4: 
                         raise newException(Exception, "Invalid timing function!")
                     

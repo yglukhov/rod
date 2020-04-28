@@ -6,15 +6,9 @@ import algorithm
 import variant, tables, json, math, strutils
 
 type
-    EInterpolationKind* = enum
-        eiLinear
-        eiBezier
-        # eiDiscrete #should be in property
-        eiPresampled
-
     EInterpolation* = object
-        case kind*: EInterpolationKind
-        of eiBezier:
+        case kind*: KeyInterpolationKind
+        of KeyInterpolationKind.eiBezier:
             points*: array[4, float]
         else:
             discard
@@ -126,7 +120,7 @@ proc `%`*(a: EditedAnimation): JsonNode =
         # by `values` key
         var isPresampled: bool 
         for k in prop.keys: 
-            if k.interpolation.kind == eiPresampled:
+            if k.interpolation.kind == KeyInterpolationKind.eiPresampled:
                 isPresampled = true
                 break
         
@@ -138,7 +132,7 @@ proc `%`*(a: EditedAnimation): JsonNode =
                 k.keyValue:
                     ser.visit(value, "v")
                 ser.visit(k.interpolation.kind, "i")
-                if k.interpolation.kind == eiBezier:
+                if k.interpolation.kind == KeyInterpolationKind.eiBezier:
                     ser.visit(k.interpolation.points, "f")
                 keys.add(jk)
 
@@ -171,9 +165,9 @@ proc toEditedProperty(n: Node, k:string, j: JsonNode): EditedProperty =
             key.property = result
             key.position = jk["p"].getFloat(0.0)
             key.interpolation = EInterpolation(
-                kind: parseEnum[EInterpolationKind](jk["i"].getStr(""))
+                kind: parseEnum[KeyInterpolationKind](jk["i"].getStr(""))
                 )
-            if key.interpolation.kind == eiBezier:
+            if key.interpolation.kind == KeyInterpolationKind.eiBezier:
                 key.interpolation.points = to(jk["f"], array[4, float])
             result.keys.add(key)
 
@@ -192,7 +186,7 @@ proc toEditedProperty(n: Node, k:string, j: JsonNode): EditedProperty =
                 var k = new(EditedKey)
                 k.value = newVariant(v)
                 k.position = i / values.len
-                k.interpolation = EInterpolation(kind: eiPresampled)
+                k.interpolation = EInterpolation(kind: KeyInterpolationKind.eiPresampled)
                 k.property = result
                 result.keys.add(k)
             var dur: float32

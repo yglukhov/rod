@@ -155,21 +155,21 @@ proc newInterpolationPropertyView(setter: proc(s: EInterpolation), getter: proc(
             r.changeInspector()
     curveEdit.addSubview(pasteButton)
 
-    let items = toSeq(low(EInterpolationKind) .. high(EInterpolationKind)).map do(v: EInterpolationKind) -> string: $v
+    let items = toSeq(low(KeyInterpolationKind) .. high(KeyInterpolationKind)).map do(v: KeyInterpolationKind) -> string: $v
     var popupButton = PopupButton.new(newRect(0, 0, 200, editorRowHeight))
     popupButton.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     popupButton.items = items
     popupButton.onAction do():
         let i = popupButton.selectedIndex
         if i != -1:
-            if items[i] == $eiBezier and curveEdit.superview.isNil:
+            if items[i] == $KeyInterpolationKind.eiBezier and curveEdit.superview.isNil:
                 r.addSubview(curveEdit)
 
-            elif items[i] != $eiBezier and not curveEdit.superview.isNil:
+            elif items[i] != $KeyInterpolationKind.eiBezier and not curveEdit.superview.isNil:
                 curveEdit.removeFromSuperview()
 
-            var v = EInterpolation(kind: parseEnum[EInterpolationKind](items[i]))
-            if v.kind == eiBezier:
+            var v = EInterpolation(kind: parseEnum[KeyInterpolationKind](items[i]))
+            if v.kind == KeyInterpolationKind.eiBezier:
                 v.points = bezierPoints
             setter v
             if not r.changeInspector.isNil():
@@ -185,11 +185,11 @@ proc newInterpolationPropertyView(setter: proc(s: EInterpolation), getter: proc(
         bezierPoints[2] = bezierView.p3
         bezierPoints[3] = bezierView.p4
 
-        setter EInterpolation(kind: eiBezier, points: bezierPoints)
+        setter EInterpolation(kind: KeyInterpolationKind.eiBezier, points: bezierPoints)
         if not r.changeInspector.isNil():
             r.changeInspector()
 
-    if inter.kind == eiBezier:
+    if inter.kind == KeyInterpolationKind.eiBezier:
         setCurve(inter.points)
 
         r.addSubview(curveEdit) 

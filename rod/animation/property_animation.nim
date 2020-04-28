@@ -9,6 +9,11 @@ import rod/utils/bin_deserializer
 export animation
 
 type
+    KeyInterpolationKind* {.pure.} = enum
+        eiLinear
+        eiBezier
+        eiPresampled
+
     AnimatedProperty* = ref object
         nodeName*, propName*: string
         compIndex*: int
@@ -136,7 +141,7 @@ proc newKeyframeSampler[T](j: JsonNode): KeyFrameAnimationSampler[T] {.inline.} 
     for v in j:
         keys[i].v = elementFromJson(T, v["v"])
         keys[i].p = v["p"].getFloat()
-        if v{"i"}.getStr("") == "eiBezier":
+        if parseEnum[KeyInterpolationKind](v{"i"}.getStr("")) == KeyInterpolationKind.eiBezier:
             let points = v["f"].to(array[4, float])
             keys[i].tf = bezierTimingFunction(points[0], points[1], points[2], points[3])
         inc i
@@ -154,8 +159,9 @@ proc newKeyframeSampler[T](b: BinDeserializer): KeyFrameAnimationSampler[T] {.in
     for i in 0 ..< keys.len:
         keys[i].p = b.readFloat32()
         b.visit(keys[i].v)
-        let inter = b.readStr()
-        if inter == "eiBezier":
+        var inter: KeyInterpolationKind
+        b.visit(inter)
+        if inter == KeyInterpolationKind.eiBezier:
             var arr = b.getBuffer(float32, 4)
             keys[i].tf = bezierTimingFunction(arr[0], arr[1], arr[2], arr[3])
 
