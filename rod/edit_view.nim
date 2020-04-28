@@ -10,8 +10,6 @@ import rod/scene_composition
 import rod / editor / [editor_project_settings, editor_tab_registry,
         editor_workspace_view, editor_types, animation/animation_editor_types]
 
-import rod / component / ae_composition
-
 import rod/utils/json_serializer
 export editor_types
 
@@ -200,8 +198,6 @@ when loadingAndSavingAvailable:
             
             var comp = newComposition(p)
             comp.loadComposition do():
-            # var n: Node
-            # n = newNodeWithUrl(p) do():
                 let n = comp.node
                 var c = new(CompositionDocument)
                 c.path = p
@@ -210,7 +206,6 @@ when loadingAndSavingAvailable:
 
                 when defined(rodedit):
                     echo "try parse anims ", not n.isNil
-                    # echo not n.jAnimations.isNil
                     
                     if not n.isNil and not n.jAnimations.isNil:
                         for k, v in n.jAnimations:
@@ -224,7 +219,6 @@ when loadingAndSavingAvailable:
                                 echo "failed to parse animation"
                         if c.animations.len > 0:
                             c.currentAnimation = c.animations[0]
-                        echo "parsed anims ", c.animations.len
 
                 for tb in e.workspaceView.compositionEditors:
                     if tb.composition.path == p:
@@ -240,8 +234,6 @@ when loadingAndSavingAvailable:
                     e.workspaceView.addTab(tbv)
                     e.workspaceView.selectTab(tbv)
                 
-                # echo "try parse anims ", not n.isNil
-            # echo "whjat ", n.isNil
         except:
             error "Can't load composition at ", p
             error "Exception caught: ", getCurrentExceptionMsg()

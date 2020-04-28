@@ -26,10 +26,8 @@ template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVe
 template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat())
 template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat(), jelem[3].getFloat())
 template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat(), jelem[3].getFloat(1))
-template elementFromJson(t: typedesc[int8], jelem: JsonNode): int8 = jelem.getInt().int8
 template elementFromJson(t: typedesc[int32], jelem: JsonNode): int32 = jelem.getInt().int32
 template elementFromJson(t: typedesc[int16], jelem: JsonNode): int16 = jelem.getInt().int16
-template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getInt()
 template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBool()
 
 proc splitPropertyName*(name: string, nodeName: var string, compIndex: var int, propName: var string) =
@@ -104,9 +102,7 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped) =
     of clause(Vector4): action(Vector4)
     of clause(Quaternion): action(Quaternion)
     of clause(Color): action(Color)
-    # of clause(int8): action(int8)
     of clause(int32): action(int32)
-    # of clause(int): action(int)
     of clause(int16): action(int16)
     of clause(bool): action(bool)
     else:
@@ -153,26 +149,15 @@ proc newKeyframeSampler(t: TypeId, j: JsonNode): AbstractAnimationSampler =
 
 proc newKeyframeSampler[T](b: BinDeserializer): KeyFrameAnimationSampler[T] {.inline.} =
     let keysLen = b.readInt16()
-    echo "keys ", keysLen
     var keys = newSeq[KeyFrame[T]](keysLen)
     shallow(keys)
     for i in 0 ..< keys.len:
         keys[i].p = b.readFloat32()
-        echo "prog ", keys[i].p 
-
-        # var v: (when T is int: int32 else: T)
-        # b.visit(v)
-        # keys[i].v = T(v)
-        # keys[i].v = b.getBuffer(T, 1)[0]
         b.visit(keys[i].v)
-        echo "val ", keys[i].v
-
         let inter = b.readStr()
-        echo "interpolation ", inter
         if inter == "eiBezier":
             var arr = b.getBuffer(float32, 4)
             keys[i].tf = bezierTimingFunction(arr[0], arr[1], arr[2], arr[3])
-            echo "tf ", arr[0], " ", arr[1], " ", arr[2], " ", arr[3]
 
     result = newKeyFrameAnimationSampler[T](keys)
 
@@ -197,9 +182,7 @@ template findAnimatablePropertyAux(body: untyped) =
     visitor.flags = { pfAnimatable }
     visitor.commit = proc() =
         if res.isEmpty:
-            # echo "tryfind ", propName
             if visitor.name == propName:
-                # echo "found ", visitor.name
                 res = visitor.setterAndGetter
     body
 
@@ -238,7 +221,6 @@ proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: flo
         let setter = sng.get(SetterAndGetter[T]).setter
         let sampler = AnimationSampler[T](s)
         result = proc(p: float) =
-            # echo "setter ", setter.isNil, " sampler ", sampler.isNil
             setter(sampler.sample(p))
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
     switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, makeSetter)
@@ -318,7 +300,7 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
         ap.new()
         ap.nodeName = nodeName
         ap.propName = propName
-        echo "k: ", nodeName, ".", propName
+        # echo "k: ", nodeName, ".", propName
         ap.compIndex = -1
         ap.scale = 1.0
         let sng = findAnimatablePropertyForSubtree(n, nodeName, -1, propName)
@@ -334,7 +316,6 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
         if not aeComp: isKeyFrame = bool(b.readUint8())
 
         if isKeyFrame:
-            echo " ", nodeName, " ", propName
             ap.sampler = newKeyframeSampler(t, b)
         else:
             var cutf = -1
@@ -357,7 +338,6 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
     result.onAnimate = proc(p: float) =
         for ap in res.animatedProperties:
             ap.progressSetter(p * ap.scale)
-    echo "done "
 
 proc attachToNode*(pa: PropertyAnimation, n: Node) =
     for ap in pa.animatedProperties:

@@ -58,8 +58,7 @@ method draw*(v: DopesheetView, r: Rect) =
                 elif key.position >= v.fromX:
                     var pos = v.curvePointToLocal(newPoint(key.position, 0.0))
                     pos.y = rowMaxY - v.rowHeight / 2
-                    # if i == v.
-                    # if y == v.selectedCurve and x == v.selectedKey:
+
                     if (pi:y, ki:x) in v.selectedKeys:
                         c.fillColor = newColor(0.7, 0.7, 1)
                     else:
@@ -151,16 +150,9 @@ proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
                             let pos = v.curvePointToLocal(newPoint(key.position, rowMaxY - v.rowHeight / 2))
                             if v.selectionRect.intersect(rectAtPoint(pos, 4)):
                                 let s = (pi:y, ki:x)
-                                # if s in v.mSelectedKeys:
-                                #     v.mSelectedKeys.excl(s)
-                                # else:
                                 v.mSelectedKeys.incl(s)
-                                # v.draggedKey = v.selectedKeys[0]
                 v.draggedKey = (pi: -1, ki: -1)
         else: #bsUp
-            # if v.draggedKey.pi == -1 and v.draggedKey.ki == -1:
-            #     v.selectedKeys.clear()
-            # else:
             v.draggedKey = (pi: -1, ki: -1)
             v.selectionRect = zeroRect
 

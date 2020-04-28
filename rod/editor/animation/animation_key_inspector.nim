@@ -6,10 +6,7 @@ import nimx/[view, text_field, button,
 
 import rod/property_editors/[propedit_registry, standard_editors]
 import rod/animation/[property_animation]
-# import rod/[node, component, rod_types]
-# import rod/edit_view
 import rod / editor / [ animation/animation_editor_types, editor_types ]
-# import rod/editor/animation/editor_animation_view
 import algorithm, tables, variant, sequtils, strutils, json
 
 export view

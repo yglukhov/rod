@@ -112,9 +112,6 @@ proc `%`*(a: EditedAnimation): JsonNode =
     ser.visit(a.duration, "duration")
     ser.visit(a.name, "name")
     ser.visit(a.fps, "fps")
-    # meta["duration"] = %a.duration
-    # meta["name"] = %a.name
-    # meta["fps"] = %a.fps
     result["rodedit$metadata"] = meta
 
     for prop in a.properties:
@@ -138,15 +135,11 @@ proc `%`*(a: EditedAnimation): JsonNode =
                 var jk = newJobject()
                 ser.node = jk
                 ser.visit(k.position, "p")
-                # jk["p"] = %k.position
                 k.keyValue:
                     ser.visit(value, "v")
-                    # jk["v"] = %value
                 ser.visit(k.interpolation.kind, "i")
-                # jk["i"] = %($k.interpolation.kind)
                 if k.interpolation.kind == eiBezier:
                     ser.visit(k.interpolation.points, "f")
-                    # jk["f"] = %k.interpolation.points
                 keys.add(jk)
 
             jp["keys"] = keys
@@ -185,21 +178,19 @@ proc toEditedProperty(n: Node, k:string, j: JsonNode): EditedProperty =
             result.keys.add(key)
 
             template getKeyValue(T: typedesc) =
-                # var val : (when T is int: int32 else: T)
                 var val: T
                 des.visit(val, "v")
-                key.value = newVariant(T(val)) #disable ConvFromXtoItselfNotNeeded
+                key.value = newVariant(val)
             template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
             switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, getKeyValue)
     elif "values" in j:
         des.node = j
         template getKeyValue(T: typedesc) =
-            # var values: (when T is int: seq[int32] else: seq[T])
             var values: seq[T]
             des.visit(values, "values")
             for i, v in values:
                 var k = new(EditedKey)
-                k.value = newVariant(T(v)) #disable ConvFromXtoItselfNotNeeded
+                k.value = newVariant(v)
                 k.position = i / values.len
                 k.interpolation = EInterpolation(kind: eiPresampled)
                 k.property = result
@@ -218,7 +209,7 @@ proc toEditedAnimation*(n: Node, j: JsonNode): EditedAnimation =
             a.name = v{"name"}.getStr("")
             a.duration = v{"duration"}.getFloat(1.0)
             continue
-        echo "toEditedAnimation ", k, " " , v
+        # echo "toEditedAnimation ", k, " " , v
         a.properties.add(n.toEditedProperty(k, v))
     if a.fps == 0 and a.properties.len > 0:
         a.duration = a.properties[0].duration

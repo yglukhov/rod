@@ -187,10 +187,6 @@ proc read*[T](b: BinDeserializer, data: var T) =
             data.setLen(sz)
             b.read(openarray[type(data[0])](data))
 
-    # elif T is Quaternion:
-    #     let buf = b.getBuffer(float32, 4)
-    #     v = newQuaternion(buf[0], buf[1], buf[2], buf[3])
-
     elif T is string:
         data = b.readStr()
 

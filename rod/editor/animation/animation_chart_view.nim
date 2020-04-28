@@ -7,8 +7,6 @@ import animation_editor_types
 const rulerHeight* = 25
 
 type AnimationChartView* = ref object of View
-    # curves*: seq[AbstractAnimationCurve]
-    # keys*: seq[EditedKey]
     fromX*, toX*: Coord
     fromY*, toY*: Coord
     cursorPos*: Coord
@@ -29,7 +27,6 @@ method init*(v: AnimationChartView, r: Rect) =
     procCall v.View.init(r)
     v.toX = 1.0
     v.fromY = 300.0
-    # v.curves = @[]
     v.sampleRate = 30
     v.gridColor = newGrayColor(0.6, 1.0)
     v.gridSize = newSize(1.0 / float(v.sampleRate), 100)
@@ -139,7 +136,6 @@ proc cursorTrackingHandler*(v: AnimationChartView): proc(e: Event): bool =
         if not v.onCursorPosChange.isNil:
             v.onCursorPosChange()
         v.setNeedsDisplay()
-        # echo "cursorPos ", v.cursorPos
         result = e.buttonState != bsUp
 
 method onTouchEv*(v: AnimationChartView, e: var Event): bool =

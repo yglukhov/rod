@@ -114,7 +114,6 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
                     let animEditor = getEditorTab[AnimationEditView](i.editor)
                     if not animEditor.isNil:
                         animEditor.addEditedProperty(n, epn & "." & propName, sng)
-                    #     animEditor.foo()
 
             expView.addContent(propHolder)
 

@@ -107,7 +107,6 @@ proc visit*[T: enum](b: JsonDeserializer, v: var T, key: string) =
 proc visit*(b: JsonDeserializer, v: var bool, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        # v = j.getBool()
         b.get(j, v)
 
 proc visit*(b: JsonDeserializer, v: var Color, key: string) =
@@ -154,4 +153,3 @@ proc visit*(b: JsonDeserializer, v: var Quaternion, key: string) =
     let j = b.node{key}
     if not j.isNil:
         b.get(j, v)
-        # v = newQuaternion(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
