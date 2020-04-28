@@ -41,6 +41,10 @@ AELayer.properties:
     timeremap
     timeRemapEnabled
 
+when defined(rodedit):
+    proc animationBuffer*(c: AEComposition): JsonNode = c.buffers
+    proc `animationBuffer=`*(c: AEComposition, v: JsonNode) = c.buffers = v
+
 proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     let pStart = m.start / c.duration
     let pEnd = m.duration / c.duration + pStart

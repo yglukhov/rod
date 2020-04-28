@@ -31,7 +31,7 @@ type
         selectedProperties: seq[int]
 
         keysInspector: AnimatioKeyInspectorView
-        cachedAnimation: PropertyAnimation
+        cachedAnimation: Animation
         nameField: TextField
         fpsField: TextField
         durationField: TextField
@@ -120,7 +120,8 @@ proc rebuildAnimation(v: AnimationEditView) =
     var comp = v.editor.currentComposition
     if comp.isNil: return
     try:
-        v.cachedAnimation = newPropertyAnimation(comp.rootNode, janim)
+        v.cachedAnimation = newPropertyAnimation(comp.rootNode, janim).addOnAnimate() do(p: float):
+            v.dopesheetView.cursorPos = p
         echo janim
     except:
         v.cachedAnimation = nil
@@ -160,13 +161,13 @@ proc onCursorPosChange(v: AnimationEditView, pos: float) =
 const topPanelHeight = 25
 const bottomPanelHeight = 25
 
-proc createPlayButton(v: AnimationEditView): Button =
-    result = Button.new(newRect(0, 0, 50, topPanelHeight))
-    result.title = "Play"
-    var currentlyPlayingAnimation: Animation
-    let b = result
-    result.onAction do():
-        v.playEditedAnimation()
+# proc createPlayButton(v: AnimationEditView): Button =
+#     result = Button.new(newRect(0, 0, 50, topPanelHeight))
+#     result.title = "Play"
+#     var currentlyPlayingAnimation: Animation
+#     let b = result
+#     result.onAction do():
+#         v.playEditedAnimation()
         # if not currentlyPlayingAnimation.isNil:
         #     currentlyPlayingAnimation.cancel()
         #     currentlyPlayingAnimation = nil
@@ -405,6 +406,8 @@ method init*(v: AnimationEditView, r: Rect) =
     v.dopesheetView = DopesheetView.new(newRect(0, 0, mainSplitView.bounds.width - leftPaneWidth, mainSplitView.bounds.height))
     v.dopesheetView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     v.dopesheetView.onCursorPosChange = proc() =
+        if not v.cachedAnimation.isNil:
+            v.cachedAnimation.cancel()
         v.onCursorPosChange(v.dopesheetView.cursorPos)
     v.dopesheetView.onKeysChanged = proc(arr: seq[DopesheetSelectedKey]) =
         let a = v.editedAnimation
@@ -482,6 +485,10 @@ method tabAnchor*(v: AnimationEditView): EditorTabAnchor =
 method onCompositionChanged*(v: AnimationEditView, comp: CompositionDocument) =
     procCall v.EditorTabView.onCompositionChanged(comp)
     # v.editedNode = comp.rootNode
+    if comp.animations.len > 0:
+        v.editedAnimation = comp.animations[0]
+    else:
+        v.editedAnimation = nil
     echo "onCompositionChanged "
     v.reload()
 

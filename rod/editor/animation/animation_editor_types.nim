@@ -1,7 +1,9 @@
 import nimx / [ types, matrixes, animation, property_visitor ]
 import rod/animation/[animation_sampler, property_animation], rod / [ quaternion, rod_types ]
+import rod / utils / [ json_deserializer, json_serializer ]
+import rod / node
 import algorithm
-import variant, tables, json, math
+import variant, tables, json, math, strutils
 
 type
     EInterpolationKind* = enum
@@ -24,6 +26,7 @@ type
         interpolation*: EInterpolation
 
     EditedProperty* = ref object
+        duration: float 
         enabled*: bool
         rawName: string #nodeName.componentIndex.componentProperty, nodeName.nodeProperty, etc
         node: Node
@@ -104,14 +107,20 @@ proc `%`*(a: EditedAnimation): JsonNode =
     result = newJObject()
     var meta = newJObject()
 
-    meta["duration"] = %a.duration
-    meta["name"] = %a.name
-    meta["fps"] = %a.fps
+    var ser = newJsonSerializer()
+    ser.node = meta
+    ser.visit(a.duration, "duration")
+    ser.visit(a.name, "name")
+    ser.visit(a.fps, "fps")
+    # meta["duration"] = %a.duration
+    # meta["name"] = %a.name
+    # meta["fps"] = %a.fps
     result["rodedit$metadata"] = meta
 
     for prop in a.properties:
         if not prop.enabled: continue
         var jp = newJObject()
+
         jp["duration"] = %a.duration
         var keys = newJArray()
         
@@ -127,12 +136,17 @@ proc `%`*(a: EditedAnimation): JsonNode =
         if not isPresampled:
             for k in prop.keys:
                 var jk = newJobject()
-                jk["p"] = %k.position
+                ser.node = jk
+                ser.visit(k.position, "p")
+                # jk["p"] = %k.position
                 k.keyValue:
-                    jk["v"] = %value
-                jk["i"] = %($k.interpolation.kind)
+                    ser.visit(value, "v")
+                    # jk["v"] = %value
+                ser.visit(k.interpolation.kind, "i")
+                # jk["i"] = %($k.interpolation.kind)
                 if k.interpolation.kind == eiBezier:
-                    jk["f"] = %k.interpolation.points
+                    ser.visit(k.interpolation.points, "f")
+                    # jk["f"] = %k.interpolation.points
                 keys.add(jk)
 
             jp["keys"] = keys
@@ -147,20 +161,68 @@ proc `%`*(a: EditedAnimation): JsonNode =
 proc sampleRate*(a: EditedAnimation): int =
     ceil(a.fps.float * a.duration).int
 
-# proc toEditedProperty(n:string, j: JsonNode): EditedProperty =
-#     var p = newEditedProperty(n)
-#     if "keys" in j:
+proc toEditedProperty(n: Node, k:string, j: JsonNode): EditedProperty =
+    var nodeName, rawPropName: string
+    var compIndex: int
+    splitPropertyName(k, nodeName, compIndex, rawPropName)
+    let sng = findAnimatablePropertyForSubtree(n, nodeName, compIndex, rawPropName)
 
+    var pname = k
+    pname.removePrefix(nodeName)
+    result = newEditedProperty(n.findNode(nodeName), pname, sng)
+    var des = newJsonDeserializer()
+    if "keys" in j:
+        for jk in j["keys"]:
+            des.node = jk
+            var key = new(EditedKey)
+            key.property = result
+            key.position = jk["p"].getFloat(0.0)
+            key.interpolation = EInterpolation(
+                kind: parseEnum[EInterpolationKind](jk["i"].getStr(""))
+                )
+            if key.interpolation.kind == eiBezier:
+                key.interpolation.points = to(jk["f"], array[4, float])
+            result.keys.add(key)
 
-# proc toEditedAnimation*(n: Node, j: JsonNode): EditedAnimation =
-#     var a = new(EditedAnimation)
-#     for k, v in j:
-#         if k == "rodedit$metadata":
-#             a.fps = v{"fps"}.getInt(25)
-#             a.name = v{"name"}.getStr("")
-#             a.duration = v{"duration"}.getFloat(1.0)
-#             continue
-        
-#         a.properties.add(toEditedProperty(k, v))
+            template getKeyValue(T: typedesc) =
+                # var val : (when T is int: int32 else: T)
+                var val: T
+                des.visit(val, "v")
+                key.value = newVariant(T(val)) #disable ConvFromXtoItselfNotNeeded
+            template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+            switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, getKeyValue)
+    elif "values" in j:
+        des.node = j
+        template getKeyValue(T: typedesc) =
+            # var values: (when T is int: seq[int32] else: seq[T])
+            var values: seq[T]
+            des.visit(values, "values")
+            for i, v in values:
+                var k = new(EditedKey)
+                k.value = newVariant(T(v)) #disable ConvFromXtoItselfNotNeeded
+                k.position = i / values.len
+                k.interpolation = EInterpolation(kind: eiPresampled)
+                k.property = result
+                result.keys.add(k)
+            var dur: float32
+            des.visit(dur, "duration")
+            result.duration = dur
+        template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
+        switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, getKeyValue)
+
+proc toEditedAnimation*(n: Node, j: JsonNode): EditedAnimation =
+    var a = new(EditedAnimation)
+    for k, v in j:
+        if k == "rodedit$metadata":
+            a.fps = v{"fps"}.getInt(25)
+            a.name = v{"name"}.getStr("")
+            a.duration = v{"duration"}.getFloat(1.0)
+            continue
+        echo "toEditedAnimation ", k, " " , v
+        a.properties.add(n.toEditedProperty(k, v))
+    if a.fps == 0 and a.properties.len > 0:
+        a.duration = a.properties[0].duration
+        a.fps = int(a.properties[0].keys.len.float / a.duration)
+    result = a
 
 

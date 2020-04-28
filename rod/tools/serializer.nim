@@ -29,9 +29,11 @@ proc getRelativeResourcePath*(s: Serializer, path: string): string =
     when not defined(js) and not defined(android) and not defined(ios):
         resourcePath = urlParentDir(s.url)
         resourcePath.removePrefix("file://")
-
-    result = relativePathToPath(resourcePath, path)
-    echo "save path = ", resourcePath, "  relative = ", result
+    
+    var fixedPath = path
+    fixedPath.removePrefix("file://")
+    result = relativePathToPath(resourcePath, fixedPath)
+    echo "save path = ", resourcePath, "  relative = ", result, " url ", s.url
 
 template isAbsoluteUrl(u: string): bool =
     # TODO: make it smarter

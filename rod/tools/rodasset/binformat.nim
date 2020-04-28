@@ -57,22 +57,42 @@ proc writeSamplerValues(b: BinSerializer, propType: typedesc, v: JsonNode) =
         toComponentType(v[i], values[i])
     b.write(values)
 
-proc writeSamplerValues(b: BinSerializer, propName: string, v: JsonNode) =
+# todo: fix this
+template typeOfProperty(propName: string, body: untyped) =
     case propName
     of "tX", "tY", "tZ", "sX", "sY", "sZ", "alpha", "inWhite", "inBlack",
             "inGamma", "outWhite", "outBlack", "Tracking Amount", "lightness", "amount",
             "redInGamma", "blueInGamma", "greenInGamma", "redOutWhite", "greenOutWhite",
             "blueOutWhite", "redInWhite", "greenInWhite", "blueInWhite", "hue", "strokeWidth",
             "radius", "timeremap":
-        b.writeSamplerValues(float32, v)
-    of "translation", "scale", "anchor": b.writeSamplerValues(array[3, float32], v)
-    of "rotation", "white", "black", "strokeColor", "color": b.writeSamplerValues(array[4, float32], v)
-    of "size": b.writeSamplerValues(array[2, float32], v)
-    of "curFrame": b.writeSamplerValues(int16, v)
-    of "enabled": b.writeSamplerValues(bool, v)
+        body(float32)
+    of "translation", "scale", "anchor": body(array[3, float32])
+    of "rotation", "white", "black", "strokeColor", "color": body(array[4, float32])
+    of "size": body(array[2, float32])
+    of "curFrame": body(int16)
+    of "enabled": body(bool)
     else: raise newException(Exception, "Unknown property type: " & propName)
 
-proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) =
+proc writeSamplerValues(b: BinSerializer, propName: string, v: JsonNode) =
+    template writeValues(T: typedesc) =
+        writeSamplerValues(b, T, v)
+    typeOfProperty(propName, writeValues)
+    # case propName
+    # of "tX", "tY", "tZ", "sX", "sY", "sZ", "alpha", "inWhite", "inBlack",
+    #         "inGamma", "outWhite", "outBlack", "Tracking Amount", "lightness", "amount",
+    #         "redInGamma", "blueInGamma", "greenInGamma", "redOutWhite", "greenOutWhite",
+    #         "blueOutWhite", "redInWhite", "greenInWhite", "blueInWhite", "hue", "strokeWidth",
+    #         "radius", "timeremap":
+    #     b.writeSamplerValues(float32, v)
+    # of "translation", "scale", "anchor": b.writeSamplerValues(array[3, float32], v)
+    # of "rotation", "white", "black", "strokeColor", "color": b.writeSamplerValues(array[4, float32], v)
+    # of "size": b.writeSamplerValues(array[2, float32], v)
+    # of "curFrame": b.writeSamplerValues(int16, v)
+    # of "enabled": b.writeSamplerValues(bool, v)
+    # else: raise newException(Exception, "Unknown property type: " & propName)
+
+# todo: use from property_animation?
+proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) = 
     # A property name can one of the following:
     # nodeName.propName # looked up in node first, then in first met component
     # nodeName.compIndex.propName # looked up only in specified component
@@ -316,13 +336,15 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
 # ... TODO: Complete this
 
 proc writeAnimation(b: BinSerializer, anim: JsonNode) =
-    let propsCount = anim.len
+    const rodeditMeta = "rodedit$metadata"
+    let propsCount = if rodeditMeta in anim: anim.len - 1 else: anim.len
     b.write(int16(propsCount))
     let anyProp = anim.anyValue
     b.write(anyProp["duration"].getFloat())
     b.write(anyProp{"numberOfLoops"}.getInt(1).int16)
 
     for k, v in anim:
+        if k == rodeditMeta: continue #skip editor metadata
         var nodeName, propName: string
         var compIdx: int
         splitPropertyName(k, nodeName, compIdx, propName)
@@ -330,8 +352,34 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
         b.write(propName)
         let frameLerp = v{"frameLerp"}.getBool(true)
         b.write(int8(frameLerp))
-        let vals = v["values"]
-        b.writeSamplerValues(propName, vals)
+        
+        let vals = v{"values"}
+        b.write(int8(vals.isNil)) #is key frame animation
+        if vals.isNil:
+            let keys = v["keys"]
+            b.write(int16(keys.len))
+            for k in keys:
+                b.write(float32(k["p"].getFloat()))
+                
+                #todo: fix this
+                template writeValues(T: typedesc) =
+                    var v: T
+                    toComponentType(k["v"], v)
+                    echo "write value for key ", propName, " ", v, " t ", $T
+                    b.write(v)
+                typeOfProperty(propName, writeValues)
+
+                let inter = k["i"].getStr("")
+                b.write(inter)
+                if inter == "eiBezier":
+                    if k["f"].len != 4: 
+                        raise newException(Exception, "Invalid timing function!")
+                    
+                    for fi in k["f"]: #write timing function
+                        b.write(float32(fi.getFloat()))
+        else:
+            let vals = v["values"]
+            b.writeSamplerValues(propName, vals)
 
 proc writeAnimations(b: BinSerializer, comp: JsonNode) =
     let anims = comp{"animations"}

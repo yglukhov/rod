@@ -187,6 +187,10 @@ proc read*[T](b: BinDeserializer, data: var T) =
             data.setLen(sz)
             b.read(openarray[type(data[0])](data))
 
+    # elif T is Quaternion:
+    #     let buf = b.getBuffer(float32, 4)
+    #     v = newQuaternion(buf[0], buf[1], buf[2], buf[3])
+
     elif T is string:
         data = b.readStr()
 
@@ -215,7 +219,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
     elif T is int | int64:
         {.error: "int and int64 not supported " .}
     else:
-        {.error: "Unknown type " .}
+        {.error: "Unknown type " & $T .}
 
 
 proc visit*[T](b: BinDeserializer, v: var T) {.inline.} =
