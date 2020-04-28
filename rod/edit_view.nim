@@ -8,7 +8,8 @@ import nimx/pasteboard/pasteboard
 import rod_types, node
 import rod/scene_composition
 import rod / editor / [editor_project_settings, editor_tab_registry,
-        editor_workspace_view, editor_types]
+        editor_workspace_view, editor_types, animation/animation_editor_types]
+
 import rod/utils/json_serializer
 export editor_types
 
@@ -62,6 +63,11 @@ proc focusOnNode*(cameraNode: node.Node, focusNode: node.Node) =
         focusNode.position.z + distance
     )
 
+proc getEditorTab*[T](e: Editor): T =
+    for t in e.workspaceView.tabs:
+        if t of T:
+            return t.T
+
 proc updateCameraSelector(e: Editor) = discard #todo: fix this!
     # var items = newSeq[string]()
     # var i = 0
@@ -76,6 +82,11 @@ proc updateCameraSelector(e: Editor) = discard #todo: fix this!
     #             inc i
     # e.cameraSelector.items = items
     # e.cameraSelector.selectedIndex = selectedIndex
+
+proc onEditModeChanged*(e: Editor, m: EditMode) =
+    e.mode = m
+    for t in e.workspaceView.tabs:
+        t.onEditModeChanged(m)
 
 proc sceneTreeDidChange*(e: Editor) =
     e.updateCameraSelector()
@@ -94,6 +105,8 @@ when loadingAndSavingAvailable:
         result = url
         result.removePrefix("file://")
         result = relativePath(result, base).replace("\\", "/")
+else:
+    proc relativeUrl*(url: string, base: string): string = url
 
 when defined(rodedit):
     proc makeCompositionRefsRelative(e: Editor, n: Node, path: string) =
@@ -131,13 +144,11 @@ when loadingAndSavingAvailable:
         if result.len == 0 or e.startFromGame:
             result = getAppDir() & "/../.."
 
-    proc openComposition*(e: Editor, p: string)
-
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false) =
         var newPath = c.path
         if c.path.len == 0 or saveAs:
             var di: DialogInfo
-            di.folder = e.currentProject.path
+            # di.folder = e.currentProject.path
             di.extension = "jcomp"
             di.kind = dkSaveFile
             di.filters = @[(name:"JCOMP", ext:"*.jcomp")]
@@ -158,6 +169,11 @@ when loadingAndSavingAvailable:
                         c.rootNode.composition = nil # hack to serialize content 
 
                 let data = nodeToJson(c.rootNode, newPath)
+                if c.animations.len > 0:
+                    var janims = newJObject()
+                    for a in c.animations:
+                        janims[a.name] = %a
+                    data["animations"] = janims
                 writeFile(newPath, data.pretty())
                 when defined(rodedit):
                     e.revertComposotionRef(c.rootNode)
@@ -180,9 +196,29 @@ when loadingAndSavingAvailable:
             if p.find("file://") == -1:
                 p = "file://" & p
             
-            var n: Node
-            n = newNodeWithUrl(p) do():
-                var c:CompositionDocument
+            var comp = newComposition(p)
+            comp.loadComposition do():
+                let n = comp.node
+                var c = new(CompositionDocument)
+                c.path = p
+                c.path.removePrefix("file://")
+                c.rootNode = n
+
+                when defined(rodedit):
+                    echo "try parse anims ", not n.isNil
+                    
+                    if not n.isNil and not n.jAnimations.isNil:
+                        for k, v in n.jAnimations:
+                            try:
+                                var a = n.toEditedAnimation(v)
+                                a.name = k
+                                c.animations.add(a)
+                            except: 
+                                echo getStackTrace(getCurrentException())
+                                echo getCurrentExceptionMsg()
+                                echo "failed to parse animation"
+                        if c.animations.len > 0:
+                            c.currentAnimation = c.animations[0]
 
                 for tb in e.workspaceView.compositionEditors:
                     if tb.composition.path == p:
@@ -192,21 +228,19 @@ when loadingAndSavingAvailable:
                         e.workspaceView.selectTab(tb)
                         return
 
-                c = new(CompositionDocument)
-                c.path = p
-                c.path.removePrefix("file://")
-                c.rootNode = n
                 var tbv = e.workspaceView.createCompositionEditor(c)
                 if not tbv.isNil:
                     tbv.name = splitFile(p).name
                     e.workspaceView.addTab(tbv)
                     e.workspaceView.selectTab(tbv)
+                
         except:
             error "Can't load composition at ", p
             error "Exception caught: ", getCurrentExceptionMsg()
             error "stack trace: ", getCurrentException().getStackTrace()
 
 else:
+    proc currentProjectPath*(e: Editor): string = discard
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)= discard
     proc openComposition*(e: Editor, p: string) = discard
 
@@ -298,7 +332,7 @@ proc initNotifHandlers(e: Editor)=
     e.notifCenter.addObserver(RodEditorNotif_onCompositionOpen, e) do(args: Variant):
         when loadingAndSavingAvailable:
             var di: DialogInfo
-            di.folder = e.currentProject.path
+            # di.folder = e.currentProject.path
             di.kind = dkOpenFile
             di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json")]
             di.title = "Open composition"

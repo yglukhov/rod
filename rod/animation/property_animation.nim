@@ -9,6 +9,11 @@ import rod/utils/bin_deserializer
 export animation
 
 type
+    KeyInterpolationKind* {.pure.} = enum
+        eiLinear
+        eiBezier
+        eiPresampled
+
     AnimatedProperty* = ref object
         nodeName*, propName*: string
         compIndex*: int
@@ -26,11 +31,11 @@ template elementFromJson(t: typedesc[Vector2], jelem: JsonNode): Vector2 = newVe
 template elementFromJson(t: typedesc[Vector3], jelem: JsonNode): Vector3 = newVector3(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat())
 template elementFromJson(t: typedesc[Vector4], jelem: JsonNode): Vector4 = newVector4(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat(), jelem[3].getFloat())
 template elementFromJson(t: typedesc[Color], jelem: JsonNode): Color = newColor(jelem[0].getFloat(), jelem[1].getFloat(), jelem[2].getFloat(), jelem[3].getFloat(1))
-template elementFromJson(t: typedesc[int], jelem: JsonNode): int = jelem.getInt()
+template elementFromJson(t: typedesc[int32], jelem: JsonNode): int32 = jelem.getInt().int32
 template elementFromJson(t: typedesc[int16], jelem: JsonNode): int16 = jelem.getInt().int16
 template elementFromJson(t: typedesc[bool], jelem: JsonNode): bool = jelem.getBool()
 
-proc splitPropertyName(name: string, nodeName: var string, compIndex: var int, propName: var string) =
+proc splitPropertyName*(name: string, nodeName: var string, compIndex: var int, propName: var string) =
     # A property name can one of the following:
     # nodeName.propName # looked up in node first, then in first met component
     # nodeName.compIndex.propName # looked up only in specified component
@@ -102,7 +107,7 @@ template switchAnimatableTypeId*(t: TypeId, clause: untyped, action: untyped) =
     of clause(Vector4): action(Vector4)
     of clause(Quaternion): action(Quaternion)
     of clause(Color): action(Color)
-    of clause(int): action(int)
+    of clause(int32): action(int32)
     of clause(int16): action(int16)
     of clause(bool): action(bool)
     else:
@@ -129,26 +134,44 @@ proc newValueSampler(t: TypeId, j:JsonNode, lerpBetweenFrames: bool, originalLen
 
     switchAnimatableTypeId(t, getTypeId, makeSampler)
 
-proc newKeyframeSampler[T](j: JsonNode): BezierKeyFrameAnimationSampler[T] {.inline.} =
-    var keys = newSeq[BezierKeyFrame[T]](j.len)
+proc newKeyframeSampler[T](j: JsonNode): KeyFrameAnimationSampler[T] {.inline.} =
+    var keys = newSeq[KeyFrame[T]](j.len)
     shallow(keys)
     var i = 0
     for v in j:
         keys[i].v = elementFromJson(T, v["v"])
         keys[i].p = v["p"].getFloat()
-        let ie = v["ie"]
-        keys[i].inX = ie[0].getFloat()
-        keys[i].inY = ie[1].getFloat()
-        let oe = v["oe"]
-        keys[i].outX = oe[0].getFloat()
-        keys[i].outY = oe[1].getFloat()
+        if parseEnum[KeyInterpolationKind](v{"i"}.getStr("")) == KeyInterpolationKind.eiBezier:
+            let points = v["f"].to(array[4, float])
+            keys[i].tf = bezierTimingFunction(points[0], points[1], points[2], points[3])
         inc i
-    result = newBezierKeyFrameAnimationSampler[T](keys)
+    result = newKeyFrameAnimationSampler[T](keys)
 
 proc newKeyframeSampler(t: TypeId, j: JsonNode): AbstractAnimationSampler =
     template makeSampler(T: typedesc) =
         result = newKeyframeSampler[T](j)
     switchAnimatableTypeId(t, getTypeId, makeSampler)
+
+proc newKeyframeSampler[T](b: BinDeserializer): KeyFrameAnimationSampler[T] {.inline.} =
+    let keysLen = b.readInt16()
+    var keys = newSeq[KeyFrame[T]](keysLen)
+    shallow(keys)
+    for i in 0 ..< keys.len:
+        keys[i].p = b.readFloat32()
+        b.visit(keys[i].v)
+        var inter: KeyInterpolationKind
+        b.visit(inter)
+        if inter == KeyInterpolationKind.eiBezier:
+            var arr = b.getBuffer(float32, 4)
+            keys[i].tf = bezierTimingFunction(arr[0], arr[1], arr[2], arr[3])
+
+    result = newKeyFrameAnimationSampler[T](keys)
+
+proc newKeyframeSampler(t: TypeId, b: BinDeserializer): AbstractAnimationSampler =
+    template makeSampler(T: typedesc) =
+        result = newKeyframeSampler[T](b)
+    switchAnimatableTypeId(t, getTypeId, makeSampler)
+
 
 proc typeIdForSetterAndGetter(ap: Variant): TypeId =
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
@@ -160,12 +183,13 @@ template findAnimatablePropertyAux(body: untyped) =
     var visitor {.inject.} : PropertyVisitor
     visitor.requireName = true
     visitor.requireSetter = true
+    when defined(rodedit):
+        visitor.requireGetter = true
     visitor.flags = { pfAnimatable }
     visitor.commit = proc() =
         if res.isEmpty:
             if visitor.name == propName:
                 res = visitor.setterAndGetter
-
     body
 
     result = res
@@ -197,7 +221,7 @@ proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int
         result = findAnimatableProperty(animatedNode, compIndex, rawPropName)
     if result.isEmpty:
         raise newException(Exception, "Animated property not found: " & nodeName & "." & $compIndex & "." & rawPropName)
-
+ 
 proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: float) =
     template makeSetter(T: typedesc) =
         let setter = sng.get(SetterAndGetter[T]).setter
@@ -208,15 +232,16 @@ proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: flo
     switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, makeSetter)
 
 proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
-    result.new()
-    result.init()
-    result.animatedProperties = @[]
-    shallow(result.animatedProperties)
+    var r = new(PropertyAnimation)
+    r.init()
+    r.animatedProperties = @[]
+    shallow(r.animatedProperties)
 
-    result.loopDuration = 0.0 # TODO: Hack - remove
+    r.loopDuration = 0.0 # TODO: Hack - remove
     for k, jp in j:
-        result.loopDuration = max(jp["duration"].getFloat(), result.loopDuration) # TODO: Hack - remove
-        result.numberOfLoops = jp{"numberOfLoops"}.getInt(1) # TODO: Hack - remove
+        if k == "rodedit$metadata": continue
+        r.loopDuration = max(jp["duration"].getFloat(), r.loopDuration) # TODO: Hack - remove
+        r.numberOfLoops = jp{"numberOfLoops"}.getInt(1) # TODO: Hack - remove
         var animScale = 1.0
         if "animScale" in jp:
             animScale = 1.0 / jp["animScale"].getFloat()
@@ -252,11 +277,11 @@ proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
 
         ap.progressSetter = makeProgressSetter(sng, ap.sampler)
 
-        result.animatedProperties.add(ap)
+        r.animatedProperties.add(ap)
 
-    let res = result
+    result = r
     result.onAnimate = proc(p: float) =
-        for ap in res.animatedProperties:
+        for ap in r.animatedProperties:
             ap.progressSetter(p * ap.scale)
 
 proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyAnimation =
@@ -293,29 +318,23 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
             raise
 
         let frameLerp = bool(b.readUint8())
+        var isKeyFrame = false
+        if not aeComp: isKeyFrame = bool(b.readUint8())
 
-        var cutf = -1
-        var olen = -1
-
-        if aeComp:
-            olen = b.readInt16()
-            cutf = b.readInt16()
-
-        let numValues = b.readInt16()
-
-        # if "keys" in jp:
-        #     ap.sampler = newKeyframeSampler(t, jp["keys"])
-        # elif "cutf" in jp:
-        #     let lerp = jp{"frameLerp"}.getBool(true)
-        #     let olen = jp{"len"}.getInt(-1).int
-        #     let cutf = jp{"cutf"}.getInt(-1).int
-        #     ap.sampler = newValueSampler(t, jp["values"], lerp, olen, cutf)
-        # else:
-
-        if aeComp:
-            ap.sampler = newValueSampler(t, b, numValues, frameLerp, olen, cutf)
+        if isKeyFrame:
+            ap.sampler = newKeyframeSampler(t, b)
         else:
-            ap.sampler = newValueSampler(t, b, numValues, frameLerp)
+            var cutf = -1
+            var olen = -1
+            if aeComp:
+                olen = b.readInt16()
+                cutf = b.readInt16()
+
+            let numValues = b.readInt16()
+            if aeComp:
+                ap.sampler = newValueSampler(t, b, numValues, frameLerp, olen, cutf)
+            else:
+                ap.sampler = newValueSampler(t, b, numValues, frameLerp)
 
         ap.progressSetter = makeProgressSetter(sng, ap.sampler)
 

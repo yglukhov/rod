@@ -696,8 +696,9 @@ proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
 
 proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node {.deprecated.} =
     let c = newComposition(url)
-    c.loadComposition(onComplete)
     result = c.node
+    c.loadComposition(onComplete)
+    
 
 proc newNodeWithResource*(path: string): Node =
     let bd = binDeserializerForPath(path)

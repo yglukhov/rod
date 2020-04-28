@@ -21,8 +21,12 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
         v = T(j.getBiggestInt())
     elif T is string:
         v = j.getStr()
+    elif T is bool:
+        v = j.getBool()
     elif T is Rect:
         v = newRect(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
+    elif T is Quaternion:
+        v = newQuaternion(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
     elif T is tuple:
         var i = 0
         for k, vv in fieldPairs(v):
@@ -44,7 +48,7 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
         for i in 0 ..< j.len:
             b.get(j[i], v[i])
     else:
-        {.error: "unknown type".}
+        {.error: "unknown type " & $T .}
 
 proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
     case jimage.kind
@@ -103,7 +107,7 @@ proc visit*[T: enum](b: JsonDeserializer, v: var T, key: string) =
 proc visit*(b: JsonDeserializer, v: var bool, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = j.getBool()
+        b.get(j, v)
 
 proc visit*(b: JsonDeserializer, v: var Color, key: string) =
     let j = b.node{key}
@@ -148,4 +152,4 @@ proc visit*[I: static[int], T](b: JsonDeserializer, v: var array[I, T], key: str
 proc visit*(b: JsonDeserializer, v: var Quaternion, key: string) =
     let j = b.node{key}
     if not j.isNil:
-        v = newQuaternion(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
+        b.get(j, v)

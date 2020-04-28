@@ -215,7 +215,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
     elif T is int | int64:
         {.error: "int and int64 not supported " .}
     else:
-        {.error: "Unknown type " .}
+        {.error: "Unknown type " & $T .}
 
 
 proc visit*[T](b: BinDeserializer, v: var T) {.inline.} =
