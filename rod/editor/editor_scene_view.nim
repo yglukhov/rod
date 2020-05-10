@@ -65,7 +65,7 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
             if not castedNode.isNil:
                 when defined(rodedit):
                     var p = castedNode.parent
-                    while not p.isNil and p.composition.isNil:
+                    while not p.isNil and p.composition.isNil and castedNode != v.composition.rootNode:
                         p = p.parent
 
                     if castedNode != p and p != v.composition.rootNode:    
