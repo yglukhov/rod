@@ -235,9 +235,11 @@ proc createChangeBackgroundColorButton(w: WorkspaceView) =
             cPicker = newColorPickerView(newRect(0, 0, 300, 200))
             when ColorPickerView is Control:
                 cPicker.onAction do():
+                    if w.editor.sceneView.isNil: return
                     w.editor.sceneView.backgroundColor = cPicker.color
             else:
                 cPicker.onColorSelected = proc(c: Color) =
+                    if w.editor.sceneView.isNil: return
                     w.editor.sceneView.backgroundColor = c
             let popupPoint = b.convertPointToWindow(newPoint(0, b.bounds.height + 5))
             cPicker.setFrameOrigin(popupPoint)

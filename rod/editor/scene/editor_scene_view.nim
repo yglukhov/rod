@@ -1,14 +1,13 @@
 import nimx / [ types, view, event, view_event_handling, portable_gl, context,
     pasteboard/pasteboard, assets/asset_loading, image, matrixes, clip_view ]
 
-import rod / editor / [gizmo, gizmo_move]
-import rod / [node, rod_types, edit_view, viewport]
+import rod / editor / scene / [gizmo, gizmo_move, node_selector, editor_camera_controller]
+import rod / editor / scene / instruments / [ scene_grid ]
+import rod / [ node, rod_types, edit_view, viewport, tools/debug_draw]
 import rod / component / [ sprite, camera ]
-
-import rod/editor_camera_controller
-import node_selector
 import os
 import logging
+
 
 type
     EditorDropDelegate* = ref object of DragDestinationDelegate
@@ -96,6 +95,10 @@ method init*(v: EditorSceneView, r: Rect)=
 
     var clipView = new(ClipView, newRect(0,0,r.width, r.height))
     clipView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    
+    var sceneGrid = new(EditorSceneGrid, newRect(0,0,r.width, r.height))
+    sceneGrid.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    v.addSubview(sceneGrid)
 
     v.nodeSelector = newNodeSelector()
 
@@ -134,8 +137,11 @@ method init*(v: EditorSceneView, r: Rect)=
         v.nodeSelector.draw()
 
     v.addSubview(clipView)
-
+    sceneGrid.scene = v.sceneView
     v.trackMouseOver(true)
+
+# method draw*(v: EditorSceneView, r: Rect) = 
+#     procCall v.EditorTabView.draw(r)
 
 method tabSize*(v: EditorSceneView, bounds: Rect): Size=
     result = newSize(bounds.width, 250.0)

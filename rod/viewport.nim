@@ -4,33 +4,9 @@ import nimx / [ context, types, image, portable_gl, window,
 import algorithm, logging, times, tables
 import rod_types, node, ray
 import component/camera
-import rod/material/shader
 
 export SceneView
 
-const GridVertexShader = """
-attribute vec3 aPosition;
-
-uniform mat4 modelViewProjectionMatrix;
-
-void main()
-{
-    gl_Position = modelViewProjectionMatrix * vec4(aPosition, 1.0);
-}
-"""
-const GridFragmentShader = """
-#ifdef GL_ES
-#extension GL_OES_standard_derivatives : enable
-precision mediump float;
-#endif
-
-void main()
-{
-    gl_FragColor = vec4(0.0, 0.0, 0.0, 0.3);
-}
-"""
-
-var gridShader: Shader
 var deltaTime = 0.0
 var oldTime = 0.0
 
@@ -122,53 +98,6 @@ proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
 
 template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProjectionMatrix()
 
-const gridLineCount = 10
-proc drawGrid(v: SceneView) =
-    let c = currentContext()
-    let gl = c.gl
-
-    for i in 0 .. gridLineCount-1:
-        var p1 = newVector3(10.0 * i.float, 0.0, 45.0)
-        var p2 = newVector3(10.0 * i.float, 0.0, -45.0)
-        p1.x -= gridLineCount / 2.0 * 10.0 - 5
-        p2.x -= gridLineCount / 2.0 * 10.0 - 5
-        c.vertexes[6 * i + 0] = p1.x
-        c.vertexes[6 * i + 1] = p1.y
-        c.vertexes[6 * i + 2] = p1.z
-        c.vertexes[6 * i + 3] = p2.x
-        c.vertexes[6 * i + 4] = p2.y
-        c.vertexes[6 * i + 5] = p2.z
-
-    for i in 0 .. gridLineCount-1:
-        var p1 = newVector3(45.0, 0.0, 10.0 * i.float)
-        var p2 = newVector3(-45.0, 0.0, 10.0 * i.float)
-        p1.z -= gridLineCount / 2.0 * 10.0 - 5
-        p2.z -= gridLineCount / 2.0 * 10.0 - 5
-        let index = 6 * i + (gridLineCount) * 6
-        c.vertexes[index + 0] = p1.x
-        c.vertexes[index + 1] = p1.y
-        c.vertexes[index + 2] = p1.z
-        c.vertexes[index + 3] = p2.x
-        c.vertexes[index + 4] = p2.y
-        c.vertexes[index + 5] = p2.z
-
-    if gridShader.isNil:
-        gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
-
-    gridShader.bindShader()
-    gridShader.setTransformUniform()
-
-    gl.enableVertexAttribArray(0);
-    c.bindVertexData(6 * gridLineCount * 2)
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
-
-    gl.depthMask(true)
-    gl.enable(gl.DEPTH_TEST)
-    gl.drawArrays(gl.LINES, 0, 2 * 2 * gridLineCount)
-
-    gl.disable(gl.DEPTH_TEST)
-    gl.depthMask(true)
-
 import tables
 var drawTable*: TableRef[int, seq[Node]]
 method draw*(v: SceneView, r: Rect) =
@@ -183,8 +112,6 @@ method draw*(v: SceneView, r: Rect) =
         drawTable.clear()
     v.viewProjMatrix = v.getViewProjectionMatrix()
     c.withTransform v.viewProjMatrix:
-        if v.editing: v.drawGrid()
-
         v.rootNode.drawNode(true, drawTable)
         for k, v in drawTable:
             c.gl.clearDepthStencil()

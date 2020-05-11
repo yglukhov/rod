@@ -1,6 +1,6 @@
 import nimx/[context, portable_gl, types, matrixes, event]
 import rod/component/[primitives/cone, primitives/cube, mesh_component, material]
-import rod/[node, viewport, quaternion, editor/gizmo]
+import rod/[node, viewport, quaternion, editor/scene/gizmo]
 import strutils
 
 type MoveGizmo* = ref object of Gizmo
