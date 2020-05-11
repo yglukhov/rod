@@ -167,30 +167,6 @@ proc DDdrawText*(text: string, p: Point, size: float = 16.0, color: Color = gree
 
     currentContext().drawText(p, fText)
 
-const GridVertexShader = """
-attribute vec3 aPosition;
-
-uniform mat4 modelViewProjectionMatrix;
-
-void main()
-{
-    gl_Position = modelViewProjectionMatrix * vec4(aPosition, 1.0);
-}
-"""
-const GridFragmentShader = """
-#ifdef GL_ES
-#extension GL_OES_standard_derivatives : enable
-precision mediump float;
-#endif
-uniform vec4 uColor;
-
-void main()
-{
-    gl_FragColor = uColor;
-}
-"""
-
-var gridShader: Shader
 
 proc DDdrawGrid*(r: Rect, s: Size) =
     let c = currentContext()
@@ -201,14 +177,10 @@ proc DDdrawGrid*(r: Rect, s: Size) =
     
     let totalVetexes = (xLines + yLines) * 6
     let drawCalls = ceil(totalVetexes/c.vertexes.len).int
-   
-    if gridShader.isNil:
-        gridShader = newShader(GridVertexShader, GridFragmentShader, @[(0.GLuint, "aPosition")])
 
-    gridShader.bindShader()
-    gridShader.setTransformUniform()
-
-    gridShader.setUniform("uColor", c.strokeColor)
+    debugDrawShader.bindShader()
+    debugDrawShader.setTransformUniform()
+    debugDrawShader.setUniform("uColor", c.strokeColor)
 
     gl.enableVertexAttribArray(0);
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
@@ -226,8 +198,8 @@ proc DDdrawGrid*(r: Rect, s: Size) =
         var xToDraw = 0
 
         for i in curY ..< yLines:
-            var p1 = newVector3(0.0, i.float * s.height) + newVector3(r.x, r.y)
-            var p2 = newVector3(r.width, i.float * s.height) + newVector3(r.x, r.y)
+            var p1 = newVector3(0.0, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
+            var p2 = newVector3(r.width, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
             
             let index = lineYIndex(yToDraw)
             c.vertexes[index + 0] = p1.x
@@ -244,8 +216,8 @@ proc DDdrawGrid*(r: Rect, s: Size) =
 
         if lineXIndex(0) + 5 < c.vertexes.len:
             for i in curX ..< xLines:
-                var p1 = newVector3(i.float * s.width, 0.0) + newVector3(r.x, r.y)
-                var p2 = newVector3(i.float * s.width, r.height) + newVector3(r.x, r.y)
+                var p1 = newVector3(i.float * s.width, 0.0, 0.0) + newVector3(r.x, r.y, 0.0)
+                var p2 = newVector3(i.float * s.width, r.height, 0.0) + newVector3(r.x, r.y, 0.0)
                 
                 let index = lineXIndex(xToDraw)
                 c.vertexes[index + 0] = p1.x
