@@ -1,5 +1,5 @@
 import rod/editor/[editor_inspector_view, editor_tree_view,
-    animation/editor_animation_view, editor_scene_view, editor_scene_settings,
+    animation/editor_animation_view, scene/editor_scene_view, scene/editor_scene_settings,
     editor_console
 ]
 

@@ -166,3 +166,77 @@ proc DDdrawText*(text: string, p: Point, size: float = 16.0, color: Color = gree
     fText.setTextColorInRange(0, -1, color)
 
     currentContext().drawText(p, fText)
+
+
+proc DDdrawGrid*(r: Rect, s: Size) =
+    let c = currentContext()
+    let gl = c.gl
+
+    let xLines = ceil(r.width / s.width).int
+    let yLines = ceil(r.height / s.height).int
+    
+    let totalVetexes = (xLines + yLines) * 6
+    let drawCalls = ceil(totalVetexes/c.vertexes.len).int
+
+    debugDrawShader.bindShader()
+    debugDrawShader.setTransformUniform()
+    debugDrawShader.setUniform("uColor", c.strokeColor)
+
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
+    
+    # gl.depthMask(true)
+    # gl.enable(gl.DEPTH_TEST)
+
+    template lineYIndex(i: int): int = i * 6
+    template lineXIndex(i: int): int = 6 * i + (yToDraw) * 6
+
+    var draw = 0
+    var curX, curY: int
+    while draw < drawCalls:
+        var yToDraw = 0
+        var xToDraw = 0
+
+        for i in curY ..< yLines:
+            var p1 = newVector3(0.0, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
+            var p2 = newVector3(r.width, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
+            
+            let index = lineYIndex(yToDraw)
+            c.vertexes[index + 0] = p1.x
+            c.vertexes[index + 1] = p1.y
+            c.vertexes[index + 2] = p1.z
+            c.vertexes[index + 3] = p2.x
+            c.vertexes[index + 4] = p2.y
+            c.vertexes[index + 5] = p2.z
+            inc yToDraw
+
+            if lineYIndex(yToDraw) + 5 >= c.vertexes.len:
+                break 
+        curY += yToDraw
+
+        if lineXIndex(0) + 5 < c.vertexes.len:
+            for i in curX ..< xLines:
+                var p1 = newVector3(i.float * s.width, 0.0, 0.0) + newVector3(r.x, r.y, 0.0)
+                var p2 = newVector3(i.float * s.width, r.height, 0.0) + newVector3(r.x, r.y, 0.0)
+                
+                let index = lineXIndex(xToDraw)
+                c.vertexes[index + 0] = p1.x
+                c.vertexes[index + 1] = p1.y
+                c.vertexes[index + 2] = p1.z
+                c.vertexes[index + 3] = p2.x
+                c.vertexes[index + 4] = p2.y
+                c.vertexes[index + 5] = p2.z
+                inc xToDraw
+
+                if lineXIndex(xToDraw) + 5 >= c.vertexes.len:
+                    break 
+        curX += xToDraw
+
+        let vertexesToDraw = yToDraw + xToDraw
+        c.bindVertexData(6 * vertexesToDraw)
+        gl.drawArrays(gl.LINES, 0, GLsizei(vertexesToDraw * 4))
+        inc draw
+
+    # gl.disable(gl.DEPTH_TEST)
+    # gl.depthMask(true)
+    gl.disableVertexAttribArray(0)

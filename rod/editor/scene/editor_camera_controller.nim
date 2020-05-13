@@ -98,6 +98,17 @@ proc onKeyUp*(cc: EditorCameraController, e: var Event) =
     cc.currKey = 0.VirtualKey
 
 proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event) =
+    if cc.editedView.camera.projectionMode == cpOrtho: 
+        if cc.currMouseKey == VirtualKey.MouseButtonSecondary:
+
+            var shift_pos = newVector3(cc.prev_x - dx, cc.prev_y - dy, 0.0) * cc.editedView.camera.node.scale
+            cc.prev_x = dx
+            cc.prev_y = dy
+            cc.camPivot.worldPos = cc.camPivot.worldPos + shift_pos
+            cc.updateCamera()
+            
+        return
+
     if cc.currKey == VirtualKey.LeftAlt or cc.currKey == VirtualKey.RightAlt:
         cc.currentAngle.x += cc.prev_y - dy
         cc.currentAngle.y += cc.prev_x - dx
@@ -121,15 +132,15 @@ proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event
 
     cc.updateCamera()
 
-
 proc onMouseScrroll*(cc: EditorCameraController, e : var Event) =
     var dir: Vector3 = cc.camPivot.worldPos - cc.camAnchor.worldPos
     let ndir: Vector3 = normalized(dir)
     let offset: Vector3 = ndir * e.offset.y - ndir * e.offset.x * 10.0
 
     if cc.editedView.camera.projectionMode == cpOrtho:
-        cc.editedView.camera.node.scale = cc.editedView.camera.node.scale + e.offset.x * 0.1
-
+        cc.editedView.camera.node.scale = cc.editedView.camera.node.scale + e.offset.y * 0.005
+        return
+    
     # 0 coord lock protection
     if length(offset) > length(dir) - 0.1 and dot(offset, dir) > 0.5:
         return

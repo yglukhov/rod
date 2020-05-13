@@ -61,7 +61,7 @@ proc createComponentsView(inspector: InspectorView, n: Node)
 
 
 proc visitProperties*(i: InspectorView, c: Composition, p: var PropertyVisitor) =
-    when loadingAndSavingAvailable:
+    when defined(rodedit):
         var url = relativeUrl(c.url, i.editor.currentProjectPath())
     else:
         var url = c.url

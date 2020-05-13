@@ -103,7 +103,8 @@ const EditorCameraNodeName3D* = "[EditorCamera3D]"
 const EditorRootNodeName* = "[EditorRoot]"
 
 # Default open tabs
-const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Animation", "Assets" ]
+# const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Animation", "Assets" ]
+const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Assets" ]
 
 # Other
 const EditorViewportSize* = newSize(1920.0, 1080.0)
