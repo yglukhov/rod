@@ -12,9 +12,6 @@ import variant
 
 export view
 
-
-# import rod.editor.editor_tab
-
 type SceneSettingsView* = ref object of EditorTabView
     propView: LinearLayout
     scView: ScrollView
@@ -73,19 +70,11 @@ proc `inspectedNode=`*(i: SceneSettingsView, n: Node) =
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
 
-
         for v in n.components:
             closureScope:
                 expView = newExpandingView(newRect(0, 0, 328, 20.0))
                 expView.title = v.className
-                let component = v
                 expView.expand()
-
-                let removeButton = newButton(expView, newPoint(328 - 18, 0), newSize(18.0, 18), "-")
-                removeButton.autoresizingMask = {afFlexibleMinX}
-                removeButton.onAction do():
-                    n.removeComponent(component)
-                    i.inspectedNode = n
 
             v.visitProperties(visitor)
             i.propView.addSubview(expView)

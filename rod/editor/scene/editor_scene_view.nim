@@ -98,7 +98,7 @@ method init*(v: EditorSceneView, r: Rect)=
     
     var sceneGrid = new(EditorSceneGrid, newRect(0,0,r.width, r.height))
     sceneGrid.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    v.addSubview(sceneGrid)
+    clipView.addSubview(sceneGrid)
 
     v.nodeSelector = newNodeSelector()
 
@@ -114,6 +114,7 @@ method init*(v: EditorSceneView, r: Rect)=
         let c2d = cameraNode2d.component(Camera)
         c2d.viewportSize = EditorViewportSize
         c2d.projectionMode = cpOrtho
+        c2d.node.scale = newVector3(1.2, 1.2, 1.2)
         cameraNode2d.position = newVector3(EditorViewportSize.width * 0.5, EditorViewportSize.height * 0.5, 100.0)
 
         let cameraNode3d = editView.rootNode.newChild(EditorCameraNodeName3D)

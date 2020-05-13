@@ -1,11 +1,11 @@
-import nimx / [ view, types, matrixes, context ]
+import nimx / [ view, types, matrixes, context, portable_gl ]
 import rod / [ rod_types, node, viewport ]
 import rod / tools / debug_draw
 import rod / editor / editor_types
 import math
 
 type EditorSceneGrid* = ref object of View
-  gridSize: Size
+  gridSize*: Size
   currentScene: SceneView
 
 method init*(v: EditorSceneGrid, r: Rect) =
@@ -23,20 +23,27 @@ method draw*(v: EditorSceneGrid, r: Rect) =
   let mvp = v.currentScene.getViewProjectionMatrix()
   let c = currentContext()
   
+
+  template drawGrid(r: Rect,s: Size, color: Color) =
+    var gr = r
+    gr.origin.x = gr.x - (s.width + (gr.x mod s.width))
+    gr.origin.y = gr.y - (s.height + (gr.y mod s.height))
+    gr.size.width += s.width
+    gr.size.height += s.height
+    c.strokeColor = color
+    
+    DDdrawGrid(gr, s)
+
+
   c.withTransform mvp:
     let p0 = v.currentScene.screenToWorldPoint(newVector3())
     let p1 = v.currentScene.screenToWorldPoint(newVector3(r.width, r.height))    
     var gr = newRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y)
-
-    gr.origin.x = gr.x - (gr.x mod v.gridSize.width)
-    gr.origin.y = gr.y - (gr.y mod v.gridSize.height)
-    c.strokeColor = newColor(0.0, 0.0, 0.0, 0.1)
-    DDdrawGrid(gr, v.gridSize)
-
     
-    gr.origin.x = gr.x - (gr.x mod (v.gridSize.width * 5))
-    gr.origin.y = gr.y - (gr.y mod (v.gridSize.height * 5))
-    c.strokeColor = newColor(0.0, 0.0, 0.0, 0.3)
-    DDdrawGrid(gr, newSize(v.gridSize.width * 5, v.gridSize.height * 5))
+    # looks like incorrect opengl state with ClipView, so this circle Won't be rendered
+    DDdrawCircle(newVector3(), 1)
 
-    DDdrawRect(newRect(0, 0, 1920, 1080))
+    drawGrid(gr, v.gridSize, newColor(0.0, 0.0, 0.0, 0.1))
+    drawGrid(gr, newSize(v.gridSize.width * 5, v.gridSize.height * 5), newColor(0.0, 0.0, 0.0, 0.3))
+
+    DDdrawRect(newRect(0, 0, v.currentScene.camera.viewportSize.width, v.currentScene.camera.viewportSize.height))

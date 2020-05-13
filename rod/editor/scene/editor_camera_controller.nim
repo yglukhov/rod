@@ -132,7 +132,6 @@ proc onScrollProgress*(cc: EditorCameraController, dx, dy : float, e : var Event
 
     cc.updateCamera()
 
-
 proc onMouseScrroll*(cc: EditorCameraController, e : var Event) =
     var dir: Vector3 = cc.camPivot.worldPos - cc.camAnchor.worldPos
     let ndir: Vector3 = normalized(dir)

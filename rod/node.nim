@@ -365,8 +365,10 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
             n.components[ci].componentNodeWillBeRemovedFromSceneView()
             inc ci
 
-    for c in n.children:
-        c.nodeWillBeRemovedFromSceneView()
+    var ci = 0
+    while ci < n.children.len:
+        n.children[ci].nodeWillBeRemovedFromSceneView()
+        inc ci
     n.mSceneView = nil
 
 proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
@@ -378,8 +380,10 @@ proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
             while ci < size:
                 n.components[ci].componentNodeWasAddedToSceneView()
                 inc ci
-        for c in n.children:
-            c.nodeWasAddedToSceneView(v)
+        var ci = 0
+        while ci < n.children.len:
+            n.children[ci].nodeWasAddedToSceneView(v)
+            inc ci
     else:
         # There may be cases where this proc has already been called.
         # E.g. component adds child node to its node in
