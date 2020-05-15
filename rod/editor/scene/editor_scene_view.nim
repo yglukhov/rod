@@ -2,12 +2,11 @@ import nimx / [ types, view, event, view_event_handling, portable_gl, context,
     pasteboard/pasteboard, assets/asset_loading, image, matrixes, clip_view ]
 
 import rod / editor / scene / [gizmo, gizmo_move, node_selector, editor_camera_controller]
-import rod / editor / scene / instruments / [ scene_grid ]
+import rod / editor / scene / components / [ grid, editor_component, viewport_rect ]
 import rod / [ node, rod_types, edit_view, viewport, tools/debug_draw]
 import rod / component / [ sprite, camera ]
 import os
 import logging
-
 
 type
     EditorDropDelegate* = ref object of DragDestinationDelegate
@@ -95,11 +94,6 @@ method init*(v: EditorSceneView, r: Rect)=
 
     var clipView = new(ClipView, newRect(0,0,r.width, r.height))
     clipView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    
-    var sceneGrid = new(EditorSceneGrid, newRect(0,0,r.width, r.height))
-    sceneGrid.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
-    clipView.addSubview(sceneGrid)
-
     v.nodeSelector = newNodeSelector()
 
     if not v.editor.startFromGame:
@@ -108,6 +102,8 @@ method init*(v: EditorSceneView, r: Rect)=
         editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
 
         editView.rootNode = newNode(EditorRootNodeName)
+        let gc = editView.rootNode.component(GridComponent)
+
         editView.editing = true
 
         let cameraNode2d = editView.rootNode.newChild(EditorCameraNodeName2D)
@@ -124,6 +120,7 @@ method init*(v: EditorSceneView, r: Rect)=
         editView.rootNode.addChild(v.composition.rootNode)
         clipView.addSubview(editView)
 
+        discard editView.rootNode.newChild("overlay").component(ViewportRect)
         v.sceneView = editView
     else:
         v.sceneView = v.rootNode.sceneView
@@ -138,11 +135,12 @@ method init*(v: EditorSceneView, r: Rect)=
         v.nodeSelector.draw()
 
     v.addSubview(clipView)
-    sceneGrid.scene = v.sceneView
     v.trackMouseOver(true)
 
 # method draw*(v: EditorSceneView, r: Rect) = 
 #     procCall v.EditorTabView.draw(r)
+
+
 
 method tabSize*(v: EditorSceneView, bounds: Rect): Size=
     result = newSize(bounds.width, 250.0)

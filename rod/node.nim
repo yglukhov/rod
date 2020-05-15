@@ -6,6 +6,9 @@ import rod/asset_bundle
 import quaternion, ray, rod_types
 import tables, typetraits, json, strutils, math, os
 
+when defined(rodedit):
+    import rod / editor / scene / components / editor_component
+
 export Node
 
 proc sceneView*(n: Node): SceneView = n.mSceneView
@@ -268,6 +271,8 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
             # Legacy api support. Will be removed soon.
             for c in n.components:
                 c.draw()
+                when defined(rodedit):
+                    c.onDrawGizmo()
                 hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
 
     let shouldDrawChildren = recursive and not hasPosteffectComponent

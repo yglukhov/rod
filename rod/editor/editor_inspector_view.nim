@@ -219,4 +219,7 @@ method onCompositionChanged*(v: InspectorView, comp: CompositionDocument) =
     # v.inspectedNode = comp.rootNode
     v.setEditedNode(comp.selectedNode)
 
+method onEditModeChanged*(v: InspectorView, mode: EditMode) = 
+    v.inspectedNode = v.currNode
+
 registerEditorTab("Inspector", InspectorView)

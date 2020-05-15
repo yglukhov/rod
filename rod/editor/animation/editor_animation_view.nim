@@ -46,12 +46,15 @@ proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
         v.nameField.text = val.name
         v.fpsField.text = $val.fps
         v.durationField.text = $val.duration
-        
     else:
         v.dopesheetView.editedAnimation = nil
         v.nameField.text = ""
         v.fpsField.text = ""
         v.durationField.text = ""
+    
+    var currComp = v.editor.currentComposition
+    if not currComp.isNil:
+        currComp.currentAnimation = val
     v.reload()
 
 proc newEditedAnimation(v: AnimationEditView) =
@@ -379,6 +382,7 @@ method viewWillMoveToWindow*(v: AnimationEditView, w: Window) =
     else:
         setTimeout(0.1) do(): # hack to prevent sigfault on editor start
             v.editor.onEditModeChanged(emAnimation)
+            v.editedAnimation = v.editedAnimation
 
 method acceptsFirstResponder*(v: AnimationEditView): bool = true
 
