@@ -347,8 +347,10 @@ proc createSceneMenu(w: WorkspaceView) =
                     var sceneEdit = w.createCompositionEditor()
                     if not sceneEdit.isNil:
                         w.addTab(sceneEdit)
-                - "Load comp":
+                - "Open comp":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionOpen)
+                - "Load comp":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionLoad)
                     # e.loadNode()
                 - "Save comp":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionSave)
