@@ -42,7 +42,7 @@ proc reload(v: AnimationEditView)
 proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
     if val != nil:
         v.dopesheetView.editedAnimation = val
-        v.dopesheetView.sampleRate = v.editedAnimation.sampleRate()
+        v.dopesheetView.sampleRate = val.sampleRate()
         v.nameField.text = val.name
         v.fpsField.text = $val.fps
         v.durationField.text = $val.duration
