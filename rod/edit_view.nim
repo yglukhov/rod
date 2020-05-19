@@ -223,22 +223,6 @@ when loadingAndSavingAvailable:
             error "stack trace: ", getCurrentException().getStackTrace()
             # e.openComposition(path)
 
-    proc openComposition(e: Editor, c: CompositionDocument)=
-        var c = c
-        for tb in e.workspaceView.compositionEditors:
-            if tb.composition.path == c.path:
-                c = tb.composition
-                c.rootNode = c.rootNode
-                tb.onCompositionChanged(c)
-                e.workspaceView.selectTab(tb)
-                return
-
-        var tbv = e.workspaceView.createCompositionEditor(c)
-        if not tbv.isNil:
-            tbv.name = splitFile(c.path).name
-            e.workspaceView.addTab(tbv)
-            e.workspaceView.selectTab(tbv)
-
     proc openComposition*(e: Editor, p: string) =
         e.loadCompositionDocument(p) do(c: CompositionDocument):
             var c = c
@@ -365,8 +349,7 @@ proc initNotifHandlers(e: Editor)=
             di.title = "Open composition"
             let path = di.show()
             if path.len > 0:
-                e.loadCompositionDocument(path) do(c: CompositionDocument):
-                    e.openComposition(c)
+                e.openComposition(path)
         else: discard
 
     e.notifCenter.addObserver(RodEditorNotif_onCompositionLoad, e) do(args: Variant):
