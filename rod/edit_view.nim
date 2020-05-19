@@ -352,7 +352,7 @@ proc initNotifHandlers(e: Editor)=
                 e.openComposition(path)
         else: discard
 
-    e.notifCenter.addObserver(RodEditorNotif_onCompositionLoad, e) do(args: Variant):
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionAdd, e) do(args: Variant):
         when loadingAndSavingAvailable:
             var di: DialogInfo
             # di.folder = e.currentProject.path
