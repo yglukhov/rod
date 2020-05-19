@@ -25,7 +25,7 @@ type
         rootNode*: Node
         editor*: Editor
         composition*: CompositionDocument
-    
+
     CompositionDocument* = ref object
         path*: string
         rootNode*: Node
@@ -86,6 +86,7 @@ method onEditModeChanged*(v: EditorTabView, mode: EditMode) {.base.} = discard
 
 # Notifications
 const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"
+const RodEditorNotif_onCompositionAdd* = "RodEditorNotif_onCompositionAdd"
 const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
 const RodEditorNotif_onCompositionSaveAs* = "RodEditorNotif_onCompositionSaveAs"
 const RodEditorNotif_onCompositionNew* = "RodEditorNotif_onCompositionNew"

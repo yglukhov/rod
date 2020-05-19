@@ -338,7 +338,7 @@ proc createSceneMenu(w: WorkspaceView) =
             let m = makeMenu("Scene"):
                 - "Load":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionOpen)
-                    
+
             w.addToolbarMenu(m)
         else:
             let m = makeMenu("Scene"):
@@ -347,8 +347,10 @@ proc createSceneMenu(w: WorkspaceView) =
                     var sceneEdit = w.createCompositionEditor()
                     if not sceneEdit.isNil:
                         w.addTab(sceneEdit)
-                - "Load comp":
+                - "Open comp":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionOpen)
+                - "Add comp":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionAdd)
                     # e.loadNode()
                 - "Save comp":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionSave)

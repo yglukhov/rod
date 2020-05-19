@@ -161,12 +161,12 @@ when loadingAndSavingAvailable:
             if newPath.len > 0:
                 let compName = splitFile(newPath).name
                 c.rootNode.name = compName
-                
+
                 when defined(rodedit):
                     e.makeCompositionRefsRelative(c.rootNode, newPath)
                     var composition = c.rootNode.composition
                     if not c.rootNode.composition.isNil:
-                        c.rootNode.composition = nil # hack to serialize content 
+                        c.rootNode.composition = nil # hack to serialize content
 
                 let data = nodeToJson(c.rootNode, newPath)
                 if c.animations.len > 0:
@@ -187,15 +187,12 @@ when loadingAndSavingAvailable:
             error "Exception caught: ", getCurrentExceptionMsg()
             error "stack trace: ", getCurrentException().getStackTrace()
 
-    proc openComposition*(e: Editor, p: string)=
+    proc loadCompositionDocument*(e: Editor, path: string, cb: proc(r: CompositionDocument)) =
         try:
-            if e.startFromGame:
-                return
-            
-            var p = p
+            var p = path
             if p.find("file://") == -1:
                 p = "file://" & p
-            
+
             var comp = newComposition(p)
             comp.loadComposition do():
                 let n = comp.node
@@ -206,43 +203,57 @@ when loadingAndSavingAvailable:
 
                 when defined(rodedit):
                     echo "try parse anims ", not n.isNil
-                    
+
                     if not n.isNil and not n.jAnimations.isNil:
                         for k, v in n.jAnimations:
                             try:
                                 var a = n.toEditedAnimation(v)
                                 a.name = k
                                 c.animations.add(a)
-                            except: 
+                            except:
                                 echo getStackTrace(getCurrentException())
                                 echo getCurrentExceptionMsg()
                                 echo "failed to parse animation"
                         if c.animations.len > 0:
                             c.currentAnimation = c.animations[0]
-
-                for tb in e.workspaceView.compositionEditors:
-                    if tb.composition.path == p:
-                        c = tb.composition
-                        c.rootNode = n
-                        tb.onCompositionChanged(c)
-                        e.workspaceView.selectTab(tb)
-                        return
-
-                var tbv = e.workspaceView.createCompositionEditor(c)
-                if not tbv.isNil:
-                    tbv.name = splitFile(p).name
-                    e.workspaceView.addTab(tbv)
-                    e.workspaceView.selectTab(tbv)
-                
+                cb(c)
         except:
-            error "Can't load composition at ", p
+            error "Can't load composition at ", path
             error "Exception caught: ", getCurrentExceptionMsg()
             error "stack trace: ", getCurrentException().getStackTrace()
+            # e.openComposition(path)
+
+    proc openComposition*(e: Editor, p: string) =
+        e.loadCompositionDocument(p) do(c: CompositionDocument):
+            var c = c
+            for tb in e.workspaceView.compositionEditors:
+                if tb.composition.path == c.path:
+                    c = tb.composition
+                    c.rootNode = c.rootNode
+                    tb.onCompositionChanged(c)
+                    e.workspaceView.selectTab(tb)
+                    return
+
+            var tbv = e.workspaceView.createCompositionEditor(c)
+            if not tbv.isNil:
+                tbv.name = splitFile(c.path).name
+                e.workspaceView.addTab(tbv)
+                e.workspaceView.selectTab(tbv)
+
+    proc loadCompositionToScene*(e: Editor, p: string) =
+        e.loadCompositionDocument(p) do(c: CompositionDocument):
+            if not e.currentComposition.isNil:
+                var p = e.currentComposition.selectedNode
+                if p.isNil:
+                    p = e.currentComposition.rootNode
+                p.addChild(c.rootNode)
+                e.currentComposition.owner.onCompositionChanged(e.currentComposition)
 
 else:
     proc currentProjectPath*(e: Editor): string = discard
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)= discard
     proc openComposition*(e: Editor, p: string) = discard
+    proc loadCompositionToScene*(e: Editor, p: string) = discard
 
 proc selectNode*(editor: Editor, node: Node) =
     editor.selectedNode = node
@@ -318,7 +329,7 @@ proc onFirstResponderChanged(e: Editor, fr: View)=
 
 proc initNotifHandlers(e: Editor)=
     e.notifCenter = newNotificationCenter()
-    
+
     e.notifCenter.addObserver(RodEditorNotif_onCompositionSave, e) do(args: Variant):
         when loadingAndSavingAvailable:
             e.saveComposition(e.mCurrentComposition)
@@ -340,6 +351,19 @@ proc initNotifHandlers(e: Editor)=
             if path.len > 0:
                 e.openComposition(path)
         else: discard
+
+    e.notifCenter.addObserver(RodEditorNotif_onCompositionAdd, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            var di: DialogInfo
+            # di.folder = e.currentProject.path
+            di.kind = dkOpenFile
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json")]
+            di.title = "Open composition"
+            let path = di.show()
+            if path.len > 0:
+                e.loadCompositionToScene(path)
+        else: discard
+
 
 proc onKeyDown(ed: Editor, e: var Event): bool =
     case commandFromEvent(e)
