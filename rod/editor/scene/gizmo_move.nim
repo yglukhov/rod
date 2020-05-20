@@ -1,7 +1,7 @@
 import nimx/[context, portable_gl, types, matrixes, event]
 import rod/component/[primitives/cone, primitives/cube, mesh_component, material]
 import rod/[node, viewport, quaternion, editor/scene/gizmo]
-import strutils, math
+import strutils
 
 type MoveGizmo* = ref object of Gizmo
     screenPoint: Vector3
@@ -126,12 +126,11 @@ method proccesTransform*(g: MoveGizmo, position: Point) =
     var curPosition: Vector3
     curPosition = g.mEditedNode.sceneView.screenToWorldPoint(curScreenPoint) + g.offset
     curPosition = curPosition - g.gizmoNode.worldPos
-    if classify(curPosition.x) == fcNan: return #happens when gizmo and edited node out of screen
     g.gizmoNode.position = g.gizmoNode.worldPos + curPosition * g.axisMask
-    var r = g.gizmoNode.position
     if not g.mEditedNode.parent.isNil:
-        r = g.mEditedNode.parent.worldToLocal(g.gizmoNode.position)
-    g.mEditedNode.position = r
+        g.mEditedNode.position = g.mEditedNode.parent.worldToLocal(g.gizmoNode.position)
+    else:
+        g.mEditedNode.position = g.gizmoNode.position
 
 method stopTransform*(g: MoveGizmo) =
     g.axisMask = newVector3(0.0, 0.0, 0.0)
