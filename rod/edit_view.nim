@@ -68,6 +68,10 @@ proc getEditorTab*[T](e: Editor): T =
         if t of T:
             return t.T
 
+proc onCompositionSaved*(e: Editor, c: CompositionDocument) =
+    for t in e.workspaceView.compositionEditors:
+        t.onCompositionSaved(c)
+
 proc updateCameraSelector(e: Editor) = discard #todo: fix this!
     # var items = newSeq[string]()
     # var i = 0
@@ -182,6 +186,7 @@ when loadingAndSavingAvailable:
                 c.path = newPath
                 e.workspaceView.setTabTitle(c.owner, compName)
 
+                e.onCompositionSaved(c)
         except:
             error "Can't save composition at ", newPath
             error "Exception caught: ", getCurrentExceptionMsg()

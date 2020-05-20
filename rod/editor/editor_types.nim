@@ -82,6 +82,8 @@ method onSceneChanged*(v: EditorTabView) {.base, deprecated.}=
 method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base.} =
     v.composition = comp
 
+method onCompositionSaved*(v: EditorTabView, comp: CompositionDocument) {.base.} = discard
+
 method onEditModeChanged*(v: EditorTabView, mode: EditMode) {.base.} = discard
 
 # Notifications
