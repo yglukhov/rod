@@ -5,7 +5,7 @@ import rod / editor / scene / [gizmo, gizmo_move, node_selector, editor_camera_c
 import rod / editor / scene / components / [ grid, editor_component, viewport_rect ]
 import rod / [ node, rod_types, edit_view, viewport, tools/debug_draw]
 import rod / component / [ sprite, camera ]
-import os
+import os, strutils
 import logging
 
 type
@@ -66,7 +66,7 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
                     while not p.isNil and p.composition.isNil and castedNode != v.composition.rootNode:
                         p = p.parent
 
-                    if castedNode != p and p != v.composition.rootNode:    
+                    if castedNode != p and p != v.composition.rootNode:
                         castedNode = p
 
                 v.editor.selectedNode = castedNode
@@ -137,10 +137,6 @@ method init*(v: EditorSceneView, r: Rect)=
     v.addSubview(clipView)
     v.trackMouseOver(true)
 
-# method draw*(v: EditorSceneView, r: Rect) = 
-#     procCall v.EditorTabView.draw(r)
-
-
 
 method tabSize*(v: EditorSceneView, bounds: Rect): Size=
     result = newSize(bounds.width, 250.0)
@@ -180,7 +176,7 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
                             cs = editorScene.selectedNode.parent
                         if cs.isNil:
                             raise newException(Exception, "Can't attach to prefab. Attaching to prafab parent failed, parent is nil")
-                    
+
                     cs.addChild(n)
                     editorScene.composition.selectedNode = cs
                     editorScene.editor.onCompositionChanged(editorScene.composition)
@@ -188,13 +184,13 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
                     discard target.makeFirstResponder()
         except:
             warn "Can't deserialize ", i.data, " ", getCurrentExceptionMsg()
-    
+
     of rodPbSprite:
         loadAsset[Image]("file://" & i.data) do(image: Image, err: string):
             if image.isNil:
                 warn "Can't load image from ", i.data
                 return
-            
+
             var spName = splitFile(i.data)
             var n = newNode(spName.name)
             n.component(Sprite).image = image
@@ -210,5 +206,30 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
             # editorScene.editor.selectedNode = n
     else:
         discard
+
+proc allComprefs(n: Node, s: var seq[Composition])=
+    if not n.composition.isNil:
+        s.add(n.composition)
+    for ch in n.children:
+        ch.allComprefs(s)
+
+proc updateComprRef(c: Composition) =
+    echo "updateCompRef ", c.url
+    var n: Node
+    n = newNodeWithURL(c.url) do():
+        if not n.isNil:
+            c.node.removeAllChildren()
+            while n.children.len > 0:
+                c.node.addChild(n.children[0])
+
+method onCompositionSaved*(v: EditorSceneView, comp: CompositionDocument) =
+    if comp.owner == v: return
+
+    let compPath = "file://" & comp.path.replace("\\", "/")
+    var comps: seq[Composition]
+    v.composition.rootNode.allComprefs(comps)
+    for c in comps:
+        if c.url == compPath:
+            c.updateComprRef()
 
 registerEditorTab(RodInternalTab & "/Scene", EditorSceneView)
