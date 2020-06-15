@@ -179,9 +179,9 @@ import component/ui_component, algorithm
 method name*(v: SceneView): string =
     result = "SceneView"
 
-type UIComponentIntersection = tuple[i: Vector3, c: UIComponent]
+type UIComponentIntersection* = tuple[i: Vector3, c: UIComponent]
 
-proc getUiComponentsIntersectingWithRay(v: SceneView, r: Ray): seq[UIComponentIntersection] =
+proc getUiComponentsIntersectingWithRay*(v: SceneView, r: Ray): seq[UIComponentIntersection] =
     result = @[]
     for c in v.uiComponents:
         var inter : Vector3
