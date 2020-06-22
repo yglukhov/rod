@@ -57,12 +57,13 @@ proc wrapperAUX(bin, toolName, pathToToolMainNim: string, useDanger:bool, cflags
 
 
 proc runWrapper*(toolName, pathToToolMainNim: string) =
-    let tmp = getTempDir()
+    var prefix = getEnv("ROD_ASSET_BIN")
+    if prefix.len == 0:
+        prefix = getTempDir()
     let cd = getCurrentDir()
     let projName = splitPath(cd).tail
-    let bin = tmp / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
+    let bin = prefix / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
     wrapperAUX(bin, toolName, pathToToolMainNim, useDanger = true)
-
 
 proc runEditorWrapper*(toolName, pathToToolMainNim: string) =
     let cd = getCurrentDir()
