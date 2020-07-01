@@ -14,7 +14,7 @@ method onDrawGizmo*(c: GridComponent) =
   let scene = c.node.sceneView
   let ss = scene.bounds
   let p0 = scene.screenToWorldPoint(newVector3())
-  let p1 = scene.screenToWorldPoint(newVector3(ss.width, ss.height))    
+  let p1 = scene.screenToWorldPoint(newVector3(ss.width, ss.height))
 
   let ctx = currentContext()
 
@@ -25,15 +25,11 @@ method onDrawGizmo*(c: GridComponent) =
     gr.size.width += s.width * 2
     gr.size.height += s.height * 2
     ctx.strokeColor = color
-    
+
     DDdrawGrid(gr, s)
 
   var gr = newRect(p0.x, p0.y, p1.x - p0.x, p1.y - p0.y)
-  
-  #todo: remove this draw
-  DDdrawCircle(newVector3(), 1) 
-
   drawGrid(gr, c.gridSize, newColor(0.0, 0.0, 0.0, 0.1))
   drawGrid(gr, newSize(c.gridSize.width * 5, c.gridSize.height * 5), newColor(0.0, 0.0, 0.0, 0.3))
-  
+
 registerComponent(GridComponent, "Editor")

@@ -6,6 +6,7 @@ beforeBuild = proc(b: Builder) =
     b.mainFile = "editor/rodedit_main"
     b.originalResourcePath = "editor/res"
     b.additionalNimFlags.add("-d:rodplugin")
+    b.additionalNimFlags.add("-d:rodedit")
     b.additionalNimFlags.add("--putenv:PREFS_FILE_NAME=rodedit.json")
 
 proc filterExceptions(name: string): bool =

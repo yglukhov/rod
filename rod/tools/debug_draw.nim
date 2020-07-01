@@ -4,7 +4,7 @@ import math
 import opengl
 
 const vertexShader = """
-attribute vec4 aPosition;
+attribute vec3 aPosition;
 uniform mat4 modelViewProjectionMatrix;
 void main() { gl_Position = modelViewProjectionMatrix * vec4(aPosition.xyz, 1.0); }
 """
@@ -174,7 +174,7 @@ proc DDdrawGrid*(r: Rect, s: Size) =
 
     let xLines = ceil(r.width / s.width).int
     let yLines = ceil(r.height / s.height).int
-    
+
     let totalVetexes = (xLines + yLines) * 6
     let drawCalls = ceil(totalVetexes/c.vertexes.len).int
 
@@ -183,8 +183,7 @@ proc DDdrawGrid*(r: Rect, s: Size) =
     debugDrawShader.setUniform("uColor", c.strokeColor)
 
     gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
-    
+
     # gl.depthMask(true)
     # gl.enable(gl.DEPTH_TEST)
 
@@ -200,7 +199,7 @@ proc DDdrawGrid*(r: Rect, s: Size) =
         for i in curY ..< yLines:
             var p1 = newVector3(0.0, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
             var p2 = newVector3(r.width, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
-            
+
             let index = lineYIndex(yToDraw)
             c.vertexes[index + 0] = p1.x
             c.vertexes[index + 1] = p1.y
@@ -211,14 +210,14 @@ proc DDdrawGrid*(r: Rect, s: Size) =
             inc yToDraw
 
             if lineYIndex(yToDraw) + 5 >= c.vertexes.len:
-                break 
+                break
         curY += yToDraw
 
         if lineXIndex(0) + 5 < c.vertexes.len:
             for i in curX ..< xLines:
                 var p1 = newVector3(i.float * s.width, 0.0, 0.0) + newVector3(r.x, r.y, 0.0)
                 var p2 = newVector3(i.float * s.width, r.height, 0.0) + newVector3(r.x, r.y, 0.0)
-                
+
                 let index = lineXIndex(xToDraw)
                 c.vertexes[index + 0] = p1.x
                 c.vertexes[index + 1] = p1.y
@@ -229,14 +228,13 @@ proc DDdrawGrid*(r: Rect, s: Size) =
                 inc xToDraw
 
                 if lineXIndex(xToDraw) + 5 >= c.vertexes.len:
-                    break 
+                    break
         curX += xToDraw
 
-        let vertexesToDraw = yToDraw + xToDraw
-        c.bindVertexData(6 * vertexesToDraw)
-        gl.drawArrays(gl.LINES, 0, GLsizei(vertexesToDraw * 4))
+        let linesToDraw = yToDraw + xToDraw
+        c.bindVertexData(6 * linesToDraw)
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
+        gl.drawArrays(gl.LINES, 0, GLsizei(linesToDraw * 2))
         inc draw
 
-    # gl.disable(gl.DEPTH_TEST)
-    # gl.depthMask(true)
     gl.disableVertexAttribArray(0)
