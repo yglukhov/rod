@@ -172,7 +172,6 @@ method deserialize*(t: Text, j: JsonNode, s: Serializer) =
 
         var isColorGradient: bool
         s.deserializeValue(j, "isColorGradient", isColorGradient)
-        echo "deserializeValue"
         if isColorGradient:
             var color1: Color
             var color2: Color
@@ -269,24 +268,18 @@ proc `strokeColorTo=`*(c: Text, v: Color) =
 
 proc isStrokeGradient*(c: Text): bool = c.mText.strokeOfRuneAtPos(0).isGradient
 proc `isStrokeGradient=`*(c: Text, v: bool) =
-    echo "isStrokeGradient"
     var s = c.mText.strokeOfRuneAtPos(0)
     if v:
-        echo "true"
         c.mText.setStrokeInRange(0, -1, s.color1, s.color2, s.size)
     else:
-        echo "false"
         c.mText.setStrokeInRange(0, -1, s.color1, s.size)
 
 proc isColorGradient*(c: Text): bool = c.mText.colorOfRuneAtPos(0).isGradient
 proc `isColorGradient=`*(c: Text, v: bool) =
-    echo "isColorGradient"
     var s = c.mText.colorOfRuneAtPos(0)
     if v:
-        echo "true"
         c.mText.setTextColorInRange(0, -1, s.color1, s.color2)
     else:
-        echo "false"
         c.mText.setTextColorInRange(0, -1, s.color1)
 
 proc colorFrom*(c: Text): Color = c.mText.colorOfRuneAtPos(0).color1
@@ -297,8 +290,6 @@ proc `colorFrom=`*(c: Text, v: Color) =
 
 proc colorTo*(c: Text): Color = c.mText.colorOfRuneAtPos(0).color2
 proc `colorTo=`*(c: Text, v: Color) =
-    echo "colorTo"
-    echo "isColorGradient = ", c.isColorGradient
     var s = c.mText.colorOfRuneAtPos(0)
     s.color2 = v
     c.mText.setTextColorInRange(0, -1, s.color1, s.color2)
@@ -307,7 +298,6 @@ proc lineSpacing*(c: Text): Coord = c.mText.lineSpacing
 proc `lineSpacing=`*(c: Text, s: float32) = c.mText.lineSpacing = s
 
 method serialize*(c: Text, s: Serializer): JsonNode =
-    echo "serialize"
     result = newJObject()
     result.add("text", s.getValue(c.text))
     result.add("color", s.getValue(c.color))
@@ -325,8 +315,6 @@ method serialize*(c: Text, s: Serializer): JsonNode =
         result.add("font", s.getValue(fontFace))
     result.add("strokeSize", s.getValue(c.strokeSize))
     result.add("strokeColor", s.getValue(c.strokeColor))
-
-    echo "isColorGradient = ", s.getValue(c.isColorGradient)
     result.add("isColorGradient", s.getValue(c.isColorGradient))
     result.add("colorFrom", s.getValue(c.colorFrom))
     result.add("colorTo", s.getValue(c.colorTo))
@@ -352,7 +340,6 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     result.add("verticalAlignment", s.getValue(vertAlign))
 
 proc toPhantom(c: Text, p: var object) =
-    echo "toPhantom"
     p.text = c.mText.text
 
     let fontFace = c.font().face
@@ -391,7 +378,6 @@ proc toPhantom(c: Text, p: var object) =
     p.verticalAlignment = c.mText.verticalAlignment
 
 proc fromPhantom(c: Text, p: object) =
-    echo "fromPhantom"
     c.mText.text = p.text
 
     var fontSize = p.fontSize
@@ -409,10 +395,8 @@ proc fromPhantom(c: Text, p: object) =
     c.mText.setFontInRange(0, -1, font)
 
     if p.isColorGradient:
-        echo "true"
         c.mText.setTextColorInRange(0, -1, p.color, p.color2)
     else:
-        echo "false"
         c.mText.setTextColorInRange(0, -1, p.color)
 
     if p.shadowColor.a > 0 or p.shadowRadius > 0 or p.shadowSpread > 0:
@@ -510,7 +494,6 @@ method draw*(t: Text) =
             t.debugDraw()
 
 method visitProperties*(t: Text, p: var PropertyVisitor) =
-    echo "visitProperties"
     p.visitProperty("text", t.text)
     p.visitProperty("fontSize", t.fontSize)
     p.visitProperty("font", t.font)
@@ -522,7 +505,6 @@ method visitProperties*(t: Text, p: var PropertyVisitor) =
     p.visitProperty("Tracking Amount", t.trackingAmount)
     p.visitProperty("lineSpacing", t.lineSpacing)
 
-    echo "t.isColorGradient = ", t.isColorGradient
     p.visitProperty("isColorGradient", t.isColorGradient)
     p.visitProperty("colorFrom", t.colorFrom)
     p.visitProperty("colorTo", t.colorTo)

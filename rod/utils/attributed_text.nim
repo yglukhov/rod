@@ -189,7 +189,6 @@ proc processAttributedText*(fText: FormattedText) =
                     else:
                         fText.setStrokeInRange(ta.start, ta.to, s.color1, s.size)
                 elif a.typ == TextAttributeType.isColorGradient:
-                    echo "TextAttributeType.isColorGradient"
                     var s = fText.colorOfRuneAtPos(ta.start)
                     if parseBool(a.value):
                         fText.setTextColorInRange(ta.start, ta.to, s.color1, s.color2)
