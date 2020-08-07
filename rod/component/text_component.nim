@@ -316,6 +316,7 @@ method serialize*(c: Text, s: Serializer): JsonNode =
     result.add("strokeSize", s.getValue(c.strokeSize))
     result.add("strokeColor", s.getValue(c.strokeColor))
     result.add("isColorGradient", s.getValue(c.isColorGradient))
+
     result.add("colorFrom", s.getValue(c.colorFrom))
     result.add("colorTo", s.getValue(c.colorTo))
     result.add("isStrokeGradient", s.getValue(c.isStrokeGradient))
