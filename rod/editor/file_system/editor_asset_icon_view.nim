@@ -79,8 +79,8 @@ method draw*(v: ImageIconView, r: Rect)=
 
 proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
     let sp = p.fullPath.splitFile()
-    
-    result = FilePreview(kind: 
+
+    result = FilePreview(kind:
         if p.hasContent:
             akContainer
         else:
