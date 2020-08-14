@@ -168,7 +168,7 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, comp
     let s = newJsonDeserializer()
     s.node = j
     s.disableAwake = true
-    s.compPath = relativePath(b.assetBundlePath, compPath)
+    s.compPath = relativePathToPath(b.assetBundlePath, compPath)
 
     s.getImageForPath = proc(path: string, offset: var Point): Image =
         let desc = b.imageDesc(path)
@@ -305,7 +305,7 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
         b.write(propName)
         let frameLerp = v{"frameLerp"}.getBool(true)
         b.write(int8(frameLerp))
-        
+
         let vals = v{"values"}
         b.write(int8(vals.isNil)) #is key frame animation
         if vals.isNil:
@@ -313,7 +313,7 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
             b.write(int16(keys.len))
             for k in keys:
                 b.write(float32(k["p"].getFloat()))
-                
+
                 #todo: fix this
                 template writeValues(T: typedesc) =
                     var v: T
@@ -324,9 +324,9 @@ proc writeAnimation(b: BinSerializer, anim: JsonNode) =
                 let inter = parseEnum[KeyInterpolationKind](k["i"].getStr(""))
                 b.write(inter)
                 if inter == KeyInterpolationKind.eiBezier:
-                    if k["f"].len != 4: 
+                    if k["f"].len != 4:
                         raise newException(Exception, "Invalid timing function!")
-                    
+
                     for fi in k["f"]: #write timing function
                         b.write(float32(fi.getFloat()))
         else:
