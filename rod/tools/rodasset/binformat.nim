@@ -168,7 +168,7 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, comp
     let s = newJsonDeserializer()
     s.node = j
     s.disableAwake = true
-    s.compPath = relativePathToPath(b.assetBundlePath, compPath)
+    s.compPath = relativePath(b.assetBundlePath, compPath)
 
     s.getImageForPath = proc(path: string, offset: var Point): Image =
         let desc = b.imageDesc(path)
