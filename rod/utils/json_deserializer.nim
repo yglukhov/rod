@@ -57,7 +57,6 @@ proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
             result = ""
         else:
             result = b.compPath.parentDir / jimage.str
-            normalizePath(result, false)
     of JObject: result = jimage["orig"].str
     else: doAssert(false)
 
