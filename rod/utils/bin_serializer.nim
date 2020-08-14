@@ -71,6 +71,8 @@ proc getNeighbourImageBundlePath(b: BinSerializer, p2: string):tuple[asset:strin
             if fileExists(p / "config.rab"):
                 var p3 = path.substr(p.len + 1)
                 path = p.subStr(curDir.len + 1)
+                normalizePath(path, false)
+                normalizePath(p3, false)
 
                 return (asset:p3, bundle: path)
 
