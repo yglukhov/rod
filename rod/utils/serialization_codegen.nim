@@ -93,7 +93,8 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
             when compiles(awake(`v`)):
                 if not `s`.disableAwake:
                     awake(`v`)
-    echo repr(result)
+
+    # echo repr(result)
 
 template genSerializationCodeForComponent*(c: typed) =
     import rod / utils / [ bin_deserializer ]
