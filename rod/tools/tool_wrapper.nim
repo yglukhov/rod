@@ -63,7 +63,7 @@ proc runWrapper*(toolName, pathToToolMainNim: string) =
     let cd = getCurrentDir()
     let projName = splitPath(cd).tail
     let bin = prefix / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
-    wrapperAUX(bin, toolName, pathToToolMainNim, useDanger = true)
+    wrapperAUX(bin, toolName, pathToToolMainNim, useDanger = true,  @["--stackTrace:on"])
 
 proc runEditorWrapper*(toolName, pathToToolMainNim: string) =
     let cd = getCurrentDir()
