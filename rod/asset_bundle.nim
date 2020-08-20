@@ -235,7 +235,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             else:
                 let client = newHttpClient(sslContext = nil)
 
-            createDir(parentDir(destPath))
+            existsOrCreateDir(parentDir(destPath))
             client.downloadFile(url, zipFilePath)
             client.close()
             when defined(ssl):
