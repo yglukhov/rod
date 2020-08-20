@@ -138,7 +138,7 @@ else:
 type AssetBundleDescriptor* = object
     hash*: string
     path*: string
-    resources*: seq[string]
+    url*: string
 
 proc isConfigRabExternal(configRab: string): bool {.compileTime.} =
     when defined(android):
@@ -227,7 +227,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
 
         try:
             when defined(ssl):
-                when defined(windows) or defined(android):
+                when defined(windows) or defined(android) or defined(macosx):
                     let sslCtx = newContext(verifyMode = CVerifyNone)
                 else:
                     let sslCtx = newContext()
@@ -235,6 +235,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             else:
                 let client = newHttpClient(sslContext = nil)
 
+            createDir(parentDir(destPath))
             client.downloadFile(url, zipFilePath)
             client.close()
             when defined(ssl):
@@ -268,8 +269,11 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
             handler("")
         else:
             when not defined(js) and not defined(emscripten) and not defined(windows) and not defined(rodplugin):
-                assert(not getURLForAssetBundle.isNil)
-                let url = getURLForAssetBundle(abd.hash)
+                var url = abd.url
+                if url.len == 0:
+                    assert(not getURLForAssetBundle.isNil)
+                    url = getURLForAssetBundle(abd.hash)
+
                 var ctx: DownloadCtx
                 ctx.new()
                 ctx.handler = handler
