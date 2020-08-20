@@ -138,7 +138,6 @@ else:
 type AssetBundleDescriptor* = object
     hash*: string
     path*: string
-    resources*: seq[string]
 
 proc isConfigRabExternal(configRab: string): bool {.compileTime.} =
     when defined(android):
