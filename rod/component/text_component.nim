@@ -15,7 +15,10 @@ Text.properties:
     font(phantom = string)
     fontSize(phantom = float32)
     color(phantom = Color)
-    color2(phantom = Color)
+    color2:
+        phantom: Color
+        serializationKey: "colorTo"
+
     shadowOff(phantom = Size)
     shadowColor(phantom = Color)
     shadowSpread(phantom = float32)
@@ -23,7 +26,9 @@ Text.properties:
 
     strokeSize(phantom = float32)
     strokeColor(phantom = Color)
-    strokeColor2(phantom = Color)
+    strokeColor2:
+        phantom: Color
+        serializationKey: "strokeColorTo"
 
     bounds(phantom = Rect)
     lineSpacing(phantom = float32)
