@@ -12,6 +12,7 @@ type GraphicsSettings* = object
     packCompositions*: bool
     quantizeExceptions*: seq[string]
     posterizeExceptions*: seq[string]
+    noDownsample*: seq[string]
     useWebp*: bool
     webpQuality*: float
     webpLossless*: bool
@@ -79,6 +80,9 @@ proc parseConfig*(rabFilePath: string, fast: bool = false): Settings =
         of "noposterize":
             if not fast:
                 result.graphics.posterizeExceptions = parseExceptions(val, rabFilePath.parentDir)
+        of "noDownsample":
+            if not fast:
+                result.graphics.noDownsample = parseExceptions(val, rabFilePath.parentDir)
         of "debugOnly":
             result.debugOnly = parseBool(val)
         of "packCompositions":

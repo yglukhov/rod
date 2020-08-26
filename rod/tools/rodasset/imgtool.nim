@@ -102,9 +102,9 @@ proc checkCompositionRefs(c: JsonNode, compPath, originalResPath: string) =
             if not (fileExists(acr & ".json") or fileExists(acr & ".jcomp")):
                 missingRefs.add(acr)
     if missingRefs.len != 0:
-        echo "Missing compositionRefs in ", compPath, ":"
+        error "Missing compositionRefs in ", compPath, ":"
         for m in missingRefs:
-            echo m
+            error m
         raise newException(Exception, "Missing compositions")
 
 proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
@@ -167,6 +167,7 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
                         downsampleRatio: tool.settings.graphics.downsampleRatio,
                         disablePotAdjustment: tool.settings.graphics.disablePotAdjustment
                     ))
+                    warn "WARNING: Pack unreffered image ", p
 
 proc createIndex(tool: ImgTool, occurences: openarray[ImageOccurence]) =
     let idx = newJArray()
@@ -185,6 +186,7 @@ proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
         let name = splitFile(o.path).name
         let doQuant = not tool.settings.graphics.quantizeExceptions.contains(name)
         let doPosterize = not tool.settings.graphics.posterizeExceptions.contains(name)
+        let noDownsample = tool.settings.graphics.noDownsample.contains(name)
 
         if doQuant:
             o.category = "quant"
@@ -192,6 +194,8 @@ proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
             o.category = "posterize"
         else:
             o.category = "dont_optimize"
+        if noDownsample:
+            o.downsampleRatio = 1.0
 
 proc convertSpritesheetToPVR(path: string) =
     let dstPath = path.pathToPVR()
@@ -209,7 +213,7 @@ proc optimizeSpritesheet(path, category: string) =
         except:
             discard
         if res != 0:
-            echo "WARNING: pngquant failed ", path
+            warn "WARNING: pngquant failed ", path
     elif category == "posterize":
         let tmp = path & "__tmp"
         moveFile(path, tmp)
@@ -219,7 +223,7 @@ proc optimizeSpritesheet(path, category: string) =
         except:
             discard
         if res != 0:
-            echo "WARNING: posterize failed or not found ", path
+            warn "WARNING: posterize failed or not found ", path
             removeFile(path)
             moveFile(tmp, path)
         else:
@@ -236,7 +240,7 @@ proc optimizeSpritesheet(path, category: string) =
     except:
         discard
     if res != 0:
-        echo "WARNING: removing sRGB failed ", path
+        warn "WARNING: removing sRGB failed ", path
 
 proc run*(tool: ImgTool) =
     tool.compositions = newSeq[JsonNode](tool.compositionPaths.len)
@@ -299,7 +303,7 @@ proc run*(tool: ImgTool) =
         let b = newBinSerializer()
         b.assetBundlePath = tool.originalResPath.substr("res/".len)
         b.writeCompositions(tool.compositions, tool.compositionPaths, tool.resPath / "comps.rodpack", tool.index)
-        echo "Comppack written: ", tool.resPath / "comps.rodpack", " alignment bytes: ", b.totalAlignBytes
+        info "Comppack written: ", tool.resPath / "comps.rodpack", " alignment bytes: ", b.totalAlignBytes
 
     sync() # Wait until spritesheet optimizations complete
 
@@ -315,4 +319,4 @@ proc runImgToolForCompositions*(compositionPatterns: openarray[string], outPrefi
     tool.compressOutput = compressOutput
     let startTime = epochTime()
     tool.run()
-    echo "Done. Time: ", epochTime() - startTime
+    info "Done. Time: ", epochTime() - startTime
