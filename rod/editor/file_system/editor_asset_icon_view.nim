@@ -63,7 +63,15 @@ method draw*(v: ImageIconView, r: Rect)=
                     v.makeThumb = false
                     v.isThumb = true
                     return
+
                 var tsize = newSize(size.width * scale,  size.height * scale)
+
+                const limitSize = 4.0
+
+                if tsize.width < limitSize:
+                    tsize.width = limitSize
+                if tsize.height < limitSize:
+                    tsize.height = limitSize
 
                 var renderRect = newRect(r.origin, tsize)
                 var nimg = imageWithSize(tsize)
