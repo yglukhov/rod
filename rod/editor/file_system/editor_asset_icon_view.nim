@@ -52,33 +52,43 @@ type FilePreview* = ref object of View
 
 method draw*(v: ImageIconView, r: Rect)=
     procCall v.View.draw(r)
-    let c = currentContext()
     if not v.image.isNil:
+        let c = currentContext()
         if v.makeThumb:
             if not v.isThumb:
-                var size = v.image.size
-                var maxSize = max(size.width, size.height)
+                let size = v.image.size
+                let maxSize = max(size.width, size.height)
                 let scale = r.width / maxSize
-                if scale > 1.0:
-                    v.makeThumb = false
-                    v.isThumb = true
-                    return
-
-                var tsize = newSize(size.width * scale,  size.height * scale)
-                tsize.width = max(tsize.width, 1)
-                tsize.height = max(tsize.height, 1)
-
-                var renderRect = newRect(r.origin, tsize)
-                var nimg = imageWithSize(tsize)
-                nimg.draw do():
-                    c.drawImage(v.image, renderRect)
-
-                v.image = nimg
                 v.isThumb = true
                 v.makeThumb = false
-        else:
-            var orig = newPoint(r.x + (r.width - v.image.size.width) * 0.5, r.y + (r.height - v.image.size.height) * 0.5)
-            c.drawImage(v.image, newRect(orig, v.image.size))
+                if scale < 1.0:
+                    var tsize = size * scale
+
+                    const limitSize = 4.0
+
+                    if tsize.width < limitSize:
+                        tsize.width = limitSize
+                    if tsize.height < limitSize:
+                        tsize.height = limitSize
+
+                    let renderRect = newRect(zeroPoint, tsize)
+                    let nimg = imageWithSize(tsize)
+                    nimg.draw do():
+                        c.drawImage(v.image, renderRect)
+
+                    v.image = nimg
+
+        let orig = newPoint(r.x + (r.width - v.image.size.width) * 0.5, r.y + (r.height - v.image.size.height) * 0.5)
+        c.drawImage(v.image, newRect(orig, v.image.size))
+
+proc imageViewWithIconForPath(path: string, frame: Rect): ImageIconView =
+    let img_data = iconBitmapForFile(path, 128, 128)
+    if img_data.len > 0:
+        let img = imageWithBitmap(cast[ptr uint8](unsafeAddr img_data[0]), 128, 128, 4)
+        result = new(ImageIconView)
+        result.init(frame)
+        result.makeThumb = true
+        result.image = img
 
 proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
     let sp = p.fullPath.splitFile()
@@ -102,48 +112,35 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
         iconPos.x = 0.0
         iconSize = newSize(r.height, r.height)
 
+    let iconRect = newRect(iconPos, iconSize)
     let res = result
     case res.kind:
     of akSound:
-        res.icon = newView(newRect(iconPos, iconSize))
+        res.icon = newView(iconRect)
         res.icon.backgroundColor = newColor(0.2, 0.3, 0.4, 1.0)
 
     of akImage:
         let imgView = new(ImageIconView)
-        imgView.init(newRect(iconPos, iconSize))
+        imgView.init(iconRect)
         imgView.makeThumb = true
         loadAsset[Image]("file://" & p.fullPath) do(i: Image, err: string):
             imgView.image = i
         res.icon = imgView
 
     of akContainer:
-        let img_data = iconBitmapForFile(p.fullPath, 128, 128)
-        if img_data.len > 0:
-            let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
-            let imgView = new(ImageIconView)
-            imgView.init(newRect(iconPos, iconSize))
-            imgView.makeThumb = true
-            imgView.image = img
-            res.icon = imgView
-        else:
-            res.icon = newView(newRect(iconPos, iconSize))
+        res.icon = imageViewWithIconForPath(p.fullPath, iconRect)
+        if res.icon.isNil:
+            res.icon = newView(iconRect)
             res.icon.backgroundColor = newColor(0.5, 0.4, 0.6, 1.0)
 
     of akComposition:
-        res.icon = newView(newRect(iconPos, iconSize))
+        res.icon = newView(iconRect)
         res.icon.backgroundColor = newColor(0.5, 0.8, 0.6, 1.0)
 
     else:
-        let img_data = iconBitmapForFile(p.fullPath, 128, 128)
-        if img_data.len > 0:
-            let img = imageWithBitmap(cast[ptr uint8](img_data), 128, 128, 4)
-            let imgView = new(ImageIconView)
-            imgView.init(newRect(iconPos, iconSize))
-            imgView.makeThumb = true
-            imgView.image = img
-            res.icon = imgView
-        else:
-            res.icon = newView(newRect(iconPos, iconSize))
+        res.icon = imageViewWithIconForPath(p.fullPath, iconRect)
+        if res.icon.isNil:
+            res.icon = newView(iconRect)
             res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
             var extField = newLabel(newRect(0.0, 0.0, iconSize.width, iconSize.height))
             extField.formattedText.horizontalAlignment = haCenter
