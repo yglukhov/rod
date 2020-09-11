@@ -52,38 +52,34 @@ type FilePreview* = ref object of View
 
 method draw*(v: ImageIconView, r: Rect)=
     procCall v.View.draw(r)
-    let c = currentContext()
     if not v.image.isNil:
+        let c = currentContext()
         if v.makeThumb:
             if not v.isThumb:
-                var size = v.image.size
-                var maxSize = max(size.width, size.height)
+                let size = v.image.size
+                let maxSize = max(size.width, size.height)
                 let scale = r.width / maxSize
-                if scale > 1.0:
-                    v.makeThumb = false
-                    v.isThumb = true
-                    return
-
-                var tsize = newSize(size.width * scale,  size.height * scale)
-
-                const limitSize = 4.0
-
-                if tsize.width < limitSize:
-                    tsize.width = limitSize
-                if tsize.height < limitSize:
-                    tsize.height = limitSize
-
-                var renderRect = newRect(r.origin, tsize)
-                var nimg = imageWithSize(tsize)
-                nimg.draw do():
-                    c.drawImage(v.image, renderRect)
-
-                v.image = nimg
                 v.isThumb = true
                 v.makeThumb = false
-        else:
-            var orig = newPoint(r.x + (r.width - v.image.size.width) * 0.5, r.y + (r.height - v.image.size.height) * 0.5)
-            c.drawImage(v.image, newRect(orig, v.image.size))
+                if scale < 1.0:
+                    var tsize = size * scale
+
+                    const limitSize = 4.0
+
+                    if tsize.width < limitSize:
+                        tsize.width = limitSize
+                    if tsize.height < limitSize:
+                        tsize.height = limitSize
+
+                    let renderRect = newRect(zeroPoint, tsize)
+                    let nimg = imageWithSize(tsize)
+                    nimg.draw do():
+                        c.drawImage(v.image, renderRect)
+
+                    v.image = nimg
+
+        let orig = newPoint(r.x + (r.width - v.image.size.width) * 0.5, r.y + (r.height - v.image.size.height) * 0.5)
+        c.drawImage(v.image, newRect(orig, v.image.size))
 
 proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
     let sp = p.fullPath.splitFile()
