@@ -9,9 +9,11 @@ import rod/[node, viewport, quaternion, rod_types]
 import strutils, tables, times
 import variant
 
+const openDialogAvailable = not defined(android) and not defined(ios) and not defined(emscripten)
+
 when defined(js):
     from dom import alert
-elif defined(rodedit):
+elif openDialogAvailable:
     import os_files/dialog
 
 template toStr(v: SomeFloat, precision: uint): string = formatFloat(v, ffDecimal, precision)
@@ -238,14 +240,15 @@ proc newCompositionPropertyView(setter: proc(s: Composition), getter: proc(): Co
     var open = newButton(newRect(0, y, 208, editorRowHeight))
     open.title = "open"
     open.onAction do():
-        var di: DialogInfo
-        # di.folder = e.currentProject.path
-        di.kind = dkOpenFile
-        di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json")]
-        di.title = "Open composition"
-        let path = di.show()
-        if path.len > 0:
-            setter(newComposition("file://" & path))
+        when openDialogAvailable:
+            var di: DialogInfo
+            # di.folder = e.currentProject.path
+            di.kind = dkOpenFile
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json")]
+            di.title = "Open composition"
+            let path = di.show()
+            if path.len > 0:
+                setter(newComposition("file://" & path))
 
     result.addSubview(open)
 
