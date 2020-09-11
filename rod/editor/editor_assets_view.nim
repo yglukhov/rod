@@ -6,7 +6,7 @@ import nimx / [types, matrixes, view, table_view_cell, text_field,
 import file_system / [ filesystem_view ]
 import variant, tables
 import rod / [edit_view]
-import times
+import times, os, strutils
 
 type EditorAssetsView* = ref object of EditorTabView
     fileSystemView: FileSystemView
@@ -36,6 +36,17 @@ method init*(v: EditorAssetsView, r: Rect)=
     v.fileSystemView.onPathChanged do(np: string):
         curPath.text = np
 
+    var filter = newTextField(newRect(segm.frame.origin.x - 250.0, 0, 220.0, 20.0))
+    filter.autoresizingMask = { afFlexibleMinX, afFlexibleHeight }
+    filter.continuous = true
+    filter.onAction do():
+        v.fileSystemView.onFilterContent() do(path: string) -> bool:
+            let sp = path.splitFile()
+            result = sp.name == filter.text or filter.text in sp.name
+            if not result:
+                result = sp.ext == filter.text or filter.text in sp.ext
+
+    bottomMenu.addSubview(filter)
 
     v.fileSystemView.onDragStart do(fileViews: seq[FilePreview]):
         var drag_data = ""
