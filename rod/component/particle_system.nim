@@ -23,7 +23,6 @@ attribute float aLifeTime;
 uniform mat4 modelViewProjectionMatrix;
 uniform mat4 projMatrix;
 uniform mat4 viewMatrix;
-uniform mat4 worldMatrix;
 uniform vec3 uNodeScale;
 
 varying float vAlpha;
@@ -114,18 +113,17 @@ void main()
     if (aID == 1.0) { vertexOffset = vec3( 0.5,  0.5,  0); }
     if (aID == 2.0) { vertexOffset = vec3( 0.5,  -0.5, 0); }
     if (aID == 3.0) { vertexOffset = vec3(-0.5,  -0.5, 0); }
-
     #ifdef TEXTURED
         texCoords = vec2(vertexOffset.xy) + vec2(0.5, 0.5);
     #endif
 #endif
 
-    vertexOffset = vertexOffset * uNodeScale * aScale;
+    vertexOffset = (vec4(vertexOffset * aScale, 1.0) * viewMatrix).xyz;
 
     mat4 rMatrix = getRotationMatrix(aRotation);
     vec4 rotatedVertexOffset = rMatrix * vec4(vertexOffset, 1.0);
 
-    mat4 modelView = viewMatrix;// * worldMatrix;
+    mat4 modelView = viewMatrix;
     vec4 transformedPos = viewMatrix * vec4(aPosition, 1.0);
 
 #ifndef ROTATION_3D
@@ -136,8 +134,7 @@ void main()
     // transformation already is in transformedPos
     modelView[3][0] = 0.0;    modelView[3][1] = 0.0;    modelView[3][2] = 0.0;
 
-    vec4 P = modelView * vec4(rotatedVertexOffset.xyz + transformedPos.xyz, 1.0);
-    gl_Position = projMatrix * P;
+    gl_Position = projMatrix * vec4(rotatedVertexOffset.xyz + transformedPos.xyz, 1.0);
 }
 """
 const ParticleFragmentShader = """

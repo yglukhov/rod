@@ -25,6 +25,7 @@ type
         lifetime*: float
         birthRate*: float
         particlePrototype*: Node
+        mParticleComposition: Composition
         numberOfParticles*: int
         currentParticles: int
         gravity*: Vector3
@@ -180,12 +181,22 @@ method draw*(p: ParticleEmitter) =
 
     p.lastDrawTime = curTime
 
+proc particleComposition*(pe: ParticleEmitter): Composition =
+    pe.mParticleComposition
+
+proc `particleComposition=`*(pe: ParticleEmitter, val: Composition) =
+    pe.mParticleComposition = val
+    if pe.mParticleComposition.isNil: return
+    pe.mParticleComposition.loadComposition() do():
+        pe.particlePrototype = pe.mParticleComposition.node
+
 method visitProperties*(pe: ParticleEmitter, p: var PropertyVisitor) =
     p.visitProperty("lifetime", pe.lifetime)
     p.visitProperty("birthRate", pe.birthRate)
     p.visitProperty("particlePrototype", pe.particlePrototype)
+    p.visitProperty("particleComposition", pe.particleComposition)
     p.visitProperty("numberOfParticles", pe.numberOfParticles)
-    p.visitProperty("currentParticles", pe.currentParticles)
+    # p.visitProperty("currentParticles", pe.currentParticles)
     p.visitProperty("gravity", pe.gravity)
     p.visitProperty("oneShot", pe.oneShot)
     p.visitProperty("direction", pe.direction)

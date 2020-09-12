@@ -5,13 +5,15 @@ import nimx/[view, text_field, matrixes, image, button,
 import rod/component/[ae_composition]
 import rod/property_editors/propedit_registry
 import nimx/property_editors/standard_editors #used
-import rod/[node, viewport, quaternion]
+import rod/[node, viewport, quaternion, rod_types]
 import strutils, tables, times
 import variant
 
+const openDialogAvailable = not defined(android) and not defined(ios) and not defined(emscripten)
+
 when defined(js):
     from dom import alert
-elif not defined(android) and not defined(ios) and not defined(emscripten):
+elif openDialogAvailable:
     import os_files/dialog
 
 template toStr(v: SomeFloat, precision: uint): string = formatFloat(v, ffDecimal, precision)
@@ -219,6 +221,39 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
                         a.onComplete() do():
                             pb.title = "play"
 
+proc newCompositionPropertyView(setter: proc(s: Composition), getter: proc(): Composition): PropertyEditorView =
+    result = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight * 3))
+    const vecLen = 3
+
+    # let horLayout = newHorizontalLayout(newRect(0, 0, 208, editorRowHeight * 3))
+    # horLayout.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+    # result.addSubview(horLayout)
+
+    let v = getter()
+    var y = 0.0
+    y += editorRowHeight
+    var lbl = newLabel(newRect(0, y, 208, editorRowHeight))
+    lbl.text = if v.isNil: "" else: v.url
+    result.addSubview(lbl)
+    y += editorRowHeight
+
+    var open = newButton(newRect(0, y, 208, editorRowHeight))
+    open.title = "open"
+    open.onAction do():
+        when openDialogAvailable:
+            var di: DialogInfo
+            # di.folder = e.currentProject.path
+            di.kind = dkOpenFile
+            di.filters = @[(name:"JCOMP", ext:"*.jcomp"), (name:"Json", ext:"*.json")]
+            di.title = "Open composition"
+            let path = di.show()
+            if path.len > 0:
+                setter(newComposition("file://" & path))
+
+    result.addSubview(open)
+
+
 registerPropertyEditor(newNodePropertyView)
 registerPropertyEditor(newQuaternionPropertyView)
 registerPropertyEditor(newAEMarkerPropertyView)
+registerPropertyEditor(newCompositionPropertyView)
