@@ -110,7 +110,7 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
     var iconPos = newPoint(icoset * 0.5, 0.0)
     if compact:
         iconPos.x = 0.0
-        iconSize = newSize(r.height, r.height)
+        iconSize = r.size
 
     let iconRect = newRect(iconPos, iconSize)
     let res = result
@@ -142,14 +142,14 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
         if res.icon.isNil:
             res.icon = newView(iconRect)
             res.icon.backgroundColor = newColor(0.5, 0.5, 0.5, 0.2)
-            var extField = newLabel(newRect(0.0, 0.0, iconSize.width, iconSize.height))
-            extField.formattedText.horizontalAlignment = haCenter
-            extField.formattedText.verticalAlignment = vaCenter
-            extField.formattedText.truncationBehavior = tbCut
-            extField.text = sp.ext[1..^1]
-            extField.formattedText.boundingSize = extField.bounds.size
-
-            res.icon.addSubview(extField)
+            if sp.ext.len != 0:
+                let extField = newLabel(newRect(zeroPoint, iconSize))
+                extField.formattedText.horizontalAlignment = haCenter
+                extField.formattedText.verticalAlignment = vaCenter
+                extField.formattedText.truncationBehavior = tbCut
+                extField.text = sp.ext[1..^1]
+                extField.formattedText.boundingSize = extField.bounds.size
+                res.icon.addSubview(extField)
 
     res.addSubview(res.icon)
     var textFrame = newRect(0.0, r.size.height - 20.0, r.size.width, 20.0)
