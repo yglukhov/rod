@@ -149,8 +149,9 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
 
     for marker in compos.markers:
         y += 10.0
+        let name = marker.name
         let label = newLabel(newRect(0, y, 100, 15))
-        label.text = marker.name
+        label.text = name
         label.textColor = newGrayColor(0.9)
         result.addSubview(label)
         label.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
@@ -180,11 +181,11 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
         result.addSubview(playBttn)
         y += editorRowHeight
 
-        animT[marker.name] = compos.compositionNamed(marker.name)
-        animT[marker.name].prepare(epochTime())
+        animT[name] = compos.compositionNamed(name)
+        animT[name].prepare(epochTime())
 
         closureScope:
-            let mName = marker.name
+            let mName = name
             let sl = slider
             let pl = progLabel
             let gb = goBttn
@@ -223,7 +224,6 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
 
 proc newCompositionPropertyView(setter: proc(s: Composition), getter: proc(): Composition): PropertyEditorView =
     result = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight * 3))
-    const vecLen = 3
 
     # let horLayout = newHorizontalLayout(newRect(0, 0, 208, editorRowHeight * 3))
     # horLayout.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}

@@ -22,8 +22,8 @@ proc serializationKey(p: PropertyDesc): NimNode =
     else:
         result = newLit(p.name)
 
-proc actualReference(p: PropertyDesc): NimNode =
-    let o = if p.hasAttr("phantom"): newIdentNode("phantom") else: newIdentNode("v")
+proc actualReference(p: PropertyDesc, v: NimNode): NimNode =
+    let o = if p.hasAttr("phantom"): newIdentNode("phantom") else: v
     newNimNode(nnkDotExpr).add(o, newIdentNode(p.name))
 
 proc propertyDescWithName(typdesc: NimNode, name: string): PropertyDesc =
@@ -34,11 +34,9 @@ proc propertyDescWithName(typdesc: NimNode, name: string): PropertyDesc =
     result.name = name
     result.attributes = initTable[string, NimNode]()
 
-macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
-        serTyp: typed{nkSym}, keyed: static[bool], serialize: static[bool],
+macro genSerializerProc(typdesc: typed{nkSym}, serTyp: typed{nkSym}, v: typed, s: typed,
+        keyed: static[bool], serialize: static[bool],
         bin: static[bool], skipPhantom: static[bool]): untyped =
-    let v = newIdentNode("v")
-    let s = newIdentNode("s")
     let phantomIdent = newIdentNode("phantom")
 
     let phantomTyp = genPhantomTypeSection(typdesc)
@@ -52,33 +50,33 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
     if not serialize and impl.kind == nnkTypeDef and impl.len >= 3 and impl[2].kind != nnkRefTy:
         paramTyp = newNimNode(nnkVarTy).add(paramTyp)
 
-    result = newProc(name, [newEmptyNode(), newIdentDefs(v, paramTyp), newIdentDefs(s, serTyp)])
+    result = newNimNode(nnkStmtList)
 
     if not phantomTyp.isNil and phantomTyp.kind != nnkEmpty:
-        result.body.add(phantomTyp)
+        result.add(phantomTyp)
         let pv = quote do:
             var `phantomIdent`: Phantom
-        result.body.add(pv)
+        result.add(pv)
 
         if serialize and not skipPhantom:
-            result.body.add(newCall("toPhantom", v, phantomIdent))
+            result.add(newCall("toPhantom", v, phantomIdent))
 
     for p in typdesc.serializablePropertyDescs:
-        let visitCall = newCall(ident("visit"), s, actualReference(p))
+        let visitCall = newCall(ident("visit"), s, actualReference(p, v))
         if keyed: visitCall.add(p.serializationKey())
 
         if p.hasAttr("combinedWith"):
             let p1 = typdesc.propertyDescWithName($p.attributes["combinedWith"])
-            visitCall.add(actualReference(p1))
+            visitCall.add(actualReference(p1, v))
             if keyed: visitCall.add(p1.serializationKey())
 
         # if keyed and not serialize and not bin and p.hasAttr("default"):
         #     visitCall.add(p.attributes["default"])
 
-        result.body.add(visitCall)
+        result.add(visitCall)
         # let echoPrefix = newLit($serTyp & " " & p.name & ": ")
-        # let echoValue = actualReference(p)
-        # result.body.add quote do:
+        # let echoValue = actualReference(p, v)
+        # result.add quote do:
         #     when compiles(echo(`echoPrefix`, `echoValue`)):
         #         echo `echoPrefix`, `echoValue`
         #     else:
@@ -86,10 +84,10 @@ macro genSerializerProc*(typdesc: typed{nkSym}, name: untyped{nkIdent},
 
     if not phantomTyp.isNil and phantomTyp.kind != nnkEmpty:
         if not serialize and not skipPhantom:
-            result.body.add(newCall("fromPhantom", v, phantomIdent))
+            result.add(newCall("fromPhantom", v, phantomIdent))
 
     if not serialize:
-        result.body.add quote do:
+        result.add quote do:
             when compiles(awake(`v`)):
                 if not `s`.disableAwake:
                     awake(`v`)
@@ -104,40 +102,30 @@ template genSerializationCodeForComponent*(c: typed) =
                 bin_serializer, serialization_hash_calculator ]
 
         bind className
-        genSerializerProc(c, serializeAux, BinSerializer, false, true, true, false)
-        genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
-        genSerializerProc(c, serializeAux, JsonSerializer, true, true, false, false)
-        genSerializerProc(c, calcSerializationHashAux, SerializationHashCalculator, true, true, false, true)
+        method deserialize*(v: c, b: JsonDeserializer) =
+            genSerializerProc(c, JsonDeserializer, v, b, true, false, false, false)
 
-        method deserialize*(cm: c, b: JsonDeserializer) =
-            deserializeAux(cm, b)
+        method serialize*(v: c, b: JsonSerializer) =
+            b.visit(className(v), "_c")
+            genSerializerProc(c, JsonSerializer, v, b, true, true, false, false)
 
-        method serialize*(cm: c, b: JsonSerializer) =
-            b.visit(className(cm), "_c")
-            serializeAux(cm, b)
+        method serialize*(v: c, b: BinSerializer) =
+            genSerializerProc(c, BinSerializer, v, b, false, true, true, false)
 
-        method serialize*(cm: c, b: BinSerializer) =
-            serializeAux(cm, b)
-
-        method serializationHash*(cm: c, b: SerializationHashCalculator) =
-            calcSerializationHashAux(cm, b)
+        method serializationHash*(v: c, b: SerializationHashCalculator) =
+            genSerializerProc(c, SerializationHashCalculator, v, b, true, true, false, true)
 
     method supportsNewSerialization*(cm: c): bool = true
 
-    genSerializerProc(c, deserializeAux, BinDeserializer, false, false, true, false)
-
-    method deserialize*(cm: c, b: BinDeserializer) =
-        deserializeAux(cm, b)
+    method deserialize*(v: c, b: BinDeserializer) =
+        genSerializerProc(c, BinDeserializer, v, b, false, false, true, false)
 
 template genJsonSerializationrFor*(c: typed) =
     import rod / utils / [ json_deserializer, json_serializer ]
 
-    genSerializerProc(c, deserializeAux, JsonDeserializer, true, false, false, false)
-    genSerializerProc(c, serializeAux, JsonSerializer, true, true, false, false)
-
-    proc toJson*(cm: c): JsonNode=
+    proc toJson*(v: c): JsonNode=
         var b = newJsonSerializer()
-        serializeAux(cm, b)
+        genSerializerProc(c, JsonSerializer, v, b, true, true, false, false)
         result = b.node
 
     proc `to c`*(jn: JsonNode): c =
@@ -145,4 +133,4 @@ template genJsonSerializationrFor*(c: typed) =
         b.node = jn
         when c is ref:
             result.new()
-        deserializeAux(result, b)
+        genSerializerProc(c, JsonDeserializer, result, b, true, false, false, false)

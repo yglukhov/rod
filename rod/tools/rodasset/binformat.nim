@@ -3,6 +3,7 @@ import tree_traversal
 
 import nimx / [ types, image, pathutils, class_registry ]
 import ../../utils/[ bin_serializer, json_deserializer ]
+import ../../rod_types
 import ../../node
 import ../../component
 import ../../component/all_components
