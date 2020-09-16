@@ -99,8 +99,8 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
         if exceptions.len > 0:
             for ael in c.layers:
                 if ael.node.name notin exceptions:
-                    var innerExceptions = exceptions.filter(proc(s:string):bool = s.startsWith(ael.node.name&delimiter))
-                    innerExceptions.apply(proc(s:var string) = s = s.split(delimiter,1)[1])
+                    var innerExceptions = exceptions.filterIt(it.startsWith(ael.node.name & delimiter))
+                    innerExceptions.applyIt(it.split(delimiter, 1)[1])
 
                     let cm = c.applyLayerSettings(ael, marker, innerExceptions)
                     if not cm.isNil:

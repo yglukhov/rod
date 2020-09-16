@@ -14,10 +14,16 @@ type
 
     ArrayAnimationSampler*[T] = BufferAnimationSampler[T, seq[T]]
 
-    KeyFrame*[T] = tuple[p: float, v: T, tf: proc(p:float):float]
-    
+    KeyFrame*[T] = object
+        p*: float
+        v*: T
+        tf*: proc(p:float):float
+
     KeyFrameAnimationSampler*[T] = ref object of AnimationSampler[T]
         keys*: seq[KeyFrame[T]]
+
+proc keyFrame*[T](p: float, v: T, tf: proc(p: float): float = nil): KeyFrame[T] =
+    KeyFrame[T](p: p, v: v, tf: tf)
 
 proc newBufferAnimationSampler*[T, B](values: B, lerpBetweenFrames = true, originalLen: int = -1, cutFront: int = 0): BufferAnimationSampler[T, B] =
     result.new()
@@ -138,7 +144,7 @@ when isMainModule:
         doAssert(s.sample(1.5) ==~ 5.0)
 
     block: # Test keyframe sampler (lerp)
-        let s = newKeyFrameAnimationSampler(@[(0.0, 1.0, nil), (0.5, 2.0, nil), (1.0, 4.0, nil)])
+        let s = newKeyFrameAnimationSampler(@[keyFrame(0.0, 1.0), keyFrame(0.5, 2.0), keyFrame(1.0, 4.0)])
         doAssert(s.sample(-0.5) ==~ 1.0)
         doAssert(s.sample(0) ==~ 1.0)
         doAssert(s.sample(0.25) ==~ 1.5) # Lerp here

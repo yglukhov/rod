@@ -71,10 +71,9 @@ proc `inspectedNode=`*(i: SceneSettingsView, n: Node) =
         i.propView.addSubview(expView)
 
         for v in n.components:
-            closureScope:
-                expView = newExpandingView(newRect(0, 0, 328, 20.0))
-                expView.title = v.className
-                expView.expand()
+            expView = newExpandingView(newRect(0, 0, 328, 20.0))
+            expView.title = v.className
+            expView.expand()
 
             v.visitProperties(visitor)
             i.propView.addSubview(expView)
