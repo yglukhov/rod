@@ -8,6 +8,11 @@ when defined(rodedit):
     import json
 
 type
+    NodeFlags* = enum # Don't change the order!
+        enabled
+        affectsChildren # Should posteffects affect only this node or its children as well
+        dirty
+
     Node* = ref object
         mTranslation*: Vector3
         mRotation*: Quaternion
@@ -18,16 +23,14 @@ type
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
-        alpha*: Coord
         mMatrix*: Matrix4
         worldMatrix*: Matrix4
-        isDirty*: bool
-        layer*: int
-        isEnabled*: bool
-        mAnchorPoint*: Vector3
-        affectsChildren*: bool # Should posteffects affect only this node or its children as well
+        layer*: int32
+        alpha*: Coord
         composition*: Composition
-        
+        mAnchorPoint*: Vector3
+        mFlags*: set[NodeFlags]
+
         when defined(rodedit):
             jAnimations*: JsonNode
 

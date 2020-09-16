@@ -26,6 +26,18 @@ proc addAnimation*(n: Node, a: Animation) =
 proc removeAnimation*(n: Node, a: Animation) =
     n.animationRunner.runner.removeAnimation(a)
 
+proc isEnabled*(n: Node): bool {.inline.} = NodeFlags.enabled in n.mFlags
+proc `isEnabled=`*(n: Node, flag: bool) {.inline.} =
+    if flag: n.mFlags.incl(NodeFlags.enabled) else: n.mFlags.excl(NodeFlags.enabled)
+
+proc affectsChildren*(n: Node): bool {.inline.} = NodeFlags.affectsChildren in n.mFlags
+proc `affectsChildren=`*(n: Node, flag: bool) {.inline.} =
+    if flag: n.mFlags.incl(NodeFlags.affectsChildren) else: n.mFlags.excl(NodeFlags.affectsChildren)
+
+proc isDirty*(n: Node): bool {.inline.} = NodeFlags.dirty in n.mFlags
+proc `isDirty=`*(n: Node, flag: bool) {.inline.} =
+    if flag: n.mFlags.incl(NodeFlags.dirty) else: n.mFlags.excl(NodeFlags.dirty)
+
 proc newNode*(name: string = ""): Node =
     result.new()
     result.mScale = newVector3(1, 1, 1)
@@ -38,7 +50,7 @@ proc newNode*(name: string = ""): Node =
     result.affectsChildren = true
 
 proc setDirty(n: Node) =
-    if n.isDirty == false:
+    if not n.isDirty:
         n.isDirty = true
         for c in n.children:
             c.setDirty()
@@ -554,7 +566,6 @@ proc isEnabledInTree*(n: Node): bool =
         if not p.enabled: return false
         p = p.parent
     return true
-    # return n.enabled and (n.parent.isNil or n.parent.isNodeEnabledInTree())
 
 # Serialization
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
@@ -750,7 +761,7 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
                 result["componets"] = newJArray()
                 result["componets"].add(jcomp)
         return
-    
+
     if n.components.len > 0:
         var componentsNode = newJArray()
         result.add("components", componentsNode)
@@ -909,8 +920,6 @@ type
         bicRotation = "r"
         bicScale = "s"
         bicTranslation = "t"
-    NodeFlags* {.pure.} = enum
-        enabled, affectsChildren
 
 proc newNode*(b: BinDeserializer, compName: string): Node =
     let oldPos = b.getPosition()
