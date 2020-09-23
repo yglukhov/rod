@@ -287,7 +287,7 @@ proc createCloseEditorButton(e: Editor, cb: proc()) =
         cb()
 
 proc copyNode*(e: Editor, n: Node = nil)=
-    echo "copyNode"
+    # echo "copyNode"
     var cn = n
     if n.isNil:
         cn = e.selectedNode
@@ -312,7 +312,7 @@ proc cutNode*(e: Editor, n: Node = nil)=
         e.sceneTreeDidChange()
 
 proc pasteNode*(e: Editor, n: Node = nil)=
-    echo "pasteNode"
+    # echo "pasteNode"
     let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
     if not pbi.isNil:
         echo "try paste node"
@@ -380,7 +380,7 @@ proc initNotifHandlers(e: Editor)=
         else: discard
 
 proc onKeyDown(ed: Editor, e: var Event): bool =
-    echo "editor onKeyDown ", e.keyCode
+    # echo "editor onKeyDown ", e.keyCode
     case commandFromEvent(e)
     of kcCopy:
         ed.copyNode()
@@ -396,10 +396,6 @@ proc onKeyDown(ed: Editor, e: var Event): bool =
         result = true
     else:
         discard
-    
-    if e.keyCode == VirtualKey.Z:
-        echo "WTF"
-        result = true
 
 proc createWorkspace(w: Window, e: Editor): WorkspaceView =
     result = createWorkspaceLayout(w, e)
