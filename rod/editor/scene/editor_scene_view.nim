@@ -21,17 +21,21 @@ type
 
 method onKeyDown*(v: EditorSceneView, e: var Event): bool =
     result = procCall v.View.onKeyDown(e)
-    v.cameraController.onKeyDown(e)
+    ## camera controller buttons
 
-method onKeyUp*(v: EditorSceneView, e: var Event): bool =
-    result = procCall v.View.onKeyDown(e)
-    v.cameraController.onKeyUp(e)
+    if e.keyCode in [ VirtualKey.R, VirtualKey.S, VirtualKey.F ]:
+        result = true
+    v.cameraController.onKeyDown(e)
     if e.keyCode == VirtualKey.F:
         v.cameraController.setToNode(v.composition.selectedNode)
         result = true
     elif e.keyCode == VirtualKey.S and e.modifiers.anyCtrl():
         v.editor.saveComposition(v.composition)
         result = true
+
+method onKeyUp*(v: EditorSceneView, e: var Event): bool =
+    result = procCall v.View.onKeyDown(e)
+    v.cameraController.onKeyUp(e)
 
 method onScroll*(v: EditorSceneView, e: var Event): bool=
     if not v.editor.sceneInput:

@@ -8,7 +8,6 @@ import rod / [ node ]
 import rod / editor / [ editor_types, editor_tab_registry ]
 
 when loadingAndSavingAvailable:
-    import rod/editor/editor_open_project_view
     import os
 
 proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView
@@ -198,34 +197,6 @@ proc createViewMenu(w: WorkspaceView) =
 
     w.addToolbarMenu(m)
 
-when loadingAndSavingAvailable:
-    proc createProjectMenu(w: WorkspaceView) =
-        let m = makeMenu("Project"):
-            - "Open":
-                var openProj = new(EditorOpenProjectView)
-                openProj.init(w.bounds)
-                w.addSubview(openProj)
-
-                openProj.onOpen = proc(p: EditorProject)=
-                    openProj.removeFromSuperview()
-                    w.editor.currentProject = p
-                    w.removeFromSuperview()
-                    w.editor.workspaceView = createWorkspaceLayout(w.editor.window, w.editor)
-                    echo "try open project ", p
-
-                openProj.onClose = proc()=
-                    openProj.removeFromSuperview()
-
-            - "Save":
-                if w.editor.currentProject.path.len == 0:
-                    echo "not saved project"
-
-                w.editor.currentProject.tabs = @[]
-                for t in w.tabs:
-                    w.editor.currentProject.tabs.add((name:t.name, frame: zeroRect))
-                w.editor.currentProject.saveProject()
-
-        w.addToolbarMenu(m)
 
 proc createChangeBackgroundColorButton(w: WorkspaceView) =
     var cPicker: ColorPickerView
@@ -384,9 +355,6 @@ proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =
 
     w.verticalLayout.addSubview(w.horizontalLayout)
     w.addSubview(w.verticalLayout)
-
-    when loadingAndSavingAvailable:
-        w.createProjectMenu()
 
     if w.editor.startFromGame and not w.editor.rootNode.isNil:
         let rootEditorView = w.editor.sceneView.superview

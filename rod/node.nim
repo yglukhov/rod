@@ -578,7 +578,7 @@ proc isEnabledInTree*(n: Node): bool =
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
-proc loadNodeFromJson(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
+proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
     let serializer = Serializer.new()
     serializer.url = url
     serializer.jdeser = newJsonDeserializer()
