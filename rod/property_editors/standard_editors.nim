@@ -1,12 +1,12 @@
 import nimx/[view, text_field, matrixes, image, button,
     linear_layout, property_visitor, numeric_text_field,
-    slider, animation
+    slider, animation, context, view_event_handling, event
 ]
-import rod/component/[ae_composition]
+import rod/component/[ae_composition, rti]
 import rod/property_editors/propedit_registry
 import nimx/property_editors/standard_editors #used
 import rod/[node, viewport, quaternion, rod_types]
-import strutils, tables, times
+import strutils, tables, times, math
 import variant
 
 const openDialogAvailable = not defined(android) and not defined(ios) and not defined(emscripten)
@@ -222,7 +222,7 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
                         a.onComplete() do():
                             pb.title = "play"
 
-proc newCompositionPropertyView(setter: proc(s: Composition), getter: proc(): Composition): PropertyEditorView =
+proc newCompositionPropertyView(setter: proc(s: rod_types.Composition), getter: proc(): rod_types.Composition): PropertyEditorView =
     result = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight * 3))
 
     # let horLayout = newHorizontalLayout(newRect(0, 0, 208, editorRowHeight * 3))
@@ -253,7 +253,74 @@ proc newCompositionPropertyView(setter: proc(s: Composition), getter: proc(): Co
     result.addSubview(open)
 
 
+type NodeAnchorView = ref object of View
+    pX: float
+    pY: float
+    size: Size
+    onChanged: proc(p: Point)
+
+proc ppx(v: NodeAnchorView): float = v.pX / v.size.width 
+proc ppy(v: NodeAnchorView): float = v.pY / v.size.height
+
+method draw(v: NodeAnchorView, r: Rect) =
+    let dotSize = 10.0
+
+    let c = currentContext()
+    c.fillColor = clearColor()
+    c.strokeWidth = 3
+    c.drawRect(r)
+
+    c.strokeWidth = 1
+    c.fillColor = blackColor()
+    c.drawLine(newPoint(r.x + r.width * 0.5, r.y), newPoint(r.x + r.width * 0.5, r.y + r.height))
+    c.drawLine(newPoint(r.x , r.y + r.height * 0.5), newPoint(r.x + r.width, r.y + r.height * 0.5))
+
+    c.fillColor = newColor(1.0, 0.2, 0.4, 1.0)
+    c.strokeWidth = 0
+    c.drawEllipseInRect(newRect(v.ppx * r.width - dotSize * 0.5, v.ppy * r.height - dotSize * 0.5, dotSize, dotSize))
+
+method onTouchEv*(v: NodeAnchorView, e: var Event): bool = 
+    var px = (e.localPosition.x / v.bounds.size.width) 
+    var py = (e.localPosition.y / v.bounds.size.height) 
+
+    template algn(p1: float) =
+        if p1 < 0.25:
+            p1 = 0.0
+        elif p1 > 0.25 and p1 < 0.75:
+            p1 = 0.5
+        else:
+            p1 = 1.0
+
+    px.algn()
+    py.algn()
+
+    if (v.ppx != px or v.ppy != py) and not v.onChanged.isNil:
+        v.pX = px * v.size.width
+        v.pY = py * v.size.height
+        v.onChanged(newPoint(v.pX, v.pY))
+    result = true
+
+proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX), getter: proc(): NodeAnchorAUX): PropertyEditorView =
+    let boxSize = 100.0
+    result = PropertyEditorView.new(newRect(0, 0, 208, boxSize + 10))
+    let n = getter().node
+    var minP = newVector3(high(float), high(float))
+    var maxP = newVector3(low(float), low(float))
+    n.nodeBounds2d(minP, maxP)
+
+    var v = NodeAnchorView.new(newRect(0, 5, boxSize, boxSize))
+    v.size = newSize(maxP.x - minP.x, maxP.y - minP.y)
+    v.pX = n.anchor.x
+    v.pY = n.anchor.y
+    if v.size.width > 0 and v.size.height > 0:
+        v.onChanged = proc(p: Point) =
+            n.anchor = newVector3(p.x, p.y)
+    # echo "size ", v.size, " x ", v.pX, " y ", v.pY
+    result.addSubview(v)
+
+registerPropertyEditor(newNodeAnchorAUXPropertyView)
 registerPropertyEditor(newNodePropertyView)
 registerPropertyEditor(newQuaternionPropertyView)
 registerPropertyEditor(newAEMarkerPropertyView)
 registerPropertyEditor(newCompositionPropertyView)
+

@@ -17,9 +17,6 @@ when rodPluginFile.len != 0:
 when defined(rodedit):
     import os
 
-when loadingAndSavingAvailable:
-    import rod/editor/editor_open_project_view
-
 const isMobile = defined(ios) or defined(android)
 
 proc runAutoTestsIfNeeded() =

@@ -21,7 +21,6 @@ import variant
 
 when loadingAndSavingAvailable:
     import os_files/dialog
-    import rod/editor/editor_open_project_view
     import os
 
 proc `selectedNode=`*(e: Editor, n: Node) =
@@ -288,14 +287,19 @@ proc createCloseEditorButton(e: Editor, cb: proc()) =
         cb()
 
 proc copyNode*(e: Editor, n: Node = nil)=
+    # echo "copyNode"
     var cn = n
     if n.isNil:
         cn = e.selectedNode
-
     if not cn.isNil:
-        let data = nodeToJson(cn, "/j")
-        let pbi = newPasteboardItem(NodePboardKind, $data)
-        pasteboardWithName(PboardGeneral).write(pbi)
+        try:
+            echo "try copy node ", cn.name
+            let data = nodeToJson(cn, e.currentProjectPath())
+            let pbi = newPasteboardItem(NodePboardKind, $data)
+            pasteboardWithName(PboardGeneral).write(pbi)
+        except:
+            echo getCurrentExceptionMsg()
+            echo getStackTrace(getCurrentException())
 
 proc cutNode*(e: Editor, n: Node = nil)=
     e.copyNode(n)
@@ -308,21 +312,27 @@ proc cutNode*(e: Editor, n: Node = nil)=
         e.sceneTreeDidChange()
 
 proc pasteNode*(e: Editor, n: Node = nil)=
+    # echo "pasteNode"
     let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
     if not pbi.isNil:
-        let j = parseJson(pbi.data)
-        let pn = newNode()
-        # pn.loadComposition(j, "file:///j") #todo: wtf?
+        echo "try paste node"
+        try:
+            let j = parseJson(pbi.data)
+            let pn = newNode()
+            pn.loadNodeFromJson(j, "file://" & e.currentProjectPath()) do():
+                var cn = n
+                if cn.isNil:
+                    cn = e.selectedNode
 
-        var cn = n
-        if cn.isNil:
-            cn = e.selectedNode
+                if cn.isNil:
+                    cn = e.rootNode
 
-        if cn.isNil:
-            cn = e.rootNode
-
-        cn.addChild(pn)
-        e.sceneTreeDidChange()
+                cn.addChild(pn)
+                e.selectedNode = pn
+                e.sceneTreeDidChange()
+        except:
+            echo getCurrentExceptionMsg()
+            echo getStackTrace(getCurrentException())
 
 proc onFirstResponderChanged(e: Editor, fr: View)=
     for t in e.workspaceView.compositionEditors:
@@ -369,8 +379,8 @@ proc initNotifHandlers(e: Editor)=
                 e.loadCompositionToScene(path)
         else: discard
 
-
 proc onKeyDown(ed: Editor, e: var Event): bool =
+    # echo "editor onKeyDown ", e.keyCode
     case commandFromEvent(e)
     of kcCopy:
         ed.copyNode()
@@ -380,6 +390,9 @@ proc onKeyDown(ed: Editor, e: var Event): bool =
         result = true
     of kcPaste:
         ed.pasteNode()
+        result = true
+    of kcUndo:
+        echo "editor undo"
         result = true
     else:
         discard

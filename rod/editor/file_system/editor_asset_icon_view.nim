@@ -110,7 +110,7 @@ proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
     var iconPos = newPoint(icoset * 0.5, 0.0)
     if compact:
         iconPos.x = 0.0
-        iconSize = r.size
+        iconSize = newSize(r.height, r.height)
 
     let iconRect = newRect(iconPos, iconSize)
     let res = result

@@ -11,6 +11,9 @@ when defined(rodedit):
 
 export Node
 
+type NodeAnchorAUX* = ref object
+    node*: Node
+
 proc sceneView*(n: Node): SceneView = n.mSceneView
 proc getGlobalAlpha*(n: Node): float32
 proc worldTransform*(n: Node): Matrix4
@@ -500,8 +503,12 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
     p.visitProperty("anchor", n.anchor)
+    
+    when defined(rodedit):
+        var mAnch = NodeAnchorAUX(node: n)
+        p.visitProperty("anchorSetter", mAnch, { pfEditable })
     p.visitProperty("alpha", n.alpha)
-    p.visitProperty("affectsCh", n.affectsChildren)
+    p.visitProperty("affectsCh", n.affectsChildren, { pfEditable })
 
     p.visitProperty("tX", n.positionX, { pfAnimatable })
     p.visitProperty("tY", n.positionY, { pfAnimatable })
@@ -510,7 +517,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("sY", n.scaleY, { pfAnimatable })
     p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
 
-    p.visitProperty("layer", n.layer)
+    # p.visitProperty("layer", n.layer, { pfEditable })
     p.visitProperty("enabled", n.enabled)
 
 proc reparentTo*(n, newParent: Node) {.deprecated.} =
@@ -571,7 +578,7 @@ proc isEnabledInTree*(n: Node): bool =
 proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
 proc deserialize*(n: Node, j: JsonNode, s: Serializer)
 
-proc loadNodeFromJson(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
+proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
     let serializer = Serializer.new()
     serializer.url = url
     serializer.jdeser = newJsonDeserializer()
@@ -735,7 +742,9 @@ proc newNodeWithResource*(path: string): Node =
     var done = false
     c.loadComposition() do():
         done = true
-    if not done: 
+    when defined(rodedit):
+        if true: return c.node
+    if not done:
         raise newException(Exception, "newNodeWithResource(" & path & ") could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
     result = c.node
 
