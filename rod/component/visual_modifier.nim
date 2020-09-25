@@ -28,7 +28,7 @@ method beforeDraw*(vm: VisualModifier, index: int): bool =
 
 method afterDraw*(vm: VisualModifier, index: int) =
     let gl = currentContext().gl
-    gl.blendFunc(gl.SRC_ALPHA, COLOR_MULTIPLY.GLenum)
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
 
 method deserialize*(vm: VisualModifier, j: JsonNode, serealizer: Serializer) =
     var v = j{"blendMode"}

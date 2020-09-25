@@ -792,17 +792,15 @@ method draw*(ps: ParticleSystem) =
 
     if ps.isBlendAdd:
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE)
-    else:
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
     gl.drawElements(gl.TRIANGLES, ps.count * 6, gl.UNSIGNED_SHORT)
 
     #TODO to default settings
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    if ps.isBlendAdd:
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
     gl.activeTexture(gl.TEXTURE0)
-    gl.enable(gl.BLEND)
     if ps.hasDepthTest:
         gl.disable(gl.DEPTH_TEST)
         gl.depthMask(true)

@@ -164,10 +164,6 @@ method draw*(t: Tracer) =
         gl.vertexAttribPointer(aPosition.GLuint, 3.GLint, gl.FLOAT, false, (3 * sizeof(GLfloat)).GLsizei , 0)
         gl.useProgram(tracerShader)
 
-        if t.color[3] < 1.0:
-            gl.enable(gl.BLEND)
-            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
-
         c.setColorUniform(tracerShader, "uColor", t.color)
 
         let vp = t.node.sceneView

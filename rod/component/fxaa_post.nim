@@ -176,7 +176,7 @@ method draw*(r: FXAAPost) =
         gl.uniform1i(gl.getUniformLocation(FXAAPostSharedShader, "texUnit"), 0)
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.drawElements(gl.TRIANGLES, FXAAPostSharedNumberOfIndexes, gl.UNSIGNED_SHORT)
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+    gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
     gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
 
