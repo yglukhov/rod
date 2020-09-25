@@ -894,7 +894,7 @@ method updateSetup*(m: Material, n: Node) {.base.} =
 
     if c.alpha < 1.0 or m.blendEnable:
         gl.enable(gl.BLEND)
-        gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
+        gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     else:
         gl.disable(gl.BLEND)
     if m.depthEnable:
