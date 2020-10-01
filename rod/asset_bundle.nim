@@ -189,10 +189,18 @@ when defined(android):
     import nimx/utils/android
     import android/content/context
     import android/extras/pathutils
+elif defined(ios):
+    import darwin/foundation
 
 proc cacheDir(): string {.inline.} =
     when defined(android):
         mainActivity().getExternalCacheDir().getAbsolutePath()
+    elif defined(ios):
+        let sp = NSSearchPathForDirectoriesInDomains(NSSearchPathDirectory.caches, {NSSearchPathDomain.user}, true)
+        if sp.len != 0:
+          $sp[0]
+        else:
+          "/tmp"
     else:
         "/tmp/rodappcache"
 
