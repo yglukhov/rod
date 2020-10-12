@@ -6,28 +6,21 @@ import json, logging
 
 type Sprite* = ref object of Component
     offset*: Point
-    # size*: Size
     frameOffsets*: seq[Point]
     images*: seq[Image]
     mCurrentFrame*: int16
-    # segmentsGeometry: seq[float32] # Used for nine-part images
-    when not defined(release):
-        resourceUrl: string
 
 Sprite.properties:
     images:
         serializationKey: "fileNames"
         combinedWith: frameOffsets
-
-    # segmentsGeometry:
-    #     serializationKey: "segments"
+    mCurrentFrame:
+        serializationKey: "currentFrame"
 
 template `currentFrame`*(s: Sprite): int =
     int(s.mCurrentFrame)
 
 template `currentFrame=`*(s: Sprite, v: int) =
-    # when not defined(release):
-    #     assert(v >= 0, s.resourceUrl & " currentFrame negative")
     s.mCurrentFrame = int16(v)
 
 proc image*(s: Sprite): Image =
@@ -46,18 +39,11 @@ proc getOffset*(s: Sprite): Point =
 
 proc calculatedSize(s: Sprite): Size =
     ## If size is zeroSize - return image size.
-    # if s.size == zeroSize:
     if not s.image.isNil:
         result = s.image.size
-    # else:
-    #     result = s.size
 
 proc effectiveSize*(s: Sprite): Size =
     result = s.calculatedSize()
-    # let off = s.getOffset()
-
-    # result.width += off.x
-    # result.height += off.y
 
 method draw*(s: Sprite) =
     let c = currentContext()
@@ -116,15 +102,6 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
         s.createFrameAnimation()
 
     serealizer.deserializeValue(j, "offset", s.offset)
-
-    # v = j{"segments"}
-    # if not v.isNil and v.len == 4:
-    #     s.segmentsGeometry = newSeq[float32](4)
-    #     for i in 0 ..< 4: s.segmentsGeometry[i] = v[i].getFloat().float32
-
-    # v = j{"size"}
-    # if not v.isNil:
-    #     s.size = newSize(v[0].getFloat(), v[1].getFloat())
 
 proc awake(c: Sprite) =
     if c.images.len > 1:

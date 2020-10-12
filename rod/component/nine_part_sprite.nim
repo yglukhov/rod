@@ -9,9 +9,9 @@ type NinePartSprite* = ref object of Sprite
   segments: Vector4
 
 NinePartSprite.properties:
-  mSize
-  segments:
-    serializationKey: "segments"
+  mSize:
+    serializationKey: "size"
+  segments
 
 proc size*(s: NinePartSprite): Size =
   s.mSize
@@ -28,18 +28,15 @@ proc `image=`*(s: NinePartSprite, i: Image) =
   procCall s.Sprite.`image=`(i)
   s.segments.x = i.size.width * 0.4
   s.segments.y = i.size.width * 0.4
+  s.segments.z = i.size.height * 0.4
+  s.segments.w = i.size.height * 0.4
 
   s.size = i.size
-  # s.segments.z = i.size.height * 0.5
-  # s.segments.w = i.size.height * 0.5
 
-proc calculatedSize(s: NinePartSprite): Size =
-  ## If size is zeroSize - return image size.
-  # if not s.isNinePart:
-  #   if not s.image.isNil:
-  #     result = s.image.size
-  # else:
-  result = s.size
+method getBBox*(s: NinePartSprite): BBox =
+    let sz = s.size
+    result.maxPoint = newVector3(sz.width + s.getOffset.x, sz.height + s.getOffset.y, 0.0)
+    result.minPoint = newVector3(s.getOffset.x, s.getOffset.y, 0.0)
 
 method draw*(s: NinePartSprite) =
   let c = currentContext()
@@ -47,8 +44,19 @@ method draw*(s: NinePartSprite) =
   if not i.isNil:
     var r: Rect
     r.origin = s.getOffset()
-    r.size = s.calculatedSize()
+    r.size = s.size
     c.drawNinePartImage(i, r, s.marginLeft, s.marginTop, s.marginRight, s.marginBottom)
+
+# hack serializer/deserializer from sprite
+method serialize*(c: NinePartSprite, s: Serializer): JsonNode =
+  result = procCall c.Sprite.serialize(s)
+  var r2 = procCall c.Component.serialize(s)
+  for k, v in r2:
+    result[k] = v
+
+method deserialize*(c: NinePartSprite, j: JsonNode, s: Serializer) =
+  procCall c.Sprite.deserialize(j, s)
+  procCall c.Component.deserialize(j, s)
 
 genSerializationCodeForComponent(NinePartSprite)
 registerComponent(NinePartSprite)
@@ -64,13 +72,11 @@ when defined(rodedit):
 
   proc `segmentsAUX=`*(s: NinePartSprite, v: NinePartSegmentsAUX) =
     s.segments = v.segments
-    # s.image = v.image
-    s.size = v.size
 
 method visitProperties*(s: NinePartSprite, p: var PropertyVisitor) =
-  # procCall s.Sprite.visitProperties(p)
-  p.visitProperty("size", s.size)
   p.visitProperty("image", s.image)
+  p.visitProperty("size", s.size)
+  p.visitProperty("segments", s.segments)
 
   when defined(rodedit):
     p.visitProperty("nine part", s.segmentsAUX)

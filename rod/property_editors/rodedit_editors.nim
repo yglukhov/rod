@@ -84,6 +84,7 @@ type NinePartView = ref object of View
   scale: float
   mOnAction: proc()
   prevTouch: Point
+  editedSegment: int
 
 proc onAction(v: NinePartView, cb: proc()) =
   v.mOnAction = cb
@@ -103,7 +104,8 @@ method draw(v: NinePartView, r: Rect) =
   let font = systemFont()
 
   var maxSize = max(v.image.size.width, v.image.size.height)
-  v.scale = r.width / maxSize
+  let imgArea = newRect(0, 0, r.width, r.height - 20)
+  v.scale = imgArea.width / maxSize
   var dr = v.imageRect()
   c.drawImage(v.image, dr)
 
@@ -114,11 +116,14 @@ method draw(v: NinePartView, r: Rect) =
 
   c.strokeWidth = 3
 
+  const lbls = ["left", "right", "top", "bottom"]
   template drawSegment(i: int, body: untyped) =
     let pc = c.strokeColor
     if v.segmentsHighlight[i]:
       c.strokeColor = newColor(1.0, 0.4, 0.2, 1.0)
     body
+    if v.segmentsHighlight[i]:
+      c.drawText(font, newPoint(0, r.height - 20), lbls[i] & " " & $v.segments[i])
     c.strokeColor = pc
 
   #left
@@ -150,25 +155,32 @@ proc segmentAt(v: NinePartView, p: Point): int =
       return i
 
   check 0, newRect(newPoint(v.segments.x * v.scale - margin, 0), newSize(margin * 2, dr.height))
-  check 1, newRect(newPoint(dr.width - v.segments.x * v.scale - margin, 0), newSize(margin * 2, dr.height))
+  check 1, newRect(newPoint(dr.width - v.segments.y * v.scale - margin, 0), newSize(margin * 2, dr.height))
   check 2, newRect(newPoint(0, v.segments.z * v.scale - margin), newSize(dr.width, margin * 2))
   check 3, newRect(newPoint(0, dr.height - v.segments.w * v.scale - margin), newSize(dr.width, margin * 2))
 
 method onTouchEv*(v: NinePartView, e: var Event): bool =
   if e.buttonState == bsDown:
     v.prevTouch = e.localPosition
+    v.editedSegment = v.segmentAt(e.localPosition)
     return true
   else:
-    # let diff = e.localPosition - v.prevTouch
-    let i = v.segmentAt(e.localPosition)
+    var dr = v.imageRect()
+    let i = v.editedSegment
     case i:
-    of 0, 1: #left, right
-      v.segments[i] = e.localPosition.x
-    of 2,3: #top
-      v.segments[i] = e.localPosition.y
+    of 0: #left
+      v.segments[i] = e.localPosition.x / v.scale
+    of 1: #right
+      v.segments[i] = (dr.width - e.localPosition.x) / v.scale
+    of 2: #top
+      v.segments[i] = e.localPosition.y / v.scale
+    of 3: #bottom
+      v.segments[i] = (dr.height - e.localPosition.y) / v.scale
     else:
       discard
 
+    if not v.mOnAction.isNil:
+      v.mOnAction()
     result = true
 
 proc clearHightlights(v: NinePartView) =
@@ -188,8 +200,8 @@ method onMouseOut*(v: NinePartView, e: var Event) =
   v.clearHightlights()
 
 proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX), getter: proc(): NinePartSegmentsAUX): PropertyEditorView =
-  let boxSize = 200.0
-  result = PropertyEditorView.new(newRect(0,0,208, boxSize + 10))
+  let boxSize = 170.0
+  let pv = PropertyEditorView.new(newRect(0,0,208, boxSize + 10))
 
   let n = getter()
   var v = NinePartView.new(newRect(0, 5, boxSize, boxSize))
@@ -198,7 +210,9 @@ proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX), getter: proc():
   v.image = n.image
   v.onAction do():
     setter(NinePartSegmentsAUX(segments: v.segments, image: v.image, size: v.size))
-
-  result.addSubview(v)
+    # if not pv.changeInspector.isNil:
+    #     pv.changeInspector()
+  pv.addSubview(v)
+  result = pv
 
 registerPropertyEditor(newNinePartViewEditor)

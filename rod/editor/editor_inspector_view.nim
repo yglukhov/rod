@@ -1,4 +1,4 @@
-import nimx/[view, text_field, button, 
+import nimx/[view, text_field, button,
     scroll_view, linear_layout, slider, property_visitor,
     expanding_view, stack_view
 ]
@@ -96,13 +96,13 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             visitor.flags = { pfAnimatable }
         else:
             visitor.flags = { pfEditable }
-        
+
         visitor.commit = proc() =
             let propView = propertyEditorForProperty(n, visitor.name, visitor.setterAndGetter, nil, changeInspectorView)
             propView.autoresizingMask = {afFlexibleWidth}
             let propHolder = newView(propView.frame)
             propHolder.addSubview(propView)
-            
+
             if i.editor.mode == emAnimation:
                 var btn = newButton(propView, newPoint(100 - 17, 1), newSize(16, 16), "a")
                 btn.autoresizingMask = {afFlexibleMinX}
@@ -121,7 +121,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             expView.title = "Composition"
             expView.expand()
             i.visitProperties(n.composition, visitor)
-            
+
             var openComp = newButton(expView, newPoint(328 - 50, 0), newSize(50.0, 18), "open")
             openComp.autoresizingMask = {afFlexibleMinX}
             openComp.onAction do():
@@ -131,7 +131,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             i.propView.addSubview(expView)
 
             expView= newExpandingView(newRect(0, 20, 328, 20.0))
-        
+
         expView.title = "Node"
         expView.expand()
 
@@ -151,7 +151,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
                 removeButton.onAction do():
                     n.removeComponent(component)
                     i.inspectedNode = n
-            
+
             editedPropertyName = "." & $idx
             v.visitProperties(visitor)
             i.propView.addSubview(expView)
@@ -219,7 +219,7 @@ method onCompositionChanged*(v: InspectorView, comp: CompositionDocument) =
     # v.inspectedNode = comp.rootNode
     v.setEditedNode(comp.selectedNode)
 
-method onEditModeChanged*(v: InspectorView, mode: EditMode) = 
+method onEditModeChanged*(v: InspectorView, mode: EditMode) =
     v.inspectedNode = v.currNode
 
 registerEditorTab("Inspector", InspectorView)
