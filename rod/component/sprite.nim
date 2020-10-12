@@ -6,11 +6,11 @@ import json, logging
 
 type Sprite* = ref object of Component
     offset*: Point
-    size*: Size
+    # size*: Size
     frameOffsets*: seq[Point]
     images*: seq[Image]
     mCurrentFrame*: int16
-    segmentsGeometry: seq[float32] # Used for nine-part images
+    # segmentsGeometry: seq[float32] # Used for nine-part images
     when not defined(release):
         resourceUrl: string
 
@@ -19,8 +19,8 @@ Sprite.properties:
         serializationKey: "fileNames"
         combinedWith: frameOffsets
 
-    segmentsGeometry:
-        serializationKey: "segments"
+    # segmentsGeometry:
+    #     serializationKey: "segments"
 
 template `currentFrame`*(s: Sprite): int =
     int(s.mCurrentFrame)
@@ -44,20 +44,13 @@ proc getOffset*(s: Sprite): Point =
     if s.frameOffsets.len > s.currentFrame and s.currentFrame >= 0:
         result += s.frameOffsets[s.currentFrame]
 
-template isNinePart(s: Sprite): bool = s.segmentsGeometry.len > 0
-template marginLeft(s: Sprite): float32 = s.segmentsGeometry[0]
-template marginRight(s: Sprite): float32 = s.segmentsGeometry[1]
-template marginTop(s: Sprite): float32 = s.segmentsGeometry[2]
-template marginBottom(s: Sprite): float32 = s.segmentsGeometry[3]
-
 proc calculatedSize(s: Sprite): Size =
     ## If size is zeroSize - return image size.
-    if s.size == zeroSize:
-        let i = s.image
-        if not i.isNil:
-            result = i.size
-    else:
-        result = s.size
+    # if s.size == zeroSize:
+    if not s.image.isNil:
+        result = s.image.size
+    # else:
+    #     result = s.size
 
 proc effectiveSize*(s: Sprite): Size =
     result = s.calculatedSize()
@@ -74,10 +67,7 @@ method draw*(s: Sprite) =
         var r: Rect
         r.origin = s.getOffset()
         r.size = s.calculatedSize()
-        if s.isNinePart:
-            c.drawNinePartImage(i, r, s.marginLeft, s.marginTop, s.marginRight, s.marginBottom)
-        else:
-            c.drawImage(i, r)
+        c.drawImage(i, r)
 
 proc createFrameAnimation(s: Sprite) {.inline.} =
     let a = newAnimation()
@@ -127,14 +117,14 @@ method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
 
     serealizer.deserializeValue(j, "offset", s.offset)
 
-    v = j{"segments"}
-    if not v.isNil and v.len == 4:
-        s.segmentsGeometry = newSeq[float32](4)
-        for i in 0 ..< 4: s.segmentsGeometry[i] = v[i].getFloat().float32
+    # v = j{"segments"}
+    # if not v.isNil and v.len == 4:
+    #     s.segmentsGeometry = newSeq[float32](4)
+    #     for i in 0 ..< 4: s.segmentsGeometry[i] = v[i].getFloat().float32
 
-    v = j{"size"}
-    if not v.isNil:
-        s.size = newSize(v[0].getFloat(), v[1].getFloat())
+    # v = j{"size"}
+    # if not v.isNil:
+    #     s.size = newSize(v[0].getFloat(), v[1].getFloat())
 
 proc awake(c: Sprite) =
     if c.images.len > 1:
