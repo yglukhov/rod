@@ -503,7 +503,7 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("scale", n.scale)
     p.visitProperty("rotation", n.rotation)
     p.visitProperty("anchor", n.anchor)
-    
+
     when defined(rodedit):
         var mAnch = NodeAnchorAUX(node: n)
         p.visitProperty("anchorSetter", mAnch, { pfEditable })
@@ -682,7 +682,7 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
                 comp.deserialize(c, s)
 
     let compositionRef = j{"compositionRef"}.getStr()
-    if compositionRef.len != 0: # and not n.name.endsWith(".placeholder"):
+    if compositionRef.len != 0:
         s.startAsyncOp()
         newComposition(s.toAbsoluteUrl(compositionRef), n).loadComposition() do():
             s.endAsyncOp()
@@ -696,7 +696,6 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
     s.deserializeValue(j, "layer", n.layer)
     s.deserializeValue(j, "enabled", n.enabled)
     s.deserializeValue(j, "affectsChildren", n.affectsChildren)
-
 
     proc cb()=
         let animations = j{"animations"}
@@ -725,7 +724,7 @@ proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node {.deprecated.}
     let c = newComposition(url)
     result = c.node
     c.loadComposition(onComplete)
-    
+
 
 proc newNodeWithResource*(path: string): Node =
     let bd = binDeserializerForPath(path)
@@ -777,7 +776,12 @@ proc serialize*(n: Node, s: Serializer): JsonNode =
 
         for value in n.components:
             var jcomp: JsonNode
-            jcomp = value.serialize(s)
+            if not value.supportsNewSerialization:
+                jcomp = value.serialize(s)
+            else:
+                jcomp = newJObject()
+                s.jser.node = jcomp
+                value.serialize(s.jser)
 
             if not jcomp.isNil:
                 jcomp.add("_c", %value.className())
@@ -815,7 +819,7 @@ proc serialize*(n: Node, s: JsonSerializer) =
             jn["components"].add(s.node)
             s.node = jn
         return
-    
+
     if n.components.len > 0:
         let jn = s.node
         let jcomps = newJArray()
@@ -836,7 +840,7 @@ proc serialize*(n: Node, s: JsonSerializer) =
             jchildren.add(s.node)
         s.node = jn
 
-        
+
     when defined(rodedit):
         if not n.jAnimations.isNil:
             s.node["animations"] = n.jAnimations

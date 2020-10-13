@@ -55,6 +55,8 @@ method init*(m: MeshComponent) =
 
     m.debugSkeleton = false
 
+method supportsNewSerialization*(cm: MeshComponent): bool = false
+
 proc checkMinMax*(m: MeshComponent, x, y, z: float32) =
     if x < m.vboData.minCoord[0]:
         m.vboData.minCoord[0] = x
@@ -621,4 +623,3 @@ method rayCast*(ns: MeshComponent, r: Ray, distance: var float32): bool =
         return false
 
     result = procCall ns.Component.rayCast(r, distance)
-

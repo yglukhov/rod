@@ -16,6 +16,7 @@ Sprite.properties:
         combinedWith: frameOffsets
     mCurrentFrame:
         serializationKey: "currentFrame"
+    offset
 
 template `currentFrame`*(s: Sprite): int =
     int(s.mCurrentFrame)
@@ -69,55 +70,11 @@ method getBBox*(s: Sprite): BBox =
     result.maxPoint = newVector3(sz.width + s.getOffset.x, sz.height + s.getOffset.y, 0.0)
     result.minPoint = newVector3(s.getOffset.x, s.getOffset.y, 0.0)
 
-method deserialize*(s: Sprite, j: JsonNode, serealizer: Serializer) =
-    var v = j{"alpha"} # Deprecated
-    if not v.isNil:
-        s.node.alpha = v.getFloat(1.0)
-        warn "Alpha in sprite component deprecated"
-
-    when not defined(release):
-        s.resourceUrl = serealizer.url
-
-    v = j{"images"}
-    if v.isNil:
-        v = j{"fileNames"}
-    if v.isNil:
-        s.image = imageWithResource(j["name"].getStr())
-        warn "Sprite component format deprecated: ", j["name"].getStr()
-    else:
-        s.images = newSeq[Image](v.len)
-        for i in 0 ..< s.images.len:
-            closureScope:
-                let ii = i
-                deserializeImage(v[ii], serealizer) do(img: Image, err: string):
-                    s.images[ii] = img
-
-    v = j{"frameOffsets"}
-    if not v.isNil:
-        s.frameOffsets = newSeqOfCap[Point](v.len)
-        for p in v:
-            s.frameOffsets.add(newPoint(p[0].getFloat(), p[1].getFloat()))
-
-    if s.images.len > 1:
-        s.createFrameAnimation()
-
-    serealizer.deserializeValue(j, "offset", s.offset)
-
 proc awake(c: Sprite) =
     if c.images.len > 1:
         c.createFrameAnimation()
 
 genSerializationCodeForComponent(Sprite)
-
-method serialize*(c: Sprite, s: Serializer): JsonNode =
-    result = newJObject()
-    result.add("currentFrame", s.getValue(c.currentFrame))
-    result.add("offset", s.getValue(c.offset))
-
-    var imagesNode = newJArray()
-    result.add("fileNames", s.getValue(imagesNode))
-    for img in c.images:
-        imagesNode.add( s.getValue(s.getRelativeResourcePath(img.filePath())) )
 
 template curFrameAux(t: Sprite): int16 = t.mCurrentFrame
 template `curFrameAux=`(t: Sprite, f: int16) = t.mCurrentFrame = f
