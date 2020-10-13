@@ -76,7 +76,6 @@ when defined(rodedit):
 method visitProperties*(s: NinePartSprite, p: var PropertyVisitor) =
   p.visitProperty("image", s.image)
   p.visitProperty("size", s.size)
-  p.visitProperty("segments", s.segments)
 
   when defined(rodedit):
     p.visitProperty("nine part", s.segmentsAUX)

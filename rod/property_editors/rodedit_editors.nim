@@ -87,7 +87,9 @@ type NinePartView = ref object of View
   editedSegment: int
 
 proc onAction(v: NinePartView, cb: proc()) =
-  v.mOnAction = cb
+  v.mOnAction = proc()=
+    if not cb.isNil:
+      cb()
 
 method init(v: NinePartView, r: Rect) =
   procCall v.View.init(r)
@@ -108,11 +110,6 @@ method draw(v: NinePartView, r: Rect) =
   v.scale = imgArea.width / maxSize
   var dr = v.imageRect()
   c.drawImage(v.image, dr)
-
-  # c.drawText(font, newPoint(0, 0), "left")
-  # c.drawText(font, newPoint(50, 0), "right")
-  # c.drawText(font, newPoint(100, 0), "top")
-  # c.drawText(font, newPoint(150, 0), "bottom")
 
   c.strokeWidth = 3
 
@@ -202,17 +199,31 @@ method onMouseOut*(v: NinePartView, e: var Event) =
 proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX), getter: proc(): NinePartSegmentsAUX): PropertyEditorView =
   let boxSize = 170.0
   let pv = PropertyEditorView.new(newRect(0,0,208, boxSize + 10))
-
   let n = getter()
-  var v = NinePartView.new(newRect(0, 5, boxSize, boxSize))
+  var v = NinePartView.new(newRect(0, 25, boxSize, boxSize))
+  v.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+
+  var sv: View
+  proc update() =
+    if not sv.isNil:
+      sv.removeFromSuperview()
+    var sng: SetterAndGetter[Vector4]
+    sng.setter = proc(val: Vector4) =
+        v.segments = val
+        setter(NinePartSegmentsAUX(segments: v.segments, image: v.image, size: v.size))
+    sng.getter = proc(): Vector4 =
+        v.segments
+    sv = propertyEditorForProperty(newVariant(), newVariant(sng))
+    pv.addSubview(sv)
+
   v.size = n.size
   v.segments = n.segments
   v.image = n.image
   v.onAction do():
     setter(NinePartSegmentsAUX(segments: v.segments, image: v.image, size: v.size))
-    # if not pv.changeInspector.isNil:
-    #     pv.changeInspector()
+    update()
   pv.addSubview(v)
+  update()
   result = pv
 
 registerPropertyEditor(newNinePartViewEditor)
