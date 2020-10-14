@@ -39,6 +39,7 @@ iterator allComponentNodesOfType*(n: JsonNode, typ: string): (JsonNode, JsonNode
 
 iterator allSpriteNodes*(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
+    for n, c in allComponentNodesOfType(n, "NinePartSprite"): yield(n, c)
 
 iterator allMeshComponentNodes*(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "MeshComponent"): yield(n, c)

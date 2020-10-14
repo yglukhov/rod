@@ -183,7 +183,7 @@ method init*(v: EditorTreeView, r: Rect)=
     deleteNodeButton.autoresizingMask = { afFlexibleMinY, afFlexibleMaxX }
     deleteNodeButton.title = "-"
     deleteNodeButton.onAction do():
-        if outlineView.selectedIndexPath.len != 0:
+        if outlineView.selectedIndexPath.len > 1:
             let n = outlineView.itemAtIndexPath(outlineView.selectedIndexPath).get(Node)
             n.removeFromParent()
             var sip = outlineView.selectedIndexPath

@@ -198,7 +198,7 @@ method onMouseOut*(v: NinePartView, e: var Event) =
 
 proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX), getter: proc(): NinePartSegmentsAUX): PropertyEditorView =
   let boxSize = 170.0
-  let pv = PropertyEditorView.new(newRect(0,0,208, boxSize + 10))
+  let pv = PropertyEditorView.new(newRect(0,0,208, boxSize + 30))
   let n = getter()
   var v = NinePartView.new(newRect(0, 25, boxSize, boxSize))
   v.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
