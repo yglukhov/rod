@@ -101,6 +101,7 @@ proc nodeToJson(n: Node, path: string): JsonNode =
     let s = Serializer.new()
     s.url = "file://" & path
     s.jser = newJsonSerializer()
+    s.jser.url = s.url
     result = n.serialize(s)
 
 when loadingAndSavingAvailable:

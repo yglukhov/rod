@@ -22,4 +22,6 @@ method afterDraw*(o: Overlay, index: int) =
     gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ONE, gl.ONE_MINUS_SRC_ALPHA)
     popPostEffect()
 
+method supportsNewSerialization*(cm: Overlay): bool = true
+
 registerComponent(Overlay, "Effects")

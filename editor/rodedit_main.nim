@@ -65,7 +65,7 @@ proc startApplication() =
 
     runAutoTestsIfNeeded()
 
-when not defined(js):
+when defined(rodedit):
     onUnhandledException = proc(msg: string) =
         var msg = msg.indent(8)
         error "Exception caught:\n ", msg

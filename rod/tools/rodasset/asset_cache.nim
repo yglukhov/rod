@@ -7,7 +7,7 @@ import settings
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
-const hashVersion = 10
+const hashVersion = 11
 
 const audioFileExtensions = [".wav", ".ogg", ".mp3"]
 

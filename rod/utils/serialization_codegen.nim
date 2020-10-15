@@ -103,21 +103,34 @@ template genSerializationCodeForComponent*(c: typed) =
 
         bind className
         method deserialize*(v: c, b: JsonDeserializer) =
+            when hasProperties(superType(c)):
+                procCall deserialize(superType(c)(v), b)
+
             genSerializerProc(c, JsonDeserializer, v, b, true, false, false, false)
 
         method serialize*(v: c, b: JsonSerializer) =
+            when hasProperties(superType(c)):
+                procCall serialize(superType(c)(v), b)
+
             b.visit(className(v), "_c")
             genSerializerProc(c, JsonSerializer, v, b, true, true, false, false)
 
         method serialize*(v: c, b: BinSerializer) =
+            when hasProperties(superType(c)):
+                procCall serialize(superType(c)(v), b)
+
             genSerializerProc(c, BinSerializer, v, b, false, true, true, false)
 
         method serializationHash*(v: c, b: SerializationHashCalculator) =
+            when hasProperties(superType(c)):
+                procCall serializationHash(superType(c)(v), b)
+
             genSerializerProc(c, SerializationHashCalculator, v, b, true, true, false, true)
 
-    method supportsNewSerialization*(cm: c): bool = true
-
     method deserialize*(v: c, b: BinDeserializer) =
+        when hasProperties(superType(c)):
+            procCall deserialize(superType(c)(v), b)
+
         genSerializerProc(c, BinDeserializer, v, b, false, false, true, false)
 
 template genJsonSerializationrFor*(c: typed) =

@@ -10,6 +10,10 @@ var props {.compileTime.} = initTable[string, seq[PropertyDesc]]()
 proc hasAttr*(d: PropertyDesc, attr: string): bool =
     attr in d.attributes
 
+proc hasProperties*(t: typedesc): bool {.compileTime.} =
+    result = $t in props
+    echo "hasProperties ", result, " ", $t
+
 iterator propertyDescs*(typdesc: NimNode): PropertyDesc =
     let k = $typdesc
     if k in props:

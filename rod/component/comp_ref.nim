@@ -1,7 +1,7 @@
 import nimx / [ types, matrixes, property_visitor ]
 import rod / [ node, rod_types, component, tools/serializer ]
 import rod / utils / [property_desc, serialization_codegen ]
-import rod/component/sprite
+import rod/component/nine_part_sprite
 import json
 
 
@@ -16,8 +16,8 @@ CompRef.properties:
 
 proc setSize(n: Node, sz: Size) =
     for c in n.components:
-        if c of Sprite:
-            let s = Sprite(c)
+        if c of NinePartSprite:
+            let s = NinePartSprite(c)
             s.size = sz
     for c in n.children:
         c.setSize(sz)

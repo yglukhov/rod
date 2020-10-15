@@ -66,13 +66,8 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
             var castedNode = v.tryRayCast(e)
             if not castedNode.isNil:
                 when defined(rodedit):
-                    var p = castedNode.parent
-                    while not p.isNil and p.composition.isNil and castedNode != v.composition.rootNode:
-                        p = p.parent
-
-                    if castedNode != p and p != v.composition.rootNode:
-                        castedNode = p
-
+                    while castedNode != v.composition.rootNode and not castedNode.composition.isNil:
+                        castedNode = castedNode.parent
                 v.editor.selectedNode = castedNode
             else:
                 v.editor.selectedNode = nil
