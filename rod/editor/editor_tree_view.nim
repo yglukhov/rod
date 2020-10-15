@@ -203,19 +203,19 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
                 var cell = v.outlineView.cellAtIndexPath(v.outlineView.selectedIndexPath)
                 v.renameField.text = n.name
                 v.renameField.setFrame(newRect(newPoint(15.0, cell.frame.y), cell.frame.size))
+                v.renameField.onAction do():
+                    v.renameField.onAction(nil)
+                    let n = v.nodeFromSelectedOutlinePath()
+                    if not v.renameField.superview.isNil and v.renameField.isFirstResponder():
+                        n.name = v.renameField.text
+                        v.renameField.removeFromSuperview()
+                    discard v.window.makeFirstResponder(v.outlineView)
+
                 v.outlineView.superview.addSubview(v.renameField)
                 discard v.window.makeFirstResponder(v.renameField)
             else:
                 discard v.window.makeFirstResponder(v.outlineView)
-        else:
-            if not v.renameField.superview.isNil and v.renameField.isFirstResponder():
-                n.name = v.renameField.text
-                v.renameField.removeFromSuperview()
-
-            discard v.window.makeFirstResponder(v.outlineView)
-
         result = true
-
     elif e.keyCode == VirtualKey.Escape:
         v.filterField.text = ""
         v.filterField.sendAction()

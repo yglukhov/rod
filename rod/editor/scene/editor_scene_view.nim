@@ -66,8 +66,10 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
             var castedNode = v.tryRayCast(e)
             if not castedNode.isNil:
                 when defined(rodedit):
+                    echo "castedNode ", castedNode.name
                     while castedNode != v.composition.rootNode and not castedNode.composition.isNil:
                         castedNode = castedNode.parent
+                        echo "\t ", castedNode.name
                 v.editor.selectedNode = castedNode
             else:
                 v.editor.selectedNode = nil
@@ -163,8 +165,10 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     case i.kind:
     of rodPbComposition:
         try:
+            echo "try drop node ", i.data
             var n: Node
             n = newNodeWithURL("file://" & i.data) do():
+                echo "node isnil ", n.isNil
                 if not n.isNil:
                     var editorScene = target.EditorSceneView
                     var cs = editorScene.selectedNode
@@ -175,7 +179,7 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
                             cs = editorScene.selectedNode.parent
                         if cs.isNil:
                             raise newException(Exception, "Can't attach to prefab. Attaching to prafab parent failed, parent is nil")
-
+                    echo "add child "
                     cs.addChild(n)
                     editorScene.composition.selectedNode = cs
                     editorScene.editor.onCompositionChanged(editorScene.composition)

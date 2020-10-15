@@ -586,6 +586,7 @@ proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "", onComplete: proc(
     serializer.jdeser = newJsonDeserializer()
     serializer.jdeser.getImageForPath = proc(path: string, off: var Point): Image =
         const prefix = "file://"
+        echo "prefix ", url, " path ", path
         doAssert(url.startsWith(prefix), "Internal error")
         var p = url[prefix.len .. ^1]
         p = p.parentDir / path
@@ -663,7 +664,7 @@ proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
 import rod/animation/property_animation
 
 proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
-
+    echo "deserialize ", s.url
     var v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
@@ -676,7 +677,12 @@ proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
                 var className: string
                 s.deserializeValue(v[i], "_c", className)
                 let comp = n.addComponent(className)
-                comp.deserialize(v[i], s)
+                if not comp.supportsNewSerialization():
+                    comp.deserialize(v[i], s)
+                else:
+                    s.jdeser.node = v[i]
+                    comp.deserialize(s.jdeser)
+
         else:
             # Deprecated. Old save format support
             for k, c in v:
@@ -738,8 +744,10 @@ proc newNodeWithResource*(path: string): Node =
             raise
     else:
         echo "No BinDeserializer for ", path
-
-    let c = newComposition("res://" & path)
+    when defined(rodedit):
+        let c = newComposition("file://" & path)
+    else:
+        let c = newComposition("res://" & path)
     var done = false
     c.loadComposition() do():
         done = true
