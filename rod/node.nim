@@ -1,10 +1,11 @@
 import nimx / [ context, types, animation, image, portable_gl, view, property_visitor, pathutils ]
 import nimx / assets / [ asset_manager, asset_loading ]
 import rod / utils / [ bin_deserializer, json_serializer, json_deserializer ]
-import rod/tools/serializer
 import rod/asset_bundle
 import quaternion, ray, rod_types
 import tables, typetraits, json, strutils, math, os
+
+import rod/tools/serializer
 
 when defined(rodedit):
     import rod / editor / scene / components / editor_component
@@ -577,32 +578,31 @@ proc isEnabledInTree*(n: Node): bool =
     return true
 
 # Serialization
-proc newNodeFromJson*(j: JsonNode, s: Serializer): Node
-proc deserialize*(n: Node, j: JsonNode, s: Serializer)
+proc deserialize*(n: Node, s: JsonDeserializer)
 
-proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "", onComplete: proc() = nil) =
-    let serializer = Serializer.new()
-    serializer.url = url
-    serializer.jdeser = newJsonDeserializer()
-    serializer.jdeser.getImageForPath = proc(path: string, off: var Point): Image =
+proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "") =
+    let deser = newJsonDeserializer()
+    deser.compPath = url
+    deser.getImageForPath = proc(url: string, off: var Point): Image =
         const prefix = "file://"
-        echo "prefix ", url, " path ", path
+        echo "image url ", url
         doAssert(url.startsWith(prefix), "Internal error")
         var p = url[prefix.len .. ^1]
-        p = p.parentDir / path
-        normalizePath(p, false)
         when not defined(js) and not defined(emscripten):
             # TODO: We have to figure out smth about js...
             result = imageWithContentsOfFile(p)
 
-    serializer.onComplete = onComplete
     let oldNodeRefTab = nodeLoadRefTable
     nodeLoadRefTable = newTable[string, seq[NodeRefResolveProc]]()
     defer: nodeLoadRefTable = oldNodeRefTab
 
-    n.deserialize(j, serializer)
+    deser.node = j
+    n.deserialize(deser)
     n.resolveNodeRefs()
-    serializer.finish()
+
+proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "", onComplete: proc()) {.deprecated.} =
+    n.loadNodeFromJson(j, url)
+    if not onComplete.isNil: onComplete()
 
 proc binDeserializerForPath(path: string): BinDeserializer =
     let am = sharedAssetManager()
@@ -663,76 +663,59 @@ proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
 
 import rod/animation/property_animation
 
-proc deserialize*(n: Node, j: JsonNode, s: Serializer) =
-    echo "deserialize ", s.url
+proc deserialize*(n: Node, s: JsonDeserializer) =
+    assert(s.compPath.len != 0)
+    echo "deserialize ", s.compPath
+    let j = s.node
     var v = j{"children"}
     if not v.isNil:
         for i in 0 ..< v.len:
-            n.addChild(newNodeFromJson(v[i], s))
+            s.node = v[i]
+            let c = newNode()
+            c.deserialize(s)
+            n.addChild(c)
+        s.node = j
 
     v = j{"components"}
     if not v.isNil:
         if v.kind == JArray:
             for i in 0 ..< v.len:
+                s.node = v[i]
                 var className: string
-                s.deserializeValue(v[i], "_c", className)
+                s.visit(className, "_c")
                 let comp = n.addComponent(className)
-                if not comp.supportsNewSerialization():
-                    comp.deserialize(v[i], s)
-                else:
-                    s.jdeser.node = v[i]
-                    comp.deserialize(s.jdeser)
-
+                comp.deserialize(s)
+            s.node = j
         else:
-            # Deprecated. Old save format support
-            for k, c in v:
-                let comp = n.component(k)
-                comp.deserialize(c, s)
+            doAssert(false, "Old save format")
 
     let compositionRef = j{"compositionRef"}.getStr()
     if compositionRef.len != 0:
-        s.startAsyncOp()
-        newComposition(s.toAbsoluteUrl(compositionRef), n).loadComposition() do():
-            s.endAsyncOp()
+        newComposition(toAbsoluteUrl(s.compPath, compositionRef), n).loadComposition()
 
-    s.deserializeValue(j, "name", n.name)
-    s.deserializeValue(j, "translation", n.position)
-    s.deserializeValue(j, "scale", n.mScale)
-    s.deserializeValue(j, "rotation", n.mRotation)
-    s.deserializeValue(j, "anchor", n.anchor)
-    s.deserializeValue(j, "alpha", n.alpha)
-    s.deserializeValue(j, "layer", n.layer)
-    s.deserializeValue(j, "enabled", n.enabled)
-    s.deserializeValue(j, "affectsChildren", n.affectsChildren)
+    s.visit(n.name, "name")
+    s.visit(n.mTranslation, "translation")
+    s.visit(n.mScale, "scale")
+    s.visit(n.mRotation, "rotation")
+    s.visit(n.mAnchorPoint, "anchor")
+    s.visit(n.alpha, "alpha")
+    s.visit(n.layer, "layer")
+    n.isEnabled = s.node{"enabled"}.getBool(true)
+    n.affectsChildren = s.node{"affectsChildren"}.getBool(true)
 
-    proc cb()=
-        let animations = j{"animations"}
-        if not animations.isNil and animations.len > 0:
-            n.animations = newTable[string, Animation]()
-            for k, v in animations:
-                n.animations[k] = newPropertyAnimation(n, v)
+    let animations = j{"animations"}
+    if not animations.isNil and animations.len > 0:
+        n.animations = newTable[string, Animation]()
+        for k, v in animations:
+            n.animations[k] = newPropertyAnimation(n, v)
 
-        when defined(rodedit):
-            n.jAnimations = animations
+    when defined(rodedit):
+        n.jAnimations = animations
 
-    if s.isAsyncOperation:
-        let oldCb = s.onComplete
-        s.onComplete = proc()=
-            cb()
-            if not oldCb.isNil:
-                oldCb()
-    else:
-        cb()
-
-proc newNodeFromJson(j: JsonNode, s: Serializer): Node =
-    result = newNode()
-    result.deserialize(j, s)
-
-proc newNodeWithUrl*(url: string, onComplete: proc() = nil): Node {.deprecated.} =
+proc newNodeWithUrl*(url: string): Node {.deprecated.} =
     let c = newComposition(url)
     result = c.node
-    c.loadComposition(onComplete)
-
+    c.loadComposition()
 
 proc newNodeWithResource*(path: string): Node =
     let bd = binDeserializerForPath(path)
