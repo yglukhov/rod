@@ -85,8 +85,6 @@ method deserialize*(c: Component, s: JsonDeserializer) {.base.} =
     ss.url = s.compPath
     c.deserialize(s.node, ss)
 
-method serialize*(c: Component, s: BinSerializer) {.base.} = doAssert(false, "Not implemented")
-
 method serialize*(c: Component, s: JsonSerializer) {.base.} =
     let ss = Serializer.new()
     ss.jser = s
@@ -94,6 +92,18 @@ method serialize*(c: Component, s: JsonSerializer) {.base.} =
     s.node = c.serialize(ss)
     if "_c" notin s.node:
         s.node["_c"] = %className(c)
+
+method serialize*(c: Component, b: BinSerializer) {.base.} =
+    let js = newJsonSerializer()
+    js.node = newJObject()
+    c.serialize(js)
+    let j = js.node
+    let name = j["_c"]
+    j.delete("_c")
+    var s = ""
+    toUgly(s, j)
+    b.write(s.len.int32)
+    b.writeStrNoLen(s)
 
 method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
 

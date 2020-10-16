@@ -243,9 +243,8 @@ proc writeUnknownComponent(b: BinSerializer, j: JsonNode) =
     var s = ""
     toUgly(s, j)
     j["_c"] = name
-    b.align(sizeof(int32))
-    b.stream.write(s.len.int32)
-    b.stream.write(s)
+    b.write(s.len.int32)
+    b.writeStrNoLen(s)
 
 proc writeComponents(b: BinSerializer, nodes: seq[JsonNode], writer: proc(b: BinSerializer, node: JsonNode)) =
     for n in nodes:
@@ -271,7 +270,7 @@ proc writeComponents(b: BinSerializer, name: string, nodes: seq[JsonNode], compP
             c.add(s)
 
     b.write(nodeIds)
-    if isClassRegistered(name) and newObjectOfClass(name).Component.supportsNewSerialization():
+    if isClassRegistered(name):
         if name == "AEComposition":
             b.writeComponents(c) do(j: JsonNode):
                 writeAECompositionComponent(b, j, nodes)

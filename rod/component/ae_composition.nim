@@ -208,7 +208,7 @@ method deserialize*(c: AEComposition, b: BinDeserializer) =
 
 method serialize*(c: AEComposition, s: JsonSerializer) =
     s.node["buffers"] = c.buffers
-    s.node["_c"] = %c.className()
+    s.node["_c"] = %($AEComposition)
 
     let markers = newJObject()
     for m in c.markers:
