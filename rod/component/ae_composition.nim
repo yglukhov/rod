@@ -242,26 +242,8 @@ method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     var r = t
     p.visitProperty("AECompos", r)
 
-# method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
-#     serealizer.deserializeValue(j, "inPoint", c.inPoint)
-#     serealizer.deserializeValue(j, "outPoint", c.outPoint)
-#     serealizer.deserializeValue(j, "scale", c.animScale)
-#     serealizer.deserializeValue(j, "startTime", c.startTime)
-#     serealizer.deserializeValue(j, "duration", c.duration)
-#     serealizer.deserializeValue(j, "timeremap", c.timeremap)
-#     serealizer.deserializeValue(j, "timeRemapEnabled", c.timeRemapEnabled)
-
 genSerializationCodeForComponent(AELayer)
 
-
-
-# method serialize*(c: AELayer, s: JsonSerializer) =
-#     let j = s.node
-#     .add("inPoint", s.getValue(c.inPoint))
-#     result.add("outPoint", s.getValue(c.outPoint))
-#     result.add("scale", s.getValue(c.animScale))
-#     result.add("startTime", s.getValue(c.startTime))
-#     result.add("duration", s.getValue(c.duration))
 
 method visitProperties*(t: AELayer, p: var PropertyVisitor) =
     p.visitProperty("inPoint",   t.inPoint)
