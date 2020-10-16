@@ -585,7 +585,6 @@ proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "") =
     deser.compPath = url
     deser.getImageForPath = proc(url: string, off: var Point): Image =
         const prefix = "file://"
-        echo "image url ", url
         doAssert(url.startsWith(prefix), "Internal error")
         var p = url[prefix.len .. ^1]
         when not defined(js) and not defined(emscripten):
@@ -665,7 +664,6 @@ import rod/animation/property_animation
 
 proc deserialize*(n: Node, s: JsonDeserializer) =
     assert(s.compPath.len != 0)
-    echo "deserialize ", s.compPath
     let j = s.node
     var v = j{"children"}
     if not v.isNil:
@@ -782,7 +780,6 @@ proc serialize*(n: Node, s: JsonSerializer) =
             child.serialize(s)
             jchildren.add(s.node)
         s.node = jn
-
 
     when defined(rodedit):
         if not n.jAnimations.isNil:

@@ -70,7 +70,6 @@ proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
             result = b.compPath.parentDirEx & '/' & jimage.str
     of JObject: result = jimage["orig"].getStr()
     else: doAssert(false)
-    echo "IMAGHE PATH: ", result
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode, offset: var Point): Image =
     var path = b.imagePath(j)
