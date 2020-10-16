@@ -745,7 +745,7 @@ proc newNodeWithResource*(path: string): Node =
     else:
         echo "No BinDeserializer for ", path
     when defined(rodedit):
-        let c = newComposition("file://" & path)
+        let c = newComposition("file://res/" & path)
     else:
         let c = newComposition("res://" & path)
     var done = false
@@ -756,56 +756,6 @@ proc newNodeWithResource*(path: string): Node =
     if not done:
         raise newException(Exception, "newNodeWithResource(" & path & ") could not complete synchronously. Possible reason: needed asset bundles are not preloaded.")
     result = c.node
-
-proc serialize*(n: Node, s: Serializer): JsonNode =
-    result = newJObject()
-    result.add("name", s.getValue(n.name))
-    result.add("translation", s.getValue(n.position))
-    result.add("scale", s.getValue(n.scale))
-    result.add("rotation", s.getValue(n.rotation))
-    result.add("anchor", s.getValue(n.anchor))
-    result.add("alpha", s.getValue(n.alpha))
-    result.add("layer", s.getValue(n.layer))
-    result.add("affectsChildren", s.getValue(n.affectsChildren))
-    result.add("enabled", s.getValue(n.enabled))
-
-    if not n.composition.isNil:
-        result.add("compositionRef", s.getValue(n.composition.url))
-        let aeLayer = n.componentIfAvailable("AELayer")
-        if not aeLayer.isNil:
-            var jcomp = aeLayer.serialize(s)
-            if not jcomp.isNil:
-                jcomp.add("_c", %aeLayer.className())
-                result["componets"] = newJArray()
-                result["componets"].add(jcomp)
-        return
-
-    if n.components.len > 0:
-        var componentsNode = newJArray()
-        result.add("components", componentsNode)
-
-        for value in n.components:
-            var jcomp: JsonNode
-            if not value.supportsNewSerialization:
-                jcomp = value.serialize(s)
-            else:
-                jcomp = newJObject()
-                s.jser.node = jcomp
-                value.serialize(s.jser)
-
-            if not jcomp.isNil:
-                jcomp.add("_c", %value.className())
-                componentsNode.add(jcomp)
-
-    if n.children.len > 0:
-        var childsNode = newJArray()
-        result.add("children", childsNode)
-        for child in n.children:
-            childsNode.add(child.serialize(s))
-
-    when defined(rodedit):
-        if not n.jAnimations.isNil:
-            result.add("animations", n.jAnimations)
 
 proc serialize*(n: Node, s: JsonSerializer) =
     s.visit(n.name, "name")

@@ -1,5 +1,5 @@
 import nimx / [ types, context, animation, property_visitor ]
-import rod / utils / [property_desc, serialization_codegen, bin_deserializer ]
+import rod / utils / [property_desc, serialization_codegen, bin_deserializer, json_serializer, json_deserializer ]
 import rod/[ rod_types, node, component, viewport ]
 import rod/animation/property_animation
 import rod/tools/serializer
@@ -143,7 +143,8 @@ proc findNodeWithAEComp(node: Node, name: string): Node =
 
     result = node.findNode(name)
 
-method deserialize*(c: AEComposition, j: JsonNode, serealizer: Serializer) =
+method deserialize*(c: AEComposition, s: JsonDeserializer) =
+    let j = s.node
     c.layers = @[]
     if "layers" in j:
         for jln in j["layers"]:
@@ -205,9 +206,8 @@ method deserialize*(c: AEComposition, b: BinDeserializer) =
     for m in c.markers:
         c.node.registerAnimation(m.name, c.setCompositionMarker(m))
 
-method serialize*(c: AEComposition, s: Serializer): JsonNode=
-    result = newJObject()
-    result.add("buffers", c.buffers)
+method serialize*(c: AEComposition, s: JsonSerializer) =
+    s.node.add("buffers", c.buffers)
 
     let markers = newJObject()
     for m in c.markers:
@@ -215,18 +215,19 @@ method serialize*(c: AEComposition, s: Serializer): JsonNode=
         markers[m.name]["start"] = %m.start
         markers[m.name]["duration"] = %m.duration
 
-    result["markers"] = markers
+    s.node["markers"] = markers
 
     when defined(rodedit):
-        result["layers"] = c.jLayers
+        s.node["layers"] = c.jLayers
     else:
         let layers = newJArray()
         for l in c.layers:
             layers.add(%l.node.name)
-        result["layers"] = layers
+        s.node["layers"] = layers
 
 method componentNodeWasAddedToSceneView*(c: AEComposition) =
     if c.allCompAnim.isNil:
+        assert(not c.buffers.isNil)
         c.allCompAnim = newPropertyAnimation(c.node, c.buffers)
 
 method supportsNewSerialization*(c: AEComposition): bool = true
@@ -241,26 +242,26 @@ method visitProperties*(t: AEComposition, p: var PropertyVisitor) =
     var r = t
     p.visitProperty("AECompos", r)
 
-method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
-    serealizer.deserializeValue(j, "inPoint", c.inPoint)
-    serealizer.deserializeValue(j, "outPoint", c.outPoint)
-    serealizer.deserializeValue(j, "scale", c.animScale)
-    serealizer.deserializeValue(j, "startTime", c.startTime)
-    serealizer.deserializeValue(j, "duration", c.duration)
-    serealizer.deserializeValue(j, "timeremap", c.timeremap)
-    serealizer.deserializeValue(j, "timeRemapEnabled", c.timeRemapEnabled)
+# method deserialize*(c: AELayer, j: JsonNode, serealizer: Serializer) =
+#     serealizer.deserializeValue(j, "inPoint", c.inPoint)
+#     serealizer.deserializeValue(j, "outPoint", c.outPoint)
+#     serealizer.deserializeValue(j, "scale", c.animScale)
+#     serealizer.deserializeValue(j, "startTime", c.startTime)
+#     serealizer.deserializeValue(j, "duration", c.duration)
+#     serealizer.deserializeValue(j, "timeremap", c.timeremap)
+#     serealizer.deserializeValue(j, "timeRemapEnabled", c.timeRemapEnabled)
 
 genSerializationCodeForComponent(AELayer)
 
 
 
-method serialize*(c: AELayer, s: Serializer): JsonNode=
-    result = newJObject()
-    result.add("inPoint", s.getValue(c.inPoint))
-    result.add("outPoint", s.getValue(c.outPoint))
-    result.add("scale", s.getValue(c.animScale))
-    result.add("startTime", s.getValue(c.startTime))
-    result.add("duration", s.getValue(c.duration))
+# method serialize*(c: AELayer, s: JsonSerializer) =
+#     let j = s.node
+#     .add("inPoint", s.getValue(c.inPoint))
+#     result.add("outPoint", s.getValue(c.outPoint))
+#     result.add("scale", s.getValue(c.animScale))
+#     result.add("startTime", s.getValue(c.startTime))
+#     result.add("duration", s.getValue(c.duration))
 
 method visitProperties*(t: AELayer, p: var PropertyVisitor) =
     p.visitProperty("inPoint",   t.inPoint)

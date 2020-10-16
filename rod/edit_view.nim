@@ -13,8 +13,6 @@ import rod / editor / [editor_project_settings, editor_tab_registry,
 import rod/utils/json_serializer
 export editor_types
 
-import tools/serializer
-
 export editor_tab_registry
 
 import variant
@@ -98,11 +96,10 @@ proc sceneTreeDidChange*(e: Editor) =
         t.onCompositionChanged(e.currentComposition)
 
 proc nodeToJson(n: Node, path: string): JsonNode =
-    let s = Serializer.new()
+    let s = newJsonSerializer()
     s.url = "file://" & path
-    s.jser = newJsonSerializer()
-    s.jser.url = s.url
-    result = n.serialize(s)
+    n.serialize(s)
+    s.node
 
 when loadingAndSavingAvailable:
     proc relativeUrl*(url: string, base: string): string =
