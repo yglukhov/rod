@@ -207,13 +207,15 @@ method deserialize*(c: AEComposition, b: BinDeserializer) =
         c.node.registerAnimation(m.name, c.setCompositionMarker(m))
 
 method serialize*(c: AEComposition, s: JsonSerializer) =
-    s.node.add("buffers", c.buffers)
+    s.node["buffers"] = c.buffers
+    s.node["_c"] = %c.className()
 
     let markers = newJObject()
     for m in c.markers:
-        markers[m.name] = newJObject()
-        markers[m.name]["start"] = %m.start
-        markers[m.name]["duration"] = %m.duration
+        let jm = newJObject()
+        jm["start"] = %m.start
+        jm["duration"] = %m.duration
+        markers[m.name] = jm
 
     s.node["markers"] = markers
 
