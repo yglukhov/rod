@@ -57,6 +57,10 @@ proc writeArrayNoLen*[T](b: BinSerializer, data: openarray[T]) =
         for i in 0 ..< data.len:
             b.write(data[i])
 
+proc writeStrNoLen*(b: BinSerializer, data: string) =
+    if data.len != 0:
+        b.stream.writeData(unsafeAddr data[0], data.len)
+
 proc getNeighbourImageBundlePath(b: BinSerializer, p2: string):tuple[asset:string, bundle:string]=
     when not defined(js):
         var curDir = getCurrentDir() / "res"

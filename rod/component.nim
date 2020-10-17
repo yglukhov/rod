@@ -33,8 +33,6 @@ template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: stri
     registerClass(T, creator)
     registerComponentGroup(group, typetraits.name(T))
 
-method supportsNewSerialization*(cm: Component): bool {.base.} = true #todo: remove after migration to new serialization will be done
-
 proc createComponent*(name: string): Component =
     if isClassRegistered(name) == false:
         raise newException(Exception, "Component " & name & " is not registered")
@@ -56,7 +54,13 @@ method isPosteffectComponent*(c: Component): bool {.base.} = false
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method getBBox*(c: Component): BBox {.base.} = discard
 
-method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.}
+method serialize*(c: Component, s: Serializer): JsonNode {.base.} =
+    # Deprecated. If your compoenent hits this, override the new JsonSerializer serialization
+    doAssert(false, "Not implemented")
+
+method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} =
+    # Deprecated. If your compoenent hits this, override the new JsonDeserializer serialization
+    doAssert(false, "Not implemented")
 
 proc deserializeFromJson*(c: Component, b: BinDeserializer) =
     # Temporary hacky way to fall back to json deserialization when binary is not implemented
@@ -75,20 +79,33 @@ proc deserializeFromJson*(c: Component, b: BinDeserializer) =
 method deserialize*(c: Component, b: BinDeserializer) {.base.} =
     c.deserializeFromJson(b)
 
-method deserialize*(c: Component, s: JsonDeserializer) {.base.} = discard
-method serialize*(c: Component, s: BinSerializer) {.base.} = discard
-method serialize*(c: Component, s: JsonSerializer) {.base.} = discard
+method deserialize*(c: Component, s: JsonDeserializer) {.base.} =
+    let ss = Serializer.new()
+    ss.jdeser = s
+    ss.url = s.compPath
+    c.deserialize(s.node, ss)
+
+method serialize*(c: Component, s: JsonSerializer) {.base.} =
+    let ss = Serializer.new()
+    ss.jser = s
+    ss.url = s.url
+    s.node = c.serialize(ss)
+    if "_c" notin s.node:
+        s.node["_c"] = %className(c)
+
+method serialize*(c: Component, b: BinSerializer) {.base.} =
+    let js = newJsonSerializer()
+    js.node = newJObject()
+    c.serialize(js)
+    let j = js.node
+    let name = j["_c"]
+    j.delete("_c")
+    var s = ""
+    toUgly(s, j)
+    b.write(s.len.int32)
+    b.writeStrNoLen(s)
+
 method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
-
-method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} =
-    let js = s.jdeser
-    js.node = j
-    c.deserialize(js)
-
-method serialize*(c: Component, s: Serializer): JsonNode {.base.} =
-    result = newJObject()
-    s.jser.node = result
-    c.serialize(s.jser)
 
 type UpdateProcComponent = ref object of Component
     updateProc: proc()
