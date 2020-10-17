@@ -767,8 +767,8 @@ proc serialize*(n: Node, s: JsonSerializer) =
         jn["components"] = jcomps
         for c in n.components:
             s.node = newJObject()
-            doAssert("_c" in s.node, "component did not serialize properly: " & c.className())
             c.serialize(s)
+            doAssert("_c" in s.node, "component did not serialize properly: " & c.className())
             jcomps.add(s.node)
         s.node = jn
 
