@@ -95,7 +95,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
                 b.write(v)
 
     elif T is seq or T is openarray:
-        doAssert(data.len <= uint16.high)
+        doAssert(data.len <= uint16.high.int)
         b.write(data.len.uint16)
         if data.len != 0:
             b.writeArrayNoLen(data)
