@@ -67,22 +67,13 @@ proc init(ab: AssetBundle, handler: proc()) {.inline.} =
         ab.index = j
         ab.spriteSheets = initTable[string, seq[JsonNode]]()
         let packedImages = ab.index["packedImages"]
-        if not packedImages.isNil:
-            if packedImages.kind == JArray:
-                for v in packedImages:
-                    let fn = v["file"].str
-                    if fn in ab.spriteSheets:
-                        ab.spriteSheets[fn].add(v)
-                    else:
-                        ab.spriteSheets[fn] = @[v]
-            else:
-                for k, v in packedImages:
-                    v["orig"] = %k
-                    let fn = v["file"].str
-                    if fn in ab.spriteSheets:
-                        ab.spriteSheets[fn].add(v)
-                    else:
-                        ab.spriteSheets[fn] = @[v]
+        if not packedImages.isNil and packedImages.kind == JArray:
+            for v in packedImages:
+                let fn = v["file"].str
+                if fn in ab.spriteSheets:
+                    ab.spriteSheets[fn].add(v)
+                else:
+                    ab.spriteSheets[fn] = @[v]
 
         indexComplete = true
         if indexComplete and compsComplete: onComplete()

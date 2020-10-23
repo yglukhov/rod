@@ -1,5 +1,5 @@
 import nimx/[context, portable_gl, types, image, matrixes, property_visitor, view]
-import rod/[component, quaternion, node, viewport, tools/serializer]
+import rod/[component, quaternion, node, viewport]
 import rod/component/[material, camera]
 import rod / utils / [property_desc, serialization_codegen ]
 import math, opengl, json
@@ -890,59 +890,6 @@ method draw*(t: Trail) =
 
     # to default settings
     gl.disable(gl.DEPTH_TEST)
-
-method deserialize*(t: Trail, j: JsonNode, s: Serializer) =
-    if j.isNil:
-        return
-
-    s.deserializeValue(j, "color", t.color)
-    s.deserializeValue(j, "quadsToDraw", t.quadsToDraw)
-    s.deserializeValue(j, "gravity", t.gravity)
-    s.deserializeValue(j, "directRotation", t.directRotation)
-    s.deserializeValue(j, "widthOffset", t.widthOffset)
-    s.deserializeValue(j, "heightOffset", t.heightOffset)
-    s.deserializeValue(j, "angleThreshold", t.angleThreshold)
-    s.deserializeValue(j, "bDepth", t.bDepth)
-    s.deserializeValue(j, "bStretch", t.bStretch)
-    s.deserializeValue(j, "bCollapsible", t.bCollapsible)
-    s.deserializeValue(j, "cutSpeed", t.cutSpeed)
-    s.deserializeValue(j, "isWireframe", t.isWireframe)
-    s.deserializeValue(j, "imagePercent", t.imagePercent)
-    s.deserializeValue(j, "matcapPercent", t.matcapPercent)
-    s.deserializeValue(j, "bIsTiled", t.bIsTiled)
-    s.deserializeValue(j, "tiles", t.tiles)
-
-    deserializeImage(j{"trailImage"}, s) do(img: Image, err: string):
-        t.trailImage = img
-
-    deserializeImage(j{"trailMatcap"}, s) do(img: Image, err: string):
-        t.trailMatcap = img
-
-method serialize*(t: Trail, s: Serializer): JsonNode =
-    result = newJObject()
-
-    result.add("color", s.getValue(t.color))
-    result.add("quadsToDraw", s.getValue(t.quadsToDraw))
-    result.add("gravity", s.getValue(t.gravity))
-    result.add("directRotation", s.getValue(t.directRotation))
-    result.add("widthOffset", s.getValue(t.widthOffset))
-    result.add("heightOffset", s.getValue(t.heightOffset))
-    result.add("angleThreshold", s.getValue(t.angleThreshold))
-    result.add("bDepth", s.getValue(t.bDepth))
-    result.add("bStretch", s.getValue(t.bStretch))
-    result.add("bCollapsible", s.getValue(t.bCollapsible))
-    result.add("isWireframe", s.getValue(t.isWireframe))
-    result.add("cutSpeed", s.getValue(t.cutSpeed))
-    result.add("bIsTiled", s.getValue(t.bIsTiled))
-    result.add("tiles", s.getValue(t.tiles))
-    if not t.image.isNil:
-        result.add("imagePercent", s.getValue(t.imagePercent))
-    if not t.trailMatcap.isNil:
-        result.add("matcapPercent", s.getValue(t.matcapPercent))
-    if not t.image.isNil:
-        result.add("trailImage", s.getValue(s.getRelativeResourcePath(t.trailImage.filePath())))
-    if not t.trailMatcap.isNil:
-        result.add("trailMatcap", s.getValue(s.getRelativeResourcePath(t.trailMatcap.filePath())))
 
 proc collapse*(t: Trail): bool =
     result = t.bCollapsible

@@ -1,6 +1,5 @@
 import nimx/[types, context, image, composition, property_visitor]
 import rod/[rod_types, viewport, component ]
-import rod/tools/serializer
 import rod / utils / [ property_desc, serialization_codegen ]
 import json
 
@@ -87,27 +86,7 @@ method getBBox*(b: Blink): BBox =
         result.maxPoint = newVector3(0, 0, 0.0)
         result.minPoint = newVector3(img.size.width, img.size.height, 0.0)
 
-method deserialize*(b: Blink, j: JsonNode, serealizer: Serializer) =
-    deserializeImage(j{"mask"}, serealizer) do(img: Image, err: string):
-        b.mask = img
-    deserializeImage(j{"light"}, serealizer) do(img: Image, err: string):
-        b.light = img
-
-    serealizer.deserializeValue(j, "speed", b.speed)
-    serealizer.deserializeValue(j, "period", b.period)
-
 genSerializationCodeForComponent(Blink)
-
-method serialize*(c: Blink, serealizer: Serializer): JsonNode =
-    result = newJObject()
-    if c.mask.filePath().len > 0:
-        result.add("mask", serealizer.getValue(serealizer.getRelativeResourcePath(c.mask.filePath())))
-
-    if c.light.filePath().len > 0:
-        result.add("light", serealizer.getValue(serealizer.getRelativeResourcePath(c.light.filePath())))
-
-    result.add("speed", serealizer.getValue(c.speed))
-    result.add("period", serealizer.getValue(c.period))
 
 method visitProperties*(b: Blink, p: var PropertyVisitor) =
     p.visitProperty("mask", b.mask)

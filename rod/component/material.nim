@@ -59,17 +59,13 @@ type ShaderMacro = enum
     WITH_SHADOW
 
 type
-    MaterialColor* = ref object
+    MaterialColor* = object
         emission: Color
         ambient: Color
         diffuse: Color
         specular: Color
         shininess: float32
 
-        ambientInited: bool
-        emissionInited: bool
-        diffuseInited: bool
-        specularInited: bool
         shininessInited: bool
 
     Material* = ref object of RootObj
@@ -127,6 +123,13 @@ type
         uniformLocationCache*: seq[UniformLocation]
         iUniform: int
 
+const
+    invalidShaderValue* = -60
+    invalidValueThreshold = -50
+
+proc invalidShaderColor*(): Color = newColor(invalidShaderValue, 0, 0, 0)
+proc isValid(c: Color): bool = c.r >= invalidValueThreshold
+
 var shadersCache = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
 
 template getUniformLocation*(gl: GL, m: Material, name: cstring): UniformLocation =
@@ -169,144 +172,92 @@ proc falloffTexture*(m: Material): Image = result = m.falloffTexture
 proc maskTexture*(m: Material): Image = result = m.maskTexture
 proc gammaCorrection*(m: Material): bool = result = m.gammaCorrection
 
-template `emission=`*(m: Material, v: Color) =
-    if not m.color.emissionInited:
-        m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
+proc setColor(m: Material, c: var Color, v: Color, flag: ShaderMacro) =
+    c = v
+    let hasFlag = flag in m.shaderMacroFlags
+    if v.isValid != hasFlag:
+        if hasFlag:
+            m.shaderMacroFlags.excl(flag)
+        else:
+            m.shaderMacroFlags.incl(flag)
         m.bShaderNeedUpdate = true
-    m.color.emission = v
-    m.color.emissionInited = true
-template `ambient=`*(m: Material, v: Color) =
-    if not m.color.ambientInited:
-        m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
-        m.bShaderNeedUpdate = true
-    m.color.ambient = v
-    m.color.ambientInited = true
-template `diffuse=`*(m: Material, v: Color) =
-    if not m.color.diffuseInited:
-        m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
-        m.bShaderNeedUpdate = true
-    m.color.diffuse = v
-    m.color.diffuseInited = true
-template `specular=`*(m: Material, v: Color) =
-    if not m.color.specularInited:
-        m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
-        m.bShaderNeedUpdate = true
-    m.color.specular = v
-    m.color.specularInited = true
-template `shininess=`*(m: Material, s: Coord) =
-    if not m.color.shininessInited:
-        m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
-        m.bShaderNeedUpdate = true
+
+proc `emission=`*(m: Material, v: Color) =
+    m.setColor(m.color.emission, v, WITH_MATERIAL_EMISSION)
+
+proc `ambient=`*(m: Material, v: Color) =
+    m.setColor(m.color.ambient, v, WITH_MATERIAL_AMBIENT)
+
+proc `diffuse=`*(m: Material, v: Color) =
+    m.setColor(m.color.diffuse, v, WITH_MATERIAL_DIFFUSE)
+
+proc `specular=`*(m: Material, v: Color) =
+    m.setColor(m.color.specular, v, WITH_MATERIAL_SPECULAR)
+
+proc `shininess=`*(m: Material, s: Coord) =
     m.color.shininess = s
-    m.color.shininessInited = true
+    let hasFlag = WITH_MATERIAL_SHININESS in m.shaderMacroFlags
+    if s >= invalidValueThreshold != hasFlag:
+        if hasFlag:
+            m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
+        else:
+            m.shaderMacroFlags.excl(WITH_MATERIAL_SHININESS)
+        m.bShaderNeedUpdate = true
+
 template `rimDensity=`*(m: Material, val: Coord) =
     m.rimDensity = val
 template `rimColor=`*(m: Material, val: Color) =
     m.rimColor = val
-template `matcapTextureR=`*(m: Material, i: Image) =
-    if m.matcapTextureR.isNil:
-        m.shaderMacroFlags.incl(WITH_MATCAP_R)
+
+proc setTexture(m: Material, t: var Image, i: Image, flag: ShaderMacro) =
+    t = i
+    let hasFlag = flag in m.shaderMacroFlags
+    if i.isNil == hasFlag:
+        if hasFlag:
+            m.shaderMacroFlags.excl(flag)
+        else:
+            m.shaderMacroFlags.incl(flag)
         m.bShaderNeedUpdate = true
-    m.matcapTextureR = i
-    if m.matcapTextureR.isNil:
-        m.shaderMacroFlags.excl(WITH_MATCAP_R)
-        m.bShaderNeedUpdate = true
-template `matcapTextureG=`*(m: Material, i: Image) =
-    if m.matcapTextureG.isNil:
-        m.shaderMacroFlags.incl(WITH_MATCAP_G)
-        m.bShaderNeedUpdate = true
-    m.matcapTextureG = i
-    if m.matcapTextureG.isNil:
-        m.shaderMacroFlags.excl(WITH_MATCAP_G)
-        m.bShaderNeedUpdate = true
-template `matcapTextureB=`*(m: Material, i: Image) =
-    if m.matcapTextureB.isNil:
-        m.shaderMacroFlags.incl(WITH_MATCAP_B)
-        m.bShaderNeedUpdate = true
-    m.matcapTextureB = i
-    if m.matcapTextureB.isNil:
-        m.shaderMacroFlags.excl(WITH_MATCAP_B)
-        m.bShaderNeedUpdate = true
-template `matcapTextureA=`*(m: Material, i: Image) =
-    if m.matcapTextureA.isNil:
-        m.shaderMacroFlags.incl(WITH_MATCAP_A)
-        m.bShaderNeedUpdate = true
-    m.matcapTextureA = i
-    if m.matcapTextureA.isNil:
-        m.shaderMacroFlags.excl(WITH_MATCAP_A)
-        m.bShaderNeedUpdate = true
-template `matcapMaskTexture=`*(m: Material, i: Image) =
-    if m.matcapMaskTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_MATCAP_MASK_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.matcapMaskTexture = i
-    if m.matcapMaskTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_MATCAP_MASK_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `albedoTexture=`*(m: Material, i: Image) =
-    if m.albedoTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_AMBIENT_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.albedoTexture = i
-    if m.albedoTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_AMBIENT_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `glossTexture=`*(m: Material, i: Image) =
-    if m.glossTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_GLOSS_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.glossTexture = i
-    if m.glossTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_GLOSS_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `specularTexture=`*(m: Material, i: Image) =
-    if m.specularTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_SPECULAR_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.specularTexture = i
-    if m.specularTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_SPECULAR_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `normalTexture=`*(m: Material, i: Image) =
-    if m.normalTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_NORMAL_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.normalTexture = i
-    if m.normalTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_NORMAL_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `bumpTexture=`*(m: Material, i: Image) =
-    if m.bumpTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_BUMP_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.bumpTexture = i
-    if m.bumpTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_BUMP_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `reflectionTexture=`*(m: Material, i: Image) =
-    if m.reflectionTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_REFLECTION_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.reflectionTexture = i
-    if m.reflectionTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_REFLECTION_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `falloffTexture=`*(m: Material, i: Image) =
-    if m.falloffTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_FALLOF_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.falloffTexture = i
-    if m.falloffTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_FALLOF_SAMPLER)
-        m.bShaderNeedUpdate = true
-template `maskTexture=`*(m: Material, i: Image) =
-    if m.maskTexture.isNil:
-        m.shaderMacroFlags.incl(WITH_MASK_SAMPLER)
-        m.bShaderNeedUpdate = true
-    m.maskTexture = i
-    if m.maskTexture.isNil:
-        m.shaderMacroFlags.excl(WITH_MASK_SAMPLER)
-        m.bShaderNeedUpdate = true
+
+proc `matcapTextureR=`*(m: Material, i: Image) =
+    m.setTexture(m.matcapTextureR, i, WITH_MATCAP_R)
+
+proc `matcapTextureG=`*(m: Material, i: Image) =
+    m.setTexture(m.matcapTextureG, i, WITH_MATCAP_G)
+
+proc `matcapTextureB=`*(m: Material, i: Image) =
+    m.setTexture(m.matcapTextureB, i, WITH_MATCAP_B)
+
+proc `matcapTextureA=`*(m: Material, i: Image) =
+    m.setTexture(m.matcapTextureA, i, WITH_MATCAP_A)
+
+proc `matcapMaskTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.matcapMaskTexture, i, WITH_MATCAP_MASK_SAMPLER)
+
+proc `albedoTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.albedoTexture, i, WITH_AMBIENT_SAMPLER)
+
+proc `glossTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.glossTexture, i, WITH_GLOSS_SAMPLER)
+
+proc `specularTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.specularTexture, i, WITH_SPECULAR_SAMPLER)
+
+proc `normalTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.normalTexture, i, WITH_NORMAL_SAMPLER)
+
+proc `bumpTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.bumpTexture, i, WITH_BUMP_SAMPLER)
+
+proc `reflectionTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.reflectionTexture, i, WITH_REFLECTION_SAMPLER)
+
+proc `falloffTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.falloffTexture, i, WITH_FALLOF_SAMPLER)
+
+proc `maskTexture=`*(m: Material, i: Image) =
+    m.setTexture(m.maskTexture, i, WITH_MASK_SAMPLER)
+
 template `gammaCorrection=`*(m: Material, v: bool) =
     m.gammaCorrection = v
     if m.gammaCorrection: m.shaderMacroFlags.incl(WITH_GAMMA_CORRECTION)
@@ -314,28 +265,21 @@ template `gammaCorrection=`*(m: Material, v: bool) =
     m.bShaderNeedUpdate = true
 
 template removeEmissionColor*(m: Material) =
-    m.color.emissionInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_EMISSION)
-    m.bShaderNeedUpdate = true
-template removeAmbientColor*(m: Material) =
-    m.color.ambientInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_AMBIENT)
-    m.bShaderNeedUpdate = true
-template removeDiffuseColor*(m: Material) =
-    m.color.diffuseInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_DIFFUSE)
-    m.bShaderNeedUpdate = true
-template removeSpecularColor*(m: Material) =
-    m.color.specularInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_SPECULAR)
-    m.bShaderNeedUpdate = true
-template removeShininess*(m: Material) =
-    m.color.shininessInited = false
-    m.shaderMacroFlags.excl(WITH_MATERIAL_SHININESS)
-    m.bShaderNeedUpdate = true
+    m.emission = invalidShaderColor()
 
-proc isLightReceiver*(m: Material): bool =
-    result = m.isLightReceiver
+template removeAmbientColor*(m: Material) =
+    m.ambient = invalidShaderColor()
+
+template removeDiffuseColor*(m: Material) =
+    m.diffuse = invalidShaderColor()
+
+template removeSpecularColor*(m: Material) =
+    m.specular = invalidShaderColor()
+
+template removeShininess*(m: Material) =
+    m.shininess = invalidShaderValue
+
+proc isLightReceiver*(m: Material): bool = m.isLightReceiver
 
 template `isLightReceiver=`*(m: Material, val: bool) =
     if m.isLightReceiver != val:
@@ -363,7 +307,7 @@ template `isLightReceiver=`*(m: Material, val: bool) =
 proc isRIM*(m: Material): bool =
     result = m.isRIM
 
-template `isRIM=`*(m: Material, val: bool) =
+proc `isRIM=`*(m: Material, val: bool) =
     if m.isRIM != val:
         m.isRIM = val
         if val:
@@ -373,11 +317,11 @@ template `isRIM=`*(m: Material, val: bool) =
         m.bShaderNeedUpdate = true
 
 template setupRIMLightTechnique*(m: Material) =
-    let c = currentContext()
-    let gl = c.gl
     if m.shader == invalidProgram:
         m.shaderMacroFlags.incl(WITH_RIM_LIGHT)
     else:
+        let c = currentContext()
+        let gl = c.gl
         gl.uniform1f(gl.getUniformLocation(m, "uRimDensity"), m.rimDensity.GLfloat)
         c.setColorUniform(m, "uRimColor", m.rimColor)
 
@@ -409,7 +353,6 @@ proc newDefaultMaterial*(): Material =
     result.isWireframe = false
     result.isLightReceiver = true
     result.bEnableBackfaceCulling = true
-    result.color.new()
     result.matcapPercentR = 1.0
     result.matcapPercentG = 1.0
     result.matcapPercentB = 1.0
@@ -650,37 +593,36 @@ proc setupSamplerAttributes(m: Material) =
             gl.uniformMatrix4fv(gl.getUniformLocation(m, "lightMatrix"), false, postContext.depthMatrix)
 
 proc setupMaterialAttributes(m: Material) =
-    if not m.color.isNil:
-        let c = currentContext()
-        let gl = c.gl
+    let c = currentContext()
+    let gl = c.gl
 
-        if m.color.ambientInited:
-            if m.shader == invalidProgram:
-                m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
-            else:
-                c.setColorUniform(m, "uMaterialAmbient", m.color.ambient)
-        if m.color.emissionInited:
-            if m.shader == invalidProgram:
-                m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
-            else:
-                c.setColorUniform(m, "uMaterialEmission", m.color.emission)
-        if m.color.diffuseInited:
-            if m.shader == invalidProgram:
-                m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
-            else:
-                c.setColorUniform(m, "uMaterialDiffuse", m.color.diffuse)
-        if m.color.specularInited:
-            if m.shader == invalidProgram:
-                m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
-            else:
-                c.setColorUniform(m, "uMaterialSpecular", m.color.specular)
-        if m.color.shininessInited:
-            if m.shader == invalidProgram:
-                m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
-            else:
-                gl.uniform1f(gl.getUniformLocation(m, "uMaterialShininess"), m.color.shininess)
-        if m.shader != invalidProgram:
-            gl.uniform1f(gl.getUniformLocation(m, "uMaterialTransparency"), c.alpha)
+    if m.color.ambient.isValid():
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATERIAL_AMBIENT)
+        else:
+            c.setColorUniform(m, "uMaterialAmbient", m.color.ambient)
+    if m.color.emission.isValid():
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATERIAL_EMISSION)
+        else:
+            c.setColorUniform(m, "uMaterialEmission", m.color.emission)
+    if m.color.diffuse.isValid():
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATERIAL_DIFFUSE)
+        else:
+            c.setColorUniform(m, "uMaterialDiffuse", m.color.diffuse)
+    if m.color.specular.isValid():
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATERIAL_SPECULAR)
+        else:
+            c.setColorUniform(m, "uMaterialSpecular", m.color.specular)
+    if m.color.shininessInited:
+        if m.shader == invalidProgram:
+            m.shaderMacroFlags.incl(WITH_MATERIAL_SHININESS)
+        else:
+            gl.uniform1f(gl.getUniformLocation(m, "uMaterialShininess"), m.color.shininess)
+    if m.shader != invalidProgram:
+        gl.uniform1f(gl.getUniformLocation(m, "uMaterialTransparency"), c.alpha)
 
 proc setupLightAttributes(m: Material, v: SceneView) =
     var lightsCount = 0
