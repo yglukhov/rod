@@ -40,7 +40,7 @@ proc newString*(b: BinSerializer, s: string): int16 =
 
 
 type Serializable =
-    array | openarray | tuple | seq | string | int8 | int16 | int32 | bool | enum | uint8 | Image
+    array | openarray | tuple | seq | string | int8 | int16 | int32 | bool | enum | uint8 | uint16 | uint32 | Image
 
 proc write*(b: BinSerializer, data: float32) =
     b.align(sizeof(data))
@@ -95,7 +95,8 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
                 b.write(v)
 
     elif T is seq or T is openarray:
-        b.write(data.len.int16)
+        doAssert(data.len <= uint16.high)
+        b.write(data.len.uint16)
         if data.len != 0:
             b.writeArrayNoLen(data)
 
@@ -108,7 +109,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
             let off = b.newString(data)
             b.write(off)
 
-    elif T is int16 | int32:
+    elif T is int16 | int32 | uint16 | uint32:
         b.align(sizeof(data))
         b.stream.write(data)
 
@@ -136,7 +137,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
 
             if idx == b.images.len:
                 b.write(int16(-2))
-                var (asset, bundle) = b.getNeighbourImageBundlePath(path)
+                let (asset, bundle) = b.getNeighbourImageBundlePath(path)
                 b.write(asset)
                 b.write(bundle)
             else:

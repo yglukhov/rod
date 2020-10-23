@@ -582,11 +582,10 @@ proc deserialize*(n: Node, s: JsonDeserializer)
 
 proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "") =
     let deser = newJsonDeserializer()
-    deser.compPath = url
-    deser.getImageForPath = proc(url: string, off: var Point): Image =
-        const prefix = "file://"
-        doAssert(url.startsWith(prefix), "Internal error")
-        var p = url[prefix.len .. ^1]
+    const prefix = "file://"
+    doAssert(url.startsWith(prefix), "Internal error")
+    deser.compPath = url[prefix.len ..  ^1]
+    deser.getImageForPath = proc(p: string, off: var Point): Image =
         when not defined(js) and not defined(emscripten):
             # TODO: We have to figure out smth about js...
             result = imageWithContentsOfFile(p)
@@ -689,7 +688,9 @@ proc deserialize*(n: Node, s: JsonDeserializer) =
 
     let compositionRef = j{"compositionRef"}.getStr()
     if compositionRef.len != 0:
-        newComposition(toAbsoluteUrl(s.compPath, compositionRef), n).loadComposition()
+        var p = parentDir(s.compPath) / compositionRef
+        normalizePath(p, false)
+        newComposition("file://" & p, n).loadComposition()
 
     s.visit(n.name, "name")
     s.visit(n.mTranslation, "translation")

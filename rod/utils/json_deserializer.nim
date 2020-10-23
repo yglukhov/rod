@@ -17,7 +17,7 @@ proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image
 proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) =
     when T is float | float32 | float64:
         v = j.getFloat()
-    elif T is int | int32 | int64 | int16:
+    elif T is int | int32 | int64 | int16 | uint64 | uint32 | uint16:
         v = T(j.getBiggestInt())
     elif T is string:
         v = j.getStr()
@@ -67,13 +67,15 @@ proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
         if jimage.str.len == 0:
             result = ""
         else:
-            result = b.compPath.parentDirEx & '/' & jimage.str
-    of JObject: result = jimage["orig"].getStr()
+            result = b.compPath.parentDirEx / jimage.str
+            normalizePath(result, false)
+    of JObject:
+        result = jimage["orig"].getStr()
     else: doAssert(false)
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode, offset: var Point): Image =
-    var path = b.imagePath(j)
-    result = b.getImageForPath(path, offset)
+    let path = b.imagePath(j)
+    b.getImageForPath(path, offset)
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image =
     var path = b.imagePath(j)
@@ -87,6 +89,13 @@ proc visit*[T](b: JsonDeserializer, v: var T, key: string) =
     let j = b.node{key}
     if not j.isNil:
         b.get(j, v)
+
+proc visit*[T](b: JsonDeserializer, v: var T, key: string, default: T) =
+    let j = b.node{key}
+    if not j.isNil:
+        b.get(j, v)
+    else:
+        v = default
 
 proc visit*(b: JsonDeserializer, images: var seq[Image], imagesKey: string, frameOffsets: var seq[Point], frameOffsetsKey: string) =
     let jimages = b.node[imagesKey]

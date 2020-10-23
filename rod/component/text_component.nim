@@ -2,7 +2,7 @@ import json
 import nimx/[types, font, context, view, property_visitor, portable_gl, formatted_text]
 import rod / utils / [ property_desc, serialization_codegen, attributed_text ]
 import rod/[rod_types, node, component, viewport, component/camera]
-import rod/tools/[serializer, debug_draw]
+import rod/tools/debug_draw
 export formatted_text
 
 type
@@ -71,125 +71,6 @@ proc `verticalAlignment=`*(t: Text, verticalAlignment: VerticalAlignment) =
 proc text*(t: Text) : string =
     result = t.mText.text
 
-method deserialize*(t: Text, j: JsonNode, s: Serializer) =
-    var v = j{"text"}
-    if not v.isNil and v.kind == JString:
-        t.mText.text = v.str
-
-    if v.isNil or v.kind == JString:
-        var fontSize: float
-        v = j{"fontSize"}
-        if not v.isNil:
-            fontSize = v.getFloat()
-
-        v = j{"font"}
-        var font: Font
-        if not v.isNil:
-            let fontFace = v.getStr()
-            font = newFontWithFace(fontFace, fontSize)
-            if font.isNil:
-                echo "font = ", fontFace, "  doesn't load, system font will be used"
-                font = systemFontOfSize(fontSize)
-        elif font_size > 0:
-            font = systemFontOfSize(fontSize)
-        t.mText.setFontInRange(0, -1, font)
-
-        v = j{"color"}
-        if not v.isNil:
-            let color = newColor(v[0].getFloat(), v[1].getFloat(), v[2].getFloat())
-            t.mText.setTextColorInRange(0, -1, color)
-            if v.len > 3: # Deprecated
-                t.node.alpha = v[3].getFloat()
-
-        v = j{"shadowOff"}
-        var shadowX, shadowY: float  # TODO do only one format
-        if not v.isNil:
-            shadowX = v[0].getFloat()
-            shadowY = v[1].getFloat()
-        else:
-            s.deserializeValue(j, "shadowX", shadowX)
-            s.deserializeValue(j, "shadowY", shadowY)
-
-        var isShadowExist = false
-        if shadowX > 0.0 or shadowY > 0.0: isShadowExist = true
-
-        elif "shadowX" in j and "shadowY" in j:
-            shadowY = j["shadowY"].getFloat()
-            shadowX = j["shadowX"].getFloat()
-
-        v = j{"shadowColor"}
-        var shadowColor: Color
-        s.deserializeValue(j, "shadowColor", shadowColor)
-        if shadowColor.a > 0.0: isShadowExist = true
-
-        var shadowSpread: float32
-        s.deserializeValue(j, "shadowSpread", shadowSpread)
-        if shadowSpread > 0.0: isShadowExist = true
-
-        var shadowRadius: float32
-        s.deserializeValue(j, "shadowRadius", shadowRadius)
-        if shadowRadius > 0.0: isShadowExist = true
-
-        if isShadowExist:
-            t.mText.setShadowInRange(0, -1, shadowColor, newSize(shadowX, shadowY), shadowRadius, shadowSpread)
-
-        v = j{"justification"}
-        var horAlign = haLeft
-        if not v.isNil:
-            case v.getStr()
-            of "left", "haLeft": horAlign = haLeft
-            of "center", "haCenter": horAlign = haCenter
-            of "right", "haRight": horAlign = haRight
-            else: discard
-
-        t.mText.horizontalAlignment = horAlign
-
-        v = j{"verticalAlignment"}
-        var vertAlign = vaTop
-        if not v.isNil:
-            case v.getStr()
-            of "top", "vaTop": vertAlign = vaTop
-            of "center", "vaCenter": vertAlign = vaCenter
-            of "bottom", "vaBottom": vertAlign = vaBottom
-            else: discard
-
-        t.mText.verticalAlignment = vertAlign
-
-        var strokeSize: float
-        s.deserializeValue(j, "strokeSize", strokeSize)
-        if strokeSize != 0:
-            var isStrokeGradient: bool
-            s.deserializeValue(j, "isStrokeGradient", isStrokeGradient)
-            if isStrokeGradient:
-                var color1: Color
-                var color2: Color
-                s.deserializeValue(j, "strokeColorFrom", color1)
-                s.deserializeValue(j, "strokeColorTo", color2)
-                t.mText.setStrokeInRange(0, -1, color1, color2, strokeSize)
-            else:
-                var color: Color
-                s.deserializeValue(j, "strokeColor", color)
-                t.mText.setStrokeInRange(0, -1, color, strokeSize)
-
-        var ls : float32
-        s.deserializeValue(j, "lineSpacing", ls)
-        t.mText.lineSpacing = ls
-
-        var isColorGradient: bool
-        s.deserializeValue(j, "isColorGradient", isColorGradient)
-        if isColorGradient:
-            var color1: Color
-            var color2: Color
-            s.deserializeValue(j, "colorFrom", color1)
-            s.deserializeValue(j, "colorTo", color2)
-            t.mText.setTextColorInRange(0, -1, color1, color2)
-
-        v = j{"bounds"}
-        if not v.isNil:
-            t.mBoundingOffset = newPoint(v[0].getFloat(), v[1].getFloat())
-            t.mText.boundingSize = newSize(v[2].getFloat(), v[3].getFloat())
-
-        t.mText.processAttributedText()
 ################################################################################
 # Old compatibility api
 proc color*(c: Text): Color = c.mText.colorOfRuneAtPos(0).color1
@@ -301,49 +182,6 @@ proc `colorTo=`*(c: Text, v: Color) =
 
 proc lineSpacing*(c: Text): Coord = c.mText.lineSpacing
 proc `lineSpacing=`*(c: Text, s: float32) = c.mText.lineSpacing = s
-
-method serialize*(c: Text, s: Serializer): JsonNode =
-    result = newJObject()
-    result.add("text", s.getValue(c.text))
-    result.add("color", s.getValue(c.color))
-    result.add("shadowX", s.getValue(c.shadowX))
-    result.add("shadowY", s.getValue(c.shadowY))
-    result.add("shadowRadius", s.getValue(c.shadowRadius))
-    result.add("shadowSpread", s.getValue(c.shadowSpread))
-    result.add("shadowColor", s.getValue(c.shadowColor))
-    result.add("Tracking Amount", s.getValue(c.trackingAmount))
-    result.add("lineSpacing", s.getValue(c.lineSpacing))
-    result.add("fontSize", s.getValue(c.font.size))
-
-    let fontFace = c.font().face
-    if fontFace != systemFont().face:
-        result.add("font", s.getValue(fontFace))
-    result.add("strokeSize", s.getValue(c.strokeSize))
-    result.add("strokeColor", s.getValue(c.strokeColor))
-
-    result.add("isColorGradient", s.getValue(c.isColorGradient))
-    result.add("colorFrom", s.getValue(c.colorFrom))
-    result.add("colorTo", s.getValue(c.colorTo))
-    result.add("isStrokeGradient", s.getValue(c.isStrokeGradient))
-    result.add("strokeColorFrom", s.getValue(c.strokeColorFrom))
-    result.add("strokeColorTo", s.getValue(c.strokeColorTo))
-
-    result.add("bounds", s.getValue([c.mBoundingOffset.x, c.mBoundingOffset.y, c.mText.boundingSize.width, c.mText.boundingSize.height]))
-
-    var horAlign = "haLeft"
-    case c.mText.horizontalAlignment
-    of haLeft: horAlign = "haLeft"
-    of haCenter: horAlign = "haCenter"
-    of haRight: horAlign = "haRight"
-    else: discard
-    result.add("justification", s.getValue(horAlign))
-
-    var vertAlign = "vaTop"
-    case c.mText.verticalAlignment
-    of vaTop: vertAlign = "vaTop"
-    of vaCenter: vertAlign = "vaCenter"
-    of vaBottom: vertAlign = "vaBottom"
-    result.add("verticalAlignment", s.getValue(vertAlign))
 
 proc toPhantom(c: Text, p: var object) =
     p.text = c.mText.text

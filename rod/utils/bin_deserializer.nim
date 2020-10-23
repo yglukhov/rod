@@ -32,6 +32,10 @@ proc readInt16*(b: BinDeserializer): int16 {.inline.} =
     b.align(sizeof(result))
     b.stream.readInt16()
 
+proc readUint16*(b: BinDeserializer): uint16 {.inline.} =
+    b.align(sizeof(result))
+    b.stream.readUint16()
+
 proc readInt32*(b: BinDeserializer): int32 {.inline.} =
     b.align(sizeof(result))
     b.stream.readInt32()
@@ -130,7 +134,7 @@ proc rewindToComposition*(b: BinDeserializer, name: string) =
     b.stream.setPosition(pos)
 
 proc readUint8*(b: BinDeserializer): uint8 {.inline.} =
-    cast[uint8](b.stream.readInt8())
+    b.stream.readUint8()
 
 proc readInt8*(b: BinDeserializer): int8 {.inline.} =
     b.stream.readInt8()
@@ -145,8 +149,8 @@ proc getImageInfoForIndex(b: BinDeserializer, idx: int16, path: var string, fram
 
 proc getImageForIndex(b: BinDeserializer, idx: int16, im: var Image) =
     if idx == -2:
-        var asset = b.readStr()
-        var bundle = b.readStr()
+        let asset = b.readStr()
+        let bundle = b.readStr()
         im = sharedAssetManager().cachedAsset(Image, bundle & '/' & asset)
 
     elif idx != -1:
@@ -182,7 +186,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
                 b.read(v)
 
     elif T is seq:
-        let sz = b.readInt16()
+        let sz = b.readUInt16().int
         if sz > 0:
             data.setLen(sz)
             b.read(openarray[type(data[0])](data))
@@ -190,7 +194,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
     elif T is string:
         data = b.readStr()
 
-    elif T is int16 | int32 | float32:
+    elif T is int16 | int32 | float32 | uint16 | uint32:
         b.align(sizeof(data))
         discard b.stream.readData(addr data, sizeof(T))
 
