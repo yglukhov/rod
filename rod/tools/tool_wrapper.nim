@@ -18,7 +18,7 @@ proc nimblePath(package: string): string =
 proc compileRealBin(bin, toolName, mainNim: string, useDanger: bool,  cflags: seq[string]) =
     createDir(bin.parentDir())
     var args = @["c", "--threads:on", "-d:release",
-        "-d:rodplugin"]
+        "-d:rodplugin", "--warning[LockLevel]:off"]
     if useDanger:
         args.add(@["-d:danger" ])
     else:

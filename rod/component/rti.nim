@@ -16,7 +16,7 @@ type RTI* = ref object of Component
     mOldWorldVPMat: Matrix4
     mOldVPMat: Matrix4
     mOldVp: Rect
-    mGfs: GlFrameState
+    mRTICtx: RTIContext
 
     mDrawInImage: bool
     mExpandRect: Rect
@@ -271,7 +271,7 @@ method beforeDraw*(rti: RTI, index: int): bool =
             rti.mOldVPMat = rti.node.sceneView.viewProjMatrix
             rti.node.sceneView.viewProjMatrix = rti.getTransitionProjMat() * rti.getTransitionViewMat()
 
-            rti.imageRenderTarget.beginDraw(rti.mGfs)
+            rti.imageRenderTarget.beginDraw(rti.mRTICtx)
 
             result = false
 
@@ -283,7 +283,7 @@ method afterDraw*(rti: RTI, index: int) =
 
             rti.mDrawInImage = false
 
-            rti.imageRenderTarget.endDraw(rti.mGfs)
+            rti.imageRenderTarget.endDraw(rti.mRTICtx)
             if not rti.image.flipped:
                 rti.image.flipVertically()
 

@@ -224,10 +224,10 @@ method draw*(bc: BlurComponent) =
             bc.node.sceneView.postprocessContext.shader = bc.motionShader # bind
             gl.useProgram(bc.motionShader)
             bc.motionMap.flipVertically()
-            bc.motionMap.draw( proc() =
+            bc.motionMap.draw:
                 c.withTransform mvpMatrix:
                     for n in bc.node.children: n.recursiveDrawPost()
-            )
+
             bc.node.sceneView.postprocessContext.shader = invalidProgram # release
             gl.useProgram(invalidProgram)
 
@@ -235,10 +235,10 @@ method draw*(bc: BlurComponent) =
 
 
         bc.postMap.flipVertically()
-        bc.postMap.draw( proc() =
+        bc.postMap.draw:
             c.withTransform mvpMatrix:
                 for n in bc.node.children: n.recursiveDraw()
-        )
+
 
     if bc.postShader != invalidProgram:
         gl.useProgram(bc.postShader)

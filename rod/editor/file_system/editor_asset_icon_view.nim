@@ -1,5 +1,5 @@
 import nimx / [ text_field, image, view, formatted_text, context, button,
-                render_to_image, window ]
+                render_to_image, window, context ]
 import nimx/assets/asset_loading
 import tables, os, streams
 
@@ -73,7 +73,7 @@ method draw*(v: ImageIconView, r: Rect)=
 
                     let renderRect = newRect(zeroPoint, tsize)
                     let nimg = imageWithSize(tsize)
-                    nimg.draw do():
+                    nimg.draw:
                         c.drawImage(v.image, renderRect)
 
                     v.image = nimg
