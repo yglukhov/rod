@@ -46,6 +46,7 @@ proc getFrustum*(c: Camera): Frustum =
     result.max = wt * newVector3(d.right - frustumOffset, d.bottom - frustumOffset, 0.0)
 
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
+    doAssert(not c.node.sceneView.isNil)
     let absBounds = c.node.sceneView.convertRectToWindow(c.node.sceneView.bounds)
     var winSize = absBounds.size
     if not c.node.sceneView.window.isNil:
