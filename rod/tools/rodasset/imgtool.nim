@@ -108,7 +108,7 @@ proc checkCompositionRefs(c: JsonNode, compPath, originalResPath: string) =
         raise newException(Exception, "Missing compositions")
 
 proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
-    var referredImages = initSet[string]()
+    var referredImages = initHashSet[string]()
 
     for i, c in tool.compositions:
         let compPath = tool.compositionPaths[i]
@@ -270,7 +270,7 @@ proc run*(tool: ImgTool) =
         if not o.info.parentComposition.isNil:
             tool.adjustImageNode(o)
 
-    tool.processedImages = initSet[string]()
+    tool.processedImages = initHashSet[string]()
     for o in occurences:
         tool.processedImages.incl(o.path)
 
