@@ -150,7 +150,7 @@ method draw*(r: FXAAPost) =
     var projTransform : Transform3D
     vp.camera.getProjectionMatrix(newRect(0,0, r.resolution[0], r.resolution[1]), projTransform)
 
-    r.image.draw do():
+    r.image.draw:
         c.withTransform projTransform*vp.viewMatrix()*r.node.worldTransform:
             for n in r.node.children: n.recursiveDraw()
     r.image.flipVertically()
