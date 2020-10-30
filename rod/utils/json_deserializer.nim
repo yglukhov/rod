@@ -67,7 +67,7 @@ proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
         if jimage.str.len == 0:
             result = ""
         else:
-            result = b.compPath.parentDirEx / jimage.str
+            result = b.compPath.parentDirEx & "/" & jimage.str
             normalizePath(result, false)
     of JObject:
         result = jimage["orig"].getStr()
