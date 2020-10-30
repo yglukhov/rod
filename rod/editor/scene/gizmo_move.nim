@@ -128,7 +128,10 @@ method proccesTransform*(g: MoveGizmo, position: Point) =
     curPosition = curPosition - g.gizmoNode.worldPos
     g.gizmoNode.position = g.gizmoNode.worldPos + curPosition * g.axisMask
     if not g.mEditedNode.parent.isNil:
-        g.mEditedNode.position = g.mEditedNode.parent.worldToLocal(g.gizmoNode.position)
+        try:
+            g.mEditedNode.position = g.mEditedNode.parent.worldToLocal(g.gizmoNode.position)
+        except:
+            discard
     else:
         g.mEditedNode.position = g.gizmoNode.position
 

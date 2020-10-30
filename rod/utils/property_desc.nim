@@ -70,7 +70,7 @@ proc parsePropertyDescs(properties: NimNode): seq[PropertyDesc] =
 proc verifyProperties(pr: seq[PropertyDesc]) =
     for p in pr:
         for a in keys(p.attributes):
-            assert(a in ["serializationKey", "noserialize", "phantom", "combinedWith"], "Invalid attribute: " & a)
+            assert(a in ["serializationKey", "noserialize", "phantom", "combinedWith", "default"], "Invalid attribute: " & a)
 
 macro properties*(typdesc: typed{nkSym}, body: untyped): untyped =
     let k = $typdesc

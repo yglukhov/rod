@@ -24,29 +24,35 @@ proc `%`*(v: Color): JsonNode = %[v.r, v.g, v.b, v.a]
 proc `%`*(v: Rect): JsonNode = %[v.x, v.y, v.width, v.height]
 template `%`*(v: Quaternion): JsonNode = %(TVector4[Coord](v))
 
-proc getRelativeResourcePath*(s: Serializer, path: string): string =
+proc getRelativeResourcePath*(baseUrl, path: string): string =
     var resourcePath = path
     when not defined(js) and not defined(android) and not defined(ios):
-        resourcePath = urlParentDir(s.url)
+        resourcePath = urlParentDir(baseUrl)
         resourcePath.removePrefix("file://")
     
     var fixedPath = path
     fixedPath.removePrefix("file://")
     result = relativePathToPath(resourcePath, fixedPath)
-    echo "save path = ", resourcePath, "  relative = ", result, " url ", s.url
+    echo "save path = ", resourcePath, "  relative = ", result, " url ", baseUrl
 
 template isAbsoluteUrl(u: string): bool =
     # TODO: make it smarter
     u.find("://") != -1
 
-proc toAbsoluteUrl*(s: Serializer, relativeOrAbsoluteUrl: string): string =
+proc toAbsoluteUrl*(baseUrl, relativeOrAbsoluteUrl: string): string =
     if isAbsolute(relativeOrAbsoluteUrl):
         return "file://" & relativeOrAbsoluteUrl
 
     if isAbsoluteUrl(relativeOrAbsoluteUrl): return relativeOrAbsoluteUrl
 
-    result = urlParentDir(s.url) & '/' & relativeOrAbsoluteUrl
+    result = urlParentDir(baseUrl) & '/' & relativeOrAbsoluteUrl
     normalizePath(result, false)
+
+proc getRelativeResourcePath*(s: Serializer, path: string): string =
+    s.url.getRelativeResourcePath(path)
+
+proc toAbsoluteUrl*(s: Serializer, relativeOrAbsoluteUrl: string): string =
+    s.url.toAbsoluteUrl(relativeOrAbsoluteUrl)
 
 proc getDeserialized(s: Serializer, j: JsonNode, name: string, val: var string) =
     let jN = j{name}

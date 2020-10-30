@@ -70,8 +70,8 @@ macro genSerializerProc(typdesc: typed{nkSym}, serTyp: typed{nkSym}, v: typed, s
             visitCall.add(actualReference(p1, v))
             if keyed: visitCall.add(p1.serializationKey())
 
-        # if keyed and not serialize and not bin and p.hasAttr("default"):
-        #     visitCall.add(p.attributes["default"])
+        if keyed and not serialize and not bin and p.hasAttr("default"):
+            visitCall.add(p.attributes["default"])
 
         result.add(visitCall)
         # let echoPrefix = newLit($serTyp & " " & p.name & ": ")

@@ -66,8 +66,10 @@ method onTouchEv*(v: EditorSceneView, e: var Event): bool =
             var castedNode = v.tryRayCast(e)
             if not castedNode.isNil:
                 when defined(rodedit):
+                    echo "castedNode ", castedNode.name
                     while castedNode != v.composition.rootNode and not castedNode.composition.isNil:
                         castedNode = castedNode.parent
+                        echo "\t ", castedNode.name
                 v.editor.selectedNode = castedNode
             else:
                 v.editor.selectedNode = nil
@@ -163,24 +165,25 @@ method onDrop*(dd: EditorDropDelegate, target: View, i: PasteboardItem) =
     case i.kind:
     of rodPbComposition:
         try:
-            var n: Node
-            n = newNodeWithURL("file://" & i.data) do():
-                if not n.isNil:
-                    var editorScene = target.EditorSceneView
-                    var cs = editorScene.selectedNode
+            echo "try drop node ", i.data
+            var n = newNodeWithURL("file://" & i.data)
+            echo "node isnil ", n.isNil
+            if not n.isNil:
+                var editorScene = target.EditorSceneView
+                var cs = editorScene.selectedNode
+                if cs.isNil:
+                    cs = editorScene.rootNode
+                else:
+                    if not cs.composition.isNil and cs != editorScene.composition.rootNode:
+                        cs = editorScene.selectedNode.parent
                     if cs.isNil:
-                        cs = editorScene.rootNode
-                    else:
-                        if not cs.composition.isNil and cs != editorScene.composition.rootNode:
-                            cs = editorScene.selectedNode.parent
-                        if cs.isNil:
-                            raise newException(Exception, "Can't attach to prefab. Attaching to prafab parent failed, parent is nil")
+                        raise newException(Exception, "Can't attach to prefab. Attaching to prafab parent failed, parent is nil")
+                echo "add child "
+                cs.addChild(n)
+                editorScene.composition.selectedNode = cs
+                editorScene.editor.onCompositionChanged(editorScene.composition)
 
-                    cs.addChild(n)
-                    editorScene.composition.selectedNode = cs
-                    editorScene.editor.onCompositionChanged(editorScene.composition)
-
-                    discard target.makeFirstResponder()
+                discard target.makeFirstResponder()
         except:
             warn "Can't deserialize ", i.data, " ", getCurrentExceptionMsg()
 
@@ -215,11 +218,11 @@ proc allComprefs(n: Node, s: var seq[Composition])=
 proc updateComprRef(c: Composition) =
     echo "updateCompRef ", c.url
     var n: Node
-    n = newNodeWithURL(c.url) do():
-        if not n.isNil:
-            c.node.removeAllChildren()
-            while n.children.len > 0:
-                c.node.addChild(n.children[0])
+    n = newNodeWithURL(c.url)
+    if not n.isNil:
+        c.node.removeAllChildren()
+        while n.children.len > 0:
+            c.node.addChild(n.children[0])
 
 method onCompositionSaved*(v: EditorSceneView, comp: CompositionDocument) =
     if comp.owner == v: return

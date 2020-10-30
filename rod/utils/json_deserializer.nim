@@ -14,10 +14,10 @@ proc newJsonDeserializer*(): JsonDeserializer =
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image
 
-proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
+proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) =
     when T is float | float32 | float64:
         v = j.getFloat()
-    elif T is int | int32 | int64 | int16:
+    elif T is int | int32 | int64 | int16 | uint64 | uint32 | uint16:
         v = T(j.getBiggestInt())
     elif T is string:
         v = j.getStr()
@@ -27,6 +27,10 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
         v = newRect(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
     elif T is Quaternion:
         v = newQuaternion(j[0].getFloat(), j[1].getFloat(), j[2].getFloat(), j[3].getFloat())
+    elif T is Color:
+        v = newColor(j[0].getFloat(), j[1].getFloat(), j[2].getFloat())
+        if j.len > 3:
+            v.a = j[3].getFloat()
     elif T is tuple:
         var i = 0
         for k, vv in fieldPairs(v):
@@ -41,11 +45,18 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) {.inline.} =
             b.get(j[i], v[i])
 
     elif T is enum:
-        v = parseEnum[T](j.str)
+        case j.kind
+        of JString:
+            v = parseEnum[T](j.str)
+        of JInt:
+            v = cast[T](j.num)
+        else:
+            discard
 
     elif T is seq:
-        v.setLen(j.len)
-        for i in 0 ..< j.len:
+        let sz = j.len
+        v.setLen(sz)
+        for i in 0 ..< sz:
             b.get(j[i], v[i])
     else:
         {.error: "unknown type " & $T .}
@@ -56,13 +67,15 @@ proc imagePath(b: JsonDeserializer, jimage: JsonNode): string =
         if jimage.str.len == 0:
             result = ""
         else:
-            result = b.compPath.parentDir / jimage.str
-    of JObject: result = jimage["orig"].str
+            result = b.compPath.parentDirEx & "/" & jimage.str
+            normalizePath(result, false)
+    of JObject:
+        result = jimage["orig"].getStr()
     else: doAssert(false)
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode, offset: var Point): Image =
-    var path = b.imagePath(j)
-    result = b.getImageForPath(path, offset)
+    let path = b.imagePath(j)
+    b.getImageForPath(path, offset)
 
 proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image =
     var path = b.imagePath(j)
@@ -72,58 +85,17 @@ proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image =
     result = imageWithSize(newSize(1.0, 1.0))
     result.setFilePath(path)
 
-proc visit*[T: tuple](b: JsonDeserializer, v: var T, key: string) =
+proc visit*[T](b: JsonDeserializer, v: var T, key: string) =
     let j = b.node{key}
     if not j.isNil:
         b.get(j, v)
 
-proc visit*(b: JsonDeserializer, v: var float32, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        v = j.getFloat()
-
-proc visit*(b: JsonDeserializer, v: var int16, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        v = int16(j.getInt())
-
-proc visit*(b: JsonDeserializer, v: var int32, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        v = int32(j.getInt())
-
-proc visit*[T: enum](b: JsonDeserializer, v: var T, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        case j.kind
-        of JString:
-            v = parseEnum[T](j.str)
-        of JInt:
-            v = cast[T](j.num)
-        else:
-            discard
-
-proc visit*(b: JsonDeserializer, v: var bool, key: string) =
+proc visit*[T](b: JsonDeserializer, v: var T, key: string, default: T) =
     let j = b.node{key}
     if not j.isNil:
         b.get(j, v)
-
-proc visit*(b: JsonDeserializer, v: var Color, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        v = newColor(j[0].getFloat(), j[1].getFloat(), j[2].getFloat())
-        if j.len > 3:
-            v.a = j[3].getFloat()
-
-proc visit*(b: JsonDeserializer, v: var string, key: string) {.inline.} =
-    let j = b.node{key}
-    if not j.isNil:
-        v = j.getStr()
-
-proc visit*(b: JsonDeserializer, v: var Image, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        v = b.deserializeImage(j)
+    else:
+        v = default
 
 proc visit*(b: JsonDeserializer, images: var seq[Image], imagesKey: string, frameOffsets: var seq[Point], frameOffsetsKey: string) =
     let jimages = b.node[imagesKey]
@@ -133,22 +105,3 @@ proc visit*(b: JsonDeserializer, images: var seq[Image], imagesKey: string, fram
 
     for i in 0 ..< sz:
         images[i] = b.deserializeImage(jimages[i], frameOffsets[i])
-
-proc visit*[T](b: JsonDeserializer, v: var seq[T], key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        let sz = j.len
-        v.setLen(sz)
-        for i in 0 ..< sz:
-            b.get(j[i], v[i])
-
-proc visit*[I: static[int], T](b: JsonDeserializer, v: var array[I, T], key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        for i in 0 ..< I:
-            b.get(j[i], v[i])
-
-proc visit*(b: JsonDeserializer, v: var Quaternion, key: string) =
-    let j = b.node{key}
-    if not j.isNil:
-        b.get(j, v)

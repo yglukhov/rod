@@ -51,7 +51,7 @@ proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
         v.nameField.text = ""
         v.fpsField.text = ""
         v.durationField.text = ""
-    
+
     var currComp = v.editor.currentComposition
     if not currComp.isNil:
         currComp.currentAnimation = val
@@ -64,6 +64,16 @@ proc newEditedAnimation(v: AnimationEditView) =
         a.fps = 25
         a.duration = 1.0
         a.name = "myanim"
+        currComp.animations.add(a)
+        currComp.currentAnimation = a
+        v.editedAnimation = a
+
+proc copyEditedAnimation(v: AnimationEditView) =
+    var currComp = v.editor.currentComposition
+    if not currComp.isNil:
+        var ja = %v.editedAnimation
+        var a = currComp.rootNode.toEditedAnimation(ja)
+        a.name &= "_copy"
         currComp.animations.add(a)
         currComp.currentAnimation = a
         v.editedAnimation = a
@@ -107,7 +117,7 @@ proc playEditedAnimation(v: AnimationEditView) =
     if not v.cachedAnimation.isNil:
         v.window.addAnimation(v.cachedAnimation)
 
-proc reload(v: AnimationEditView) = 
+proc reload(v: AnimationEditView) =
     v.propertyTableView.reloadData()
     v.rebuildAnimation()
     var currComp = v.editor.currentComposition
@@ -122,11 +132,11 @@ proc reload(v: AnimationEditView) =
 proc onCursorPosChange(v: AnimationEditView, pos: float) =
     if v.cachedAnimation.isNil:
         v.rebuildAnimation()
-    
+
     if not v.cachedAnimation.isNil:
         try:
             v.cachedAnimation.onProgress(pos)
-        except: 
+        except:
             echo getStackTrace(getCurrentException())
             echo getCurrentExceptionMsg()
 
@@ -155,7 +165,7 @@ proc onRemoveKeys(v: AnimationEditView, keys: seq[DopesheetSelectedKey])=
         result = cmp(a.pi, b.pi)
         if result == 0:
             result = cmp(b.ki, a.ki) #del from the end of seq
-    
+
     for k in keys:
         if k.pi < v.editedAnimation.properties.len:
             v.editedAnimation.properties[k.pi].keys.del(k.ki)
@@ -166,19 +176,19 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
     result = new(View, r)
     let bh = r.height - 2
     let bw = bh
-    
+
     var w = 1.0
     var toStartButton = newButton(newRect(w, 1, bw, bh))
-    toStartButton.title = "B" 
+    toStartButton.title = "B"
     toStartButton.onAction do():
         if not v.cachedAnimation.isNil:
             v.cachedAnimation.cancel()
             v.cachedAnimation.onProgress(0.0)
     w += bw + 1
     result.addSubview(toStartButton)
-    
+
     var playButton = newButton(newRect(w, 1, bw, bh))
-    playButton.title = "P" 
+    playButton.title = "P"
     playButton.onAction do():
         if not v.cachedAnimation.isNil:
             v.cachedAnimation.cancel()
@@ -187,15 +197,15 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
     result.addSubview(playButton)
 
     var stopButton = newButton(newRect(w, 1, bw, bh))
-    stopButton.title = "S" 
+    stopButton.title = "S"
     stopButton.onAction do():
         if not v.cachedAnimation.isNil:
             v.cachedAnimation.cancel()
     w += bw + 1
     result.addSubview(stopButton)
-    
+
     var toEndButton = newButton(newRect(w, 1, bw, bh))
-    toEndButton.title = "E" 
+    toEndButton.title = "E"
     toEndButton.onAction do():
         if not v.cachedAnimation.isNil:
             v.cachedAnimation.cancel()
@@ -204,18 +214,26 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
     result.addSubview(toEndButton)
 
     var addButton = newButton(newRect(w, 1, bw, bh))
-    addButton.title = "A" 
+    addButton.title = "A"
     addButton.onAction do():
         v.newEditedAnimation()
     w += bw + 10
     result.addSubview(addButton)
 
     var delButton = newButton(newRect(w, 1, bw, bh))
-    delButton.title = "D" 
+    delButton.title = "D"
     delButton.onAction do():
         v.deleteEditedAnimation()
     w += bw + 10
     result.addSubview(delButton)
+
+    var copButton = newButton(newRect(w, 1, bw, bh))
+    copButton.title = "C"
+    copButton.onAction do():
+        v.copyEditedAnimation()
+
+    w += bw + 10
+    result.addSubview(copButton)
 
     v.animationSelector = PopupButton.new(newRect(w, 1, r.width - w, bh))
     v.animationSelector.autoresizingMask = { afFlexibleWidth, afFlexibleMaxY }
@@ -233,7 +251,7 @@ proc createBottomPanel(v: AnimationEditView, r: Rect): View =
     result = new(View, r)
     let lh = r.height - 2
     let lw = 100.0
-    
+
     var w = 1.0
     v.nameField = newTextField(newRect(w, 1, lw, lh))
     v.nameField.onAction do():
@@ -258,7 +276,7 @@ proc createBottomPanel(v: AnimationEditView, r: Rect): View =
     var fpsLbl = newLabel(newRect(w, 1, lw * 0.5, lh))
     fpsLbl.text = "fps:"
     result.addSubview(fpsLbl)
-    
+
     v.fpsField = newTextField(newRect(w + lw * 0.5, 1, lw * 0.5, lh))
     v.fpsField.onAction do():
         if v.editedAnimation.isNil: return
@@ -281,14 +299,14 @@ method init*(v: AnimationEditView, r: Rect) =
 
     let leftPaneView = View.new(newRect(0, 0, leftPaneWidth, v.bounds.height))
     leftPaneView.autoresizingMask = { afFlexibleMaxX, afFlexibleHeight }
- 
+
 
     v.propertyTableView = TableView.new(newRect(0, topPanelHeight, leftPaneWidth, leftPaneView.bounds.height - topPanelHeight - bottomPanelHeight))
-    v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}    
+    v.propertyTableView.autoresizingMask = {afFlexibleWidth, afFlexibleHeight}
     v.propertyTableView.numberOfColumns = 4
     let s = newScrollView(v.propertyTableView)
     leftPaneView.addSubview(s)
-    
+
     v.propertyTableView.numberOfRows = proc(): int =
         if v.editedAnimation.isNil: 0 else: v.editedAnimation.properties.len
 
@@ -308,7 +326,7 @@ method init*(v: AnimationEditView, r: Rect) =
             let en = Button(c.subviews[0])
             en.onAction do():
                 v.onSetEnabledProperty(c.row, en.boolValue)
-            
+
             let curAnim = v.editedAnimation
             if not curAnim.isNil and c.row < curAnim.properties.len:
                 en.value = curAnim.properties[c.row].enabled.int8
@@ -333,7 +351,7 @@ method init*(v: AnimationEditView, r: Rect) =
         v.selectedProperties = toSeq(items(v.propertyTableView.selectedRows))
 
     v.propertyTableView.defaultRowHeight = 20
-    
+
     var tv = v.createTopPanel(newRect(1, 1, leftPaneWidth, topPanelHeight))
     tv.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     leftPaneView.addSubview(tv)
@@ -354,7 +372,7 @@ method init*(v: AnimationEditView, r: Rect) =
         for k in arr:
             a.propertyAtIndex(k.pi).sortKeys()
         v.rebuildAnimation()
-    
+
     v.dopesheetView.onKeysSelected = proc(arr: seq[DopesheetSelectedKey]) =
         var keys: seq[EditedKey]
         for e in arr:
@@ -421,10 +439,10 @@ method onCompositionChanged*(v: AnimationEditView, comp: CompositionDocument) =
         v.editedAnimation = comp.animations[0]
     else:
         v.editedAnimation = nil
-    
+
     v.reload()
 
-proc addEditedProperty*(v: AnimationEditView, node: Node, prop: string, sng: Variant) = 
+proc addEditedProperty*(v: AnimationEditView, node: Node, prop: string, sng: Variant) =
     var currComp = v.editor.currentComposition
 
     if currComp.currentAnimation.isNil:
@@ -437,7 +455,7 @@ proc addEditedProperty*(v: AnimationEditView, node: Node, prop: string, sng: Var
                 ep = p
                 break reuseProperty
 
-        
+
         try: #incompatible type for animation should throw exception
             template createCurve(T: typedesc) =
                 discard

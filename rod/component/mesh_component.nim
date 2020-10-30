@@ -1,20 +1,11 @@
 import nimx / [ image, context, portable_gl, types, view, property_visitor, assets/url_stream ]
 import rod/[component, vertex_data_info, node, ray, rod_types]
-import rod/component/[material ]
-import rod/tools/serializer
-import rod/utils/[bin_deserializer,image_serialization]
+import rod/component/[material]
+import rod/utils/[property_desc, serialization_codegen]
 import animation/skeleton
-import tables, hashes, strutils, json
+import tables, hashes, strutils, streams
 import opengl
 import nimasset/obj
-
-
-when not defined(ios) and not defined(android) and not defined(js):
-    import opengl
-
-import streams
-
-# {.pragma nonserializable.}
 
 type
     VBOData* = ref object
@@ -24,6 +15,8 @@ type
         vertInfo*: VertexDataInfo
         minCoord*: Vector3
         maxCoord*: Vector3
+        indexData*: seq[GLushort]
+        vertexAttrData*: seq[GLfloat]
 
     MeshComponent* = ref object of Component
         resourceName*: string
@@ -42,6 +35,59 @@ type
 
         debugSkeleton*: bool
 
+MeshComponent.properties:
+    emission(phantom = Color, default = invalidShaderColor())
+    ambient(phantom = Color, default = invalidShaderColor())
+    diffuse(phantom = Color, default = invalidShaderColor())
+    specular(phantom = Color, default = invalidShaderColor())
+    shininess(phantom = Coord, default = invalidShaderValue)
+    rimDensity(phantom = Coord)
+    rimColor(phantom = Color)
+
+    culling(phantom = bool, default = true)
+    light(phantom = bool, default = true)
+    blend(phantom = bool)
+    depth_test(phantom = bool, default = true)
+    wireframe(phantom = bool)
+    isRIM:
+        phantom: bool
+        serializationKey: "RIM"
+    sRGB_normal(phantom = bool)
+    matcapPercentR(phantom = float32, default = 1.0)
+    matcapPercentG(phantom = float32, default = 1.0)
+    matcapPercentB(phantom = float32, default = 1.0)
+    matcapPercentA(phantom = float32, default = 1.0)
+    matcapMaskPercent(phantom = float32, default = 1.0)
+    albedoPercent(phantom = float32, default = 1.0)
+    glossPercent(phantom = float32, default = 1.0)
+    specularPercent(phantom = float32, default = 1.0)
+    normalPercent(phantom = float32, default = 1.0)
+    bumpPercent(phantom = float32, default = 1.0)
+    reflectionPercent(phantom = float32, default = 1.0)
+    falloffPercent(phantom = float32, default = 1.0)
+    maskPercent(phantom = float32, default = 1.0)
+
+    matcapTextureR(phantom = Image)
+    matcapTextureG(phantom = Image)
+    matcapTextureB(phantom = Image)
+    matcapTextureA(phantom = Image)
+    matcapMaskTexture(phantom = Image)
+    albedoTexture(phantom = Image)
+    glossTexture(phantom = Image)
+    specularTexture(phantom = Image)
+    normalTexture(phantom = Image)
+    bumpTexture(phantom = Image)
+    reflectionTexture(phantom = Image)
+    falloffTexture(phantom = Image)
+    maskTexture(phantom = Image)
+
+    vertex_coords(phantom = seq[float32])
+    tex_coords(phantom = seq[float32])
+    normals(phantom = seq[float32])
+    tangents(phantom = seq[float32])
+
+    indices(phantom = seq[uint16])
+
 var vboCache* = initTable[string, VBOData]()
 
 method init*(m: MeshComponent) =
@@ -54,8 +100,6 @@ method init*(m: MeshComponent) =
     procCall m.Component.init()
 
     m.debugSkeleton = false
-
-method supportsNewSerialization*(cm: MeshComponent): bool = false
 
 proc checkMinMax*(m: MeshComponent, x, y, z: float32) =
     if x < m.vboData.minCoord[0]:
@@ -96,19 +140,26 @@ proc mergeIndexes(m: MeshComponent, vertexData, texCoordData, normalData: openar
     result = GLushort(vertexAttrData.len / attributesPerVertex - 1)
 
 proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[GLfloat]) =
+    m.vboData.indexData = indexData
+    m.vboData.vertexAttrData = vertexAttrData
+
     let loadFunc = proc() =
+        assert(m.vboData.vertexAttrData.len != 0)
         let gl = currentContext().gl
         m.vboData.indexBuffer = gl.createBuffer()
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexBuffer)
-        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, indexData, gl.STATIC_DRAW)
+        gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, m.vboData.indexData, gl.STATIC_DRAW)
 
         m.vboData.vertexBuffer = gl.createBuffer()
         gl.bindBuffer(gl.ARRAY_BUFFER, m.vboData.vertexBuffer)
-        gl.bufferData(gl.ARRAY_BUFFER, vertexAttrData, gl.STATIC_DRAW)
-        m.vboData.numberOfIndices = indexData.len.GLsizei
+        gl.bufferData(gl.ARRAY_BUFFER, m.vboData.vertexAttrData, gl.STATIC_DRAW)
+        m.vboData.numberOfIndices = m.vboData.indexData.len.GLsizei
 
         gl.bindBuffer(gl.ARRAY_BUFFER, invalidBuffer)
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
+
+        m.vboData.indexData = @[]
+        m.vboData.vertexAttrData = @[]
 
     if currentContext().isNil:
         m.loadFunc = loadFunc
@@ -166,9 +217,6 @@ proc loadWithResource*(m: MeshComponent, resourceName: string) =
     m.loadFunc = proc() =
         m.loadMeshComponent(resourceName)
 
-template loadMeshComponentWithResource*(m: MeshComponent, resourceName: string) {.deprecated.} =
-    m.loadWithResource(resourceName)
-
 proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
     let gl = currentContext().gl
     let vertexData = [
@@ -198,9 +246,6 @@ proc loadMeshQuad(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Poi
 proc loadWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) =
     m.loadFunc = proc() =
         m.loadMeshQuad(v1, v2, v3, v4, t1, t2, t3, t4)
-
-template meshComponentWithQuad*(m: MeshComponent, v1, v2, v3, v4: Vector3, t1, t2, t3, t4: Point) {.deprecated.} =
-    m.loadWithQuad(v1, v2, v3, v4, t1, t2, t3, t4)
 
 proc load(m: MeshComponent) =
     if not m.loadFunc.isNil:
@@ -305,23 +350,26 @@ method getBBox*(c: MeshComponent): BBox =
 
 # --------- read data from VBO ------------
 
-proc getIBDataFromVRAM*(c: MeshComponent): seq[GLushort] =
+proc getIBData*(c: MeshComponent): seq[GLushort] =
     proc getBufferSubData(target: GLenum, offset: int32, data: var openarray[GLushort]) =
         when defined(android) or defined(ios) or defined(js) or defined(emscripten):
             echo "android and iOS dont't suport glGetBufferSubData"
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLushort)), cast[pointer](data));
 
-    let gl = currentContext().gl
+    if c.vboData.indexData.len == 0:
+        let gl = currentContext().gl
 
-    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.vboData.indexBuffer)
-    let bufSize = gl.getBufferParameteriv(gl.ELEMENT_ARRAY_BUFFER, gl.BUFFER_SIZE)
-    let size = int(bufSize / sizeof(GLushort))
-    result = newSeq[GLushort](size)
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, c.vboData.indexBuffer)
+        let bufSize = gl.getBufferParameteriv(gl.ELEMENT_ARRAY_BUFFER, gl.BUFFER_SIZE)
+        let size = int(bufSize / sizeof(GLushort))
+        result = newSeq[GLushort](size)
 
-    getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
+        getBufferSubData(gl.ELEMENT_ARRAY_BUFFER, 0, result)
+    else:
+        return c.vboData.indexData
 
-proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
+proc getVBData*(c: MeshComponent): seq[float32] =
     if not c.skeleton.isNil:
         return c.initMesh
 
@@ -331,14 +379,17 @@ proc getVBDataFromVRAM*(c: MeshComponent): seq[float32] =
         else:
             glGetBufferSubData(target, offset, GLsizei(data.len * sizeof(GLfloat)), cast[pointer](data));
 
-    let gl = currentContext().gl
+    if c.vboData.vertexAttrData.len == 0:
+        let gl = currentContext().gl
 
-    gl.bindBuffer(gl.ARRAY_BUFFER, c.vboData.vertexBuffer)
-    let bufSize = gl.getBufferParameteriv(gl.ARRAY_BUFFER, gl.BUFFER_SIZE)
-    let size = int(bufSize / sizeof(float32))
-    result = newSeq[float32](size)
+        gl.bindBuffer(gl.ARRAY_BUFFER, c.vboData.vertexBuffer)
+        let bufSize = gl.getBufferParameteriv(gl.ARRAY_BUFFER, gl.BUFFER_SIZE)
+        let size = int(bufSize / sizeof(float32))
+        result = newSeq[float32](size)
 
-    getBufferSubData(gl.ARRAY_BUFFER, 0, result)
+        getBufferSubData(gl.ARRAY_BUFFER, 0, result)
+    else:
+        return c.vboData.vertexAttrData
 
 proc extractVertexData*(c: MeshComponent, size, offset: int32, data: seq[float32]): seq[float32] =
     let dataStride = int(c.vboData.vertInfo.stride / sizeof(float32))
@@ -396,185 +447,126 @@ proc createVertexData*(m: MeshComponent, stride, size: int32, vertCoords, texCoo
             result[stride * i + offset + 2] = tangents[3*i + 2]
             offset += 3
 
-method deserialize*(m: MeshComponent, j: JsonNode, s: Serializer) =
-    if j.isNil:
-        return
+proc toPhantom(c: MeshComponent, p: var object) =
+    p.emission = c.material.emission
+    p.ambient = c.material.ambient
+    p.diffuse = c.material.diffuse
+    p.specular = c.material.specular
+    p.shininess = c.material.shininess
+    p.rim_density = c.material.rim_density
 
-    s.deserializeValue(j, "emission", m.material.emission)
-    s.deserializeValue(j, "ambient", m.material.ambient)
-    s.deserializeValue(j, "diffuse", m.material.diffuse)
-    s.deserializeValue(j, "specular", m.material.specular)
-    s.deserializeValue(j, "shininess", m.material.shininess)
-    s.deserializeValue(j, "rim_density", m.material.rim_density)
-    s.deserializeValue(j, "rimColor", m.material.rimColor)
+    p.culling = c.material.bEnableBackfaceCulling
+    p.light = c.material.isLightReceiver
+    p.blend = c.material.blendEnable
+    p.depth_test = c.material.depthEnable
+    p.wireframe = c.material.isWireframe
+    p.isRIM = c.material.isRIM
+    p.rimColor = c.material.rimColor
 
-    s.deserializeValue(j, "culling", m.material.bEnableBackfaceCulling)
-    s.deserializeValue(j, "light", m.material.isLightReceiver)
-    s.deserializeValue(j, "blend", m.material.blendEnable)
-    s.deserializeValue(j, "depth_test", m.material.depthEnable)
-    s.deserializeValue(j, "wireframe", m.material.isWireframe)
-    s.deserializeValue(j, "RIM", m.material.isRIM)
-    s.deserializeValue(j, "sRGB_normal", m.material.isNormalSRGB)
-    s.deserializeValue(j, "matcapPercentR", m.material.matcapPercentR)
-    s.deserializeValue(j, "matcapPercentG", m.material.matcapPercentG)
-    s.deserializeValue(j, "matcapPercentB", m.material.matcapPercentB)
-    s.deserializeValue(j, "matcapPercentA", m.material.matcapPercentA)
-    s.deserializeValue(j, "matcapMaskPercent", m.material.matcapMaskPercent)
-    s.deserializeValue(j, "albedoPercent", m.material.albedoPercent)
-    s.deserializeValue(j, "glossPercent", m.material.glossPercent)
-    s.deserializeValue(j, "specularPercent", m.material.specularPercent)
-    s.deserializeValue(j, "normalPercent", m.material.normalPercent)
-    s.deserializeValue(j, "bumpPercent", m.material.bumpPercent)
-    s.deserializeValue(j, "reflectionPercent", m.material.reflectionPercent)
-    s.deserializeValue(j, "falloffPercent", m.material.falloffPercent)
-    s.deserializeValue(j, "maskPercent", m.material.maskPercent)
+    p.sRGB_normal = c.material.isNormalSRGB
 
-    deserializeImage(j{"matcapTextureR"}, s) do(img: Image, err: string): m.material.matcapTextureR = img
-    deserializeImage(j{"matcapTextureG"}, s) do(img: Image, err: string): m.material.matcapTextureG = img
-    deserializeImage(j{"matcapTextureB"}, s) do(img: Image, err: string): m.material.matcapTextureB = img
-    deserializeImage(j{"matcapTextureA"}, s) do(img: Image, err: string): m.material.matcapTextureA = img
-    deserializeImage(j{"matcapMaskTexture"}, s) do(img: Image, err: string): m.material.matcapMaskTexture = img
-    deserializeImage(j{"albedoTexture"}, s) do(img: Image, err: string): m.material.albedoTexture = img
-    deserializeImage(j{"glossTexture"}, s) do(img: Image, err: string): m.material.glossTexture = img
-    deserializeImage(j{"specularTexture"}, s) do(img: Image, err: string): m.material.specularTexture = img
-    deserializeImage(j{"normalTexture"}, s) do(img: Image, err: string): m.material.normalTexture = img
-    deserializeImage(j{"bumpTexture"}, s) do(img: Image, err: string): m.material.bumpTexture = img
-    deserializeImage(j{"reflectionTexture"}, s) do(img: Image, err: string): m.material.reflectionTexture = img
-    deserializeImage(j{"falloffTexture"}, s) do(img: Image, err: string): m.material.falloffTexture = img
-    deserializeImage(j{"maskTexture"}, s) do(img: Image, err: string): m.material.maskTexture = img
+    p.matcapPercentR = c.material.matcapPercentR
+    p.matcapPercentG = c.material.matcapPercentG
+    p.matcapPercentB = c.material.matcapPercentB
+    p.matcapPercentA = c.material.matcapPercentA
+    p.matcapMaskPercent = c.material.matcapMaskPercent
+    p.albedoPercent = c.material.albedoPercent
+    p.glossPercent = c.material.glossPercent
+    p.specularPercent = c.material.specularPercent
+    p.normalPercent = c.material.normalPercent
+    p.bumpPercent = c.material.bumpPercent
+    p.reflectionPercent = c.material.reflectionPercent
+    p.falloffPercent = c.material.falloffPercent
+    p.maskPercent = c.material.maskPercent
 
-    proc getAttribs(name: string): seq[float32] =
-        result = newSeq[float32]()
-        let jNode = j{name}
-        if not jNode.isNil:
-            for v in jNode:
-                result.add(v.getFloat())
+    p.matcapTextureR = c.material.matcapTextureR
+    p.matcapTextureG = c.material.matcapTextureG
+    p.matcapTextureB = c.material.matcapTextureB
+    p.matcapTextureA = c.material.matcapTextureA
+    p.matcapMaskTexture = c.material.matcapMaskTexture
+    p.albedoTexture = c.material.albedoTexture
+    p.glossTexture = c.material.glossTexture
+    p.specularTexture = c.material.specularTexture
+    p.normalTexture = c.material.normalTexture
+    p.bumpTexture = c.material.bumpTexture
+    p.reflectionTexture = c.material.reflectionTexture
+    p.falloffTexture = c.material.falloffTexture
+    p.maskTexture = c.material.maskTexture
 
-    var vertCoords = getAttribs("vertex_coords")
-    var texCoords = getAttribs("tex_coords")
-    var normals = getAttribs("normals")
-    var tangents = getAttribs("tangents")
+    let data = c.getVBData()
 
-    var jNode = j{"indices"}
-    var indices = newSeq[GLushort]()
-    if not jNode.isNil:
-        for v in jNode:
-            indices.add( GLushort(v.getInt()))
+    if c.vboData.vertInfo.numOfCoordPerVert > 0:
+        p.vertex_coords = c.extractVertCoords(data)
 
-    m.vboData.vertInfo = newVertexInfoWithVertexData(vertCoords.len, texCoords.len, normals.len, tangents.len)
+    if c.vboData.vertInfo.numOfCoordPerTexCoord > 0:
+        p.tex_coords = c.extractTexCoords(data)
 
-    let stride = int32( m.vboData.vertInfo.stride / sizeof(GLfloat) )
-    let size = int32(vertCoords.len * stride / 3)
-    var vertexData = m.createVertexData(stride, size, vertCoords, texCoords, normals, tangents)
+    if c.vboData.vertInfo.numOfCoordPerNormal > 0:
+        p.normals = c.extractNormals(data)
 
-    m.createVBO(indices, vertexData)
+    if c.vboData.vertInfo.numOfCoordPerTangent > 0:
+        p.tangents = c.extractTangents(data)
 
-    jNode = j{"skeleton"}
-    if not jNode.isNil:
-        m.skeleton = newSkeleton()
-        m.skeleton.deserialize(jNode, s)
+    p.indices = c.getIBData()
+    # TODO: Save skeleton
 
-        m.initMesh = vertexData
-        m.currMesh = vertexData
+proc fromPhantom(c: MeshComponent, p: object) =
+    c.material.emission = p.emission
+    c.material.ambient = p.ambient
+    c.material.diffuse = p.diffuse
+    c.material.specular = p.specular
+    c.material.shininess = p.shininess
+    c.material.rim_density = p.rim_density
 
-        m.vertexWeights = newSeq[Glfloat]()
-        m.boneIDs = newSeq[Glfloat]()
-        s.deserializeValue(j, "vertexWeights", m.vertexWeights)
-        s.deserializeValue(j, "boneIDs", m.boneIDs)
+    c.material.bEnableBackfaceCulling = p.culling
+    c.material.isLightReceiver = p.light
+    c.material.blendEnable = p.blend
+    c.material.depthEnable = p.depth_test
+    c.material.isWireframe = p.wireframe
+    c.material.isRIM = p.isRIM
+    c.material.rimColor = p.rimColor
 
-method deserialize*(c: MeshComponent, b: BinDeserializer) =
-    c.deserializeFromJson(b)
+    c.material.isNormalSRGB = p.sRGB_normal
 
-method serialize*(c: MeshComponent, s: Serializer): JsonNode =
-    result = newJObject()
+    c.material.matcapPercentR = p.matcapPercentR
+    c.material.matcapPercentG = p.matcapPercentG
+    c.material.matcapPercentB = p.matcapPercentB
+    c.material.matcapPercentA = p.matcapPercentA
+    c.material.matcapMaskPercent = p.matcapMaskPercent
+    c.material.albedoPercent = p.albedoPercent
+    c.material.glossPercent = p.glossPercent
+    c.material.specularPercent = p.specularPercent
+    c.material.normalPercent = p.normalPercent
+    c.material.bumpPercent = p.bumpPercent
+    c.material.reflectionPercent = p.reflectionPercent
+    c.material.falloffPercent = p.falloffPercent
+    c.material.maskPercent = p.maskPercent
 
-    result.add("emission", s.getValue(c.material.emission))
-    result.add("ambient", s.getValue(c.material.ambient))
-    result.add("diffuse", s.getValue(c.material.diffuse))
-    result.add("specular", s.getValue(c.material.specular))
-    result.add("shininess", s.getValue(c.material.shininess))
-    result.add("rim_density", s.getValue(c.material.rim_density))
+    c.material.matcapTextureR = p.matcapTextureR
+    c.material.matcapTextureG = p.matcapTextureG
+    c.material.matcapTextureB = p.matcapTextureB
+    c.material.matcapTextureA = p.matcapTextureA
+    c.material.matcapMaskTexture = p.matcapMaskTexture
+    c.material.albedoTexture = p.albedoTexture
+    c.material.glossTexture = p.glossTexture
+    c.material.specularTexture = p.specularTexture
+    c.material.normalTexture = p.normalTexture
+    c.material.bumpTexture = p.bumpTexture
+    c.material.reflectionTexture = p.reflectionTexture
+    c.material.falloffTexture = p.falloffTexture
+    c.material.maskTexture = p.maskTexture
 
-    result.add("culling", s.getValue(c.material.bEnableBackfaceCulling))
-    result.add("light", s.getValue(c.material.isLightReceiver))
-    result.add("blend", s.getValue(c.material.blendEnable))
-    result.add("depth_test", s.getValue(c.material.depthEnable))
-    result.add("wireframe", s.getValue(c.material.isWireframe))
-    result.add("RIM", s.getValue(c.material.isRIM))
-    result.add("rimColor", s.getValue(c.material.rimColor))
+    c.vboData.vertInfo = newVertexInfoWithVertexData(p.vertex_coords.len, p.tex_coords.len, p.normals.len, p.tangents.len)
 
-    result.add("sRGB_normal", s.getValue(c.material.isNormalSRGB))
+    let stride = int32( c.vboData.vertInfo.stride / sizeof(GLfloat) )
+    let size = int32(p.vertex_coords.len * stride / 3)
+    let vertexData = c.createVertexData(stride, size, p.vertex_coords, p.tex_coords, p.normals, p.tangents)
 
-    result.add("matcapPercentR", s.getValue(c.material.matcapPercentR))
-    result.add("matcapPercentG", s.getValue(c.material.matcapPercentG))
-    result.add("matcapPercentB", s.getValue(c.material.matcapPercentB))
-    result.add("matcapPercentA", s.getValue(c.material.matcapPercentA))
-    result.add("matcapMaskPercent", s.getValue(c.material.matcapMaskPercent))
-    result.add("albedoPercent", s.getValue(c.material.albedoPercent))
-    result.add("glossPercent", s.getValue(c.material.glossPercent))
-    result.add("specularPercent", s.getValue(c.material.specularPercent))
-    result.add("normalPercent", s.getValue(c.material.normalPercent))
-    result.add("bumpPercent", s.getValue(c.material.bumpPercent))
-    result.add("reflectionPercent", s.getValue(c.material.reflectionPercent))
-    result.add("falloffPercent", s.getValue(c.material.falloffPercent))
-    result.add("maskPercent", s.getValue(c.material.maskPercent))
+    c.createVBO(p.indices, vertexData)
 
-    if not c.material.matcapTextureR.isNil:
-        result.add("matcapTextureR",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureR.filePath())))
-    if not c.material.matcapTextureG.isNil:
-        result.add("matcapTextureG",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureG.filePath())))
-    if not c.material.matcapTextureB.isNil:
-        result.add("matcapTextureB",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureB.filePath())))
-    if not c.material.matcapTextureA.isNil:
-        result.add("matcapTextureA",  s.getValue(s.getRelativeResourcePath(c.material.matcapTextureA.filePath())))
-    if not c.material.matcapMaskTexture.isNil:
-        result.add("matcapMaskTexture",  s.getValue(s.getRelativeResourcePath(c.material.matcapMaskTexture.filePath())))
-    if not c.material.albedoTexture.isNil:
-        result.add("albedoTexture",  s.getValue(s.getRelativeResourcePath(c.material.albedoTexture.filePath())))
-    if not c.material.glossTexture.isNil:
-        result.add("glossTexture",  s.getValue(s.getRelativeResourcePath(c.material.glossTexture.filePath())))
-    if not c.material.specularTexture.isNil:
-        result.add("specularTexture",  s.getValue(s.getRelativeResourcePath(c.material.specularTexture.filePath())))
-    if not c.material.normalTexture.isNil:
-        result.add("normalTexture",  s.getValue(s.getRelativeResourcePath(c.material.normalTexture.filePath())))
-    if not c.material.bumpTexture.isNil:
-        result.add("bumpTexture",  s.getValue(s.getRelativeResourcePath(c.material.bumpTexture.filePath())))
-    if not c.material.reflectionTexture.isNil:
-        result.add("reflectionTexture",  s.getValue(s.getRelativeResourcePath(c.material.reflectionTexture.filePath())))
-    if not c.material.falloffTexture.isNil:
-        result.add("falloffTexture",  s.getValue(s.getRelativeResourcePath(c.material.falloffTexture.filePath())))
-    if not c.material.maskTexture.isNil:
-        result.add("maskTexture",  s.getValue(s.getRelativeResourcePath(c.material.maskTexture.filePath())))
+    # TODO: Load skeleton
 
-    var data = c.getVBDataFromVRAM()
-
-    proc needsKey(name: string): bool =
-        case name
-        of "vertex_coords": return c.vboData.vertInfo.numOfCoordPerVert > 0 or false
-        of "tex_coords": return c.vboData.vertInfo.numOfCoordPerTexCoord > 0  or false
-        of "normals": return c.vboData.vertInfo.numOfCoordPerNormal > 0  or false
-        of "tangents": return c.vboData.vertInfo.numOfCoordPerTangent > 0  or false
-        else: return false
-
-    template addInfo(name: string, f: typed) =
-        if needsKey(name):
-            result[name] = s.getValue(f(c, data))
-
-    addInfo("vertex_coords", extractVertCoords)
-    addInfo("tex_coords", extractTexCoords)
-    addInfo("normals", extractNormals)
-    addInfo("tangents", extractTangents)
-
-    var ib = c.getIBDataFromVRAM()
-    var ibNode = newJArray()
-    result.add("indices", ibNode)
-    for v in ib:
-        ibNode.add(s.getValue(int32(v)))
-
-    if not c.skeleton.isNil:
-        result.add("skeleton", c.skeleton.serialize(s))
-        result["vertexWeights"] = s.getValue(c.vertexWeights)
-        result["boneIDs"] = s.getValue(c.boneIDs)
+genSerializationCodeForComponent(MeshComponent)
 
 method visitProperties*(m: MeshComponent, p: var PropertyVisitor) =
     p.visitProperty("emission", m.material.emission)
