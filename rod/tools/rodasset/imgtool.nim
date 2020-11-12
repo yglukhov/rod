@@ -187,6 +187,7 @@ proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
         let doQuant = not tool.settings.graphics.quantizeExceptions.contains(name)
         let doPosterize = not tool.settings.graphics.posterizeExceptions.contains(name)
         let noDownsample = tool.settings.graphics.noDownsample.contains(name)
+        let noAlphaCrop = tool.settings.graphics.noAlphaCrop.contains(name)
 
         if doQuant:
             o.category = "quant"
@@ -196,6 +197,8 @@ proc setCategories(tool: ImgTool, oc: var openarray[ImageOccurence]) =
             o.category = "dont_optimize"
         if noDownsample:
             o.downsampleRatio = 1.0
+        if noAlphaCrop:
+            o.allowAlphaCrop = false
 
 proc convertSpritesheetToPVR(path: string) =
     let dstPath = path.pathToPVR()
