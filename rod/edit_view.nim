@@ -21,12 +21,6 @@ when loadingAndSavingAvailable:
     import os_files/dialog
     import os
 
-    proc autosaveDir(): string =
-        const dir = "rodedit_autosave"
-        result = getTempDir() / dir
-        if not dirExists(result):
-            createDir(result)
-
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -152,6 +146,12 @@ when loadingAndSavingAvailable:
         if result.len == 0 or e.startFromGame:
             result = getAppDir() & "/../.."
 
+    proc autosaveDir(e: Editor): string =
+        const dir = ".rodedit" / "autosave"
+        result = e.currentProjectPath() / dir
+        if not dirExists(result):
+            createDir(result)
+
     proc name(c: CompositionDocument): string =
         if c.path.len > 0:
             result = splitFile(c.path).name
@@ -161,7 +161,7 @@ when loadingAndSavingAvailable:
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false, autosave = false): string {.discardable.} =
         var newPath = c.path
         if autosave:
-            newPath = autosaveDir() / c.name & format(getTime(), "(dd-MM-yy hh-mm-ss)") & ".jcomp"
+            newPath = e.autosaveDir() / c.name & format(getTime(), "(dd-MM-yy hh-mm-ss)") & ".jcomp"
             info "autosave ", c.name, " to ", newPath
 
         if not autosave and (c.path.len == 0 or saveAs):

@@ -34,7 +34,6 @@ type
 
         when defined(rodedit):
             jAnimations*: JsonNode
-            serializable*: bool
 
     BBox* = object
         minPoint*: Vector3
