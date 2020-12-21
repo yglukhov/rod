@@ -329,6 +329,9 @@ proc createSceneMenu(w: WorkspaceView) =
                 - "Save comp as ...":
                     w.editor.notifCenter.postNotification(RodEditorNotif_onCompositionSaveAs)
 
+                - "Convert to comp":
+                    w.editor.notifCenter.postNotification(RodEditorNotif_onConvertToComp)
+
             w.addToolbarMenu(m)
 
 proc createWorkspaceLayout*(window: Window, editor: Editor): WorkspaceView =

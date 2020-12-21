@@ -1,4 +1,4 @@
-import strutils, json, logging
+import strutils, json, logging, times
 
 import nimx / [ matrixes, button, popup_button, key_commands, animation,
         notification_center, window, view_event_handling ]
@@ -20,6 +20,13 @@ import variant
 when loadingAndSavingAvailable:
     import os_files/dialog
     import os
+
+    proc autosaveDir(): string =
+        const dir = "rodedit_autosave"
+        result = getTempDir() / dir
+        if not dirExists(result):
+            createDir(result)
+
 
 proc `selectedNode=`*(e: Editor, n: Node) =
     if n != e.mSelectedNode:
@@ -145,9 +152,19 @@ when loadingAndSavingAvailable:
         if result.len == 0 or e.startFromGame:
             result = getAppDir() & "/../.."
 
-    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false) =
+    proc name(c: CompositionDocument): string =
+        if c.path.len > 0:
+            result = splitFile(c.path).name
+        elif not c.rootNode.isnil:
+            result = c.rootNode.name
+
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false, autosave = false): string {.discardable.} =
         var newPath = c.path
-        if c.path.len == 0 or saveAs:
+        if autosave:
+            newPath = autosaveDir() / c.name & format(getTime(), "(dd-MM-yy hh-mm-ss)") & ".jcomp"
+            info "autosave ", c.name, " to ", newPath
+
+        if not autosave and (c.path.len == 0 or saveAs):
             var di: DialogInfo
             # di.folder = e.currentProject.path
             di.extension = "jcomp"
@@ -157,33 +174,32 @@ when loadingAndSavingAvailable:
             di.title = "Save composition" & (if saveAs: " as" else: "")
 
             newPath = di.show()
-
         try:
-            if newPath.len > 0:
-                let compName = splitFile(newPath).name
-                c.rootNode.name = compName
+            if newPath.len == 0: return
+            when defined(rodedit):
+                e.makeCompositionRefsRelative(c.rootNode, newPath)
+                var composition = c.rootNode.composition
+                if not c.rootNode.composition.isNil:
+                    c.rootNode.composition = nil # hack to serialize content
 
-                when defined(rodedit):
-                    e.makeCompositionRefsRelative(c.rootNode, newPath)
-                    var composition = c.rootNode.composition
-                    if not c.rootNode.composition.isNil:
-                        c.rootNode.composition = nil # hack to serialize content
+            let data = nodeToJson(c.rootNode, newPath)
+            if c.animations.len > 0:
+                var janims = newJObject()
+                for a in c.animations:
+                    janims[a.name] = %a
+                data["animations"] = janims
+            writeFile(newPath, data.pretty())
+            when defined(rodedit):
+                e.revertComposotionRef(c.rootNode)
+                c.rootNode.composition = composition
 
-                let data = nodeToJson(c.rootNode, newPath)
-                if c.animations.len > 0:
-                    var janims = newJObject()
-                    for a in c.animations:
-                        janims[a.name] = %a
-                    data["animations"] = janims
-                writeFile(newPath, data.pretty())
-                when defined(rodedit):
-                    e.revertComposotionRef(c.rootNode)
-                    c.rootNode.composition = composition
-
+            if not autosave:
                 c.path = newPath
-                e.workspaceView.setTabTitle(c.owner, compName)
+                c.rootNode.name = c.name
+                e.workspaceView.setTabTitle(c.owner, c.name)
 
                 e.onCompositionSaved(c)
+            result = newPath
         except:
             error "Can't save composition at ", newPath
             error "Exception caught: ", getCurrentExceptionMsg()
@@ -242,7 +258,7 @@ when loadingAndSavingAvailable:
                 e.workspaceView.addTab(tbv)
                 e.workspaceView.selectTab(tbv)
 
-    proc loadCompositionToScene*(e: Editor, p: string) =
+    proc loadCompositionToScene*(e: Editor, p: string, cb: proc(c: CompositionDocument) = nil) =
         e.loadCompositionDocument(p) do(c: CompositionDocument):
             if not e.currentComposition.isNil:
                 var p = e.currentComposition.selectedNode
@@ -250,12 +266,13 @@ when loadingAndSavingAvailable:
                     p = e.currentComposition.rootNode
                 p.addChild(c.rootNode)
                 e.currentComposition.owner.onCompositionChanged(e.currentComposition)
-
+                if not cb.isNil:
+                    cb(c)
 else:
     proc currentProjectPath*(e: Editor): string = discard
-    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false)= discard
+    proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false, autosave = false): string {.discardable.} = discard
     proc openComposition*(e: Editor, p: string) = discard
-    proc loadCompositionToScene*(e: Editor, p: string) = discard
+    proc loadCompositionToScene*(e: Editor, p: string, cb: proc(c: CompositionDocument) = nil) = discard
 
 proc selectNode*(editor: Editor, node: Node) =
     editor.selectedNode = node
@@ -332,6 +349,22 @@ proc pasteNode*(e: Editor, n: Node = nil)=
             echo getCurrentExceptionMsg()
             echo getStackTrace(getCurrentException())
 
+proc convertToComposition*(e: Editor, n: Node) =
+    discard
+    var comp = new(CompositionDocument)
+    comp.rootNode = n
+    let path = e.saveComposition(comp)
+    if path.len == 0: return
+    if not n.parent.isNil:
+        e.selectedNode = n.parent
+        n.removeFromParent()
+    e.loadCompositionToScene(path) do(c: CompositionDocument):
+        c.rootNode.position = n.position
+        c.rootNode.scale = n.scale
+        c.rootNode.rotation = n.rotation
+        c.rootNode.alpha = n.alpha
+
+
 proc onFirstResponderChanged(e: Editor, fr: View)=
     for t in e.workspaceView.compositionEditors:
         if fr.isDescendantOf(t):
@@ -376,6 +409,12 @@ proc initNotifHandlers(e: Editor)=
             if path.len > 0:
                 e.loadCompositionToScene(path)
         else: discard
+
+    e.notifCenter.addObserver(RodEditorNotif_onConvertToComp, e) do(args: Variant):
+        when loadingAndSavingAvailable:
+            e.convertToComposition(e.selectedNode)
+        else:
+            discard
 
 proc onKeyDown(ed: Editor, e: var Event): bool =
     # echo "editor onKeyDown ", e.keyCode

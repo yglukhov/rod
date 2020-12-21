@@ -30,17 +30,24 @@ proc addAnimation*(n: Node, a: Animation) =
 proc removeAnimation*(n: Node, a: Animation) =
     n.animationRunner.runner.removeAnimation(a)
 
+template setNodeFlag(n: Node, f: NodeFlags, v: bool) =
+    if v: n.mFlags.incl(f) else: n.mFlags.excl(f)
+
 proc isEnabled*(n: Node): bool {.inline.} = NodeFlags.enabled in n.mFlags
 proc `isEnabled=`*(n: Node, flag: bool) {.inline.} =
-    if flag: n.mFlags.incl(NodeFlags.enabled) else: n.mFlags.excl(NodeFlags.enabled)
+    n.setNodeFlag(NodeFlags.enabled, flag)
 
 proc affectsChildren*(n: Node): bool {.inline.} = NodeFlags.affectsChildren in n.mFlags
 proc `affectsChildren=`*(n: Node, flag: bool) {.inline.} =
-    if flag: n.mFlags.incl(NodeFlags.affectsChildren) else: n.mFlags.excl(NodeFlags.affectsChildren)
+    n.setNodeFlag(NodeFlags.affectsChildren, flag)
 
 proc isDirty*(n: Node): bool {.inline.} = NodeFlags.dirty in n.mFlags
 proc `isDirty=`*(n: Node, flag: bool) {.inline.} =
-    if flag: n.mFlags.incl(NodeFlags.dirty) else: n.mFlags.excl(NodeFlags.dirty)
+    n.setNodeFlag(NodeFlags.dirty, flag)
+
+proc isSeializable*(n: Node): bool {.inline.} = NodeFlags.serializable in n.mFlags
+proc `isSeializable=`*(n: Node, flag: bool) {.inline.} =
+    n.setNodeFlag(NodeFlags.serializable, flag)
 
 proc newNode*(name: string = ""): Node =
     result.new()
@@ -52,6 +59,8 @@ proc newNode*(name: string = ""): Node =
     result.isDirty = true
     result.isEnabled = true
     result.affectsChildren = true
+    when defined(rodedit):
+        result.serializable = true
 
 proc setDirty(n: Node) =
     if not n.isDirty:
@@ -778,6 +787,8 @@ proc serialize*(n: Node, s: JsonSerializer) =
         let jchildren = newJArray()
         jn["children"] = jchildren
         for child in n.children:
+            when defined(rodedit):
+                if not child.serializable: continue
             s.node = newJObject()
             child.serialize(s)
             jchildren.add(s.node)

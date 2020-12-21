@@ -2,7 +2,7 @@ import nimx / [outline_view, types, matrixes, view, table_view_cell, text_field,
     scroll_view, button, event, formatted_text]
 
 import rod / [node, rod_types, edit_view]
-import variant, strutils, tables
+import variant, strutils, tables, logging
 
 type EditorTreeView* = ref object of EditorTabView
     outlineView: OutlineView
@@ -100,6 +100,10 @@ method init*(v: EditorTreeView, r: Rect)=
         else:
             textField.textColor = newGrayColor(0.0)
 
+        when defined(rodedit):
+            if not n.serializable:
+                textField.textColor = newColor(0.9, 0.69, 0.67)
+
         textField.text = if n.name.len == 0: "(node)" else: n.name
 
         # btn.onAction do():
@@ -169,13 +173,14 @@ method init*(v: EditorTreeView, r: Rect)=
             sip.add(0)
         else:
             n = outlineView.itemAtIndexPath(sip).get(Node)
+        if not n.composition.isNil and n != v.rootNode:
+            return
 
         outlineView.expandRow(sip)
         discard n.newChild("New Node")
         sip.add(n.children.len - 1)
 
         v.onTreeChanged()
-
         outlineView.selectItemAtIndexPath(sip)
     v.addSubview(createNodeButton)
 

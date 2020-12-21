@@ -131,8 +131,10 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             i.propView.addSubview(expView)
 
             expView= newExpandingView(newRect(0, 20, 328, 20.0))
-
         expView.title = "Node"
+        when defined(rodedit):
+            if not n.serializable:
+                expView.title &= " is not serializable!"
         expView.expand()
 
         n.visitProperties(visitor)

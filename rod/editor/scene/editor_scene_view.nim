@@ -1,5 +1,5 @@
 import nimx / [ types, view, event, view_event_handling, portable_gl, context,
-    pasteboard/pasteboard, assets/asset_loading, image, matrixes, clip_view ]
+    pasteboard/pasteboard, assets/asset_loading, image, matrixes, clip_view, timer ]
 
 import rod / editor / scene / [gizmo, gizmo_move, node_selector, editor_camera_controller]
 import rod / editor / scene / components / [ grid, editor_component, viewport_rect ]
@@ -18,6 +18,7 @@ type
         sceneView: SceneView
         cameraController: EditorCameraController
         startPoint: Point
+        autosaveTimer: Timer
 
 method onKeyDown*(v: EditorSceneView, e: var Event): bool =
     result = procCall v.View.onKeyDown(e)
@@ -123,6 +124,8 @@ method init*(v: EditorSceneView, r: Rect)=
 
         discard editView.rootNode.newChild("overlay").component(ViewportRect)
         v.sceneView = editView
+        v.autosaveTimer = setInterval(AutoSaveTime) do():
+            v.editor.saveComposition(v.composition, autosave = true)
     else:
         v.sceneView = v.rootNode.sceneView
         v.sceneView.editing = true
