@@ -161,13 +161,14 @@ method onTouchEv*(v: AssetContainerView, e: var Event): bool =
 method onKeyDown*(v: AssetContainerView, e: var Event):bool=
     if not v.isFirstResponder: return
     case e.keyCode:
-    of VirtualKey.Delete:
-        if v.subviews.len == 0: return
-        if not v.onItemsDelete.isNil and v.selectedItems.len > 0:
-            v.onItemsDelete(v.selectedItems)
-            v.selectedItems.setLen(0)
+    # todo: implement confirm dialog
+    # of VirtualKey.Delete:
+    #     if v.subviews.len == 0: return
+    #     if not v.onItemsDelete.isNil and v.selectedItems.len > 0:
+    #         v.onItemsDelete(v.selectedItems)
+    #         v.selectedItems.setLen(0)
 
-        result = true
+    #     result = true
 
     of VirtualKey.Up, VirtualKey.Down, VirtualKey.Left, VirtualKey.Right:
         if v.subviews.len == 0: return
@@ -228,4 +229,3 @@ method draw*(v: AssetContainerView, r: Rect)=
         c.strokeWidth = 1.0
         c.fillColor = selectionColor
         c.drawRect(v.selectionRect)
-

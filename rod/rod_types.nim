@@ -12,6 +12,7 @@ type
         enabled
         affectsChildren # Should posteffects affect only this node or its children as well
         dirty
+        serializable
 
     Node* = ref object
         mTranslation*: Vector3
@@ -33,6 +34,7 @@ type
 
         when defined(rodedit):
             jAnimations*: JsonNode
+            serializable*: bool
 
     BBox* = object
         minPoint*: Vector3

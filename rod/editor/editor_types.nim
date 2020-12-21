@@ -92,6 +92,8 @@ const RodEditorNotif_onCompositionAdd* = "RodEditorNotif_onCompositionAdd"
 const RodEditorNotif_onCompositionSave* = "RodEditorNotif_onCompositionSave"
 const RodEditorNotif_onCompositionSaveAs* = "RodEditorNotif_onCompositionSaveAs"
 const RodEditorNotif_onCompositionNew* = "RodEditorNotif_onCompositionNew"
+const RodEditorNotif_onConvertToComp* = "RodEditorNotif_onConvertToComp"
+
 
 # Pasteboard
 const rodPbComposition* = "rod.composition"
@@ -111,3 +113,4 @@ const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Assets" ]
 
 # Other
 const EditorViewportSize* = newSize(1920.0, 1080.0)
+const AutoSaveTime* = 120.0
