@@ -45,8 +45,8 @@ proc isDirty*(n: Node): bool {.inline.} = NodeFlags.dirty in n.mFlags
 proc `isDirty=`*(n: Node, flag: bool) {.inline.} =
     n.setNodeFlag(NodeFlags.dirty, flag)
 
-proc isSeializable*(n: Node): bool {.inline.} = NodeFlags.serializable in n.mFlags
-proc `isSeializable=`*(n: Node, flag: bool) {.inline.} =
+proc isSerializable*(n: Node): bool {.inline.} = NodeFlags.serializable in n.mFlags
+proc `isSerializable=`*(n: Node, flag: bool) {.inline.} =
     n.setNodeFlag(NodeFlags.serializable, flag)
 
 proc newNode*(name: string = ""): Node =
@@ -59,8 +59,7 @@ proc newNode*(name: string = ""): Node =
     result.isDirty = true
     result.isEnabled = true
     result.affectsChildren = true
-    when defined(rodedit):
-        result.serializable = true
+    result.isSerializable = true
 
 proc setDirty(n: Node) =
     if not n.isDirty:
@@ -788,7 +787,7 @@ proc serialize*(n: Node, s: JsonSerializer) =
         jn["children"] = jchildren
         for child in n.children:
             when defined(rodedit):
-                if not child.serializable: continue
+                if not child.isSerializable: continue
             s.node = newJObject()
             child.serialize(s)
             jchildren.add(s.node)

@@ -101,7 +101,7 @@ method init*(v: EditorTreeView, r: Rect)=
             textField.textColor = newGrayColor(0.0)
 
         when defined(rodedit):
-            if not n.serializable:
+            if not n.isSerializable:
                 textField.textColor = newColor(0.9, 0.69, 0.67)
 
         textField.text = if n.name.len == 0: "(node)" else: n.name
