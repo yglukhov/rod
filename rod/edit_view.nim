@@ -140,6 +140,8 @@ when defined(rodedit):
                     nextChildren.add(ch.children)
             children = nextChildren
 
+
+
 when loadingAndSavingAvailable:
     proc currentProjectPath*(e: Editor): string =
         result = e.currentProject.path
@@ -445,6 +447,7 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     var editor = result
     editor.window = w
     editor.currentProject = p
+    editor.currentProject.loadEditorSettings()
     editor.startFromGame = false
     editor.initNotifHandlers()
     editor.workspaceView = createWorkspace(w, editor)

@@ -1,84 +1,79 @@
 import nimx/[matrixes, types]
-import rod/utils/[json_serializer, json_deserializer, serialization_codegen, property_desc]
-import json
-import preferences
+import rod / rod_types
+import json, os, logging, options
 
 type
-    EditorTabSettings* = tuple
-        name: string
-        frame: Rect
+  EditorTabSettings* = object
+    name*: string
+    frame*: Rect
 
-    EditorProject* = tuple
-        name: string
-        path: string
-        tabs: seq[EditorTabSettings]
-        composition: string
+  EditorSettings* = object
+    AutosaveInterval: Option[float]
+    EditorCameras: Option[seq[EditorCameraSettings]]
 
-    EditorSettings* = tuple
-        projects: seq[EditorProject]
-        lastProject: string
+  EditorCameraSettings* = object
+    name*: string
+    viewportSize*: Size
+    projectionMode*: CameraProjection
 
-    EditorSettingsObj* = ref object
+  EditorProject* = object
+    name*: string
+    path*: string
+    tabs*: seq[EditorTabSettings]
+    composition*: string
+    settings*: EditorSettings
 
-EditorTabSettings.properties:
-    name
-    frame
+const SettingsFileName = "settings.json"
 
-EditorProject.properties:
-    name
-    path
-    tabs
-    composition
+let UserSettingsPath = getHomeDir() & "/.rodedit/" & SettingsFileName
+let ProjSettingsPath = getAppDir() & "/.rodedit/" & SettingsFileName
 
-EditorSettings.properties:
-    projects
-    lastProject
+template settingsFiles(): seq[string] =
+  @[UserSettingsPath, ProjSettingsPath]
 
-
-genJsonSerializationrFor(EditorTabSettings)
-genJsonSerializationrFor(EditorProject)
-genJsonSerializationrFor(EditorSettings)
-
-proc getEditorSettings*(): EditorSettings=
-    if "settings" in sharedPreferences():
-        var jn = sharedPreferences()["settings"]
-        result = jn.toEditorSettings()
-    # echo "Load editor settings: ", result
-
-proc save*(es: EditorSettings)=
-    sharedPreferences()["settings"] = es.toJson()
-    syncPreferences()
-
-proc saveProject*(proj: EditorProject)=
-    var es = getEditorSettings()
-    if es.projects.len == 0:
-        es.projects.add(proj)
-    else:
-        var index = 0
-        var projIndex = -1
-        while index < es.projects.len:
-            var p = es.projects[index]
-            if p.path == proj.path:
-                projIndex = index
-                break
-            inc index
-
-        if projIndex < 0:
-            es.projects.add(proj)
+proc merge(a, b: JsonNode): JsonNode =
+  if a.isNil and b.isNil: return
+  if a.isNil:
+    result = parseJson($b)
+  else:
+    if b.kind == a.kind and b.kind == JObject:
+      result = parseJson($a)
+      for k, v in b:
+        if k notin a:
+          result[k] = v
         else:
-            es.projects[projIndex] = proj
+          result[k] = merge(a[k], b[k])
+    else:
+      result = parseJson($b)
 
-    es.lastProject = proj.path
-    es.save()
+proc getEditorSettingsJson(): JsonNode =
+  var jsettings: JsonNode
+  try:
+    for sf in settingsFiles:
+      info "getEditorSettingsJson: ", sf
+      if fileExists(sf):
+        jsettings = merge(jsettings, parseFile(sf))
+  except Exception as e:
+    warn "Can't parse editor settings! ", e.msg, "\n", e.getStackTrace()
+  result = jsettings
 
-proc hasProjectAtPath*(p: string): bool =
-    var settings = getEditorSettings()
-    for proj in settings.projects:
-        if proj.path == p:
-            return true
+proc loadEditorSettings*(proj: var EditorProject) =
+  let jsettings = getEditorSettingsJson()
+  if not jsettings.isNil:
+      proj.settings = jsettings.to(EditorSettings)
+  echo "loadEditorSettings ", if jsettings.isNil: "nil" else: $jsettings
 
-proc getProjectAtPath*(p: string):EditorProject =
-    var settings = getEditorSettings()
-    for proj in settings.projects:
-        if proj.path == p:
-            return proj
+proc autosaveInterval*(p: EditorProject): float =
+  result = 120.0
+  if p.settings.AutosaveInterval.isSome:
+    result = p.settings.AutosaveInterval.get()
+
+proc editorCameras*(p: EditorProject): seq[EditorCameraSettings] =
+  result = @[
+    EditorCameraSettings(name: "[EditorCamera2D]", viewportSize: newSize(1920, 1080), projectionMode: cpOrtho),
+    EditorCameraSettings(name: "[EditorCamera3D]", viewportSize: newSize(1920, 1080), projectionMode: cpPerspective)
+  ]
+  if not p.settings.EditorCameras.isSome: return
+  var r = p.settings.EditorCameras.get()
+  if r.len == 0: return
+  result = r

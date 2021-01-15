@@ -108,23 +108,24 @@ method init*(v: EditorSceneView, r: Rect)=
 
         editView.editing = true
 
-        let cameraNode2d = editView.rootNode.newChild(EditorCameraNodeName2D)
-        let c2d = cameraNode2d.component(Camera)
-        c2d.viewportSize = EditorViewportSize
-        c2d.projectionMode = cpOrtho
-        c2d.node.scale = newVector3(1.2, 1.2, 1.2)
-        cameraNode2d.position = newVector3(EditorViewportSize.width * 0.5, EditorViewportSize.height * 0.5, 100.0)
+        for camSettings in v.editor.currentProject.editorCameras:
+            let camNode = editView.rootNode.newChild(camSettings.name)
+            let cam = camNode.component(Camera)
+            cam.viewportSize = camSettings.viewportSize
+            cam.projectionMode = camSettings.projectionMode
 
-        let cameraNode3d = editView.rootNode.newChild(EditorCameraNodeName3D)
-        discard cameraNode3d.component(Camera)
-        cameraNode3d.positionZ = 100
+            if cam.projectionMode == cpOrtho:
+                camNode.scale = newVector3(1.2, 1.2, 1.2)
+                camNode.position = newVector3(cam.viewportSize.width * 0.5, cam.viewportSize.height * 0.5, 100.0)
+            else:
+                camNode.positionZ = 100
 
         editView.rootNode.addChild(v.composition.rootNode)
         clipView.addSubview(editView)
 
         discard editView.rootNode.newChild("overlay").component(ViewportRect)
         v.sceneView = editView
-        v.autosaveTimer = setInterval(AutoSaveTime) do():
+        v.autosaveTimer = setInterval(v.editor.currentProject.autosaveInterval) do():
             v.editor.saveComposition(v.composition, autosave = true)
     else:
         v.sceneView = v.rootNode.sceneView
