@@ -2,7 +2,9 @@
 
 Rod is a cross-platform 2d and 3d game engine for Nim.
 
+<!---
 [Editor live demo](http://yglukhov.github.io/rod/livedemo/main.html)
+-->
 
 Installation:
 ```
@@ -23,7 +25,7 @@ Supported platforms:
 * Windows
 * OSX
 * Linux
-* HTML5 (JavaScript or Emscripten)
+* HTML5 (Emscripten)
 
 Build Requirements:
 * Nim latest devel version
