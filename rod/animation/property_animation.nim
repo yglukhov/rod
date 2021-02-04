@@ -1,4 +1,4 @@
-import json, strutils, tables, parseutils, logging
+import json, strutils, tables, parseutils, logging, sequtils
 import nimx / [ types, matrixes, animation, property_visitor ]
 
 import variant
@@ -199,14 +199,15 @@ proc findAnimatableProperty*(n: Node, propName: string): Variant =
         n.visitProperties(visitor)
 
         if res.isEmpty:
-            for k, v in n.components:
+            for v in n.components:
                 v.visitProperties(visitor)
                 if not res.isEmpty: break
 
 proc findAnimatableProperty(n: Node, compIndex: int, propName: string): Variant =
     findAnimatablePropertyAux:
-        if n.components.len > compIndex:
-            n.components[compIndex].visitProperties(visitor)
+        let components = toSeq(n.components)
+        if components.len > compIndex:
+            components[compIndex].visitProperties(visitor)
 
 proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int, rawPropName: string): Variant =
     var animatedNode = n
@@ -221,7 +222,7 @@ proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int
         result = findAnimatableProperty(animatedNode, compIndex, rawPropName)
     if result.isEmpty:
         raise newException(Exception, "Animated property not found: " & nodeName & "." & $compIndex & "." & rawPropName)
- 
+
 proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: float) =
     template makeSetter(T: typedesc) =
         let setter = sng.get(SetterAndGetter[T]).setter

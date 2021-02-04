@@ -23,7 +23,7 @@ const initialVerticesCount = 2000
 type
     Attrib = enum
         aPosition
-    Tracer* = ref object of Component
+    Tracer* = ref object of RenderComponent
         color*: Color
         indexBuffer: BufferRef
         vertexBuffer: BufferRef

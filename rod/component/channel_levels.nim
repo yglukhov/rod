@@ -4,7 +4,7 @@ import rod / component
 import rod / tools / serializer
 import json
 
-type ChannelLevels* = ref object of Component
+type ChannelLevels* = ref object of RenderComponent
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: Coord
     inWhiteV*, inBlackV*, inGammaV*, outWhiteV*, outBlackV*: Vector3
     active: bool

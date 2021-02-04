@@ -18,7 +18,7 @@ type
         indexData*: seq[GLushort]
         vertexAttrData*: seq[GLfloat]
 
-    MeshComponent* = ref object of Component
+    MeshComponent* = ref object of RenderComponent
         resourceName*: string
         vboData*: VBOData
         loadFunc: proc()

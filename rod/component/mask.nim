@@ -79,7 +79,7 @@ var effectSolid = [
 type MaskType* = enum
     tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
 
-type Mask* = ref object of Component
+type Mask* = ref object of RenderComponent
     when defined(rodplugin):
         mMaskNode: Node
     maskComponent*: Component

@@ -12,16 +12,16 @@ type ParticleData* = tuple
     pid: float
 
 type
-    Particle* = ref object of Component
+    Particle* = ref object of ScriptComponent
         initialLifetime*, remainingLifetime*: float
         pid*: float
 
-    ParticleAttractor* = ref object of Component
+    ParticleAttractor* = ref object of ScriptComponent
         radius*: float
         gravity*: float
         resetRadius*: float
 
-    ParticleEmitter* = ref object of Component
+    ParticleEmitter* = ref object of RenderComponent
         lifetime*: float
         birthRate*: float
         particlePrototype*: Node

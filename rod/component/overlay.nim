@@ -1,7 +1,7 @@
 import nimx/[types, composition, portable_gl, matrixes]
 import rod / component
 
-type Overlay* = ref object of Component
+type Overlay* = ref object of RenderComponent
 
 var overlayPostEffect = newPostEffect("""
 

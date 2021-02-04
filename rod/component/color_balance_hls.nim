@@ -3,7 +3,7 @@ import rod / utils / [ property_desc, serialization_codegen ]
 import rod / [ component, tools/serializer ]
 import json
 
-type ColorBalanceHLS* = ref object of Component
+type ColorBalanceHLS* = ref object of RenderComponent
     hue*: float32
     saturation*: float32
     lightness*: float32

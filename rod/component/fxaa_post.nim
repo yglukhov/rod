@@ -83,7 +83,7 @@ var FXAAPostSharedVertexBuffer: BufferRef
 var FXAAPostSharedNumberOfIndexes: GLsizei
 var FXAAPostSharedShader: ProgramRef
 
-type FXAAPost* = ref object of Component
+type FXAAPost* = ref object of RenderComponent
     image: SelfContainedImage
     resolution: Vector3
     reduceMin*: float32

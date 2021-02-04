@@ -22,6 +22,10 @@ proc isEnabledInTree*(n: Node): bool
 
 import rod/component
 
+iterator components*(n: Node): Component =
+    for c in n.renderComponents: yield c
+    for c in n.scriptComponents: yield c
+
 proc animationRunner(n: Node): AnimationRunnerComponent
 
 proc addAnimation*(n: Node, a: Animation) =
@@ -164,13 +168,16 @@ proc createComponentForNode(n: Node, name: string): Component =
 
 proc addComponent*(n: Node, name: string): Component =
     result = createComponentForNode(n, name)
-    n.components.add(result)
+    if result.isRenderComponent():
+        n.renderComponents.add(result.RenderComponent)
+    else:
+        n.scriptComponents.add(result.ScriptComponent)
 
 proc addComponent*(n: Node, T: typedesc): T =
     type TT = T
     result = n.addComponent(T.name).TT
 
-proc insertComponent*(n: Node, c: Component, index: int)
+proc insertComponent(n: Node, c: Component, index: int)
 proc addComponent*(n: Node, T: typedesc, index: int): T =
     type TT = T
     result = createComponent(T.name).TT
@@ -208,19 +215,34 @@ proc componentIfAvailable*(n: Node, name: string): Component =
 proc componentIfAvailable*(n: Node, T: typedesc[Component]): T =
     result = n.getComponent(T)
 
-proc setComponent*(n: Node, name: string, c: Component) =
-    n.components.add(c)
+proc setComponent*(n: Node, name: string, c: Component) {.deprecated.} =
+    if c.isRenderComponent:
+        n.renderComponents.add(c.RenderComponent)
+    else:
+        n.scriptComponents.add(c.ScriptComponent)
 
-proc insertComponent*(n: Node, c: Component, index: int) =
-    let i = clamp(index, 0, n.components.len)
+proc insertComponent(n: Node, c: Component, index: int) =
+    template inserAUX(components: untyped, c: untyped, index: int) =
+        let i = clamp(index, 0, components.len)
+        components.insert(c, i)
+    if c.isRenderComponent:
+        n.renderComponents.inserAUX(c.RenderComponent, index)
+    else:
+        n.scriptComponents.inserAUX(c.ScriptComponent, index)
     c.componentNodeWasAddedToSceneView()
-    n.components.insert(c, i)
 
 proc removeComponent*(n: Node, c: Component) =
-    let compPos = n.components.find(c)
-    if compPos > -1:
-        c.componentNodeWillBeRemovedFromSceneView()
-        n.components.delete(compPos)
+    template removeCompAUX(components: untyped, c: untyped) =
+        let compPos = components.find(c)
+        if compPos > -1:
+            c.componentNodeWillBeRemovedFromSceneView()
+            components.delete(compPos)
+    if c.isNil: return
+
+    if c.isRenderComponent:
+        n.renderComponents.removeCompAUX(c.RenderComponent)
+    else:
+        n.scriptComponents.removeCompAUX(c.ScriptComponent)
 
 proc removeComponent*(n: Node, name: string) =
     let c = n.getComponent(name)
@@ -232,7 +254,7 @@ proc animationRunner(n: Node): AnimationRunnerComponent =
     result = n.component(AnimationRunnerComponent)
 
 proc update(n: Node) =
-    for k, v in n.components:
+    for k, v in n.scriptComponents:
         v.update()
 
 proc recursiveUpdate*(n: Node) =
@@ -280,20 +302,20 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
     var lastDrawComp = -1
     var hasPosteffectComponent = false
 
-    var compLen = n.components.len
+    var compLen = n.renderComponents.len
     var componentInterruptedDrawing = false
 
     if compLen > 0:
         tr = n.mSceneView.viewProjMatrix * n.worldTransform()
         c.withTransform tr:
-            for c in n.components:
+            for c in n.renderComponents:
                 inc lastDrawComp
                 if c.beforeDraw(lastDrawComp):
                     componentInterruptedDrawing = true
                     break
 
             # Legacy api support. Will be removed soon.
-            for c in n.components:
+            for c in n.renderComponents:
                 c.draw()
                 when defined(rodedit):
                     c.onDrawGizmo()
@@ -305,11 +327,11 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
         for c in n.children:
             c.drawNode(recursive, drawTable)
 
-    assert(compLen == n.components.len, "Components changed during drawing.")
+    assert(compLen == n.renderComponents.len, "Components changed during drawing.")
     if compLen > 0:
         c.withTransform tr:
             while lastDrawComp >= 0:
-                n.components[lastDrawComp].afterDraw(lastDrawComp)
+                n.renderComponents[lastDrawComp].afterDraw(lastDrawComp)
                 dec lastDrawComp
 
     if shouldDrawChildren and not n.affectsChildren:
@@ -389,10 +411,14 @@ proc resolveNodeRefs(n: Node) =
 
 proc nodeWillBeRemovedFromSceneView*(n: Node) =
     block components:
-        var ci = 0
-        while ci < n.components.len:
-            n.components[ci].componentNodeWillBeRemovedFromSceneView()
-            inc ci
+        template removedAUX(components: untyped) =
+            var ci = 0
+            while ci < components.len:
+                components[ci].componentNodeWillBeRemovedFromSceneView()
+                inc ci
+
+        n.renderComponents.removedAUX()
+        n.scriptComponents.removedAUX()
 
     var ci = 0
     while ci < n.children.len:
@@ -404,11 +430,16 @@ proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
     if n.mSceneView.isNil:
         n.mSceneView = v
         block components:
-            let size = n.components.len
-            var ci = 0
-            while ci < size:
-                n.components[ci].componentNodeWasAddedToSceneView()
-                inc ci
+            template addedAUX(components: untyped) =
+                let size = components.len
+                var ci = 0
+                while ci < size:
+                    components[ci].componentNodeWasAddedToSceneView()
+                    inc ci
+
+            n.renderComponents.addedAUX()
+            n.scriptComponents.addedAUX()
+
         var ci = 0
         while ci < n.children.len:
             n.children[ci].nodeWasAddedToSceneView(v)
@@ -770,7 +801,7 @@ proc serialize*(n: Node, s: JsonSerializer) =
             s.node = jn
         return
 
-    if n.components.len > 0:
+    if n.renderComponents.len > 0 or n.scriptComponents.len > 0:
         let jn = s.node
         let jcomps = newJArray()
         jn["components"] = jcomps
@@ -856,7 +887,7 @@ proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
     var inv_mat: Matrix4
     if tryInverse(n.worldTransform(), inv_mat):
         let localRay = r.transform(inv_mat)
-        for name, component in n.components:
+        for component in n.components:
             var distance: float32
             let res = component.rayCast(localRay, distance)
 
@@ -965,15 +996,10 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
                 else:
                     old.children = subComp.children
                 old.animations = subComp.animations
-                for c in subComp.components: c.node = old
-                # if old.components.len == 0:
-                #     old.components = subComp.components
-                # else:
-                old.components.add(subComp.components)
-                #old.translation = subComp.translation
-                #old.rotation = subComp.rotation
-                #old.scale = subComp.scale
-                #old.anchor = subComp.anchor
+                for c in subComp.components:
+                    c.node = old
+                old.renderComponents.add(subComp.renderComponents)
+                old.scriptComponents.add(subComp.scriptComponents)
         else:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)

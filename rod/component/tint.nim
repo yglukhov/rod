@@ -4,7 +4,7 @@ import rod/[component, tools/serializer]
 import json
 
 
-type Tint* = ref object of Component
+type Tint* = ref object of RenderComponent
     black*: Color
     white*: Color
     amount*: float32

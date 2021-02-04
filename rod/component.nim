@@ -5,7 +5,7 @@ import rod / tools / serializer
 import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
                 json_serializer, serialization_hash_calculator ]
 
-export Component
+export Component, ScriptComponent, RenderComponent
 
 method init*(c: Component) {.base.} = discard
 
@@ -42,14 +42,17 @@ proc createComponent*(name: string): Component =
 
 proc createComponent*[T](): T = createComponent(T.name).T
 
-method draw*(c: Component) {.base.} = discard # Deprecated.
-method beforeDraw*(c: Component, index: int): bool {.base.} = discard
-method afterDraw*(c: Component, index: int) {.base.} = discard
+method isRenderComponent*(c: Component): bool {.base.} = discard
+method isRenderComponent*(c: RenderComponent): bool = true
 
-method update*(c: Component) {.base.} = discard
+method draw*(c: RenderComponent) {.base.} = discard # Deprecated.
+method beforeDraw*(c: RenderComponent, index: int): bool {.base.} = discard
+method afterDraw*(c: RenderComponent, index: int) {.base.} = discard
+
+method update*(c: ScriptComponent) {.base.} = discard
 method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
-method isPosteffectComponent*(c: Component): bool {.base.} = false
+method isPosteffectComponent*(c: RenderComponent): bool {.base.} = false
 
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method getBBox*(c: Component): BBox {.base.} = discard
@@ -107,10 +110,10 @@ method serialize*(c: Component, b: BinSerializer) {.base.} =
 
 method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
 
-type UpdateProcComponent = ref object of Component
+type UpdateProcComponent = ref object of ScriptComponent
     updateProc: proc()
 
-type DrawProcComponent = ref object of Component
+type DrawProcComponent = ref object of RenderComponent
     drawProc: proc()
 
 template isEmpty*(b: BBox): bool = (b.maxPoint - b.minPoint == newVector3())
