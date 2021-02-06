@@ -1,11 +1,11 @@
 import nimx / [ context, types, animation, image, portable_gl, view, property_visitor, pathutils ]
 import nimx / assets / [ asset_manager, asset_loading ]
 import rod / utils / [ bin_deserializer, json_serializer, json_deserializer ]
-import rod/asset_bundle
+import rod / [ asset_bundle, message_queue ]
+import rod / tools / serializer
 import quaternion, ray, rod_types
 import tables, typetraits, json, strutils, math, os
 
-import rod/tools/serializer
 
 when defined(rodedit):
     import rod / editor / scene / components / editor_component
@@ -379,6 +379,37 @@ proc findNode*(n: Node, p: proc(n: Node): bool): Node =
 proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
         n.name == name
+
+proc findNode*(n: Node, parts: seq[string]): Node =
+    if parts.len == 0:
+        raise newException(Exception, "Invalid search path (len == 0)")
+    var i = 0
+    var p: Node
+    # starts from `/`, searching from rootNode
+    if parts[0].len == 0:
+        if n.sceneView.isNil:
+            raise newException(Exception, "SceneView is nil")
+        p = n.sceneView.mRootNode
+        inc i
+    # searching from this node
+    else:
+        p = n
+
+    while i < parts.len and not p.isNil:
+        if parts[i] == "..":
+            p = p.parent
+        else:
+            p = p.findNode(parts[i])
+        inc i
+    result = p
+
+proc post*(n: Node, path: string, id: string, data: string = "") =
+    if n.sceneView.isNil:
+        echo "Node sendMessage \"", id, "\" from node \"", n.name, "\" failed, sceneView is nil!"
+        return
+    var msg = NodeMessage(path: path, sender: n, data: data)
+    n.sceneView.messageQueue.post(id, msg)
+
 
 type
     NodeRefResolveProc* = proc(nodeValue: Node)

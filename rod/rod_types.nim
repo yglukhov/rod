@@ -1,7 +1,7 @@
-import nimx/[types, matrixes, animation, view, image, portable_gl]
+import nimx / [ types, matrixes, animation, view, image, portable_gl ]
+import rod / message_queue
 import quaternion
 import tables
-
 const maxLightsCount* = 8
 
 when defined(rodedit):
@@ -60,18 +60,24 @@ type
         depthImage*: SelfContainedImage
         depthMatrix*: Matrix4
 
+    NodeMessage* = object
+        path*: string
+        sender*: Node
+        data*: string
+    NodeMessageQueue* = MessageQueue[NodeMessage]
+
     SceneView* = ref object of View
         viewMatrixCached*: Matrix4
         viewProjMatrix*: Matrix4
         mCamera*: Camera
         mRootNode*: Node
         animationRunners*: seq[AnimationRunner]
-        deltaTimeAnimation*: Animation
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]
         postprocessContext*: PostprocessContext
         editing*: bool
         afterDrawProc*: proc() # PRIVATE DO NOT USE!!!
+        messageQueue*: NodeMessageQueue
 
     Composition* = ref object
         url*: string
