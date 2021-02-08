@@ -271,6 +271,8 @@ method viewDidMoveToWindow*(v:SceneView)=
         v.window.addAnimationRunner(ar)
 
 method viewWillMoveToWindow*(v: SceneView, w: Window) =
+    if not v.editing and w.isNil:
+        v.viewOnExit()
 
     if not v.window.isNil:
         for ar in v.animationRunners:
