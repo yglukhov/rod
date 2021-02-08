@@ -11,6 +11,8 @@ export SceneView
 var deltaTime = 0.0
 var oldTime = 0.0
 
+
+
 proc getDeltaTime*(): float =
     return deltaTime
 

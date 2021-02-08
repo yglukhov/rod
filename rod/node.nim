@@ -1,7 +1,7 @@
 import nimx / [ context, types, animation, image, portable_gl, view, property_visitor, pathutils ]
 import nimx / assets / [ asset_manager, asset_loading ]
 import rod / utils / [ bin_deserializer, json_serializer, json_deserializer ]
-import rod / [ asset_bundle, message_queue ]
+import rod / [ asset_bundle ]
 import rod / tools / serializer
 import quaternion, ray, rod_types
 import tables, typetraits, json, strutils, math, os
@@ -402,14 +402,6 @@ proc findNode*(n: Node, parts: openarray[string]): Node =
             p = p.findNode(parts[i])
         inc i
     result = p
-
-proc post*(n: Node, path: string, id: string, data: string = "") =
-    if n.sceneView.isNil:
-        echo "Node sendMessage \"", id, "\" from node \"", n.name, "\" failed, sceneView is nil!"
-        return
-    var msg = NodeMessage(path: path, sender: n, data: data)
-    n.sceneView.messageQueue.post(id, msg)
-
 
 type
     NodeRefResolveProc* = proc(nodeValue: Node)

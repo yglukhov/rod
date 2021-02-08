@@ -60,13 +60,11 @@ type
         depthImage*: SelfContainedImage
         depthMatrix*: Matrix4
 
-    NodeMessage* = object
-        path*: string
-        sender*: Node
-        data*: string
-    NodeMessageQueue* = MessageQueue[NodeMessage]
+    System* = ref object of RootObj
+        sceneView*: SceneView
 
     SceneView* = ref object of View
+        systems*: seq[System]
         viewMatrixCached*: Matrix4
         viewProjMatrix*: Matrix4
         mCamera*: Camera
@@ -77,7 +75,6 @@ type
         postprocessContext*: PostprocessContext
         editing*: bool
         afterDrawProc*: proc() # PRIVATE DO NOT USE!!!
-        messageQueue*: NodeMessageQueue
 
     Composition* = ref object
         url*: string
