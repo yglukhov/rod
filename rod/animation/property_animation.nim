@@ -1,4 +1,4 @@
-import json, strutils, tables, parseutils, logging, sequtils
+import json, strutils, tables, parseutils, logging
 import nimx / [ types, matrixes, animation, property_visitor ]
 
 import variant
@@ -205,9 +205,11 @@ proc findAnimatableProperty*(n: Node, propName: string): Variant =
 
 proc findAnimatableProperty(n: Node, compIndex: int, propName: string): Variant =
     findAnimatablePropertyAux:
-        let components = toSeq(n.components)
-        if components.len > compIndex:
-            components[compIndex].visitProperties(visitor)
+        let scriptCompIndex = compIndex - n.renderComponents.len
+        if n.renderComponents.len > compIndex:
+            n.renderComponents[compIndex].visitProperties(visitor)
+        elif scriptCompIndex > 0 and n.scriptComponents.len > scriptCompIndex:
+            n.scriptComponents[scriptCompIndex].visitProperties(visitor)
 
 proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int, rawPropName: string): Variant =
     var animatedNode = n

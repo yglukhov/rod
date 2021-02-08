@@ -380,7 +380,7 @@ proc findNode*(n: Node, name: string): Node =
     n.findNode proc(n: Node): bool =
         n.name == name
 
-proc findNode*(n: Node, parts: seq[string]): Node =
+proc findNode*(n: Node, parts: openarray[string]): Node =
     if parts.len == 0:
         raise newException(Exception, "Invalid search path (len == 0)")
     var i = 0
