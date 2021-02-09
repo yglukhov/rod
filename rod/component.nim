@@ -25,11 +25,22 @@ proc registeredComponents*(): seq[string] =
     for c in registeredClassesOfType(Component):
         result.add(c)
 
+template scriptComponentChecks(T: typed): bool =
+    compiles(new(T).draw()) or compiles(new(T).beforeDraw(0)) or compiles(new(T).afterDraw(0))
+
+template renderComponentChecks(T: typed): bool =
+    compiles(new(T).update(0.0)) or compiles(new(T).update())
+
 template checkComponentParent(T: typed, body: untyped):untyped =
     when not (T is ScriptComponent or T is RenderComponent):
         {.error: $T & " invalid component inheritance!".}
     else:
-        body
+        when (T is ScriptComponent) and scriptComponentChecks(T):
+            {.error: $T & " of ScriptComponent can't have draw method".}
+        elif (T is RenderComponent) and renderComponentChecks(T):
+            {.error: $T & " of RenderComponent can't have update method".}
+        else:
+            body
 
 template registerComponent*(T: typedesc, group: string = "") =
     checkComponentParent(T):

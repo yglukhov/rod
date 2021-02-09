@@ -27,7 +27,6 @@ type
         mSceneView*: SceneView
         mMatrix*: Matrix4
         worldMatrix*: Matrix4
-        layer*: int32
         alpha*: Coord
         composition*: Composition
         mAnchorPoint*: Vector3
@@ -91,7 +90,7 @@ type
         zNear*, zFar*, fov*: Coord
         viewportSize*: Size
 
-    UIComponent* = ref object of ScriptComponent
+    UIComponent* = ref object of RenderComponent
         mView*: View
         mEnabled*: bool
 
