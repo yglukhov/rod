@@ -29,7 +29,7 @@ template checkComponentParent(T: typed, body: untyped):untyped =
     when not (T is ScriptComponent or T is RenderComponent):
         {.error: $T & " invalid component inheritance!".}
     else:
-        registerClass(T)
+        body
 
 template registerComponent*(T: typedesc, group: string = "") =
     checkComponentParent(T):
