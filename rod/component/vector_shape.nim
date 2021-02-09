@@ -8,7 +8,7 @@ type VectorShapeType* = enum
     vsEllipse
     vsStar
 
-type VectorShape* = ref object of Component
+type VectorShape* = ref object of RenderComponent
     color*: Color
     strokeColor*: Color
     size*: Size

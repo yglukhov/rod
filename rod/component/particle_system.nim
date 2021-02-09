@@ -180,7 +180,7 @@ type
         idSize: int32
         lifeTimeSize: int32
 
-    ParticleSystem* = ref object of Component
+    ParticleSystem* = ref object of RenderComponent
         animation*: Animation
         count: int32
 
@@ -986,7 +986,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
 
 # -------------------- PSHolder --------------------------
 type
-    PSHolder* = ref object of Component
+    PSHolder* = ref object of RenderComponent
         played*: bool
         oldValue: bool
 

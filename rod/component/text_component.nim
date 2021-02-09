@@ -6,7 +6,7 @@ import rod/tools/debug_draw
 export formatted_text
 
 type
-    Text* = ref object of Component
+    Text* = ref object of RenderComponent
         mText*: FormattedText
         mBoundingOffset: Point
 

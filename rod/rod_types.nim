@@ -1,7 +1,7 @@
-import nimx/[types, matrixes, animation, view, image, portable_gl]
+import nimx / [ types, matrixes, animation, view, image, portable_gl ]
+import rod / message_queue
 import quaternion
 import tables
-
 const maxLightsCount* = 8
 
 when defined(rodedit):
@@ -18,7 +18,8 @@ type
         mTranslation*: Vector3
         mRotation*: Quaternion
         mScale*: Vector3
-        components*: seq[Component]
+        renderComponents*: seq[RenderComponent]
+        scriptComponents*: seq[ScriptComponent]
         children*: seq[Node]
         mParent*: Node
         name*: string
@@ -46,7 +47,10 @@ type
     Component* = ref object of RootRef
         node*: Node
 
-    AnimationRunnerComponent* = ref object of Component
+    ScriptComponent* = ref object of Component
+    RenderComponent* = ref object of Component
+
+    AnimationRunnerComponent* = ref object of ScriptComponent
         runner*: AnimationRunner
 
     PostprocessContext* = ref object
@@ -56,13 +60,16 @@ type
         depthImage*: SelfContainedImage
         depthMatrix*: Matrix4
 
+    System* = ref object of RootRef
+        sceneView*: SceneView
+
     SceneView* = ref object of View
+        systems*: seq[System]
         viewMatrixCached*: Matrix4
         viewProjMatrix*: Matrix4
         mCamera*: Camera
         mRootNode*: Node
         animationRunners*: seq[AnimationRunner]
-        deltaTimeAnimation*: Animation
         lightSources*: TableRef[string, LightSource]
         uiComponents*: seq[UIComponent]
         postprocessContext*: PostprocessContext
@@ -79,16 +86,16 @@ type
         cpOrtho,
         cpPerspective
 
-    Camera* = ref object of Component
+    Camera* = ref object of ScriptComponent
         projectionMode*: CameraProjection
         zNear*, zFar*, fov*: Coord
         viewportSize*: Size
 
-    UIComponent* = ref object of Component
+    UIComponent* = ref object of ScriptComponent
         mView*: View
         mEnabled*: bool
 
-    LightSource* = ref object of Component
+    LightSource* = ref object of ScriptComponent
         mLightAmbient*: float32
         mLightDiffuse*: float32
         mLightSpecular*: float32

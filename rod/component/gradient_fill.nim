@@ -52,7 +52,7 @@ type RampShape* = enum
     LinearRamp
     RadialRamp
 
-type GradientFill* = ref object of Component
+type GradientFill* = ref object of RenderComponent
     startPoint*: Point
     endPoint*: Point
     startColor*: Color

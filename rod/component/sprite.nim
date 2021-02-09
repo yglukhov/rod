@@ -4,7 +4,7 @@ import rod / utils / [ property_desc, serialization_codegen ]
 
 import json, logging
 
-type Sprite* = ref object of Component
+type Sprite* = ref object of RenderComponent
     offset*: Point
     frameOffsets*: seq[Point]
     images*: seq[Image]

@@ -3,7 +3,7 @@ import rod / [component, tools/serializer]
 import rod / utils / [ property_desc, serialization_codegen ]
 import json
 
-type ColorFill* = ref object of Component
+type ColorFill* = ref object of RenderComponent
     color*: Color
 
 ColorFill.properties:

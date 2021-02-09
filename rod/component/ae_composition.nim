@@ -13,7 +13,7 @@ type AEMarker* = object
     duration*: float32
     name*: string
 
-type AELayer* = ref object of Component
+type AELayer* = ref object of ScriptComponent
     inPoint*: float32
     outPoint*: float32
     animScale*: float32
@@ -22,7 +22,7 @@ type AELayer* = ref object of Component
     timeremap*: float32
     timeRemapEnabled*: bool
 
-type AEComposition* = ref object of Component
+type AEComposition* = ref object of ScriptComponent
     layers*: seq[AELayer]
     markers*: seq[AEMarker]
     duration*: float32

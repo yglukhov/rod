@@ -4,7 +4,7 @@ import rod/[rod_types, component]
 import rod/tools/serializer
 import json
 
-type Solid* = ref object of Component
+type Solid* = ref object of RenderComponent
     size*: Size
     color*: Color
 

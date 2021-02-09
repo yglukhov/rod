@@ -5,7 +5,7 @@ import rod/component/nine_part_sprite
 import json
 
 
-type CompRef* = ref object of Component
+type CompRef* = ref object of ScriptComponent
     size*: Size
     path: string
     refNode: Node
