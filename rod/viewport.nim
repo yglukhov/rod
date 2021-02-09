@@ -4,14 +4,31 @@ import nimx / [ context, types, image, portable_gl, window,
 import algorithm, logging, times, tables, strutils
 import rod_types, node, ray
 import component/camera
-import rod / [ message_queue, component ]
+import rod / [ component, systems ]
 
 export SceneView
 
 var deltaTime = 0.0
 var oldTime = 0.0
 
+proc getSystem*(v: SceneView, T: typedesc[System]): T =
+    for s in v.systems:
+        type TT = T
+        if s of TT:
+            return s.TT
+    return nil
 
+proc addSystem*(v: SceneView, T: typedesc[System]): T =
+    type TT = T
+    result = createSystem(TT).TT
+    result.sceneView = v
+    v.systems.add(result)
+
+proc system*(v: SceneView, T: typedesc[System]): T =
+    type TT = T
+    result = v.getSystem(TT)
+    if result.isNil:
+        result = v.addSystem(TT)
 
 proc getDeltaTime*(): float =
     return deltaTime
@@ -104,33 +121,16 @@ template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProject
 import tables
 var drawTable*: TableRef[int, seq[Node]]
 
-proc proceedMessage(v: SceneView, id: MessageId, msg: NodeMessage) =
-    var sp = msg.path.split("/")
-    var targetComponent = ""
-    let lsp = sp[^1].split("#")
-    if lsp.len > 1:
-        sp[^1] = lsp[0]
-        targetComponent = lsp[1]
-
-    var receiver = v.rootNode.findNode(sp)
-    if receiver.isNil:
-        echo "receiver not found ", sp
-        return
-
-    if targetComponent.len == 0:
-        echo "to target component"
-        return
-
-    let comp = receiver.componentIfAvailable(targetComponent)
-    if comp.isNil or comp.isRenderComponent: return
-    comp.ScriptComponent.onMessage(id, msg.data, msg.sender)
-
 proc update(v: SceneView, dt: float) =
-    for id, msg in v.messageQueue.popChunk(chunk = 50):
-        v.proceedMessage(id, msg)
+    for s in v.systems:
+        s.update(dt)
 
 method draw*(v: SceneView, r: Rect) =
     procCall v.View.draw(r)
+
+    for s in v.systems:
+        s.draw()
+
     if v.rootNode.isNil: return
 
     let c = currentContext()
@@ -287,7 +287,6 @@ method viewWillMoveToWindow*(v: SceneView, w: Window) =
 method init*(v: SceneView, frame: Rect) =
     procCall v.View.init(frame)
     v.addAnimationRunner(newAnimationRunner())
-    v.messageQueue = createMessageQueue[NodeMessage]()
 
     var updateAnim = newAnimation()
     updateAnim.tag = "deltaTimeAnimation"

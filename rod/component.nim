@@ -1,12 +1,11 @@
 import typetraits, tables, json
 import nimx / [ types, property_visitor, matrixes, class_registry ]
-import rod / [ rod_types, ray, message_queue ]
+import rod / [ rod_types, ray ]
 import rod / tools / serializer
 import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
                 json_serializer, serialization_hash_calculator ]
 
 export Component, ScriptComponent, RenderComponent
-export message_queue
 
 method init*(c: Component) {.base.} = discard
 
@@ -50,7 +49,6 @@ method draw*(c: RenderComponent) {.base.} = discard # Deprecated.
 method beforeDraw*(c: RenderComponent, index: int): bool {.base.} = discard
 method afterDraw*(c: RenderComponent, index: int) {.base.} = discard
 
-method onMessage*(c: ScriptComponent, id: MessageId, data: string, sender: Node) {.base.} = discard
 method update*(c: ScriptComponent) {.base.} = discard
 method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
