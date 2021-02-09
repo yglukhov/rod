@@ -13,22 +13,19 @@ var oldTime = 0.0
 
 proc getSystem*(v: SceneView, T: typedesc[System]): T =
     for s in v.systems:
-        type TT = T
-        if s of TT:
-            return s.TT
+        if s of T:
+            return s.T
     return nil
 
 proc addSystem*(v: SceneView, T: typedesc[System]): T =
-    type TT = T
-    result = createSystem(TT).TT
+    result = createSystem(T).T
     result.sceneView = v
     v.systems.add(result)
 
 proc system*(v: SceneView, T: typedesc[System]): T =
-    type TT = T
-    result = v.getSystem(TT)
+    result = v.getSystem(T)
     if result.isNil:
-        result = v.addSystem(TT)
+        result = v.addSystem(T)
 
 proc getDeltaTime*(): float =
     return deltaTime

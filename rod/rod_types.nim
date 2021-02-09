@@ -60,7 +60,7 @@ type
         depthImage*: SelfContainedImage
         depthMatrix*: Matrix4
 
-    System* = ref object of RootObj
+    System* = ref object of RootRef
         sceneView*: SceneView
 
     SceneView* = ref object of View
