@@ -4,7 +4,7 @@ import rod / tools / debug_draw
 import editor_component
 import math
 
-type GridComponent* = ref object of Component
+type GridComponent* = ref object of RenderComponent
   gridSize: Size
 
 method componentNodeWasAddedToSceneView(c: GridComponent) =
