@@ -116,7 +116,6 @@ proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
 template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProjectionMatrix()
 
 import tables
-var drawTable*: TableRef[int, seq[Node]]
 
 proc update(v: SceneView, dt: float) =
     for s in v.systems:
@@ -132,17 +131,9 @@ method draw*(v: SceneView, r: Rect) =
 
     let c = currentContext()
 
-    if drawTable.isNil:
-        drawTable = newTable[int, seq[Node]]()
-    elif drawTable.len > 0:
-        drawTable.clear()
     v.viewProjMatrix = v.getViewProjectionMatrix()
     c.withTransform v.viewProjMatrix:
-        v.rootNode.drawNode(true, drawTable)
-        for k, v in drawTable:
-            c.gl.clearDepthStencil()
-            for node in v:
-                node.drawNode(false, nil)
+        v.rootNode.drawNode(true)
 
         if not v.afterDrawProc.isNil:
             v.afterDrawProc()

@@ -288,9 +288,7 @@ proc transform*(n: Node): Matrix4 =
     n.mMatrix = n.makeTransform() * n.anchorMatrix()
     return n.mMatrix
 
-proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
-
-proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
+proc drawNode*(n: Node, recursive: bool) =
     if n.alpha < 0.0000001 or not n.enabled: return
 
     var tr: Transform3d
@@ -325,7 +323,7 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
 
     if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
         for c in n.children:
-            c.drawNode(recursive, drawTable)
+            c.drawNode(recursive)
 
     assert(compLen == n.renderComponents.len, "Components changed during drawing.")
     if compLen > 0:
@@ -336,27 +334,12 @@ proc drawNodeAux*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]])
 
     if shouldDrawChildren and not n.affectsChildren:
         for c in n.children:
-            c.drawNode(recursive, drawTable)
+            c.drawNode(recursive)
 
     c.alpha = oldAlpha
 
-proc drawNode*(n: Node, recursive: bool, drawTable: TableRef[int, seq[Node]]) =
-    if n.layer == 0:
-        drawNodeAux(n, recursive, drawTable)
-    elif not drawTable.isNil:
-        var drawNodes = drawTable.getOrDefault(n.layer)
-        # shallow(drawNodes)
-        drawNodes.add(n)
-        drawTable[n.layer] = drawNodes
-
-        if recursive:
-            for c in n.children:
-                c.drawNode(recursive, drawTable)
-    else:
-        drawNodeAux(n, recursive, drawTable)
-
 template recursiveDraw*(n: Node) =
-    n.drawNode(true, nil)
+    n.drawNode(true)
 
 iterator allNodes*(n: Node): Node =
     var s = @[n]
@@ -582,7 +565,6 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("sY", n.scaleY, { pfAnimatable })
     p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
 
-    # p.visitProperty("layer", n.layer, { pfEditable })
     p.visitProperty("enabled", n.enabled)
 
 proc reparentTo*(n, newParent: Node) {.deprecated.} =
@@ -760,7 +742,6 @@ proc deserialize*(n: Node, s: JsonDeserializer) =
     s.visit(n.mRotation, "rotation")
     s.visit(n.mAnchorPoint, "anchor")
     s.visit(n.alpha, "alpha")
-    s.visit(n.layer, "layer")
     n.isEnabled = s.node{"enabled"}.getBool(true)
     n.affectsChildren = s.node{"affectsChildren"}.getBool(true)
 
@@ -808,7 +789,6 @@ proc serialize*(n: Node, s: JsonSerializer) =
     s.visit(n.rotation, "rotation")
     s.visit(n.anchor, "anchor")
     s.visit(n.alpha, "alpha")
-    s.visit(n.layer, "layer")
     s.visit(n.affectsChildren, "affectsChildren")
     s.visit(n.enabled, "enabled")
 
