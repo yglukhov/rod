@@ -1,11 +1,11 @@
 import typetraits, tables, json
 import nimx / [ types, property_visitor, matrixes, class_registry ]
-import rod / [ rod_types, ray]
+import rod / [ rod_types, ray ]
 import rod / tools / serializer
 import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
                 json_serializer, serialization_hash_calculator ]
 
-export Component
+export Component, ScriptComponent, RenderComponent
 
 method init*(c: Component) {.base.} = discard
 
@@ -25,13 +25,32 @@ proc registeredComponents*(): seq[string] =
     for c in registeredClassesOfType(Component):
         result.add(c)
 
+template scriptComponentChecks(T: typed): bool =
+    compiles(new(T).draw()) or compiles(new(T).beforeDraw(0)) or compiles(new(T).afterDraw(0))
+
+template renderComponentChecks(T: typed): bool =
+    compiles(new(T).update(0.0)) or compiles(new(T).update())
+
+template checkComponentParent(T: typed, body: untyped):untyped =
+    when not (T is ScriptComponent or T is RenderComponent):
+        {.error: $T & " invalid component inheritance!".}
+    else:
+        when (T is ScriptComponent) and scriptComponentChecks(T):
+            {.error: $T & " of ScriptComponent can't have draw method".}
+        elif (T is RenderComponent) and renderComponentChecks(T):
+            {.error: $T & " of RenderComponent can't have update method".}
+        else:
+            body
+
 template registerComponent*(T: typedesc, group: string = "") =
-    registerClass(T)
-    registerComponentGroup(group, typetraits.name(T))
+    checkComponentParent(T):
+        registerClass(T)
+        registerComponentGroup(group, typetraits.name(T))
 
 template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: string = "") =
-    registerClass(T, creator)
-    registerComponentGroup(group, typetraits.name(T))
+    checkComponentParent(T):
+        registerClass(T, creator)
+        registerComponentGroup(group, typetraits.name(T))
 
 proc createComponent*(name: string): Component =
     if isClassRegistered(name) == false:
@@ -42,14 +61,17 @@ proc createComponent*(name: string): Component =
 
 proc createComponent*[T](): T = createComponent(T.name).T
 
-method draw*(c: Component) {.base.} = discard # Deprecated.
-method beforeDraw*(c: Component, index: int): bool {.base.} = discard
-method afterDraw*(c: Component, index: int) {.base.} = discard
+method isRenderComponent*(c: Component): bool {.base.} = discard
+method isRenderComponent*(c: RenderComponent): bool = true
 
-method update*(c: Component) {.base.} = discard
+method draw*(c: RenderComponent) {.base.} = discard # Deprecated.
+method beforeDraw*(c: RenderComponent, index: int): bool {.base.} = discard
+method afterDraw*(c: RenderComponent, index: int) {.base.} = discard
+
+method update*(c: ScriptComponent) {.base.} = discard
 method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
-method isPosteffectComponent*(c: Component): bool {.base.} = false
+method isPosteffectComponent*(c: RenderComponent): bool {.base.} = false
 
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method getBBox*(c: Component): BBox {.base.} = discard
@@ -107,10 +129,10 @@ method serialize*(c: Component, b: BinSerializer) {.base.} =
 
 method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
 
-type UpdateProcComponent = ref object of Component
+type UpdateProcComponent = ref object of ScriptComponent
     updateProc: proc()
 
-type DrawProcComponent = ref object of Component
+type DrawProcComponent = ref object of RenderComponent
     drawProc: proc()
 
 template isEmpty*(b: BBox): bool = (b.maxPoint - b.minPoint == newVector3())

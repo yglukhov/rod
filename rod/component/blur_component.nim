@@ -3,7 +3,7 @@ import nimx / [ types, context, portable_gl, render_to_image, matrixes, view,
 import rod / [node, viewport, component, postprocess_context]
 import rod/component/[camera, mesh_component]
 
-type BlurComponent* = ref object of Component
+type BlurComponent* = ref object of RenderComponent
     motionMap: SelfContainedImage
     postMap: SelfContainedImage
 
@@ -187,7 +187,7 @@ proc recursiveDrawPost(n: Node) =
     n.getTransform(tr)
     c.withTransform tr:
         var hasPosteffectComponent = false
-        if n.components.len > 0:
+        if n.renderComponents.len > 0: #wtf?
             # for v in values(n.components):
             let v = n.component(MeshComponent)
             if not v.isNil:

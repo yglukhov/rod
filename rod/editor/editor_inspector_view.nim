@@ -140,7 +140,8 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
 
-        for idx, v in n.components:
+        var idx = 0
+        for v in n.components:
             closureScope:
                 expView = newExpandingView(newRect(0, 0, 328, 20.0))
                 expView.title = v.className
@@ -157,6 +158,7 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             editedPropertyName = "." & $idx
             v.visitProperties(visitor)
             i.propView.addSubview(expView)
+            inc idx
 
         let newComponentButtn = Button.new(newRect(0, 30, 0, 20))
         newComponentButtn.title = "New component"

@@ -22,7 +22,7 @@ type
         position*: Vector3
         direction*: Vector3
 
-    PSGenShape* = ref object of Component
+    PSGenShape* = ref object of RenderComponent
         is2D*: bool
 
     ConePSGenShape* = ref object of PSGenShape
@@ -37,7 +37,7 @@ type
     BoxPSGenShape* = ref object of PSGenShape
         dimension*: Vector3
 
-    PSModifier* = ref object of Component
+    PSModifier* = ref object of RenderComponent
 
     PSModifierWave* = ref object of PSModifier
         frequence*: float32

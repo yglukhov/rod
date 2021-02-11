@@ -36,7 +36,7 @@ void compose() {
 }
 """
 
-type Blink* = ref object of Component
+type Blink* = ref object of RenderComponent
     mask: Image
     light: Image
     currLightPos: float

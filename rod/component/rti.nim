@@ -12,7 +12,7 @@ const minSize = 0.01
 const absMinPoint = newVector3(high(int).Coord, high(int).Coord, high(int).Coord)
 const absMaxPoint = newVector3(low(int).Coord, low(int).Coord, low(int).Coord)
 
-type RTI* = ref object of Component
+type RTI* = ref object of RenderComponent
     mOldWorldVPMat: Matrix4
     mOldVPMat: Matrix4
     mOldVp: Rect
@@ -57,8 +57,8 @@ proc nodeBounds2d*(n: Node, minP: var Vector3, maxP: var Vector3) =
         var wp0, wp1, wp2, wp3: Vector3
 
         var i = 0
-        while i < n.components.len:
-            let comp = n.components[i]
+        while i < n.renderComponents.len:
+            let comp = n.renderComponents[i]
             inc i
 
             let bb = comp.getBBox()

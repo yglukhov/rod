@@ -180,7 +180,7 @@ type
         idSize: int32
         lifeTimeSize: int32
 
-    ParticleSystem* = ref object of Component
+    ParticleSystem* = ref object of RenderComponent
         animation*: Animation
         count: int32
 
@@ -678,7 +678,7 @@ proc updateParticlesBuffer(ps: ParticleSystem, dt: float32) =
             ps.initParticle(ps.particles[i], newI, newParticlesCount, dt)
             inc newI
 
-proc update(ps: ParticleSystem, dt: float) =
+proc updatePS(ps: ParticleSystem, dt: float) =
     ps.worldTransform = ps.node.worldTransform()
     ps.lastPos = ps.curPos
     ps.curPos = ps.node.worldPos
@@ -702,7 +702,7 @@ method draw*(ps: ParticleSystem) =
     if not ps.isInited:
         ps.initSystem()
 
-    ps.update(dt)
+    ps.updatePS(dt)
 
     if ps.count < 1:
         return
@@ -986,7 +986,7 @@ method visitProperties*(ps: ParticleSystem, p: var PropertyVisitor) =
 
 # -------------------- PSHolder --------------------------
 type
-    PSHolder* = ref object of Component
+    PSHolder* = ref object of RenderComponent
         played*: bool
         oldValue: bool
 

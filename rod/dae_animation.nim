@@ -29,7 +29,7 @@ proc findAnimatableProperty(n: Node, propName: string): Variant =
     n.visitProperties(visitor)
 
     if res.isEmpty:
-        for k, v in n.components:
+        for v in n.components:
             v.visitProperties(visitor)
             if not res.isEmpty: break
 

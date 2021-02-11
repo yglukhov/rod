@@ -8,7 +8,7 @@ type BlendMode * = enum
     COLOR_SCREEN = GL_ONE_MINUS_SRC_COLOR
     COLOR_MULTIPLY = GL_ONE_MINUS_SRC_ALPHA
 
-type VisualModifier* = ref object of Component
+type VisualModifier* = ref object of RenderComponent
     blendMode*: BlendMode
 
 VisualModifier.properties:

@@ -1,14 +1,31 @@
 import nimx / [ context, types, image, portable_gl, window,
                 view, view_event_handling, animation ]
 
-import algorithm, logging, times, tables
+import algorithm, logging, times, tables, strutils
 import rod_types, node, ray
 import component/camera
+import rod / [ component, systems ]
 
 export SceneView
 
 var deltaTime = 0.0
 var oldTime = 0.0
+
+proc getSystem*(v: SceneView, T: typedesc[System]): T =
+    for s in v.systems:
+        if s of T:
+            return s.T
+    return nil
+
+proc addSystem*(v: SceneView, T: typedesc[System]): T =
+    result = createSystem(T).T
+    result.sceneView = v
+    v.systems.add(result)
+
+proc system*(v: SceneView, T: typedesc[System]): T =
+    result = v.getSystem(T)
+    if result.isNil:
+        result = v.addSystem(T)
 
 proc getDeltaTime*(): float =
     return deltaTime
@@ -99,24 +116,24 @@ proc screenToWorldPoint*(v: SceneView, point: Vector3): Vector3 =
 template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProjectionMatrix()
 
 import tables
-var drawTable*: TableRef[int, seq[Node]]
+
+proc update(v: SceneView, dt: float) =
+    for s in v.systems:
+        s.update(dt)
+
 method draw*(v: SceneView, r: Rect) =
     procCall v.View.draw(r)
+
+    for s in v.systems:
+        s.draw()
+
     if v.rootNode.isNil: return
 
     let c = currentContext()
 
-    if drawTable.isNil:
-        drawTable = newTable[int, seq[Node]]()
-    elif drawTable.len > 0:
-        drawTable.clear()
     v.viewProjMatrix = v.getViewProjectionMatrix()
     c.withTransform v.viewProjMatrix:
-        v.rootNode.drawNode(true, drawTable)
-        for k, v in drawTable:
-            c.gl.clearDepthStencil()
-            for node in v:
-                node.drawNode(false, nil)
+        v.rootNode.drawNode(true)
 
         if not v.afterDrawProc.isNil:
             v.afterDrawProc()
@@ -259,17 +276,17 @@ method init*(v: SceneView, frame: Rect) =
     procCall v.View.init(frame)
     v.addAnimationRunner(newAnimationRunner())
 
-    v.deltaTimeAnimation = newAnimation()
-    v.deltaTimeAnimation.tag = "deltaTimeAnimation"
-    v.deltaTimeAnimation.numberOfLoops = -1
-    v.deltaTimeAnimation.loopDuration = 1.0
-    v.deltaTimeAnimation.onAnimate = proc(p: float) =
-        deltaTime = v.deltaTimeAnimation.curLoop.float + p - oldTime
-        oldTime = v.deltaTimeAnimation.curLoop.float + p
+    var updateAnim = newAnimation()
+    updateAnim.tag = "deltaTimeAnimation"
+    updateAnim.numberOfLoops = -1
+    updateAnim.loopDuration = 1.0
+    updateAnim.onAnimate = proc(p: float) =
+        deltaTime = updateAnim.curLoop.float + p - oldTime
+        oldTime = updateAnim.curLoop.float + p
         if deltaTime < 0.0001:
             deltaTime = 0.0001
-
-    v.addAnimation(v.deltaTimeAnimation)
+        v.update(deltaTime)
+    v.addAnimation(updateAnim)
 
 method resizeSubviews*(v: SceneView, oldSize: Size) =
     procCall v.View.resizeSubviews(oldSize)

@@ -56,7 +56,7 @@ proc newNodeSelector*(): NodeSelector =
     result.color = newColor(0.12, 1, 0, 1)
 
 proc createBoxes(ns: NodeSelector) =
-    for k, v in ns.mSelectedNode.components:
+    for v in ns.mSelectedNode.components:
         let bbox = v.getBBox()
         if not bbox.isEmpty:
             # echo "node ", ns.node.name, "  min  ", bbox.minPoint, "  max  ", bbox.maxPoint

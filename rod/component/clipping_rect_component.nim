@@ -7,7 +7,7 @@ import opengl
 
 const clippingRectWithScissors = true
 
-type ClippingRectComponent* = ref object of Component
+type ClippingRectComponent* = ref object of RenderComponent
     clippingRect*: Rect
 
 ClippingRectComponent.properties:

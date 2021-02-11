@@ -272,7 +272,7 @@ type
         bActive: bool
         bValidData: bool
 
-    Trail* = ref object of Component
+    Trail* = ref object of RenderComponent
         color*: Color
 
         numberOfIndexes: GLushort
