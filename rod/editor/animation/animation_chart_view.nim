@@ -20,7 +20,7 @@ proc `sampleRate=`*(v: AnimationChartView, s: int) =
     v.mSampleRate = s
     v.gridSize = newSize(1.0 / float(v.mSampleRate), 100)
 
-proc sampleRate*(v: AnimationChartView): int = 
+proc sampleRate*(v: AnimationChartView): int =
     v.mSampleRate
 
 method init*(v: AnimationChartView, r: Rect) =
@@ -83,7 +83,7 @@ proc drawTimeRuler*(v: AnimationChartView) =
         var x = firstMarkPos + Coord(i) * markInterval
         let s = $frameNo
         x -= f.sizeOfString(s).width / 2
-        c.fillColor = newGrayColor(1.0, 0.5)
+        c.fillColor = newGrayColor(1.0, 1.0)
         var pt = newPoint(x, 0)
         c.drawText(f, pt, s)
         inc frameNo
@@ -120,9 +120,10 @@ proc drawCursor*(v: AnimationChartView) =
     if v.cursorPos >= v.fromX and v.cursorPos <= v.toX:
         let c = currentContext()
         c.fillColor = newColor(1, 0, 0)
-        c.strokeWidth = 0
+        c.strokeWidth = 1
+        c.strokeColor = newColor(1, 0, 0, 0.2)
         let p = v.curvePointToLocal(newPoint(v.cursorPos, 0))
-        c.drawRect(newRect(p.x, 0, 1, v.bounds.height))
+        c.drawRect(newRect(p.x - 1, rulerHeight, 3, v.bounds.height - rulerHeight))
 
 proc curveRoundToGrid*(v: AnimationChartView, p: var Coord) =
     p = round(p / v.gridSize.width) * v.gridSize.width

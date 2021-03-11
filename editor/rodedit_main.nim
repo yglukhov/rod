@@ -43,21 +43,6 @@ proc startApplication() =
             proj.path = getAppDir()
             mainWindow.title = "Project " & proj.name
             mainWindow.switchToEditView(proj)
-        else:
-            var settings = getEditorSettings()
-            if settings.lastProject.len > 0:
-                var proj = getProjectAtPath(settings.lastProject)
-                mainWindow.title = "Project " & proj.name
-                mainWindow.switchToEditView(proj)
-            else:
-                var openProjView = new(EditorOpenProjectView)
-                openProjView.init(mainWindow.bounds)
-                mainWindow.addSubView(openProjView)
-
-                openProjView.onOpen = proc(p: EditorProject) =
-                    openProjView.removeFromSuperview()
-                    mainWindow.title = "Project " & p.name
-                    mainWindow.switchToEditView(p)
     else:
         var proj: EditorProject
         mainWindow.title = "Rod"

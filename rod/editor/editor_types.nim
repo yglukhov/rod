@@ -3,7 +3,7 @@ import nimx / [view, button, editor/tab_view, linear_layout, popup_button,
 import rod / [node, viewport, editor/editor_project_settings]
 import rod / editor / animation / animation_editor_types
 
-export notification_center
+export notification_center, editor_project_settings
 
 const toolbarHeight* = 30
 
@@ -103,14 +103,7 @@ const NodePboardKind* = "io.github.yglukhov.rod.node"
 const BezierPboardKind* = "io.github.yglukhov.rod.bezier"
 
 # Editor's nodes
-const EditorCameraNodeName2D* = "[EditorCamera2D]"
-const EditorCameraNodeName3D* = "[EditorCamera3D]"
 const EditorRootNodeName* = "[EditorRoot]"
 
 # Default open tabs
-# const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Animation", "Assets" ]
 const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Assets" ]
-
-# Other
-const EditorViewportSize* = newSize(1920.0, 1080.0)
-const AutoSaveTime* = 120.0

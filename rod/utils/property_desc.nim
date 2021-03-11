@@ -12,7 +12,6 @@ proc hasAttr*(d: PropertyDesc, attr: string): bool =
 
 proc hasProperties*(t: typedesc): bool {.compileTime.} =
     result = $t in props
-    echo "hasProperties ", result, " ", $t
 
 iterator propertyDescs*(typdesc: NimNode): PropertyDesc =
     let k = $typdesc

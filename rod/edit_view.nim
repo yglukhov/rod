@@ -3,8 +3,7 @@ import strutils, json, logging, times
 import nimx / [ matrixes, button, popup_button, key_commands, animation,
         notification_center, window, view_event_handling ]
 
-import nimx/pasteboard/pasteboard
-
+import clipboard
 import rod_types, node
 import rod/scene_composition
 import rod / editor / [editor_project_settings, editor_tab_registry,
@@ -139,6 +138,8 @@ when defined(rodedit):
                 else:
                     nextChildren.add(ch.children)
             children = nextChildren
+
+
 
 when loadingAndSavingAvailable:
     proc currentProjectPath*(e: Editor): string =
@@ -302,16 +303,13 @@ proc createCloseEditorButton(e: Editor, cb: proc()) =
         cb()
 
 proc copyNode*(e: Editor, n: Node = nil)=
-    # echo "copyNode"
     var cn = n
     if n.isNil:
         cn = e.selectedNode
     if not cn.isNil:
         try:
-            echo "try copy node ", cn.name
-            let data = nodeToJson(cn, e.currentProjectPath())
-            let pbi = newPasteboardItem(NodePboardKind, $data)
-            pasteboardWithName(PboardGeneral).write(pbi)
+            let data = $nodeToJson(cn, e.currentProjectPath())
+            clipboardWithName(CboardGeneral).writeData(NodePboardKind, cast[seq[byte]](data))
         except:
             echo getCurrentExceptionMsg()
             echo getStackTrace(getCurrentException())
@@ -327,27 +325,26 @@ proc cutNode*(e: Editor, n: Node = nil)=
         e.sceneTreeDidChange()
 
 proc pasteNode*(e: Editor, n: Node = nil)=
-    # echo "pasteNode"
-    let pbi = pasteboardWithName(PboardGeneral).read(NodePboardKind)
-    if not pbi.isNil:
-        echo "try paste node"
-        try:
-            let j = parseJson(pbi.data)
-            let pn = newNode()
-            pn.loadNodeFromJson(j, "file://" & e.currentProjectPath()) do():
-                var cn = n
-                if cn.isNil:
-                    cn = e.selectedNode
+    var data:seq[byte]
+    if not clipboardWithName(CboardGeneral).readData(NodePboardKind, data):
+        return
+    try:
+        let j = parseJson(cast[string](data))
+        let pn = newNode()
+        pn.loadNodeFromJson(j, "file://" & e.currentProjectPath()) do():
+            var cn = n
+            if cn.isNil:
+                cn = e.selectedNode
 
-                if cn.isNil:
-                    cn = e.rootNode
+            if cn.isNil:
+                cn = e.rootNode
 
-                cn.addChild(pn)
-                e.selectedNode = pn
-                e.sceneTreeDidChange()
-        except:
-            echo getCurrentExceptionMsg()
-            echo getStackTrace(getCurrentException())
+            cn.addChild(pn)
+            e.selectedNode = pn
+            e.sceneTreeDidChange()
+    except:
+        echo getCurrentExceptionMsg()
+        echo getStackTrace(getCurrentException())
 
 proc convertToComposition*(e: Editor, n: Node) =
     discard
@@ -445,6 +442,7 @@ proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     var editor = result
     editor.window = w
     editor.currentProject = p
+    editor.currentProject.loadEditorSettings()
     editor.startFromGame = false
     editor.initNotifHandlers()
     editor.workspaceView = createWorkspace(w, editor)
