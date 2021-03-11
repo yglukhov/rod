@@ -106,5 +106,4 @@ const BezierPboardKind* = "io.github.yglukhov.rod.bezier"
 const EditorRootNodeName* = "[EditorRoot]"
 
 # Default open tabs
-# const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Animation", "Assets" ]
 const defaultTabs* = ["Inspector", "Tree", "EditScene Settings", "Assets" ]

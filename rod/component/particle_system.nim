@@ -196,11 +196,11 @@ type
         particles: seq[Particle]
         vertexDesc: VertexDesc
         worldTransform: Matrix4
-        shader*: Shader
+        shader: Shader
 
         birthRate*: float32
         lifetime*: float32
-        texture*: Image
+        texture: Image
         isTextureAnimated*: bool
         frameSize*: Size
         animColumns*: int16

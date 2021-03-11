@@ -1,13 +1,14 @@
-import nimx/[view, text_field, button, 
+import nimx/[view, text_field, button,
     scroll_view, linear_layout, property_visitor,
     expanding_view, stack_view, slider, popup_button,
-    editor/bezier_view, pasteboard/pasteboard
+    editor/bezier_view
 ]
 
 import rod/property_editors/[propedit_registry, standard_editors]
 import rod/animation/[property_animation]
 import rod / editor / [ animation/animation_editor_types, editor_types ]
-import algorithm, tables, variant, sequtils, strutils, json
+import algorithm, tables, variant, sequtils, strutils, json, logging
+import clipboard
 
 export view
 
@@ -44,7 +45,7 @@ proc buildInspector(i: AnimatioKeyInspectorView, k: EditedKey): View =
         # echo "key changed for ", k.property.name
         if not i.onKeyChanged.isNil:
             i.onKeyChanged(k)
-    
+
     var visitor : PropertyVisitor
     visitor.requireName = true
     visitor.requireSetter = true
@@ -63,7 +64,7 @@ proc buildInspector(i: AnimatioKeyInspectorView, k: EditedKey): View =
         var vsng: Variant
         template getKeyValue(T: typedesc) =
             var sng: SetterAndGetter[T]
-            sng.setter = proc(val: T) = 
+            sng.setter = proc(val: T) =
                 k.value = newVariant(val)
                 if not k.property.isNil: # change value at proprty
                     k.property.sng.get(SetterAndGetter[T]).setter(val)
@@ -97,7 +98,7 @@ proc `inspectedKeys=`*(v: AnimatioKeyInspectorView, keys: seq[EditedKey]) =
         result = cmp(a.property.name, b.property.name)
         if result == 0:
             result = cmp(a.position, b.position)
-    
+
     for k in keys:
         v.propView.addSubview(v.buildInspector(k))
 
@@ -108,12 +109,12 @@ proc `inspectedKeys=`*(v: AnimatioKeyInspectorView, keys: seq[EditedKey]) =
 proc newInterpolationPropertyView(setter: proc(s: EInterpolation), getter: proc(): EInterpolation): PropertyEditorView =
     var r = PropertyEditorView.new(newRect(0, 0, 250, editorRowHeight + 270))
     var bezierPoints:array[4, float]
-    
+
     var inter = getter()
 
     var curveEdit = View.new(newRect(0, editorRowHeight, 230, 250))
     curveEdit.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
-    
+
     var bezierView = BezierView.new(newRect(0, 20, 230, 230))
     bezierView.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     curveEdit.addSubview(bezierView)
@@ -141,18 +142,21 @@ proc newInterpolationPropertyView(setter: proc(s: EInterpolation), getter: proc(
     copyButton.title = "copy"
     copyButton.autoresizingMask = {afFlexibleMaxY}
     copyButton.onAction do():
-        let pbi = newPasteboardItem(BezierPboardKind, $(%bezierPoints))
-        pasteboardWithName(PboardGeneral).write(pbi)
+        clipboardWithName(CboardGeneral).writeData(BezierPboardKind, cast[seq[byte]]($(%bezierPoints)))
     curveEdit.addSubview(copyButton)
 
     var pasteButton = newButton(newRect(100, 0, 40, editorRowHeight))
     pasteButton.title = "paste"
     pasteButton.autoresizingMask = {afFlexibleMaxY}
     pasteButton.onAction do():
-        let pbi = pasteboardWithName(PboardGeneral).read(BezierPboardKind)
-        setCurve(parseJson(pbi.data).to(array[4, float]))
-        if not r.changeInspector.isNil():
-            r.changeInspector()
+        var data:seq[byte]
+        if clipboardWithName(CboardGeneral).readData(BezierPboardKind, data):
+            try:
+                setCurve(parseJson(cast[string](data)).to(array[4, float]))
+                if not r.changeInspector.isNil():
+                    r.changeInspector()
+            except Exception as e:
+                error "Got exception ", e.msg
     curveEdit.addSubview(pasteButton)
 
     let items = toSeq(low(KeyInterpolationKind) .. high(KeyInterpolationKind)).map do(v: KeyInterpolationKind) -> string: $v
@@ -178,7 +182,7 @@ proc newInterpolationPropertyView(setter: proc(s: EInterpolation), getter: proc(
         # echo "selected interpolation ", popupButton.selectedIndex
     popupButton.selectedIndex = items.find($inter.kind)
     r.addSubview(popupButton)
-    
+
     bezierView.onAction do():
         bezierPoints[0] = bezierView.p1
         bezierPoints[1] = bezierView.p2
@@ -192,7 +196,7 @@ proc newInterpolationPropertyView(setter: proc(s: EInterpolation), getter: proc(
     if inter.kind == KeyInterpolationKind.eiBezier:
         setCurve(inter.points)
 
-        r.addSubview(curveEdit) 
+        r.addSubview(curveEdit)
     result = r
 
 

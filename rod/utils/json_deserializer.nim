@@ -82,8 +82,13 @@ proc deserializeImage(b: JsonDeserializer, j: JsonNode): Image =
     if path.len == 0:
         return nil
 
-    result = imageWithSize(newSize(1.0, 1.0))
-    result.setFilePath(path)
+    when not defined(rodplugin):
+        var p = newPoint(0,0)
+        result = b.getImageForPath(path, p)
+
+    if result.isNil:
+        result = imageWithSize(newSize(1.0, 1.0))
+        result.setFilePath(path)
 
 proc visit*[T](b: JsonDeserializer, v: var T, key: string) =
     let j = b.node{key}

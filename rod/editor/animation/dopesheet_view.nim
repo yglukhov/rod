@@ -41,6 +41,8 @@ proc localPointToCurve(v: DopesheetView, p: Point): Point =
 proc rowMaxY(v: DopesheetView, row: int): Coord = Coord(row + 1) * v.rowHeight + rulerHeight
 
 const selectionColor = newColor(0.0, 0.0, 0.5, 0.2)
+const defaultKeyColor = newColorB(120, 158, 255, 255)
+const selectedKeyColor = newColorB(222, 231, 252, 255)
 
 method draw*(v: DopesheetView, r: Rect) =
     procCall v.AnimationChartView.draw(r)
@@ -60,9 +62,9 @@ method draw*(v: DopesheetView, r: Rect) =
                     pos.y = rowMaxY - v.rowHeight / 2
 
                     if (pi:y, ki:x) in v.selectedKeys:
-                        c.fillColor = newColor(0.7, 0.7, 1)
+                        c.fillColor = selectedKeyColor
                     else:
-                        c.fillColor = newGrayColor(0.5)
+                        c.fillColor = defaultKeyColor
                     c.drawEllipseInRect(rectAtPoint(pos, 4))
             c.fillColor = v.gridColor
             c.drawRect(newRect(0, rowMaxY, v.bounds.width, 1))
@@ -70,14 +72,14 @@ method draw*(v: DopesheetView, r: Rect) =
 
     v.drawTimeRuler()
     v.drawCursor()
-    
+
     let hasSelectionRect = v.selectionRect.width + v.selectionRect.height > 0.1
     if hasSelectionRect:
         c.strokeColor = newColor(0.0, 0.0, 0.5, 0.5)
         c.strokeWidth = 1.0
         c.fillColor = selectionColor
         c.drawRect(v.selectionRect)
-        
+
 
 proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
     result = proc(e: Event): bool =
@@ -97,7 +99,7 @@ proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
                             if v.selectionRect.intersect(rectAtPoint(pos, 4)):
                                 v.draggedKey = sel
                                 break findSelected
-                    
+
                     if not e.modifiers.anyCtrl():
                         v.clearSelection()
 
@@ -120,7 +122,7 @@ proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
             if not k.isNil and not e.modifiers.anyCtrl():
                 var p = v.localPointToCurve(e.localPosition)
                 v.curveRoundToGrid(p.x)
-                let diff = k.position - p.x                
+                let diff = k.position - p.x
                 # echo "diff ", diff
                 for sel in v.selectedKeys:
                     let k = v.editedAnimation.keyAtIndex(sel.pi, sel.ki)
@@ -130,7 +132,7 @@ proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
             else:
                 let orig = v.selectionOrigin
                 var topLeft = newPoint(0.0, 0.0)
-                topLeft.x = min(orig.x, e.localPosition.x) 
+                topLeft.x = min(orig.x, e.localPosition.x)
                 topLeft.y = min(orig.y, e.localPosition.y)
 
                 var botRight = newPoint(0.0, 0.0)
