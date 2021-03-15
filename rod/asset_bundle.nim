@@ -195,6 +195,10 @@ proc cacheDir(): string {.inline.} =
     else:
         "/tmp/rodappcache"
 
+var onRodAssetBundleDownloadingStart*: proc(asset: string)
+var onRodAssetBundleDownloadingEnd*: proc(asset: string, error: string)
+var onRodAssetBundleDownloadingProgress*: proc(asset: string, p: float)
+
 when not defined(js) and not defined(emscripten) and not defined(windows):
     import os, threadpool, httpclient, net
     import nimx/perform_on_main_thread
@@ -202,7 +206,9 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
 
     type DownloadCtx = ref object
         handler: proc(err: string)
+        onProgress: proc(p: float)
         errorMsg: cstring
+        progress: float
 
     proc onDownloadComplete(ctx: pointer) {.cdecl, gcsafe.} =
         let ctx = cast[DownloadCtx](ctx)
@@ -213,6 +219,11 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             else:
                 ctx.handler("Could not download or extract: " & $ctx.errorMsg)
                 deallocShared(ctx.errorMsg)
+
+    proc onDownloadProgress(ctx: pointer) {.cdecl, gcsafe.} =
+        let ctx = cast[DownloadCtx](ctx)
+        {.gcsafe.}:
+            ctx.onProgress(ctx.progress)
 
     proc extractGz(zipFileName, destFolder: string): bool =
         var file = newTarFile(zipFileName)
@@ -235,6 +246,11 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
                 let client = newHttpClient(sslContext = nil)
 
             discard existsOrCreateDir(parentDir(destPath))
+
+            client.onProgressChanged = proc(total, progress, speed: BiggestInt) =
+                cast[DownloadCtx](ctx).progress = float(progress.float64 / max(total.float64, 1.float64))
+                performOnMainThread(onDownloadProgress, ctx)
+
             client.downloadFile(url, zipFilePath)
             client.close()
             when defined(ssl):
@@ -275,8 +291,17 @@ proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)
 
                 var ctx: DownloadCtx
                 ctx.new()
-                ctx.handler = handler
+                ctx.handler = proc(err: string) =
+                    if not handler.isNil:
+                        handler(err)
+                    if not onRodAssetBundleDownloadingEnd.isNil:
+                        onRodAssetBundleDownloadingEnd(abd.path, err)
+                ctx.onProgress = proc(p: float) =
+                    if not onRodAssetBundleDownloadingProgress.isNil:
+                        onRodAssetBundleDownloadingProgress(abd.path, p)
                 GC_ref(ctx)
+                if not onRodAssetBundleDownloadingStart.isNil:
+                    onRodAssetBundleDownloadingStart(abd.path)
                 spawn downloadAndUnzip(url, abd.downloadedAssetsDir, cast[pointer](ctx))
             else:
                 assert(false, "Not supported")
