@@ -248,7 +248,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             discard existsOrCreateDir(parentDir(destPath))
 
             client.onProgressChanged = proc(total, progress, speed: BiggestInt) =
-                cast[DownloadCtx](ctx).progress = float(progress.float64 / total.float64)
+                cast[DownloadCtx](ctx).progress = float(progress.float64 / max(total.float64, 1.float64))
                 performOnMainThread(onDownloadProgress, ctx)
 
             client.downloadFile(url, zipFilePath)
