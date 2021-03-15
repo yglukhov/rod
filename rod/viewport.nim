@@ -118,6 +118,8 @@ template getViewMatrix*(v: SceneView): Matrix4 {.deprecated.} = v.getViewProject
 import tables
 
 proc update(v: SceneView, dt: float) =
+    if not v.rootNode.isNil:
+        v.rootNode.recursiveUpdate(dt)
     for s in v.systems:
         s.update(dt)
 
