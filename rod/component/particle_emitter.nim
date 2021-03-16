@@ -118,7 +118,7 @@ template drawParticle(p: ParticleEmitter, part: ParticleData) =
     pc.remainingLifetime = part.remainingLifetime
     pc.initialLifetime = part.initialLifetime
     pc.pid = part.pid
-    proto.recursiveUpdate()
+    proto.recursiveUpdate(getDeltaTime())
     proto.recursiveDraw()
 
 method `oneShot=`*(p:ParticleEmitter, value: bool) {.inline, base.}=
@@ -214,4 +214,3 @@ method visitProperties*(pa:ParticleAttractor, p: var PropertyVisitor) =
 registerComponent(ParticleEmitter, "ParticleSystem")
 registerComponent(Particle, "ParticleSystem")
 registerComponent(ParticleAttractor, "ParticleSystem")
-

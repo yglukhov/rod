@@ -68,7 +68,7 @@ method draw*(c: RenderComponent) {.base.} = discard # Deprecated.
 method beforeDraw*(c: RenderComponent, index: int): bool {.base.} = discard
 method afterDraw*(c: RenderComponent, index: int) {.base.} = discard
 
-method update*(c: ScriptComponent) {.base.} = discard
+method update*(c: ScriptComponent, dt: float) {.base.} = discard
 method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
 method isPosteffectComponent*(c: RenderComponent): bool {.base.} = false
@@ -149,7 +149,7 @@ proc newComponentWithDrawProc*(p: proc()): Component =
     r.drawProc = p
     result = r
 
-method update*(c: UpdateProcComponent) =
+method update*(c: UpdateProcComponent, dt: float) =
     c.updateProc()
 
 method draw*(c: DrawProcComponent) =

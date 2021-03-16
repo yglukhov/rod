@@ -253,13 +253,12 @@ proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.nam
 proc animationRunner(n: Node): AnimationRunnerComponent =
     result = n.component(AnimationRunnerComponent)
 
-proc update(n: Node) =
-    for k, v in n.scriptComponents:
-        v.update()
-
-proc recursiveUpdate*(n: Node) =
-    n.update()
-    for c in n.children: c.recursiveUpdate()
+proc recursiveUpdate*(n: Node, dt: float) =
+    if not n.enabled: return
+    for comp in n.scriptComponents:
+        comp.update(dt)
+    for c in n.children:
+        c.recursiveUpdate(dt)
 
 proc anchorMatrix(n: Node): Matrix4=
     result[0] = 1; result[1] = 0; result[2] = 0;
