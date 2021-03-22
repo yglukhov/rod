@@ -40,7 +40,7 @@ proc newString*(b: BinSerializer, s: string): int16 =
 
 
 type Serializable =
-    array | openarray | tuple | seq | string | int8 | int16 | int32 | bool | enum | uint8 | uint16 | uint32 | Image
+    array | openarray | tuple | object | seq | string | int8 | int16 | int32 | bool | enum | uint8 | uint16 | uint32 | Image
 
 proc write*(b: BinSerializer, data: float32) =
     b.align(sizeof(data))
@@ -86,7 +86,7 @@ proc write*[T: Serializable](b: BinSerializer, data: T) =
     when T is array:
         b.writeArrayNoLen(data)
 
-    elif T is tuple:
+    elif T is tuple|object:
         when isPODType(T):
             b.align(alignsize(type(data[0])))
             b.stream.write(data)

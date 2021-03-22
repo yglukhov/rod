@@ -41,6 +41,13 @@ iterator allSpriteNodes*(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "Sprite"): yield(n, c)
     for n, c in allComponentNodesOfType(n, "NinePartSprite"): yield(n, c)
 
+iterator tilemapImageLayersNodes*(n: JsonNode): (JsonNode, JsonNode) =
+    for n, c in allComponentNodesOfType(n, "ImageMapLayer"): yield(n, c)
+
+iterator tilemapNodes*(n: JsonNode): (JsonNode, JsonNode) =
+    for n, c in allComponentNodesOfType(n, "TileMap"): yield(n, c)
+
+
 iterator allMeshComponentNodes*(n: JsonNode): (JsonNode, JsonNode) =
     for n, c in allComponentNodesOfType(n, "MeshComponent"): yield(n, c)
 

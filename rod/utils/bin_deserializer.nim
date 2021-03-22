@@ -177,7 +177,7 @@ proc read*[T](b: BinDeserializer, data: var T) =
             for i in 0 ..< data.len:
                 b.read(data[i])
 
-    elif T is tuple:
+    elif T is tuple|object:
         when isPODType(T):
             b.align(alignsize(type(data[0])))
             discard b.stream.readData(addr data, sizeof(data))
