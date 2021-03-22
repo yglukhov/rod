@@ -30,6 +30,10 @@ proc write[T](b: JsonSerializer, data: T): JsonNode =
         result = newJArray()
         for k, v in fieldPairs(data):
             result.add(b.write(v))
+    elif T is object:
+        result = newJObject()
+        for k, v in fieldPairs(data):
+            result[k] = b.write(v)
     elif T is seq | openarray:
         result = newJArray()
         for v in data:

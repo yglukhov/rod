@@ -135,6 +135,21 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
                             parentNode: n, parentComponent: s, frameIndex: ifn,
                             compPath: compPath), true)
 
+        for n, s in c.tilemapImageLayersNodes:
+            let fileName = s{"image"}
+            addOccurence(fileName.getStr(), ImageOccurenceInfo(parentComposition: c,
+                parentNode: n, parentComponent: s, textureKey: "image",
+                compPath: compPath))
+
+        for n, s in c.tilemapNodes:
+            let tileSets = s{"tileSets"}
+            if not tileSets.isNil:
+                for ts in tileSets:
+                    for t in ts[0]:
+                        addOccurence(t{"image"}.getStr(), ImageOccurenceInfo(parentComposition: c,
+                            parentNode: t, parentComponent: s, textureKey: "image",
+                            compPath: compPath))
+
         for n, s in c.allMeshComponentNodes:
             for key in ["matcapTextureR", "matcapTextureG", "matcapTextureB",
                 "matcapTextureA", "matcapMaskTexture", "albedoTexture",

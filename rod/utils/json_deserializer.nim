@@ -36,7 +36,9 @@ proc get*[T](b: JsonDeserializer, j: JsonNode, v: var T) =
         for k, vv in fieldPairs(v):
             b.get(j[i], vv)
             inc i
-
+    elif T is object:
+        for k, vv in fieldPairs(v):
+            b.get(j[k], vv)
     elif T is Image:
         v = b.deserializeImage(j)
 
