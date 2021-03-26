@@ -133,7 +133,7 @@ proc collectImageOccurences(tool: ImgTool): seq[ImageOccurence] {.inline.} =
                 if fileNames[ifn].kind == JString:
                     addOccurence(fileNames[ifn].str, ImageOccurenceInfo(parentComposition: c,
                             parentNode: n, parentComponent: s, frameIndex: ifn,
-                            compPath: compPath), true)
+                            compPath: compPath), s{"_c"}.getStr() != "NinePartSprite")
 
         for n, s in c.tilemapImageLayersNodes:
             let fileName = s{"image"}
