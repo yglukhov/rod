@@ -25,6 +25,7 @@ proc setSize(n: Node, sz: Size) =
 proc awake(c: CompRef) =
     let n = newNodeWithResource(c.path)
     n.setSize(c.size)
+    n.isSerializable = false
     c.node.addChild(n)
     c.refNode = n
 
