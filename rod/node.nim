@@ -543,6 +543,41 @@ proc `worldPos=`*(n: Node, p: Vector3) =
         if n.parent.tryWorldToLocal(p, r):
             n.position = r
 
+proc nodeBounds2d(n: Node, minP: var Vector3, maxP: var Vector3) =
+    const minAlpha = 0.01
+    const minScale = 0.01
+    const minSize = 0.01
+
+    let wrldMat = n.worldTransform()
+    var wp0, wp1, wp2, wp3: Vector3
+
+    for comp in n.components:
+        let bb = comp.getBBox()
+        if not bb.isEmpty:
+            wp0 = wrldMat * bb.minPoint
+            wp1 = wrldMat * newVector3(bb.minPoint.x, bb.maxPoint.y, 0.0)
+            wp2 = wrldMat * bb.maxPoint
+            wp3 = wrldMat * newVector3(bb.maxPoint.x, bb.minPoint.y, 0.0)
+
+            minP = min(minP, wp0)
+            minP = min(minP, wp1)
+            minP = min(minP, wp2)
+            minP = min(minP, wp3)
+
+            maxP = max(maxP, wp0)
+            maxP = max(maxP, wp1)
+            maxP = max(maxP, wp2)
+            maxP = max(maxP, wp3)
+
+    for ch in n.children:
+        ch.nodeBounds2d(minP, maxP)
+
+proc nodeBounds*(n: Node): BBox =
+    n.mBBox.minPoint = newVector3(high(int).float, high(int).float, 0)
+    n.mBBox.maxPoint = newVector3(low(int).float, low(int).float, 0)
+    n.nodeBounds2d(n.mBBox.minPoint, n.mBBox.maxPoint)
+    result = n.mBBox
+
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
     p.visitProperty("translation", n.position)

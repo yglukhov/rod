@@ -3,7 +3,7 @@ import nimx/[view, text_field, matrixes, image, button,
     slider, animation, context, view_event_handling, event,
     font
 ]
-import rod/component/[rti, nine_part_sprite ]
+import rod/component/[nine_part_sprite ]
 import rod/property_editors/propedit_registry
 import nimx/property_editors/standard_editors #used
 import rod/[node, viewport, quaternion, rod_types]
@@ -60,9 +60,10 @@ proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX), getter: proc()
   let boxSize = 100.0
   result = PropertyEditorView.new(newRect(0, 0, 208, boxSize + 10))
   let n = getter().node
-  var minP = newVector3(high(float), high(float))
-  var maxP = newVector3(low(float), low(float))
-  n.nodeBounds2d(minP, maxP)
+
+  let bbox = n.nodeBounds()
+  var minP = bbox.minPoint
+  var maxP = bbox.maxPoint
 
   var v = NodeAnchorView.new(newRect(0, 5, boxSize, boxSize))
   v.size = newSize(maxP.x - minP.x, maxP.y - minP.y)

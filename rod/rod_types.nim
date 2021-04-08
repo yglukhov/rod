@@ -27,6 +27,7 @@ type
         mSceneView*: SceneView
         mMatrix*: Matrix4
         worldMatrix*: Matrix4
+        mBBox*: BBox
         alpha*: Coord
         composition*: Composition
         mAnchorPoint*: Vector3
