@@ -135,10 +135,12 @@ type UpdateProcComponent = ref object of ScriptComponent
 type DrawProcComponent = ref object of RenderComponent
     drawProc: proc()
 
-template isEmpty*(b: BBox): bool = (b.maxPoint - b.minPoint == newVector3())
+template isEmpty*(b: BBox): bool =
+    let d = b.maxPoint - b.minPoint
+    abs(d.x) < 0.0001 or abs(d.y) < 0.0001
 
 template intersect*(f: Frustum, bbox: BBox): bool =
-    f.min.x < bbox.maxPoint.x and bbox.minPoint.x < f.max.x and f.min.y < bbox.maxPoint.y and bbox.minPoint.y < f.max.y
+    f.minPoint.x < bbox.maxPoint.x and bbox.minPoint.x < f.maxPoint.x and f.minPoint.y < bbox.maxPoint.y and bbox.minPoint.y < f.maxPoint.y
 
 proc newComponentWithUpdateProc*(p: proc()): Component =
     var r : UpdateProcComponent

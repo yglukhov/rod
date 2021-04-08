@@ -544,39 +544,33 @@ proc `worldPos=`*(n: Node, p: Vector3) =
             n.position = r
 
 proc nodeBounds2d(n: Node, minP: var Vector3, maxP: var Vector3) =
-    const minAlpha = 0.01
-    const minScale = 0.01
-    const minSize = 0.01
-
     let wrldMat = n.worldTransform()
     var wp0, wp1, wp2, wp3: Vector3
-
+    var bb: BBox
     for comp in n.components:
-        let bb = comp.getBBox()
+        bb = comp.getBBox()
         if not bb.isEmpty:
             wp0 = wrldMat * bb.minPoint
             wp1 = wrldMat * newVector3(bb.minPoint.x, bb.maxPoint.y, 0.0)
             wp2 = wrldMat * bb.maxPoint
             wp3 = wrldMat * newVector3(bb.maxPoint.x, bb.minPoint.y, 0.0)
 
-            minP = min(minP, wp0)
-            minP = min(minP, wp1)
-            minP = min(minP, wp2)
-            minP = min(minP, wp3)
+            minP.x = min(minP.x, min(wp0.x, min(wp1.x, min(wp2.x, wp3.x))))
+            minP.y = min(minP.y, min(wp0.y, min(wp1.y, min(wp2.y, wp3.y))))
+            minP.z = 0
 
-            maxP = max(maxP, wp0)
-            maxP = max(maxP, wp1)
-            maxP = max(maxP, wp2)
-            maxP = max(maxP, wp3)
+            maxP.x = max(maxP.x, max(wp0.x, max(wp1.x, max(wp2.x, wp3.x))))
+            maxP.y = max(maxP.y, max(wp0.y, max(wp1.y, max(wp2.y, wp3.y))))
+            maxP.z = 0
 
     for ch in n.children:
-        ch.nodeBounds2d(minP, maxP)
+        if ch.enabled and ch.alpha > 0.001 and ch.scale.x > 0.001 and ch.scale.y > 0.001:
+            ch.nodeBounds2d(minP, maxP)
 
 proc nodeBounds*(n: Node): BBox =
-    n.mBBox.minPoint = newVector3(high(int).float, high(int).float, 0)
-    n.mBBox.maxPoint = newVector3(low(int).float, low(int).float, 0)
-    n.nodeBounds2d(n.mBBox.minPoint, n.mBBox.maxPoint)
-    result = n.mBBox
+    result.minPoint = newVector3(high(int).float, high(int).float, 0)
+    result.maxPoint = newVector3(low(int).float, low(int).float, 0)
+    n.nodeBounds2d(result.minPoint, result.maxPoint)
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
