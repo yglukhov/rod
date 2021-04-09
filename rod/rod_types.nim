@@ -39,9 +39,7 @@ type
         minPoint*: Vector3
         maxPoint*: Vector3
 
-    Frustum* = object
-        min*: Vector3
-        max*: Vector3
+    Frustum* = BBox
 
     Component* = ref object of RootRef
         node*: Node

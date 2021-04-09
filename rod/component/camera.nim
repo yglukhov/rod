@@ -42,8 +42,8 @@ proc getFrustum*(c: Camera): Frustum =
     let d = c.calculateOrthoData()
     let frustumOffset = -10.0
     let wt = c.node.worldTransform()
-    result.min = wt * newVector3(d.left + frustumOffset, d.top + frustumOffset, 0.0)
-    result.max = wt * newVector3(d.right - frustumOffset, d.bottom - frustumOffset, 0.0)
+    result.minPoint = wt * newVector3(d.left + frustumOffset, d.top + frustumOffset, 0.0)
+    result.maxPoint = wt * newVector3(d.right - frustumOffset, d.bottom - frustumOffset, 0.0)
 
 proc getProjectionMatrix*(c: Camera, viewportBounds: Rect, mat: var Transform3D) =
     doAssert(not c.node.sceneView.isNil)

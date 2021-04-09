@@ -56,22 +56,20 @@ proc newNodeSelector*(): NodeSelector =
     result.color = newColor(0.12, 1, 0, 1)
 
 proc createBoxes(ns: NodeSelector) =
-    for v in ns.mSelectedNode.components:
-        let bbox = v.getBBox()
-        if not bbox.isEmpty:
-            # echo "node ", ns.node.name, "  min  ", bbox.minPoint, "  max  ", bbox.maxPoint
-            ns.vertexData = newSeq[GLfloat]()
-            ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.minPoint.z])
-            ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.minPoint.z])
-            ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
-            ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
+    ns.vertexData.setLen(0)
+    let bbox = ns.mSelectedNode.nodeBounds()
+    if not bbox.isEmpty:
+        ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.minPoint.z])
+        ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.minPoint.z])
+        ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
+        ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.minPoint.z])
 
-            ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
-            ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
-            ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
-            ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
+        ns.vertexData.add([bbox.minPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
+        ns.vertexData.add([bbox.maxPoint.x, bbox.minPoint.y, bbox.maxPoint.z])
+        ns.vertexData.add([bbox.maxPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
+        ns.vertexData.add([bbox.minPoint.x, bbox.maxPoint.y, bbox.maxPoint.z])
 
-            ns.createVBO()
+        ns.createVBO()
 
 proc `selectedNode=`*(ns: NodeSelector, n: Node) =
     ns.mSelectedNode = n
@@ -83,7 +81,6 @@ proc draw*(ns: NodeSelector) =
     if ns.vertexData.len > 0 and not node.isNil:
         let c = currentContext()
         let gl = c.gl
-        let modelMatrix = node.worldTransform()
 
         if selectorSharedShader == invalidProgram:
             selectorSharedShader = gl.newShaderProgram(vertexShader, fragmentShader, [(aPosition.GLuint, $aPosition)])
@@ -104,7 +101,7 @@ proc draw*(ns: NodeSelector) =
 
         let vp = node.sceneView
         if not vp.isNil:
-            let mvpMatrix = vp.getViewProjectionMatrix() * modelMatrix
+            let mvpMatrix = vp.getViewProjectionMatrix()
             gl.uniformMatrix4fv(gl.getUniformLocation(selectorSharedShader, "mvpMatrix"), false, mvpMatrix)
 
         when not defined(js): glLineWidth(2.0)
