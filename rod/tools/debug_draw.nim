@@ -168,7 +168,7 @@ proc DDdrawText*(text: string, p: Point, size: float = 16.0, color: Color = gree
     currentContext().drawText(p, fText)
 
 
-proc DDdrawGrid*(r: Rect, s: Size) =
+proc DDdrawGrid*(r: Rect, s: Size, o: Point = newPoint(0,0)) =
     let c = currentContext()
     let gl = c.gl
 
@@ -197,8 +197,8 @@ proc DDdrawGrid*(r: Rect, s: Size) =
         var xToDraw = 0
 
         for i in curY ..< yLines:
-            var p1 = newVector3(0.0, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
-            var p2 = newVector3(r.width, i.float * s.height, 0.0) + newVector3(r.x, r.y, 0.0)
+            var p1 = newVector3(0.0, i.float * s.height + o.y, 0.0) + newVector3(r.x, r.y, 0.0)
+            var p2 = newVector3(r.width, i.float * s.height + o.y, 0.0) + newVector3(r.x, r.y, 0.0)
 
             let index = lineYIndex(yToDraw)
             c.vertexes[index + 0] = p1.x
@@ -215,8 +215,8 @@ proc DDdrawGrid*(r: Rect, s: Size) =
 
         if lineXIndex(0) + 5 < c.vertexes.len:
             for i in curX ..< xLines:
-                var p1 = newVector3(i.float * s.width, 0.0, 0.0) + newVector3(r.x, r.y, 0.0)
-                var p2 = newVector3(i.float * s.width, r.height, 0.0) + newVector3(r.x, r.y, 0.0)
+                var p1 = newVector3(i.float * s.width + o.x, 0.0, 0.0) + newVector3(r.x, r.y, 0.0)
+                var p2 = newVector3(i.float * s.width + o.x, r.height, 0.0) + newVector3(r.x, r.y, 0.0)
 
                 let index = lineXIndex(xToDraw)
                 c.vertexes[index + 0] = p1.x

@@ -6,7 +6,7 @@ import rod/[node, component, rod_types, viewport]
 import rod/property_editors/[propedit_registry, standard_editors]
 import rod/component/camera
 import rod/edit_view
-
+import rod/editor/scene/components/grid
 import tables
 import variant
 
@@ -40,6 +40,15 @@ method init*(i: SceneSettingsView, r: Rect) =
 
     i.reloadEditScene()
 
+proc inspect(i: SceneSettingsView, expView: var ExpandingView, visitor: var PropertyVisitor, comps: seq[Component]) =
+    for v in comps:
+        expView = newExpandingView(newRect(0, 0, 328, 20.0))
+        expView.title = v.className
+        expView.expand()
+
+        v.visitProperties(visitor)
+        i.propView.addSubview(expView)
+
 proc `inspectedNode=`*(i: SceneSettingsView, n: Node) =
     let scrollBar = i.scView.verticalScrollBar()
     let oldPos = scrollBar.value()
@@ -70,13 +79,15 @@ proc `inspectedNode=`*(i: SceneSettingsView, n: Node) =
         n.visitProperties(visitor)
         i.propView.addSubview(expView)
 
-        for v in n.components:
-            expView = newExpandingView(newRect(0, 0, 328, 20.0))
-            expView.title = v.className
-            expView.expand()
+        var comps: seq[Component]
+        for c in n.components:
+            comps.add(c)
 
-            v.visitProperties(visitor)
-            i.propView.addSubview(expView)
+        var gridComp = n.sceneView.rootNode.componentIfAvailable(EditorGrid)
+        if not gridComp.isNil:
+            comps.add(gridComp)
+
+        i.inspect(expView, visitor, comps)
 
         scrollBar.value = oldPos
         scrollBar.sendAction()

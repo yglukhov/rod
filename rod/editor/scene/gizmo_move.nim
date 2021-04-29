@@ -1,11 +1,18 @@
 import nimx/[context, portable_gl, types, matrixes, event]
 import rod/component/[primitives/cone, primitives/cube, mesh_component, material]
 import rod/[node, viewport, quaternion, editor/scene/gizmo]
+import rod/editor/scene/components/grid
 import strutils
 
 type MoveGizmo* = ref object of Gizmo
     screenPoint: Vector3
     offset: Vector3
+    mGrid: EditorGrid
+
+proc grid(c: MoveGizmo): EditorGrid =
+    if c.mGrid.isNil:
+        c.mGrid = c.gizmoNode.sceneView.rootNode.componentIfAvailable(EditorGrid)
+    result = c.mGrid
 
 method updateGizmo*(g: MoveGizmo) =
     if g.mEditedNode.isNil:
@@ -129,7 +136,10 @@ method proccesTransform*(g: MoveGizmo, position: Point) =
     g.gizmoNode.position = g.gizmoNode.worldPos + curPosition * g.axisMask
     if not g.mEditedNode.parent.isNil:
         try:
-            g.mEditedNode.position = g.mEditedNode.parent.worldToLocal(g.gizmoNode.position)
+            var p = g.gizmoNode.position
+            if g.grid.snappingEnabled:
+                p = g.grid.snappedWorldPosition(p)
+            g.mEditedNode.position = g.mEditedNode.parent.worldToLocal(p)
         except:
             discard
     else:
