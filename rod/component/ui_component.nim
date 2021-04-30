@@ -124,6 +124,7 @@ method componentNodeWillBeRemovedFromSceneView(ui: UIComponent) =
 
 method visitProperties*(ui: UIComponent, p: var PropertyVisitor) =
     p.visitProperty("enabled", ui.enabled)
-    ui.view.visitProperties(p)
+    if not ui.view.isNil:
+        ui.view.visitProperties(p)
 
 registerComponent(UIComponent)

@@ -104,7 +104,7 @@ method init*(v: EditorSceneView, r: Rect)=
         editView.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
 
         editView.rootNode = newNode(EditorRootNodeName)
-        let gc = editView.rootNode.component(GridComponent)
+        let gc = editView.rootNode.component(EditorGrid)
 
         editView.editing = true
 

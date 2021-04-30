@@ -73,12 +73,11 @@ proc createBoxes(ns: NodeSelector) =
 
 proc `selectedNode=`*(ns: NodeSelector, n: Node) =
     ns.mSelectedNode = n
-    if not n.isNil:
-        ns.createBoxes()
 
 proc draw*(ns: NodeSelector) =
     let node = ns.mSelectedNode
-    if ns.vertexData.len > 0 and not node.isNil:
+    if not node.isNil:
+        ns.createBoxes()
         let c = currentContext()
         let gl = c.gl
 
@@ -88,7 +87,6 @@ proc draw*(ns: NodeSelector) =
                 return
 
         gl.enable(gl.DEPTH_TEST)
-
         gl.bindBuffer(gl.ARRAY_BUFFER, selectorSharedVertexBuffer)
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, selectorSharedIndexBuffer)
 
