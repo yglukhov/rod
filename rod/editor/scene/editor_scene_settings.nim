@@ -146,6 +146,7 @@ proc reloadEditScene(v: SceneSettingsView)=
     v.inspectedNode = curCameraNode
 
 method onCompositionChanged*(v: SceneSettingsView, comp: CompositionDocument) =
+    procCall v.EditorTabView.onCompositionChanged(comp)
     v.reloadEditScene()
 
 method update*(v: SceneSettingsView)=

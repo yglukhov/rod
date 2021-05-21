@@ -67,6 +67,10 @@ proc visitProperties*(i: InspectorView, c: Composition, p: var PropertyVisitor) 
         var url = c.url
     p.visitProperty("url", url)
 
+proc selectedIsCompRef(i: InspectorView): bool =
+    result = not i.currNode.composition.isNil
+    if result and not i.composition.isNil:
+        result = i.currNode != i.composition.rootNode
 
 proc `inspectedNode=`*(i: InspectorView, n: Node) =
     # TODO: This is a hacky hardcode! Here we assume that inspector can have either
@@ -161,7 +165,11 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
             inc idx
 
         let newComponentButtn = Button.new(newRect(0, 30, 0, 20))
-        newComponentButtn.title = "New component"
+        newComponentButtn.enabled = not i.selectedIsCompRef
+        if newComponentButtn.enabled:
+            newComponentButtn.title = "New component"
+        else:
+            newComponentButtn.title = "Can't add component to CompRef's"
         newComponentButtn.onAction do():
             createComponentsView(i, n)
 
@@ -173,17 +181,18 @@ proc `inspectedNode=`*(i: InspectorView, n: Node) =
         discard
 
 
-proc createComponentButtons(inspector: InspectorView, components_list: seq[string]): StackView =
+proc createComponentButtons(i: InspectorView, components_list: seq[string]): StackView =
     var menu = newStackView(newRect(0, 0, componentsViewSize.width, 100))
     var components = components_list
     sort(components, system.cmp)
-    for i, c in components:
+    for _, c in components:
         closureScope:
             let compName = c
             let createButton = newButton(menu, newPoint(0, 0), newSize(componentsViewSize.width - 20.0, 16), compName)
             createButton.onAction do():
-                discard inspector.currNode.addComponent(compName)
-                inspector.inspectedNode = inspector.currNode
+                if i.selectedIsCompRef: return
+                discard i.currNode.addComponent(compName)
+                i.inspectedNode = i.currNode
 
     result = menu
 
@@ -220,7 +229,7 @@ method update*(v: InspectorView)=
         v.inspectedNode = v.currNode
 
 method onCompositionChanged*(v: InspectorView, comp: CompositionDocument) =
-    # v.inspectedNode = comp.rootNode
+    procCall v.EditorTabView.onCompositionChanged(comp)
     v.setEditedNode(comp.selectedNode)
 
 method onEditModeChanged*(v: InspectorView, mode: EditMode) =
