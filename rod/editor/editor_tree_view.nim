@@ -321,6 +321,7 @@ method update*(v: EditorTreeView)=
         frames = 0
 
 method onCompositionChanged*(v: EditorTreeView, comp: CompositionDocument) =
+    procCall v.EditorTabView.onCompositionChanged(comp)
     v.rootNode = comp.rootNode
     v.outlineView.reloadData()
     v.setEditedNode(comp.selectedNode)

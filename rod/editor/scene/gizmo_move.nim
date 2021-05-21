@@ -137,7 +137,7 @@ method proccesTransform*(g: MoveGizmo, position: Point) =
     if not g.mEditedNode.parent.isNil:
         try:
             var p = g.gizmoNode.position
-            if g.grid.snappingEnabled:
+            if not g.grid.isNil and g.grid.snappingEnabled:
                 p = g.grid.snappedWorldPosition(p)
             g.mEditedNode.position = g.mEditedNode.parent.worldToLocal(p)
         except:

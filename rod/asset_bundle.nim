@@ -183,7 +183,7 @@ when defined(android):
 elif defined(ios):
     import darwin/foundation
 
-proc cacheDir(): string {.inline.} =
+proc assetsBundleCacheDir*(): string {.inline.} =
     when defined(android):
         mainActivity().getExternalCacheDir().getAbsolutePath()
     elif defined(ios):
@@ -192,6 +192,8 @@ proc cacheDir(): string {.inline.} =
           $sp[0]
         else:
           "/tmp"
+    elif defined(windows):
+        getTempDir() & "/rodappcache"
     else:
         "/tmp/rodappcache"
 
@@ -269,7 +271,7 @@ when not defined(js) and not defined(emscripten) and not defined(windows):
             performOnMainThread(onDownloadComplete, ctx)
 
 proc downloadedAssetsDir(abd: AssetBundleDescriptor): string =
-    cacheDir() / abd.hash
+    assetsBundleCacheDir() / abd.hash
 
 proc isDownloaded*(abd: AssetBundleDescriptor): bool =
     when not defined(js) and not defined(emscripten):
