@@ -31,10 +31,10 @@ proc proceedMessage(s: MessageSystem, id: MessageId, msg: NodeMessage) =
   try:
     receiver = msg.sender.findNode(sp)
   except Exception as e:
-    warm "receiver not found ", sp, " ", e.msg
+    warn "receiver not found ", $sp, " ", e.msg
 
   if receiver.isNil:
-    warn "receiver not found ", sp
+    warn "receiver not found ", $sp
     return
 
   if targetComponent.len == 0:
