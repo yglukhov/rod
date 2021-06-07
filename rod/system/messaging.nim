@@ -1,5 +1,5 @@
 import rod / [ rod_types, message_queue, node, systems, viewport, component ]
-import strutils, typetraits
+import strutils, typetraits, logging
 
 export message_queue, systems
 
@@ -27,13 +27,18 @@ proc proceedMessage(s: MessageSystem, id: MessageId, msg: NodeMessage) =
     sp[^1] = lsp[0]
     targetComponent = lsp[1]
 
-  var receiver = msg.sender.findNode(sp)
+  var receiver: Node
+  try:
+    receiver = msg.sender.findNode(sp)
+  except Exception as e:
+    warm "receiver not found ", sp, " ", e.msg
+
   if receiver.isNil:
-    echo "receiver not found ", sp
+    warn "receiver not found ", sp
     return
 
   if targetComponent.len == 0:
-    echo "to target component"
+    warn "to target component"
     return
 
   let comp = receiver.componentIfAvailable(targetComponent)
@@ -49,7 +54,7 @@ proc post(s: MessageSystem, id: string, msg: NodeMessage) =
 
 proc post*(n: Node, path: string, id: string, data: string = "") =
   if n.sceneView.isNil:
-    echo "Node sendMessage \"", id, "\" from node \"", n.name, "\" failed, sceneView is nil!"
+    warn "Node sendMessage \"", id, "\" from node \"", n.name, "\" failed, sceneView is nil!"
     return
   var msg = NodeMessage(path: path, sender: n, data: data)
   n.sceneView.system(MessageSystem).post(id, msg)
