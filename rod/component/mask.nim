@@ -1,17 +1,6 @@
 import nimx/[types, context, image, view, matrixes, composition, property_visitor, portable_gl, render_to_image]
 import rod / utils / [ property_desc, serialization_codegen ]
 import rod / [ rod_types, node, component, viewport, component/camera ]
-import rod / component / [ sprite, solid, rti ]
-import json, tables, logging, strutils
-import times
-
-template logp(t: untyped, args: varargs[string, `$`]) =
-  block:
-    var `lastPrint t` {.global.} = epochTime()
-    if epochTime() - `lastPrint t` > 1.0:
-      `lastPrint t` = epochTime()
-      info args.join(" ")
-
 
 const comonSpritePrefix = """
 (sampler2D maskTexture, vec4 texCoords, vec4 mask_bounds, vec2 vp_size, float msk_alpha) {
@@ -120,22 +109,18 @@ proc setupMskPost(c: Mask): bool =
     min(wpmax.x - wpmin.x, vpW),
     min(wpmax.y - wpmin.y, vpH)
   )
-  logp(11, "s ", s, " wpmax ", wpmax, " wpmin ", wpmin, " bb ", bbx)
+
   if s.width < 1.0 or s.height < 1.0:
-    logp(ret, "Return ", s, " bb ", bbx)
     return false
 
   if c.maskTexture.isNil:
-    info "init img ", s
     c.maskTexture = imageWithSize(s)
-  elif (c.maskTexture.size - s).width.abs > 0.0001 or (c.maskTexture.size - s).height.abs > 0.0001:
-    info "reset img ", s
+  elif (c.maskTexture.size - s).width.abs > 0.01 or (c.maskTexture.size - s).height.abs > 0.01:
     c.maskTexture.resetToSize(s, gl)
 
   var ctx: RTIContext
   c.rti.setImage(c.maskTexture)
   c.rti.beginDraw(ctx)
-
   gl.viewport(vpX.GLint, vpY.GLint, vpW.GLsizei, vpH.GLsizei)
   c.drawMaskNode(c.mMaskNode)
 
@@ -147,7 +132,6 @@ proc setupMskPost(c: Mask): bool =
 
   let tex = getTextureQuad(c.maskTexture, currentContext().gl, theQuad)
   let texCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
-  # logp(cc, "text :", texCoords)
   pushPostEffect(effectSprite[c.maskType.int-1], tex, texCoords, newRect(wpmin, s), newSize(vpW, vpH), c.mMaskNode.getGlobalAlpha())
   result = true
 
