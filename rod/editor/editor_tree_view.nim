@@ -105,6 +105,7 @@ method init*(v: EditorTreeView, r: Rect)=
                 textField.textColor = newColor(0.9, 0.69, 0.67)
 
         textField.text = if n.name.len == 0: "(node)" else: n.name
+        textField.text = textField.text & " [" & $n.children.len & "]"
 
         # btn.onAction do():
         #     n.enabled = not n.enabled

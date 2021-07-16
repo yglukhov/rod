@@ -51,16 +51,6 @@ proc camera*(v: SceneView): Camera =
 
 template viewMatrix*(v: SceneView): Matrix4 = v.mCamera.node.worldTransform.inversed
 
-proc prepareFramebuffer(v: SceneView, i: var SelfContainedImage, sz: Size) =
-    if i.isNil:
-        info "Creating buffer"
-        i = imageWithSize(sz)
-        i.flipVertically()
-    elif i.size != sz:
-        info "Recreating buffer"
-        i = imageWithSize(sz)
-        i.flipVertically()
-
 proc getProjectionMatrix*(v: SceneView): Matrix4 =
     v.camera.getProjectionMatrix(v.bounds, result)
 

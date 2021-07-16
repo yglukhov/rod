@@ -272,7 +272,6 @@ method beforeDraw*(rti: RTI, index: int): bool =
             rti.node.sceneView.viewProjMatrix = rti.getTransitionProjMat() * rti.getTransitionViewMat()
 
             rti.imageRenderTarget.beginDraw(rti.mRTICtx)
-
             result = false
 
 method afterDraw*(rti: RTI, index: int) =
@@ -282,7 +281,6 @@ method afterDraw*(rti: RTI, index: int) =
         if not rti.bFreezeChildren or rti.mDrawInImage:
 
             rti.mDrawInImage = false
-
             rti.imageRenderTarget.endDraw(rti.mRTICtx)
             if not rti.image.flipped:
                 rti.image.flipVertically()
@@ -290,22 +288,7 @@ method afterDraw*(rti: RTI, index: int) =
             rti.node.sceneView.viewProjMatrix = rti.mOldVPMat
 
         if rti.bDraw:
-            if rti.node.sceneView.editing:
-                gl.enable(gl.DEPTH_TEST)
-                rti.drawWithBlend()
-                gl.disable(gl.BLEND)
-                if rti.node.sceneView.camera.projectionMode == cpPerspective:
-                    rti.image.flipVertically()
-                currentContext().withTransform rti.getImageVPM():
-                    var r = rti.getImageScreenBounds()
-                    let lineWidth = 1.0 / rti.aspect
-                    r.origin = r.origin - newPoint(lineWidth, lineWidth)
-                    r.size = r.size + newSize(lineWidth*2.0, lineWidth*2.0)
-                    currentContext().drawImage(rti.image, r)
-                gl.enable(gl.BLEND)
-                gl.disable(gl.DEPTH_TEST)
-            else:
-                rti.drawWithBlend()
+            rti.drawWithBlend()
 
 method serialize*(rti: RTI, serealizer: Serializer): JsonNode =
     result = newJObject()

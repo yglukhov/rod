@@ -1,183 +1,179 @@
-import nimx/[types, context, image, view, matrixes, composition, property_visitor, portable_gl]
+import nimx / [
+  types, context, image, view, matrixes, composition,
+  property_visitor, portable_gl, render_to_image, window
+]
 import rod / utils / [ property_desc, serialization_codegen ]
-import rod / [ rod_types, node, component, viewport ]
-import rod / component / [ sprite, solid, rti ]
-import json, tables, logging
-
+import rod / [ rod_types, node, component, viewport, component/camera ]
 
 const comonSpritePrefix = """
-(sampler2D mask_img, vec4 mask_img_coords, vec4 mask_bounds, vec2 vp_size, mat4 mvp_inv, float msk_alpha) {
-    vec2 xy = gl_FragCoord.xy / vp_size;
-    vec4 pos = mvp_inv * vec4(xy, gl_FragCoord.z, 1.0);
-    vec2 mskVpos = pos.xy / pos.w;
-    vec2 destuv = ( mskVpos - mask_bounds.xy ) / mask_bounds.zw;
-    vec2 uv = mask_img_coords.xy + (mask_img_coords.zw - mask_img_coords.xy) * destuv;
-    vec4 mask_color = texture2D(mask_img, uv);
-    float rect_alpha = 1.0;
-    if (uv.x < mask_img_coords.x || uv.x > mask_img_coords.z || uv.y < mask_img_coords.y || uv.y > mask_img_coords.w) {
-        rect_alpha = 0.0;
-    }
-"""
+(sampler2D maskTexture, vec4 texCoords, vec4 mask_bounds, vec2 vp_size, float msk_alpha) {
+  float x = (gl_FragCoord.x - mask_bounds.x) / mask_bounds.z;
+  float y = (vp_size.y - gl_FragCoord.y - mask_bounds.y) / mask_bounds.w;
+  vec2 uv = texCoords.xy + (texCoords.zw - texCoords.xy) * vec2(x, y);
+  vec4 mask_color = texture2D(maskTexture, uv);
+  mask_color.a *= msk_alpha;
 
-const comonSolidPrefix = """
-(vec2 mask_size, vec4 mask_color, vec2 vp_size, mat4 mvp_inv, float msk_alpha) {
-    vec2 xy = gl_FragCoord.xy / vp_size;
-    vec4 pos = mvp_inv * vec4(xy, gl_FragCoord.z, 1.0);
-    vec2 mskVpos = pos.xy / pos.w;
-    vec2 b = mask_size.xy / 2.0;
-    vec2 dp = mskVpos - b;
-    vec2 d = abs(dp) - b;
-    float rect_alpha = 1.0 - min(min(max(d.x, d.y), 0.0) + length(max(d, 0.0)), 1.0);
-    rect_alpha = step(0.0000001, rect_alpha);
+  // clamp texture, or migrate to ES3.2 and use GL_CLAMP_TO_BORDER
+  float tcW = max(texCoords.x, texCoords.z);
+  float tcH = max(texCoords.y, texCoords.w);
+  vec4 clearColor = vec4(0.0);
+  mask_color = mix(clearColor, mask_color, step(0.0001, uv.x));
+  mask_color = mix(clearColor, mask_color, step(0.0001, uv.y));
+  mask_color = mix(mask_color, clearColor, step(tcW, uv.x));
+  mask_color = mix(mask_color, clearColor, step(tcH, uv.y));
 """
 
 const alphaPostfix = """
-    float mask_alpha = mask_color.a * rect_alpha * msk_alpha;
-    gl_FragColor.a *= mask_alpha;
+  float mask_alpha = mask_color.a;
+  gl_FragColor.a *= mask_alpha;
 }
 """
 const alphaInvertedPostfix = """
-    float mask_alpha = mask_color.a * rect_alpha * msk_alpha;
-    mask_alpha = 1.0 - clamp(mask_alpha, 0.0, 1.0);
-    gl_FragColor.a *= mask_alpha;
+  float mask_alpha = mask_color.a;
+  mask_alpha = 1.0 - clamp(mask_alpha, 0.0, 1.0);
+  gl_FragColor.a *= mask_alpha;
 }
 """
 const lumaPostfix = """
-    float luma = dot(mask_color.rgb, vec3(0.299, 0.587, 0.114));
-    float mask_alpha = luma * mask_color.a * rect_alpha * msk_alpha;
-    gl_FragColor.a *= mask_alpha;
+  float luma = dot(mask_color.rgb, vec3(0.299, 0.587, 0.114));
+  float mask_alpha = luma * mask_color.a;
+  gl_FragColor.a *= mask_alpha;
 }
 """
 const lumaInvertedPostfix = """
-    float luma = dot(mask_color.rgb, vec3(0.299, 0.587, 0.114));
-    float mask_alpha = luma * mask_color.a * rect_alpha * msk_alpha;
-    mask_alpha = 1.0 - clamp(mask_alpha, 0.0, 1.0);
-    gl_FragColor.a *= mask_alpha;
+  float luma = dot(mask_color.rgb, vec3(0.299, 0.587, 0.114));
+  float mask_alpha = luma * mask_color.a;
+  mask_alpha = 1.0 - clamp(mask_alpha, 0.0, 1.0);
+  gl_FragColor.a *= mask_alpha;
 }
 """
 
 template maskPost(name, src: string): PostEffect =
-    newPostEffect("void " & name & src, name, ["sampler2D", "vec4", "vec4", "vec2", "mat4", "float"])
+  newPostEffect("void " & name & src, name, ["sampler2D", "vec4", "vec4", "vec2", "float"])
 
 var effectSprite = [
-    maskPost("maskAlphaEffect", comonSpritePrefix & alphaPostfix), # tmAlpha
-    maskPost("maskAlphaInvertedEffect", comonSpritePrefix & alphaInvertedPostfix), # tmAlphaInverted
-    maskPost("maskLumaEffect", comonSpritePrefix & lumaPostfix), # tmLuma
-    maskPost("maskLumaInvertedEffect", comonSpritePrefix & lumaInvertedPostfix) # tmLumaInverted
-]
-
-template maskSolidPost(name, src: string): PostEffect =
-    newPostEffect("void " & name & src, name, ["vec2", "vec4", "vec2", "mat4", "float"])
-
-var effectSolid = [
-    maskSolidPost("maskSolidAlphaEffect", comonSolidPrefix & alphaPostfix), # tmAlpha
-    maskSolidPost("maskSolidAlphaInvertedEffect", comonSolidPrefix & alphaInvertedPostfix), # tmAlphaInverted
-    maskSolidPost("maskSolidLumaEffect", comonSolidPrefix & lumaPostfix), # tmLuma
-    maskSolidPost("maskSolidLumaInvertedEffect", comonSolidPrefix & lumaInvertedPostfix) # tmLumaInverted
+  maskPost("maskAlphaEffect", comonSpritePrefix & alphaPostfix), # tmAlpha
+  maskPost("maskAlphaInvertedEffect", comonSpritePrefix & alphaInvertedPostfix), # tmAlphaInverted
+  maskPost("maskLumaEffect", comonSpritePrefix & lumaPostfix), # tmLuma
+  maskPost("maskLumaInvertedEffect", comonSpritePrefix & lumaInvertedPostfix) # tmLumaInverted
 ]
 
 type MaskType* = enum
-    tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
+  tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
 
 type Mask* = ref object of RenderComponent
-    when defined(rodplugin):
-        mMaskNode: Node
-    maskComponent*: Component
-    maskType*: MaskType
-    mWasPost: bool
+  mMaskNode: Node
+  maskType*: MaskType
+  mWasPost: bool
+  rti: ImageRenderTarget
+  maskTexture: SelfContainedImage
 
 Mask.properties:
-    maskType
-    layerName:
-        phantom: string
+  maskType
+  layerName:
+    phantom: string
 
-proc getInvTransform(n: Node): Matrix4 =
-    let vp = n.sceneView
-    if not vp.isNil:
-        result = vp.viewProjMatrix * n.worldTransform()
-        if not result.tryInverse(result):
-            result.loadIdentity()
-        result.scale(newVector3(2.0,2.0,2.0))
-        result.translate(newVector3(-0.5, -0.5, -0.5))
 
-proc getVpSize(): Size =
-    let glvp = currentContext().gl.getViewport()
-    result = newSize((glvp[2] - glvp[0]).float32, (glvp[3] - glvp[1]).float32)
+template worldToWindow(c: Mask, w: Vector3): Point =
+  let s = c.node.sceneView
+  let scr = s.worldToScreenPoint(w)
+  s.convertPointToWindow(newPoint(scr.x, scr.y)) * s.window.viewportPixelRatio
 
-method isMaskAplicable(c: Component): bool {.base.} = false
-method setupMaskPost(c: Component, maskType: MaskType): bool {.base.} = false
+proc drawMaskNode(c: Mask, mskN: Node) =
+  let e = mskN.enabled
+  mskN.enabled = true
+  recursiveDraw(mskN)
+  mskN.enabled = e
 
-method isMaskAplicable(s: Sprite): bool = true
-method setupMaskPost(s: Sprite, maskType: MaskType): bool =
-    if not s.image.isNil:
-        var theQuad {.noinit.}: array[4, GLfloat]
-        let tex = getTextureQuad(s.image, currentContext().gl, theQuad)
-        let maskImgCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
-        let maskBounds = newRect(s.getOffset(), s.image.size)
-        let trInv = s.node.getInvTransform()
-        let maskAlpha = s.node.getGlobalAlpha()
-        pushPostEffect(effectSprite[maskType.int-1], tex, maskImgCoords, maskBounds, getVpSize(), trInv, maskAlpha)
-        return true
+var theQuad {.noinit.}: array[4, GLfloat]
+proc setupMskPost(c: Mask): bool =
+  if c.rti.isNil:
+    c.rti = newImageRenderTarget()
 
-method isMaskAplicable(s: Solid): bool = true
-method setupMaskPost(s: Solid, maskType: MaskType): bool =
-    pushPostEffect(effectSolid[maskType.int-1], s.size, s.color, getVpSize(), s.node.getInvTransform(), s.node.getGlobalAlpha())
-    return true
+  let gl = currentContext().gl
+  let bbx = c.mMaskNode.nodeBounds()
+  var wpmin = c.worldToWindow(bbx.minPoint)
+  var wpmax = c.worldToWindow(bbx.maxPoint)
 
-proc setupMaskComponent(msk: Mask, n: Node) =
-    msk.maskComponent = nil
-    if not n.isNil:
-        discard n.findNode do(nd: Node) -> bool:
-            for comp in nd.components:
-                if comp.isMaskAplicable():
-                    if msk.maskComponent.isNil:
-                        msk.maskComponent = comp
-                        if comp of RTI:
-                            return true
-                    else:
-                        raise newException(Exception, "more than one mask targets found, use rti")
+  let isOrtho = c.node.sceneView.camera.projectionMode == cpOrtho
+  if not isOrtho:
+    swap(wpmin.y, wpmax.y)
 
-proc trySetupMask(msk: Mask, n: Node) =
-    try: msk.setupMaskComponent(n)
-    except Exception:
-        let ex = getCurrentException()
-        info ex.name, ": ", getCurrentExceptionMsg(), "\n", ex.getStackTrace()
+  let
+    oldVp = gl.getViewport()
+    vpW = (oldVp[2] - oldVp[0]).float32
+    vpH = (oldVp[3] - oldVp[1]).float32
+    vpX = -wpmin.x
+    vpY = -(vpH - wpmax.y)
+
+  let s = newSize(
+    min(wpmax.x - wpmin.x, vpW),
+    min(wpmax.y - wpmin.y, vpH)
+  )
+
+  if s.width < 1.0 or s.height < 1.0:
+    return false
+
+  if c.maskTexture.isNil:
+    c.maskTexture = imageWithSize(s)
+  elif (c.maskTexture.size - s).width.abs > 0.01 or (c.maskTexture.size - s).height.abs > 0.01:
+    c.maskTexture.resetToSize(s, gl)
+
+  var ctx: RTIContext
+  c.rti.setImage(c.maskTexture)
+  c.rti.beginDraw(ctx)
+  gl.viewport(vpX.GLint, vpY.GLint, vpW.GLsizei, vpH.GLsizei)
+  c.drawMaskNode(c.mMaskNode)
+  c.rti.endDraw(ctx)
+  gl.viewport(oldVp)
+
+  if not c.maskTexture.flipped:
+    c.maskTexture.flipVertically()
+
+  let tex = getTextureQuad(c.maskTexture, currentContext().gl, theQuad)
+  let texCoords = newRect(theQuad[0], theQuad[1], theQuad[2], theQuad[3])
+  pushPostEffect(effectSprite[c.maskType.int-1], tex, texCoords, newRect(wpmin, s), newSize(vpW, vpH), c.mMaskNode.getGlobalAlpha())
+  result = true
 
 template maskNode*(msk: Mask): Node =
-    when defined(rodplugin):
-        msk.mMaskNode
-    else:
-        if not msk.maskComponent.isNil: msk.maskComponent.node else: nil
+  msk.mMaskNode
 
 template `maskNode=`*(msk: Mask, val: Node) =
-    when defined(rodplugin):
-        msk.mMaskNode = val
-    trySetupMask(msk, val)
+  msk.mMaskNode = val
 
-# method componentNodeWillBeRemovedFromSceneView*(msk: Mask) =
-#     msk.maskComponent = nil
+method componentNodeWillBeRemovedFromSceneView*(c: Mask) =
+  if not c.rti.isNil:
+    c.rti.dispose()
+    c.rti = nil
+  c.maskTexture = nil
 
 method beforeDraw*(msk: Mask, index: int): bool =
-    if not msk.maskComponent.isNil and msk.maskType != tmNone:
-        msk.mWasPost = msk.maskComponent.setupMaskPost(msk.maskType)
+  if not msk.mMaskNode.isNil and msk.maskType != tmNone:
+    msk.mWasPost = msk.setupMskPost()
 
 method afterDraw*(msk: Mask, index: int) =
-    if msk.mWasPost:
-        popPostEffect()
-        msk.mWasPost = false
+  if msk.mWasPost:
+    popPostEffect()
+    msk.mWasPost = false
 
 method visitProperties*(msk: Mask, p: var PropertyVisitor) =
-    p.visitProperty("mask type", msk.maskType)
-    p.visitProperty("layer name", msk.maskNode)
+  p.visitProperty("mask type", msk.maskType)
+  p.visitProperty("layer name", msk.maskNode)
+
+  proc prev(c: Mask): Image =
+    if not c.maskTexture.isNil:
+      return c.maskTexture.Image
+  proc `prev=`(c: Mask, v: Image) = discard
+  p.visitProperty("mask texture", msk.prev)
 
 proc toPhantom(msk: Mask, p: var object) =
-    if not msk.maskNode.isNil:
-        p.layerName = msk.maskNode.name
+  if not msk.maskNode.isNil:
+    p.layerName = msk.maskNode.name
 
 proc fromPhantom(msk: Mask, p: object) =
-    if p.layerName.len != 0:
-        addNodeRef(p.layerName) do(n: Node):
-            msk.maskNode = n
+  if p.layerName.len != 0:
+    addNodeRef(p.layerName) do(n: Node):
+      msk.maskNode = n
 
 genSerializationCodeForComponent(Mask)
 registerComponent(Mask, "Effects")
