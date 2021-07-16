@@ -1,4 +1,7 @@
-import nimx/[types, context, image, view, matrixes, composition, property_visitor, portable_gl, render_to_image]
+import nimx / [
+  types, context, image, view, matrixes, composition,
+  property_visitor, portable_gl, render_to_image, window
+]
 import rod / utils / [ property_desc, serialization_codegen ]
 import rod / [ rod_types, node, component, viewport, component/camera ]
 
@@ -70,12 +73,11 @@ Mask.properties:
   layerName:
     phantom: string
 
-method isMaskAplicable2(c: RenderComponent): bool {.base.} = true
 
 template worldToWindow(c: Mask, w: Vector3): Point =
   let s = c.node.sceneView
   let scr = s.worldToScreenPoint(w)
-  s.convertPointToWindow(newPoint(scr.x, scr.y))
+  s.convertPointToWindow(newPoint(scr.x, scr.y)) * s.window.viewportPixelRatio
 
 proc drawMaskNode(c: Mask, mskN: Node) =
   let e = mskN.enabled
@@ -84,7 +86,6 @@ proc drawMaskNode(c: Mask, mskN: Node) =
   mskN.enabled = e
 
 var theQuad {.noinit.}: array[4, GLfloat]
-
 proc setupMskPost(c: Mask): bool =
   if c.rti.isNil:
     c.rti = newImageRenderTarget()
@@ -123,7 +124,6 @@ proc setupMskPost(c: Mask): bool =
   c.rti.beginDraw(ctx)
   gl.viewport(vpX.GLint, vpY.GLint, vpW.GLsizei, vpH.GLsizei)
   c.drawMaskNode(c.mMaskNode)
-
   c.rti.endDraw(ctx)
   gl.viewport(oldVp)
 
