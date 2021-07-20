@@ -3,9 +3,10 @@ import nimx / assets / [ asset_manager, asset_loading ]
 import rod / utils / [ bin_deserializer, json_serializer, json_deserializer ]
 import rod / [ asset_bundle ]
 import rod / tools / serializer
+import rod / [ node_2, node_flags ]
 import quaternion, ray, rod_types
 import tables, typetraits, json, strutils, math, os
-
+export node_2, node_flags
 
 when defined(rodedit):
     import rod / editor / scene / components / editor_component
@@ -34,30 +35,11 @@ proc addAnimation*(n: Node, a: Animation) =
 proc removeAnimation*(n: Node, a: Animation) =
     n.animationRunner.runner.removeAnimation(a)
 
-template setNodeFlag(n: Node, f: NodeFlags, v: bool) =
-    if v: n.mFlags.incl(f) else: n.mFlags.excl(f)
-
-proc isEnabled*(n: Node): bool {.inline.} = NodeFlags.enabled in n.mFlags
-proc `isEnabled=`*(n: Node, flag: bool) {.inline.} =
-    n.setNodeFlag(NodeFlags.enabled, flag)
-
-proc affectsChildren*(n: Node): bool {.inline.} = NodeFlags.affectsChildren in n.mFlags
-proc `affectsChildren=`*(n: Node, flag: bool) {.inline.} =
-    n.setNodeFlag(NodeFlags.affectsChildren, flag)
-
-proc isDirty*(n: Node): bool {.inline.} = NodeFlags.dirty in n.mFlags
-proc `isDirty=`*(n: Node, flag: bool) {.inline.} =
-    n.setNodeFlag(NodeFlags.dirty, flag)
-
-proc isSerializable*(n: Node): bool {.inline.} = NodeFlags.serializable in n.mFlags
-proc `isSerializable=`*(n: Node, flag: bool) {.inline.} =
-    n.setNodeFlag(NodeFlags.serializable, flag)
-
 proc newNode*(name: string = ""): Node =
     result.new()
     result.mScale = newVector3(1, 1, 1)
     result.mRotation = newQuaternion()
-    result.children = @[]
+
     result.name = name
     result.alpha = 1.0
     result.isDirty = true
@@ -65,11 +47,13 @@ proc newNode*(name: string = ""): Node =
     result.affectsChildren = true
     result.isSerializable = true
 
-proc setDirty(n: Node) =
-    if not n.isDirty:
-        n.isDirty = true
-        for c in n.children:
-            c.setDirty()
+    result.mParent = InvalidNodeIndex
+    result.mIndex = InvalidNodeIndex
+    result.mNext = InvalidNodeIndex
+    result.mPrev = InvalidNodeIndex
+    result.mFirstChild = InvalidNodeIndex
+
+
 
 template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
 proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
@@ -153,11 +137,6 @@ proc `anchor=`*(n: Node, v: Vector3) =
 
 proc anchor*(n: Node): Vector3 =
     result = n.mAnchorPoint
-
-proc parent*(n: Node): Node = n.mParent
-proc `parent=`*(n: Node, p: Node) =
-    n.mParent = p
-    n.setDirty()
 
 proc createComponentForNode(n: Node, name: string): Component =
     result = createComponent(name)
@@ -346,8 +325,8 @@ iterator allNodes*(n: Node): Node =
     while i < s.len:
         let n = s[i]
         yield n
-        if n.children.len > 0:
-            s.add(n.children)
+        for ch in n.children:
+            s.add(ch)
         inc i
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
@@ -425,9 +404,11 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
         n.renderComponents.removedAUX()
         n.scriptComponents.removedAUX()
 
+
+    let children = n.seqOfChildren
     var ci = 0
-    while ci < n.children.len:
-        n.children[ci].nodeWillBeRemovedFromSceneView()
+    while ci < children.len:
+        children[ci].nodeWillBeRemovedFromSceneView()
         inc ci
     n.mSceneView = nil
 
@@ -445,9 +426,10 @@ proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
             n.renderComponents.addedAUX()
             n.scriptComponents.addedAUX()
 
+        let children = n.seqOfChildren
         var ci = 0
-        while ci < n.children.len:
-            n.children[ci].nodeWasAddedToSceneView(v)
+        while ci < children.len:
+            children[ci].nodeWasAddedToSceneView(v)
             inc ci
     else:
         # There may be cases where this proc has already been called.
@@ -456,31 +438,39 @@ proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
         # In such case we don't have to do anything
         assert(n.mSceneView == v)
 
-proc removeChild(n, child: Node) =
-    for i, c in n.children:
-        if c == child:
-            n.children.delete(i)
-            break
+# proc removeChild(n, child: Node) =
+#     for i, c in n.children:
+#         if c == child:
+#             n.children.delete(i)
+#             break
 
-proc removeAllChildren*(n: Node) =
-    for c in n.children:
-        if not c.mSceneView.isNil:
-            c.nodeWillBeRemovedFromSceneView()
-        c.parent = nil
-    n.children.setLen(0)
+        # c.parent = nil
+#     n.children.setLen(0)
 
 proc removeFromParent*(n: Node) =
     if not n.parent.isNil:
         if not n.mSceneView.isNil:
             n.nodeWillBeRemovedFromSceneView()
+    n.removeFromParent2()
+#         n.parent.removeChild(n)
+#         n.parent = nil
 
-        n.parent.removeChild(n)
-        n.parent = nil
+#todo: think about it
+proc removeAllChildren*(n: Node) =
+    var toRemove: seq[Node]
+    for c in n.children:
+        toRemove.add(n)
+
+    var i = 0
+    while i < toRemove.len:
+        toRemove[i].removeFromParent()
+        inc i
 
 proc addChild*(n, c: Node) =
-    c.removeFromParent()
-    n.children.add(c)
-    c.parent = n
+    n.addChild2(c)
+    # c.removeFromParent()
+    # n.children.add(c)
+    # c.parent = n
     c.setDirty()
     if not n.mSceneView.isNil:
         c.nodeWasAddedToSceneView(n.mSceneView)
@@ -492,9 +482,10 @@ proc newChild*(n: Node, childName: string): Node =
 proc newChild*(n: Node): Node {.inline.} = newChild(n, "")
 
 proc insertChild*(n, c: Node, index: int) =
-    c.removeFromParent()
-    n.children.insert(c, index)
-    c.parent = n
+    n.insertChild2(c, index)
+    # c.removeFromParent()
+    # n.children.insert(c, index)
+    # c.parent = n
     c.setDirty()
     if not n.mSceneView.isNil:
         c.nodeWasAddedToSceneView(n.mSceneView)
@@ -683,7 +674,7 @@ proc binDeserializerForPath(path: string): BinDeserializer =
     if not rab.isNil:
         return rab.binDeserializer
 
-proc newNode*(b: BinDeserializer, compName: string): Node
+proc newNode*(b: BinDeserializer, compName: string, c: Composition): Node
 
 proc fixupCompositionUrlExtension(url: var string)=
     ## Makes sure the extension is jcomp
@@ -697,6 +688,7 @@ proc newComposition*(url: string, n: Node = nil): Composition =
     result.url = url
     result.node = if not n.isNil: n else: newNode()
     result.node.composition = result
+    result.world = new(World)
 
 proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
     const prefix = "res://"
@@ -705,7 +697,7 @@ proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
         let bd = binDeserializerForPath(path)
         if not bd.isNil:
             try:
-                let theNode = newNode(bd, path)
+                let theNode = newNode(bd, path, comp)
                 comp.node[] = theNode[]
                 for c in comp.node.children:
                     c.parent = comp.node
@@ -792,7 +784,10 @@ proc newNodeWithResource*(path: string): Node =
     let bd = binDeserializerForPath(path)
     if not bd.isNil:
         try:
-            return newComposition(path, newNode(bd, path)).node
+            #todo: fix this
+            var comp = newComposition(path)
+            comp.node[] = newNode(bd, path, comp)[]
+            return comp.node
         except:
             echo "Error: could not deserialize ", path
             raise
@@ -844,7 +839,7 @@ proc serialize*(n: Node, s: JsonSerializer) =
             jcomps.add(s.node)
         s.node = jn
 
-    if n.children.len > 0:
+    if n.hasChildren:
         let jn = s.node
         let jchildren = newJArray()
         jn["children"] = jchildren
@@ -907,8 +902,8 @@ proc getTreeDistance*(x, y: Node): int =
 
     assert(not cx.isNil and not cy.isNil)
 
-    let ix = px.children.find(cx)
-    let iy = px.children.find(cy)
+    let ix = px.indexOf(cx)
+    let iy = px.indexOf(cy)
 
     result = iy - ix
 
@@ -934,8 +929,8 @@ proc rayCast*(n: Node, r: Ray, castResult: var seq[RayCastInfo]) =
 
 # Debugging
 proc recursiveChildrenCount*(n: Node): int =
-    result = n.children.len
     for c in n.children:
+        inc result
         result += c.recursiveChildrenCount
 
 type
@@ -949,7 +944,7 @@ type
         bicScale = "s"
         bicTranslation = "t"
 
-proc newNode*(b: BinDeserializer, compName: string): Node =
+proc newNode*(b: BinDeserializer, compName: string, c: Composition): Node =
     let oldPos = b.getPosition()
     let oldPath = b.curCompPath
     b.curCompPath = compName
@@ -961,16 +956,17 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
     b.rewindToComposition(compName)
     let nodesCount = b.readInt16()
     var nodes = newSeq[Node](nodesCount)
-    for i in 0 ..< nodesCount: nodes[i] = newNode()
+    for i in 0 ..< nodesCount:
+        nodes[i] = newNode()
 
     var tmpBuf = b.getBuffer(int16, nodesCount - 1)
-
     # Read child-parent relations
     for i in 1 ..< nodesCount:
         let ch = nodes[i]
         let p = nodes[tmpBuf[i - 1]]
-        p.children.add(ch)
-        ch.parent = p
+        #todo: fix this
+        p.addChild2(ch)
+        # ch.parent = p
 
     let compsCount = b.readInt16()
     for i in 0 ..< compsCount:
@@ -1020,13 +1016,18 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
                 let subComp = newNodeWithResource(compRef)
                 let old = nodes[tmpBuf[i]]
 
-                for c in subComp.children:
-                    c.parent = old
+                # for c in subComp.children:
+                #     c.parent = old
 
-                if old.children.len != 0:
-                    old.children = subComp.children & old.children
+                var subCompCh = subComp.seqOfChildren
+                if old.hasChildren:
+                    for i, ch in subCompCh:
+                        old.insertChild2(ch, i)
+                    # old.children = subComp.children & old.children
                 else:
-                    old.children = subComp.children
+                    for ch in subCompCh:
+                        old.addChild2(ch)
+                    # old.children = subComp.children
                 old.animations = subComp.animations
                 for c in subComp.components:
                     c.node = old

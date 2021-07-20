@@ -268,6 +268,7 @@ method init*(v: SceneView, frame: Rect) =
     procCall v.View.init(frame)
     v.addAnimationRunner(newAnimationRunner())
 
+    v.world = new(World)
     var updateAnim = newAnimation()
     updateAnim.tag = "deltaTimeAnimation"
     updateAnim.numberOfLoops = -1

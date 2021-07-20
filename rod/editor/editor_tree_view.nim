@@ -48,7 +48,7 @@ method init*(v: EditorTreeView, r: Rect)=
             result = 1
         else:
             let n = item.get(Node)
-            result = n.children.len
+            result = n.childrenLen
             when defined(rodedit):
                 if not n.composition.isNil and n != v.rootNode:
                     result = 0
@@ -57,7 +57,7 @@ method init*(v: EditorTreeView, r: Rect)=
         if indexPath.len == 1:
             return newVariant(v.rootNode)
         else:
-            return newVariant(item.get(Node).children[indexPath[^1]])
+            return newVariant(item.get(Node).childAt(indexPath[^1]))
 
     outlineView.createCell = proc(): TableViewCell =
         var lbl = newLabel(newRect(0, 0, 100, 20))
@@ -105,7 +105,7 @@ method init*(v: EditorTreeView, r: Rect)=
                 textField.textColor = newColor(0.9, 0.69, 0.67)
 
         textField.text = if n.name.len == 0: "(node)" else: n.name
-        textField.text = textField.text & " [" & $n.children.len & "]"
+        textField.text = textField.text & " [" & $n.childrenLen & "]"
 
         # btn.onAction do():
         #     n.enabled = not n.enabled
@@ -140,13 +140,11 @@ method init*(v: EditorTreeView, r: Rect)=
         let t = outlineView.itemAtIndexPath(tos).get(Node)
         let toIndex = toIp[^1]
         if f.parent == t:
-            let cIndex = t.children.find(f)
+            let cIndex = t.indexOf(f)
             if toIndex < cIndex:
-                t.children.delete(cIndex)
-                t.children.insert(f, toIndex)
+                t.insertChild2(f, toIndex)
             elif toIndex > cIndex:
-                t.children.delete(cIndex)
-                t.children.insert(f, toIndex - 1)
+                t.insertChild2(f, toIndex - 1)
         else:
             f.removeFromParent()
             t.insertChild(f, toIndex)
@@ -179,7 +177,7 @@ method init*(v: EditorTreeView, r: Rect)=
 
         outlineView.expandRow(sip)
         discard n.newChild("New Node")
-        sip.add(n.children.len - 1)
+        sip.add(n.childrenLen - 1)
 
         v.onTreeChanged()
         outlineView.selectItemAtIndexPath(sip)
@@ -249,7 +247,7 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
         v.outlineView.expandRow(sip)
         discard n.newChild("New Node")
         if not e.modifiers.anyShift():
-            sip.add(n.children.len - 1)
+            sip.add(n.childrenLen - 1)
             v.onTreeChanged()
             v.outlineView.selectItemAtIndexPath(sip)
 
@@ -283,7 +281,7 @@ proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node, indexPath: var seq[
         var p = n.parent
         var n = n
         while not p.isNil and n != rootParent:
-            indexPath.insert(p.children.find(n), 0)
+            indexPath.insert(p.indexOf(n), 0)
             n = p
             p = p.parent
 

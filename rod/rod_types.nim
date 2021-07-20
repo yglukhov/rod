@@ -14,14 +14,16 @@ type
         dirty
         serializable
 
+    NodeIndex* = uint16
+
     Node* = ref object
         mTranslation*: Vector3
         mRotation*: Quaternion
         mScale*: Vector3
         renderComponents*: seq[RenderComponent]
         scriptComponents*: seq[ScriptComponent]
-        children*: seq[Node]
-        mParent*: Node
+        # children*: seq[Node]
+        # mParent*: Node
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
@@ -31,6 +33,14 @@ type
         composition*: Composition
         mAnchorPoint*: Vector3
         mFlags*: set[NodeFlags]
+
+        #todo: move it
+        isRemoved*: bool
+        mIndex*: NodeIndex
+        mParent*: NodeIndex
+        mNext*: NodeIndex
+        mPrev*: NodeIndex
+        mFirstChild*: NodeIndex
 
         when defined(rodedit):
             jAnimations*: JsonNode
@@ -60,7 +70,12 @@ type
     System* = ref object of RootRef
         sceneView*: SceneView
 
+    World* = ref object
+        nodes*: seq[Node]
+        isDirty*: bool
+
     SceneView* = ref object of View
+        world*: World
         systems*: seq[System]
         viewMatrixCached*: Matrix4
         viewProjMatrix*: Matrix4
@@ -76,6 +91,7 @@ type
     Composition* = ref object
         url*: string
         node*: Node
+        world*: World
         when defined(rodedit):
             originalUrl*: string # used in editor to restore url
 
