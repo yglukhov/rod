@@ -688,7 +688,6 @@ proc newComposition*(url: string, n: Node = nil): Composition =
     result.url = url
     result.node = if not n.isNil: n else: newNode()
     result.node.composition = result
-    result.world = new(World)
 
 proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
     const prefix = "res://"

@@ -41,7 +41,7 @@ type
         mNext*: NodeIndex
         mPrev*: NodeIndex
         mFirstChild*: NodeIndex
-
+        mWorld*: World
         when defined(rodedit):
             jAnimations*: JsonNode
 
@@ -91,7 +91,6 @@ type
     Composition* = ref object
         url*: string
         node*: Node
-        world*: World
         when defined(rodedit):
             originalUrl*: string # used in editor to restore url
 

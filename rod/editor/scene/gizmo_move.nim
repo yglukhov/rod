@@ -1,6 +1,6 @@
 import nimx/[context, portable_gl, types, matrixes, event]
 import rod/component/[primitives/cone, primitives/cube, mesh_component, material]
-import rod/[node, viewport, quaternion, editor/scene/gizmo]
+import rod/[rod_types, node, viewport, quaternion, editor/scene/gizmo]
 import rod/editor/scene/components/grid
 import strutils
 
@@ -56,6 +56,7 @@ proc createPlane(name: string): Node =
 
 proc createArrow(name: string): Node =
     result = newNode(name)
+
     let h = 16.0
     let cylNode = newNode()
     let coneNode = newNode()
