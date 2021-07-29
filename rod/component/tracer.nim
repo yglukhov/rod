@@ -23,7 +23,8 @@ const initialVerticesCount = 2000
 type
     Attrib = enum
         aPosition
-    Tracer* = ref object of RenderComponent
+    Tracer* = ref TracerObj
+    TracerObj = object of RenderComponent
         color*: Color
         indexBuffer: BufferRef
         vertexBuffer: BufferRef
@@ -34,7 +35,7 @@ type
         traceStep*: int
         traceStepCounter: int
 
-proc cleanup*(t: Tracer) =
+proc cleanupAux(t: var TracerObj) =
     let c = currentContext()
     if c.isNil: return
     let gl = c.gl
@@ -45,8 +46,18 @@ proc cleanup*(t: Tracer) =
         gl.deleteBuffer(t.vertexBuffer)
         t.vertexBuffer = invalidBuffer
 
+proc cleanup*(t: Tracer) =
+    cleanupAux(t[])
+
+when defined(gcDestructors):
+    proc `=destroy`(t: var TracerObj) =
+        cleanupAux(t)
+
 proc newTracer(): Tracer =
-    new(result, cleanup)
+    when defined(gcDestructors):
+        Tracer()
+    else:
+        new(result, cleanup)
 
 method init*(t: Tracer) =
     procCall t.Component.init()
@@ -182,7 +193,6 @@ method visitProperties*(t: Tracer, p: var PropertyVisitor) =
     p.visitProperty("color", t.color)
     p.visitProperty("trace_step", t.traceStep)
 
-proc creator(): RootRef =
-    result = newTracer()
+proc creator(): RootRef = newTracer()
 
 registerComponent(Tracer, creator)
