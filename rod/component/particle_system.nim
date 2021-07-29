@@ -180,7 +180,8 @@ type
         idSize: int32
         lifeTimeSize: int32
 
-    ParticleSystem* = ref object of RenderComponent
+    ParticleSystem* = ref ParticleSystemObj
+    ParticleSystemObj = object of RenderComponent
         animation*: Animation
         count: int32
 
@@ -397,7 +398,7 @@ proc initSystem(ps: ParticleSystem) =
 
     ps.isInited = true
 
-proc cleanup*(ps: ParticleSystem) =
+proc cleanupAux(ps: var ParticleSystemObj) =
     let c = currentContext()
     if c.isNil: return
     let gl = c.gl
@@ -407,6 +408,13 @@ proc cleanup*(ps: ParticleSystem) =
     if ps.vertexBuffer != invalidBuffer:
         gl.deleteBuffer(ps.vertexBuffer)
         ps.vertexBuffer = invalidBuffer
+
+proc cleanup*(ps: ParticleSystem) =
+    cleanupAux(ps[])
+
+when defined(gcDestructors):
+    proc `=destroy`(ps: var ParticleSystemObj) =
+        cleanupAux(ps)
 
 method init(ps: ParticleSystem) =
     ps.isInited = false
@@ -1069,8 +1077,11 @@ genSerializationCodeForComponent(PSHolder)
 registerComponent(PSHolder, "ParticleSystem")
 
 proc creator(): RootRef =
-    var p: ParticleSystem
-    p.new(cleanup)
-    return p
+    when defined(gcDestructors):
+        ParticleSystem()
+    else:
+        var p: ParticleSystem
+        p.new(cleanup)
+        p
 
 registerComponent(ParticleSystem, creator, "ParticleSystem")
