@@ -1,4 +1,27 @@
 import rod / [ rod_types, node_flags ]
+import sequtils
+
+# type
+#   World = ref object
+#     nodes: seq[Node]
+#     isDirty: bool
+
+#   NodeIndex = uint16
+
+#   Node = ref object of RootObj
+#     name: string
+#     isDirty: bool
+#     mIndex: NodeIndex
+#     mParent: NodeIndex
+#     mNext: NodeIndex
+#     mPrev: NodeIndex
+#     mFirstChild: NodeIndex
+#     mWorld: World
+
+
+# const InvalidIndex = high(NodeIndex)
+
+# proc newNode(name: string): Node
 
 proc setDirty*(n: Node)
 
@@ -15,36 +38,25 @@ proc getNode(w: World, i: NodeIndex): Node =
 
 proc reorder*(w: World)
 
-proc removeNode(w: World, i: NodeIndex) =
-  if i < w.nodes.len.NodeIndex:
-    # we will remove this nodes in reorder
-    w.nodes.del(i)
-    w.isDirty = true
-    ## todo: handle id changing
-
-proc dump(w: World) =
+proc dump(w: World, prefix: string = "") =
   for n in w.nodes:
-    echo n.mIndex, " : ", n.name
+    echo prefix, n.mIndex, " : ", n.name, " [par ", n.mParent, ", fst ", n.mFirstChild, ", prv ", n.mPrev, ", nxt ", n.mNext, "]"
 
 proc parent*(n: Node): Node
 
 proc moveToWorld(n: Node, w: World)
 
 proc world(n: Node): World =
-  var scene = n.mSceneView
-  if not scene.isNil:
-    return scene.world
   if not n.mWorld.isNil:
     return n.mWorld
   n.mWorld = new(World)
+  n.mIndex = n.mWorld.addNode(n)
   result = n.mWorld
 
 proc first*(n: Node): Node =
-  if n.world.isnil: return
   return n.world.getNode(n.mFirstChild)
 
 proc next(n: Node): Node =
-  if n.world.isnil: return
   return n.world.getNode(n.mNext)
 
 proc `next=`(n: Node, nn: Node) =
@@ -55,17 +67,17 @@ proc `next=`(n: Node, nn: Node) =
   nn.mPrev = n.mIndex
 
 proc prev(n: Node): Node =
-  if n.world.isnil: return
   return n.world.getNode(n.mPrev)
 
 proc parent*(n: Node): Node =
-  if n.world.isnil: return
   return n.world.getNode(n.mParent)
 
 proc `parent=`*(n: Node, p: Node) =
   if p.isNil:
+    echo n.name, " parent= nil"
     n.mParent = InvalidNodeIndex
   else:
+    echo n.name, " parent= ", p.name, " index ", p.mIndex
     n.mParent = p.mIndex
   n.setDirty()
 
@@ -77,9 +89,13 @@ proc last*(n: Node): Node =
 
 iterator children*(n: Node): Node =
   var el = n.first
+  var iters = 0
   while not el.isNil:
     yield el
     el = el.next
+    if iters > n.world.nodes.len:
+      raise newException(Exception, "looped ")
+    inc iters
 
 proc hasChildren*(n: Node): bool =
   n.mFirstChild != InvalidNodeIndex
@@ -124,17 +140,99 @@ proc setDirty*(n: Node) =
     for c in n.children:
       c.setDirty()
 
+proc offsetIndexes(n: Node, off: int, fromIndex: NodeIndex = InvalidNodeIndex) =
+  template offset(field: var NodeIndex) =
+    if field != InvalidNodeIndex:
+      field = NodeIndex(int(field) + off)
+
+  # echo "  * offsetIndexes ", n.name, " off ", off, " fromIndex ", fromIndex
+  offset(n.mIndex)
+  offset(n.mNext)
+  offset(n.mFirstChild)
+
+  if not n.prev.isNil:
+    n.prev.mNext = n.mIndex
+  elif not n.parent.isNil:
+    n.parent.mFirstChild = n.mIndex
+
+  if fromIndex == InvalidNodeIndex or n.mParent > fromIndex:
+    offset(n.mParent)
+
+  if fromIndex == InvalidNodeIndex or n.mPrev > fromIndex:
+    offset(n.mPrev)
+
+proc getOrder(node: Node, order: var seq[NodeIndex]) =
+  order.add(node.mIndex)
+  # echo "getOrder ", node.name
+  for ch in node.children:
+    getOrder(ch, order)
+
+proc moveTo(w1, w2: World, indexes: seq[NodeIndex]) =
+  var nodes: seq[Node]
+  for i in indexes:
+    nodes.add(w1.nodes[int(i)])
+
+proc setWorld(n: Node, w: World) =
+  n.mWorld = w
+  for ch in n.children:
+    ch.setWorld(w)
+
+proc moveToWorld(n: Node, w: World) =
+  echo "moveToWorld ", n.name, " world ", w.nodes.len
+  if n.mWorld.isNil:
+    n.mWorld = w
+    n.mIndex = w.addNode(n)
+    n.setWorld(w)
+    w.isDirty = true
+    w.reorder()
+    return
+  if n.mWorld == w:
+    w.isDirty = true
+    w.reorder()
+    return
+
+  let oldWorld = n.mWorld
+  oldWorld.dump("ss ")
+
+  var indexes: seq[NodeIndex]
+  # indexes.add(n.mIndex)
+  # oldWorld.dump("old0 ")
+  getOrder(n, indexes)
+  # oldWorld.moveTo(w, indexes)
+
+  oldWorld.reorder()
+  w.reorder()
+
+  # echo "moveToWorld2 ", indexes
+  for idx in indexes:
+    let node = oldWorld.nodes[idx]
+    let newIndex = w.addNode(node)
+    # echo "  offsetIndexe2 ", int(newIndex) - int(idx)
+    node.offsetIndexes(int(newIndex) - int(idx))
+  n.setWorld(w)
+
+  for i in indexes[^1].int + 1 ..< oldWorld.nodes.len:
+    # echo "offset ", oldWorld.nodes[i].name, " from ", indexes[0]
+    oldWorld.nodes[i].offsetIndexes(-indexes.len, indexes[0])
+  oldWorld.nodes.delete(first = indexes[0].int, last = indexes[^1].int)
+
+  oldWorld.isDirty = true
+  oldWorld.reorder()
+
+  w.isDirty = true
+  w.reorder()
+  # echo "  moved"
+
 proc claimChildren(n: Node) =
   var newWorld = new(World)
-  newWorld.nodes.add(n)
-  for ch in n.children:
-    discard newWorld.addNode(ch)
-  for node in newWorld.nodes:
-    n.world.removeNode(node.mIndex)
-  #reorder old world
-  n.world.reorder()
-  # set new world
-  n.mWorld = newWorld
+  newWorld.isDirty = true
+  let oldW = n.world
+  # n.world.dump("z ")
+  n.moveToWorld(newWorld)
+  # n.world.reorder()
+  # n.world.reorder()
+  # n.world.dump("x ")
+  # oldW.dump("z2 ")
 
 proc removeChild(n: Node, child: Node) =
   var prev: Node
@@ -144,8 +242,9 @@ proc removeChild(n: Node, child: Node) =
       if prev.isNil:
         n.mFirstChild = ch.mNext
       else:
-        prev.mNext = ch.mNext
+        prev.next = ch.next
       ch.mNext = InvalidNodeIndex
+      ch.mPrev = InvalidNodeIndex
       echo "remove ", ch.name, " from ", n.name
       ch.claimChildren()
       break
@@ -153,19 +252,19 @@ proc removeChild(n: Node, child: Node) =
 
 proc removeFromParent2*(n: Node) =
   let parent = n.parent
-  if parent.isNil: #root node
+  if parent.isNil:
+    echo "removeFromParent2 ", n.name, " parent isNil"
     return
   parent.removeChild(n)
 
 proc addChild2*(n: Node, ch: Node) =
-  echo " add ", ch.name, " to ", n.name
-  n.world.isDirty = true
+  echo "\nadd ", ch.name, " to ", n.name
   if ch.mIndex != InvalidNodeIndex:
     ch.removeFromParent2()
-    ch.mIndex = InvalidNodeIndex
 
-  ch.mIndex = n.world.addNode(ch)
+  # n.world.reorder()
   ch.moveToWorld n.world
+  # ch.mIndex = n.world.addNode(ch)
   ch.parent = n
 
   if n.first.isNil:
@@ -174,15 +273,13 @@ proc addChild2*(n: Node, ch: Node) =
   else:
     n.last.next = ch
   # n.printTree()
-  n.world.printWorld()
+  # n.world.printWorld()
 
 proc insertChild2*(n: Node, ch: Node, i: int) =
-  n.world.isDirty = true
   if ch.mIndex != InvalidNodeIndex:
     ch.removeFromParent2()
-    ch.mIndex = InvalidNodeIndex
 
-  ch.mIndex = n.world.addNode(ch)
+  # ch.mIndex = n.world.addNode(ch)
   ch.moveToWorld n.world
   ch.parent = n
 
@@ -206,50 +303,6 @@ proc insertChild2*(n: Node, ch: Node, i: int) =
       prev.next = ch
       return
   raise newException(Exception, "Index out of bounds")
-
-#[
-  mIndex*: NodeIndex
-  mParent*: NodeIndex
-  mNext*: NodeIndex
-  mPrev*: NodeIndex
-  mFirstChild*: NodeIndex
-]#
-
-proc offsetIndexes(n: Node, offset: int) =
-  n.mIndex = NodeIndex(int(n.mIndex) + offset)
-  n.mParent = NodeIndex(int(n.mParent) + offset)
-  n.mNext = NodeIndex(int(n.mNext) + offset)
-  n.mPrev = NodeIndex(int(n.mPrev) + offset)
-  n.mFirstChild = NodeIndex(int(n.mFirstChild) + offset)
-
-proc moveToWorld(n: Node, w: World) =
-  if n.mWorld.isNil:
-    n.mWorld = w
-    return
-  for node in n.mWorld.nodes:
-    let oldIndex = node.mIndex
-    let newIndex = w.addNode(node)
-    echo "offsetIndexes ", int(newIndex) - int(oldIndex)
-    node.offsetIndexes(int(newIndex) - int(oldIndex))
-  n.mWorld = w
-
-# proc moveToWorld(n: Node, w: World) =
-#   let startIndex = w.nodes.len
-#   var oldIndexes: seq[NodeIndex]
-
-#   for n in n.world:
-#     oldIndexes.add(n.mIndex)
-#     n.offsetIndexes(startIndex)
-#   for i in oldIndexes:
-#     w.add(n.world[i])
-#     n.world[i] = nil #todo: think about it...
-#   n.wolrd.isDirty = true
-#   w.isDirty = true
-
-# proc removeFromWorld(n: Node) =
-#   let oldWorld = n.world
-#   let offset = n.mIndex
-#   n.world = new(World)
 
 proc swapNodes(w: World, targetIndex, oldIndex: NodeIndex) =
   let node = w.nodes[oldIndex]
@@ -285,23 +338,15 @@ proc swapNodes(w: World, targetIndex, oldIndex: NodeIndex) =
     next2.mPrev = oldIndex
   swap(w.nodes[oldIndex], w.nodes[targetIndex])
 
-proc getOrder(w: World, node: Node, order: var seq[NodeIndex]) =
-  for ch in node.children:
-    order.add(ch.mIndex)
-    w.getOrder(ch, order)
-
 proc getRoot(w: World): Node =
   w.nodes[0]
 
 proc reorder*(w: World) =
-  if not w.isDirty: return
+  if not w.isDirty or w.nodes.len == 0: return
 
-  echo "Before"
-  w.printWorld()
-  w.getRoot().printTree()
+  # w.dump("Before ")
   var swaps: seq[NodeIndex]
-  swaps.add(0.NodeIndex)
-  w.getOrder(w.getRoot(), swaps)
+  getOrder(w.getRoot(), swaps)
 
   var index = 0
   while index < swaps.len:
@@ -316,11 +361,74 @@ proc reorder*(w: World) =
       if swaps[i] == index.NodeIndex:
         swaps[i] = swap
         break
-    w.getRoot().printTree()
+    # w.getRoot().printTree()
     inc index
+
 
   w.isDirty = false
 
-  echo "After"
-  w.printWorld()
-  w.getRoot().printTree()
+  # w.dump("After ")
+  # w.getRoot().printTree()
+
+# proc newNode(name: string): Node =
+#   result = new(Node)
+#   result.name = name
+#   result.mParent = InvalidIndex
+#   result.mIndex = InvalidIndex
+#   result.mNext = InvalidIndex
+#   result.mPrev = InvalidIndex
+#   result.mFirstChild = InvalidIndex
+
+# proc newChild(n: Node, name: string): Node =
+#   result = newNode(name)
+#   n.addChild2(result)
+#   echo name, " parent valid ", not result.parent.isnil, " parent index ", result.mParent
+#   echo ""
+
+# var root = newNode("root")
+
+# var scene = root.newChild("Scene")
+# var gui = root.newChild("GUI")
+
+# var topPanel = gui.newChild("top")
+# var bottom = gui.newChild("bottom")
+
+# var game1 = scene.newChild("game1")
+# var game2 = scene.newChild("game2")
+
+# var debug = root.newChild("Debug")
+# var d1 = debug.newChild("deg")
+
+# template test(name: string, body: untyped) =
+#   echo "\n"
+#   echo name
+#   body
+#   echo "tree:"
+#   root.printTree()
+#   echo "world"
+#   root.world.dump()
+
+# test "dump all":
+#   # root.world.dump()
+#   discard
+
+# test "gui remove from root":
+#   gui.removeFromParent2()
+
+# test "add gui to debug":
+#   debug.addChild2(gui)
+
+# test "add debug to game1":
+#   game1.addChild2(debug)
+
+# test "insert debug to root":
+#   root.insertChild2(debug, 1)
+
+# test "return gui to root":
+#   root.insertChild2(gui, 1)
+
+# test "reorder":
+#   root.world.dump()
+#   root.world.reorder()
+#   root.world.dump()
+#   root.printTree()
