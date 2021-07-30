@@ -152,11 +152,15 @@ proc setDirty*(n: Node) =
     for c in n.children:
       c.setDirty()
 
+proc getOrder(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var seq[NodeIndex]) =
+  order.add(node)
+  var c = hierarchy[node].firstChild
+  while c != InvalidNodeIndex:
+    getOrder(c, hierarchy, order)
+    c = hierarchy[c].next
+
 proc getOrder*(node: Node, order: var seq[NodeIndex]) =
-  order.add(node.mIndex)
-  # echo "getOrder ", node.name
-  for ch in node.children:
-    getOrder(ch, order)
+  getOrder(node.mIndex, node.mWorld.hierarchy, order)
 
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
@@ -244,7 +248,7 @@ proc addChild2*(n: Node, ch: Node) =
     n.last.next = ch
 
 proc insertChild2*(n: Node, ch: Node, i: int) =
-  if not ch.parent.isNil:
+  if ch.mParent != InvalidNodeIndex:
     ch.removeFromParent2()
     # ch.mIndex = InvalidNodeIndex
 
@@ -276,8 +280,6 @@ proc getRoot(w: World): Node =
   w.nodes[0]
 
 proc reorder*(w: World, indexes: openarray[NodeIndex]) =
-  if not w.isDirty or w.nodes.len == 0: return
-
   template fixUP(v: untyped) =
     if v != InvalidNodeIndex:
       # echo "fixup ", v
