@@ -48,11 +48,12 @@ proc newNode*(name: string = ""): Node =
     result.isSerializable = true
 
     result.mParent = InvalidNodeIndex
-    result.mIndex = InvalidNodeIndex
+    result.mIndex = 0
     result.mNext = InvalidNodeIndex
     result.mPrev = InvalidNodeIndex
     result.mFirstChild = InvalidNodeIndex
 
+    initWorldInEmptyNodeCompat(result)
 
 
 template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
@@ -455,16 +456,9 @@ proc removeFromParent*(n: Node) =
 #         n.parent.removeChild(n)
 #         n.parent = nil
 
-#todo: think about it
 proc removeAllChildren*(n: Node) =
-    var toRemove: seq[Node]
-    for c in n.children:
-        toRemove.add(n)
-
-    var i = 0
-    while i < toRemove.len:
-        toRemove[i].removeFromParent()
-        inc i
+    for c in n.seqOfChildren():
+        c.removeFromParent()
 
 proc addChild*(n, c: Node) =
     assert(not n.isNil)
@@ -700,8 +694,9 @@ proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
             try:
                 let theNode = newNode(bd, path)
                 comp.node[] = theNode[]
-                for c in comp.node.children:
-                    c.parent = comp.node
+                # TODO: Why was this code needed?
+                # for c in comp.node.children:
+                #     c.parent = comp.node
                 for c in comp.node.components:
                     c.node = comp.node
 

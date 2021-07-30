@@ -5,15 +5,30 @@ proc setDirty*(n: Node)
 
 const InvalidNodeIndex* = high(NodeIndex)
 
-proc addNode(w: World, n: Node): NodeIndex =
-  result = w.nodes.len.NodeIndex
-  w.nodes.add(n)
-  w.isDirty = true
+proc newWorld*(): World =
+  # COMPAT, should not be used
+  World(isDirty: true)
+
+proc initWorldInEmptyNodeCompat*(n: Node) =
+  n.mWorld = newWorld()
+  n.mWorld.nodes.add(n)
 
 proc getNode(w: World, i: NodeIndex): Node =
   if i < w.nodes.len.NodeIndex:
     return w.nodes[i]
 
+when not defined(release):
+  proc debugVerifyConsistency*(w: World) =
+    for i, n in w.nodes:
+      if not n.isNil:
+        assert(n.mIndex == i.NodeIndex)
+        if i != 0:
+          assert(n.mParent != InvalidNodeIndex)
+          if n.mPrev == InvalidNodeIndex:
+            assert(w.nodes[n.mParent].mFirstChild == i.NodeIndex)
+
+  proc debugVerifyConsistency*(n: Node) =
+    debugVerifyConsistency(n.mWorld)
 
 proc dump*(w: World, prefix: string = "") =
   for i, n in w.nodes:
@@ -22,15 +37,9 @@ proc dump*(w: World, prefix: string = "") =
       continue
     echo "[", prefix, ":", i, "]: ", n.mIndex, " : ", n.name, " [par ", n.mParent, ", fst ", n.mFirstChild, ", prv ", n.mPrev, ", nxt ", n.mNext, "]"
 
-proc parent*(n: Node): Node
-
 proc world*(n: Node): World =
-  if not n.mWorld.isNil:
-    return n.mWorld
-  n.mWorld = new(World)
-  n.mWorld.isDirty = true
-  n.mIndex = n.mWorld.addNode(n)
-  result = n.mWorld
+  assert(not n.mWorld.isNil)
+  n.mWorld
 
 proc first*(n: Node): Node =
   return n.world.getNode(n.mFirstChild)
@@ -53,7 +62,7 @@ proc prev(n: Node): Node =
 proc parent*(n: Node): Node =
   return n.world.getNode(n.mParent)
 
-proc `parent=`*(n: Node, p: Node) =
+proc `parent=`(n: Node, p: Node) =
   if p.isNil:
     # echo n.name, " parent= nil"
     n.mParent = InvalidNodeIndex
@@ -109,10 +118,9 @@ proc indexOf*(n: Node, c: Node): int =
   result = -1
 
 proc childAt*(n: Node, i: int): Node =
-  var q = 0
-  for ch in n.children:
+  for q, ch in n.children:
     if q == i: return ch
-    inc q
+  assert(false, "out of bounds")
 
 proc childrenLen*(n: Node): int =
   for ch in n.children:
@@ -141,24 +149,14 @@ proc getOrder*(node: Node, order: var seq[NodeIndex]) =
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
 
-proc setWorld(n: Node, w: World) =
-  n.mWorld = w
-  for ch in n.children:
-    ch.setWorld(w)
-
 proc moveToWorld(n: Node, w: World) =
   # echo "moveToWorld ", n.name, " world ", w.nodes.len
-  if n.mWorld.isNil:
-    n.mIndex = w.addNode(n)
-    n.setWorld(w)
-    w.isDirty = true
-    return
-
-  if n.mWorld == w:
-    w.isDirty = true
-    return
+  assert(not n.mWorld.isNil)
 
   w.isDirty = true
+  if n.mWorld == w:
+    return
+
   let oldWorld = n.mWorld
   oldWorld.isDirty = true
   var indexes: seq[NodeIndex]
@@ -166,12 +164,14 @@ proc moveToWorld(n: Node, w: World) =
   # oldWorld.dump("before ")
 
   getOrder(n, indexes)
-  # echo "indexes ", indexes
 
+  var newIndex = w.nodes.len.NodeIndex
   for idx in indexes:
     let node = oldWorld.nodes[idx]
-    let newIndex = w.addNode(node)
+    w.nodes.add(node)
+    node.mWorld = w
     node.mIndex = newIndex
+    inc newIndex
 
   template offset(world: World, v: var NodeIndex) =
     if v != InvalidNodeIndex:
@@ -179,50 +179,37 @@ proc moveToWorld(n: Node, w: World) =
       v = world.nodes[v].mIndex
 
   for oldIndex in indexes:
-    oldWorld.offset(oldWorld.nodes[oldIndex].mParent)
-    oldWorld.offset(oldWorld.nodes[oldIndex].mPrev)
-    oldWorld.offset(oldWorld.nodes[oldIndex].mNext)
-    oldWorld.offset(oldWorld.nodes[oldIndex].mFirstChild)
+    let nn = oldWorld.nodes[oldIndex]
+    oldWorld.offset(nn.mParent)
+    oldWorld.offset(nn.mPrev)
+    oldWorld.offset(nn.mNext)
+    oldWorld.offset(nn.mFirstChild)
 
   for oldIndex in indexes:
     oldWorld.nodes[oldIndex] = nil
-    # oldWorld.offset(oldWorld.nodes[idx].mParent)
-    # oldWorld.nodes[oldIndex] = nil
 
-  n.setWorld(w)
   # w.dump("after ")
 
+proc removeFromParent2*(ch: Node) =
+  # echo "removeFromParent2 ", n.name
+  if ch.mParent == InvalidNodeIndex:
+    # echo "* removeFromParent2 ", n.name, " parent isNil"
+    return
 
-proc claimChildren(n: Node) =
-  var newWorld = new(World)
-  newWorld.isDirty = true
-  # n.world.dump(n.name & " pre claimChildren " )
-  n.moveToWorld(newWorld)
-  # newWorld.dump(n.name & " claimChildren " )
-
-proc removeChild(n: Node, ch: Node) =
-  if ch.prev.isNil:
-    n.mFirstChild = ch.mNext
-    if not ch.next.isNil:
-      ch.next.mPrev = InvalidNodeIndex
+  if ch.mPrev == InvalidNodeIndex:
+    ch.parent.mFirstChild = ch.mNext
   else:
-    ch.prev.next = ch.next
+    ch.prev.mNext = ch.mNext
 
+  if ch.mNext != InvalidNodeIndex:
+    ch.next.mPrev = ch.mPrev
 
-  ch.parent = nil
+  ch.mParent = InvalidNodeIndex
   ch.mPrev = InvalidNodeIndex
   ch.mNext = InvalidNodeIndex
 
   # echo "remove ", ch.name, " from ", n.name
-  ch.claimChildren()
-
-proc removeFromParent2*(n: Node) =
-  # echo "removeFromParent2 ", n.name
-  let parent = n.parent
-  if parent.isNil:
-    # echo "* removeFromParent2 ", n.name, " parent isNil"
-    return
-  parent.removeChild(n)
+  ch.moveToWorld(newWorld())
 
 proc addChild2*(n: Node, ch: Node) =
   if not ch.parent.isNil:
@@ -232,7 +219,7 @@ proc addChild2*(n: Node, ch: Node) =
   ch.moveToWorld n.world
   ch.parent = n
 
-  if n.first.isNil:
+  if n.mFirstChild == InvalidNodeIndex:
     n.mFirstChild = ch.mIndex
     ch.mPrev = InvalidNodeIndex
   else:
