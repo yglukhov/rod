@@ -12,10 +12,21 @@ proc newWorld*(): World =
 proc initWorldInEmptyNodeCompat*(n: Node) =
   n.mWorld = newWorld()
   n.mWorld.nodes.add(n)
+  n.mWorld.hierarchy.add(NodeHierarchy(parent: InvalidNodeIndex, prev: InvalidNodeIndex, next: InvalidNodeIndex, firstChild: InvalidNodeIndex))
 
 proc getNode(w: World, i: NodeIndex): Node =
   if i < w.nodes.len.NodeIndex:
     return w.nodes[i]
+
+# These are just quick compat glue. TODO: get rid of them
+proc mParent(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].parent
+proc mNext(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].next
+proc mPrev(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].prev
+proc mFirstChild(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].firstChild
+proc `mParent=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].parent = v
+proc `mNext=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].next = v
+proc `mPrev=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].prev = v
+proc `mFirstChild=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].firstChild = v
 
 when not defined(release):
   proc debugVerifyConsistency*(w: World) =
@@ -23,9 +34,10 @@ when not defined(release):
       if not n.isNil:
         assert(n.mIndex == i.NodeIndex)
         if i != 0:
-          assert(n.mParent != InvalidNodeIndex)
-          if n.mPrev == InvalidNodeIndex:
-            assert(w.nodes[n.mParent].mFirstChild == i.NodeIndex)
+          let h = w.hierarchy[i]
+          assert(h.parent != InvalidNodeIndex)
+          if h.prev == InvalidNodeIndex:
+            assert(w.nodes[h.parent].mFirstChild == i.NodeIndex)
 
   proc debugVerifyConsistency*(n: Node) =
     debugVerifyConsistency(n.mWorld)
@@ -71,7 +83,7 @@ proc `parent=`(n: Node, p: Node) =
     n.mParent = p.mIndex
   n.setDirty()
 
-proc last*(n: Node): Node =
+proc last(n: Node): Node =
   result = n.first
   if result.isNil: return
   while not result.next.isNil:
@@ -173,17 +185,21 @@ proc moveToWorld(n: Node, w: World) =
     node.mIndex = newIndex
     inc newIndex
 
+  w.hierarchy.setLen(w.hierarchy.len + indexes.len)
+
   template offset(world: World, v: var NodeIndex) =
     if v != InvalidNodeIndex:
       # echo "offset ", v, " world ", world.nodes.len
       v = world.nodes[v].mIndex
 
   for oldIndex in indexes:
-    let nn = oldWorld.nodes[oldIndex]
-    oldWorld.offset(nn.mParent)
-    oldWorld.offset(nn.mPrev)
-    oldWorld.offset(nn.mNext)
-    oldWorld.offset(nn.mFirstChild)
+    var h = oldWorld.hierarchy[oldIndex]
+    oldWorld.offset(h.parent)
+    oldWorld.offset(h.prev)
+    oldWorld.offset(h.next)
+    oldWorld.offset(h.firstChild)
+    let newIndex = oldWorld.nodes[oldIndex].mIndex
+    w.hierarchy[newIndex] = h
 
   for oldIndex in indexes:
     oldWorld.nodes[oldIndex] = nil
@@ -192,21 +208,23 @@ proc moveToWorld(n: Node, w: World) =
 
 proc removeFromParent2*(ch: Node) =
   # echo "removeFromParent2 ", n.name
-  if ch.mParent == InvalidNodeIndex:
+
+  let h = addr ch.mWorld.hierarchy[ch.mIndex]
+  if h.parent == InvalidNodeIndex:
     # echo "* removeFromParent2 ", n.name, " parent isNil"
     return
 
-  if ch.mPrev == InvalidNodeIndex:
+  if h.prev == InvalidNodeIndex:
     ch.parent.mFirstChild = ch.mNext
   else:
     ch.prev.mNext = ch.mNext
 
-  if ch.mNext != InvalidNodeIndex:
-    ch.next.mPrev = ch.mPrev
+  if h.next != InvalidNodeIndex:
+    ch.next.mPrev = h.prev
 
-  ch.mParent = InvalidNodeIndex
-  ch.mPrev = InvalidNodeIndex
-  ch.mNext = InvalidNodeIndex
+  h.parent = InvalidNodeIndex
+  h.prev = InvalidNodeIndex
+  h.next = InvalidNodeIndex
 
   # echo "remove ", ch.name, " from ", n.name
   ch.moveToWorld(newWorld())
@@ -260,26 +278,28 @@ proc getRoot(w: World): Node =
 proc reorder*(w: World, indexes: openarray[NodeIndex]) =
   if not w.isDirty or w.nodes.len == 0: return
 
-  template fixUP(v: var NodeIndex) =
+  template fixUP(v: untyped) =
     if v != InvalidNodeIndex:
       # echo "fixup ", v
       v = w.nodes[int(v)].mIndex
 
-  var nodes = newSeqOfCap[Node](indexes.len)
+  var nodes = newSeq[Node](indexes.len)
+  var hierarchy = newSeq[NodeHierarchy](indexes.len)
 
   for newIndex, oldIndex in indexes:
     let n = w.nodes[int(oldIndex)]
     n.mIndex = NodeIndex(newIndex)
-    nodes.add(n)
+    nodes[newIndex] = n
 
-  for i, n in nodes:
-    n.mIndex = NodeIndex(i)
-    n.mParent.fixUP()
-    n.mPrev.fixUP()
-    n.mNext.fixUP()
-    n.mFirstChild.fixUP()
+  for newIndex, oldIndex in indexes:
+    var h = w.hierarchy[int(oldIndex)]
+    fixUP(h.parent)
+    fixUP(h.prev)
+    fixUP(h.next)
+    fixUP(h.firstChild)
+    hierarchy[newIndex] = h
 
-  w.nodes.setLen(0)
-  w.nodes = nodes
+  swap(w.nodes, nodes)
+  swap(w.hierarchy, hierarchy)
 
   w.isDirty = false

@@ -37,13 +37,15 @@ type
         #todo: move it
         isRemoved*: bool
         mIndex*: NodeIndex
-        mParent*: NodeIndex
-        mNext*: NodeIndex
-        mPrev*: NodeIndex
-        mFirstChild*: NodeIndex
         mWorld*: World
         when defined(rodedit):
             jAnimations*: JsonNode
+
+    NodeHierarchy* = object
+        parent*: NodeIndex
+        next*: NodeIndex
+        prev*: NodeIndex
+        firstChild*: NodeIndex
 
     BBox* = object
         minPoint*: Vector3
@@ -72,6 +74,7 @@ type
 
     World* = ref object
         nodes*: seq[Node]
+        hierarchy*: seq[NodeHierarchy]
         isDirty*: bool
 
     SceneView* = ref object of View

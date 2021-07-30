@@ -47,11 +47,7 @@ proc newNode*(name: string = ""): Node =
     result.affectsChildren = true
     result.isSerializable = true
 
-    result.mParent = InvalidNodeIndex
     result.mIndex = 0
-    result.mNext = InvalidNodeIndex
-    result.mPrev = InvalidNodeIndex
-    result.mFirstChild = InvalidNodeIndex
 
     initWorldInEmptyNodeCompat(result)
 
@@ -317,7 +313,13 @@ proc drawNode*(n: Node, recursive: bool) =
 
     c.alpha = oldAlpha
 
-template recursiveDraw*(n: Node) =
+proc recursiveDraw*(n: Node) =
+    let w = n.mWorld
+    if w.isDirty:
+        echo "REORDER!!!"
+        var newOrder = newSeqOfCap[NodeIndex](w.nodes.len)
+        w.nodes[0].getOrder(newOrder)
+        w.reorder(newOrder)
     n.drawNode(true)
 
 iterator allNodes*(n: Node): Node =
