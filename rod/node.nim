@@ -467,6 +467,8 @@ proc removeAllChildren*(n: Node) =
         inc i
 
 proc addChild*(n, c: Node) =
+    assert(not n.isNil)
+    assert(not c.isNil)
     n.addChild2(c)
     # c.removeFromParent()
     # n.children.add(c)
