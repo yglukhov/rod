@@ -13,6 +13,7 @@ proc initWorldInEmptyNodeCompat*(n: Node) =
   n.mWorld = newWorld()
   n.mWorld.nodes.add(n)
   n.mWorld.hierarchy.add(NodeHierarchy(parent: InvalidNodeIndex, prev: InvalidNodeIndex, next: InvalidNodeIndex, firstChild: InvalidNodeIndex))
+  n.mWorld.transform.setLen(1)
 
 proc getNode(w: World, i: NodeIndex): Node =
   if i < w.nodes.len.NodeIndex:
@@ -179,34 +180,50 @@ proc moveToWorld(n: Node, w: World) =
 
   # oldWorld.dump("before ")
 
+  # 1. Get indexes in old world of nodes to move
   getOrder(n, indexes)
 
-  var newIndex = w.nodes.len.NodeIndex
+  let wPrevSz = w.nodes.len
+  let wNewSz = wPrevSz + indexes.len
+  var newIndex = wPrevSz.NodeIndex
+
+  # 2. Copy node refs
+  w.nodes.setLen(wNewSz)
   for idx in indexes:
     let node = oldWorld.nodes[idx]
-    w.nodes.add(node)
+    w.nodes[newIndex] = node
     node.mWorld = w
     node.mIndex = newIndex
     inc newIndex
 
-  w.hierarchy.setLen(w.hierarchy.len + indexes.len)
+  # 3. Copy hieararchy
+  w.hierarchy.setLen(wNewSz)
 
   template offset(world: World, v: var NodeIndex) =
     if v != InvalidNodeIndex:
       # echo "offset ", v, " world ", world.nodes.len
       v = world.nodes[v].mIndex
 
+  newIndex = wPrevSz.NodeIndex
   for oldIndex in indexes:
     var h = oldWorld.hierarchy[oldIndex]
     oldWorld.offset(h.parent)
     oldWorld.offset(h.prev)
     oldWorld.offset(h.next)
     oldWorld.offset(h.firstChild)
-    let newIndex = oldWorld.nodes[oldIndex].mIndex
     w.hierarchy[newIndex] = h
+    inc newIndex
 
+  # 4. Mark nodes dead in their old world, by setting ref to nil
   for oldIndex in indexes:
     oldWorld.nodes[oldIndex] = nil
+
+  # 5. Copy transform
+  w.transform.setLen(wNewSz)
+  newIndex = wPrevSz.NodeIndex
+  for oldIndex in indexes:
+    w.transform[newIndex] = oldWorld.transform[oldIndex]
+    inc newIndex
 
   # w.dump("after ")
 
@@ -301,7 +318,16 @@ proc reorder*(w: World, indexes: openarray[NodeIndex]) =
     fixUP(h.firstChild)
     hierarchy[newIndex] = h
 
+  w.nodes = @[]
+  w.hierarchy = @[]
   swap(w.nodes, nodes)
   swap(w.hierarchy, hierarchy)
+
+  var transform = newSeq[NodeTransform](indexes.len)
+  for newIndex, oldIndex in indexes:
+    transform[newIndex] = w.transform[oldIndex]
+
+  w.transform = @[]
+  swap(w.transform, transform)
 
   w.isDirty = false

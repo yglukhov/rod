@@ -17,7 +17,6 @@ type
     NodeIndex* = uint16
 
     Node* = ref object
-        mTranslation*: Vector3
         mRotation*: Quaternion
         mScale*: Vector3
         renderComponents*: seq[RenderComponent]
@@ -47,6 +46,10 @@ type
         prev*: NodeIndex
         firstChild*: NodeIndex
 
+    NodeTransform* = object
+        translation*: Vector3
+
+
     BBox* = object
         minPoint*: Vector3
         maxPoint*: Vector3
@@ -75,6 +78,7 @@ type
     World* = ref object
         nodes*: seq[Node]
         hierarchy*: seq[NodeHierarchy]
+        transform*: seq[NodeTransform]
         isDirty*: bool
 
     SceneView* = ref object of View
