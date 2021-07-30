@@ -674,7 +674,7 @@ proc binDeserializerForPath(path: string): BinDeserializer =
     if not rab.isNil:
         return rab.binDeserializer
 
-proc newNode*(b: BinDeserializer, compName: string, c: Composition): Node
+proc newNode*(b: BinDeserializer, compName: string): Node
 
 proc fixupCompositionUrlExtension(url: var string)=
     ## Makes sure the extension is jcomp
@@ -696,7 +696,7 @@ proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
         let bd = binDeserializerForPath(path)
         if not bd.isNil:
             try:
-                let theNode = newNode(bd, path, comp)
+                let theNode = newNode(bd, path)
                 comp.node[] = theNode[]
                 for c in comp.node.children:
                     c.parent = comp.node
@@ -783,10 +783,7 @@ proc newNodeWithResource*(path: string): Node =
     let bd = binDeserializerForPath(path)
     if not bd.isNil:
         try:
-            #todo: fix this
-            var comp = newComposition(path)
-            comp.node[] = newNode(bd, path, comp)[]
-            return comp.node
+            return newComposition(path, newNode(bd, path)).node
         except:
             echo "Error: could not deserialize ", path
             raise
@@ -943,7 +940,7 @@ type
         bicScale = "s"
         bicTranslation = "t"
 
-proc newNode*(b: BinDeserializer, compName: string, c: Composition): Node =
+proc newNode*(b: BinDeserializer, compName: string): Node =
     let oldPos = b.getPosition()
     let oldPath = b.curCompPath
     b.curCompPath = compName
@@ -955,8 +952,7 @@ proc newNode*(b: BinDeserializer, compName: string, c: Composition): Node =
     b.rewindToComposition(compName)
     let nodesCount = b.readInt16()
     var nodes = newSeq[Node](nodesCount)
-    for i in 0 ..< nodesCount:
-        nodes[i] = newNode()
+    for i in 0 ..< nodesCount: nodes[i] = newNode()
 
     var tmpBuf = b.getBuffer(int16, nodesCount - 1)
     # Read child-parent relations
@@ -1015,18 +1011,10 @@ proc newNode*(b: BinDeserializer, compName: string, c: Composition): Node =
                 let subComp = newNodeWithResource(compRef)
                 let old = nodes[tmpBuf[i]]
 
-                # for c in subComp.children:
-                #     c.parent = old
-
                 var subCompCh = subComp.seqOfChildren
-                if old.hasChildren:
-                    for i, ch in subCompCh:
-                        old.insertChild2(ch, i)
-                    # old.children = subComp.children & old.children
-                else:
-                    for ch in subCompCh:
-                        old.addChild2(ch)
-                    # old.children = subComp.children
+                for i, ch in subCompCh:
+                    old.insertChild2(ch, i)
+
                 old.animations = subComp.animations
                 for c in subComp.components:
                     c.node = old

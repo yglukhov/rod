@@ -104,7 +104,7 @@ proc getAllCameras(n: Node): seq[Node]=
     result = @[]
     if not n.componentIfAvailable(Camera).isNil:
         result.add(n)
-
+    # n.world.dump("ssws ")
     for ch in n.children:
         result.add(ch.getAllCameras)
 
