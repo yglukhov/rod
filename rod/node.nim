@@ -40,13 +40,9 @@ proc newNode*(name: string = ""): Node =
     initWorldInEmptyNodeCompat(result)
     result.mWorld.transform[result.mIndex].scale = newVector3(1, 1, 1)
     result.mWorld.transform[result.mIndex].rotation = newQuaternion()
-
+    result.mWorld.alpha[result.mIndex] = 1.0
+    result.mWorld.flags[result.mIndex] = {NodeFlags.dirty, NodeFlags.enabled, NodeFlags.affectsChildren, NodeFlags.serializable}
     result.name = name
-    result.alpha = 1.0
-    result.isDirty = true
-    result.isEnabled = true
-    result.affectsChildren = true
-    result.isSerializable = true
 
 template enabled*(n: Node): bool = n.isEnabled
 proc `enabled=`*(n: Node, v: bool) =
@@ -242,17 +238,18 @@ proc anchorMatrix(n: Node): Matrix4=
     result[15] = 1;
 
 proc makeTransform(n: Node): Matrix4 =
-    var rot = n.rotation.toMatrix4()
+    let tr = n.mWorld.transform[n.mIndex]
+    let rot = tr.rotation.toMatrix4()
 
-    # // Set up final matrix with scale, rotation and translation
-    let s = n.scale
-    let p = n.position
+    # Set up final matrix with scale, rotation and translation
+    let s = tr.scale
+    let p = tr.translation
     result[0] = s.x * rot[0]; result[1] = s.x * rot[1]; result[2] = s.x * rot[2]
     result[4] = s.y * rot[4]; result[5] = s.y * rot[5]; result[6] = s.y * rot[6]
     result[8] = s.z * rot[8]; result[9] = s.z * rot[9]; result[10] = s.z * rot[10]
     result[12] = p.x;  result[13] = p.y; result[14] = p.z
 
-    # // No projection term
+    # No projection term
     result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
 
 proc getTransform*(n: Node, mat: var Matrix4) =
@@ -260,8 +257,13 @@ proc getTransform*(n: Node, mat: var Matrix4) =
 
 # Transformations
 proc transform*(n: Node): Matrix4 =
-    n.mMatrix = n.makeTransform() * n.anchorMatrix()
-    return n.mMatrix
+    n.makeTransform() * n.anchorMatrix()
+
+template alpha*(n: Node): Coord =
+    n.mWorld.alpha[n.mIndex]
+
+proc `alpha=`*(n: Node, v: Coord) =
+    n.mWorld.alpha[n.mIndex] = v
 
 proc drawNode*(n: Node, recursive: bool) =
     if n.alpha < 0.0000001 or not n.enabled: return
@@ -492,20 +494,21 @@ proc childNamed*(n: Node, name: string): Node =
 
 proc setBoneMatrix*(n: Node, mat: Matrix4) =
     n.isDirty = false
-    mat.multiply(n.transform, n.worldMatrix)
+    mat.multiply(n.transform, n.mWorld.worldMatrixes[n.mIndex])
 
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 
 proc worldTransform*(n: Node): Matrix4 =
+    let pwm = addr n.mWorld.worldMatrixes[n.mIndex]
     if n.isDirty:
         n.isDirty = false
         if n.parent.isNil:
-            n.worldMatrix = n.transform
+            pwm[] = n.transform
         else:
             let w = n.parent.worldTransform
-            w.multiply(n.transform, n.worldMatrix)
+            w.multiply(n.transform, pwm[])
 
-    result = n.worldMatrix
+    result = pwm[]
 
 proc localToWorld*(n: Node, p: Vector3): Vector3 =
     result = n.worldTransform * p
