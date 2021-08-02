@@ -17,12 +17,8 @@ type
     NodeIndex* = uint16
 
     Node* = ref object
-        mRotation*: Quaternion
-        mScale*: Vector3
         renderComponents*: seq[RenderComponent]
         scriptComponents*: seq[ScriptComponent]
-        # children*: seq[Node]
-        # mParent*: Node
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
@@ -30,11 +26,8 @@ type
         worldMatrix*: Matrix4
         alpha*: Coord
         composition*: Composition
-        mAnchorPoint*: Vector3
         mFlags*: set[NodeFlags]
 
-        #todo: move it
-        isRemoved*: bool
         mIndex*: NodeIndex
         mWorld*: World
         when defined(rodedit):
@@ -47,8 +40,10 @@ type
         firstChild*: NodeIndex
 
     NodeTransform* = object
+        rotation*: Quaternion
+        anchorPoint*: Vector3
         translation*: Vector3
-
+        scale*: Vector3
 
     BBox* = object
         minPoint*: Vector3
