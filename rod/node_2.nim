@@ -40,8 +40,6 @@ proc next(n: Node): Node =
 
 proc `next=`(n: Node, nn: Node) =
   if nn.isNil:
-    # if not n.next.isNil:
-
     n.mNext = InvalidNodeIndex
     return
   n.mNext = nn.mIndex
@@ -70,7 +68,7 @@ proc last*(n: Node): Node =
 
 type NodeChildrenIteratorProxy = distinct Node
 
-proc children*(n: Node): NodeChildrenIteratorProxy =  NodeChildrenIteratorProxy(n)
+proc children*(n: Node): NodeChildrenIteratorProxy = NodeChildrenIteratorProxy(n)
 
 iterator items*(p: NodeChildrenIteratorProxy): Node =
   let n = p.Node
@@ -94,6 +92,22 @@ iterator pairs*(p: NodeChildrenIteratorProxy): (int, Node) =
       raise newException(Exception, "looped ")
     inc iters
 
+proc len*(p: NodeChildrenIteratorProxy): int =
+  for i, ch in p:
+    inc result
+
+proc `[]`*(p: NodeChildrenIteratorProxy, i: int): Node =
+  for q, ch in p:
+    if q == i: return ch
+
+proc `[]`*(p: NodeChildrenIteratorProxy, i: BackwardsIndex): Node =
+  let len = p.len
+  for q, ch in p:
+    if len - q == int(i): return ch
+
+proc getSeq*(p: NodeChildrenIteratorProxy): seq[Node] =
+  for ch in p:
+    result.add(ch)
 
 proc hasChildren*(n: Node): bool =
   n.mFirstChild != InvalidNodeIndex
@@ -147,7 +161,6 @@ proc setWorld(n: Node, w: World) =
     ch.setWorld(w)
 
 proc moveToWorld(n: Node, w: World) =
-  # echo "moveToWorld ", n.name, " world ", w.nodes.len
   if n.mWorld.isNil:
     n.mIndex = w.addNode(n)
     n.setWorld(w)
@@ -156,8 +169,6 @@ proc moveToWorld(n: Node, w: World) =
 
   if n.mWorld == w:
     w.isDirty = true
-    return
-
   w.isDirty = true
   let oldWorld = n.mWorld
   oldWorld.isDirty = true
@@ -190,8 +201,6 @@ proc moveToWorld(n: Node, w: World) =
     # oldWorld.nodes[oldIndex] = nil
 
   n.setWorld(w)
-  # w.dump("after ")
-
 
 proc claimChildren(n: Node) =
   var newWorld = new(World)
@@ -207,7 +216,6 @@ proc removeChild(n: Node, ch: Node) =
       ch.next.mPrev = InvalidNodeIndex
   else:
     ch.prev.next = ch.next
-
 
   ch.parent = nil
   ch.mPrev = InvalidNodeIndex

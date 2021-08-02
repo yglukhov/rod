@@ -48,7 +48,7 @@ method init*(v: EditorTreeView, r: Rect)=
             result = 1
         else:
             let n = item.get(Node)
-            result = n.childrenLen
+            result = n.children.len
             when defined(rodedit):
                 if not n.composition.isNil and n != v.rootNode:
                     result = 0
@@ -105,7 +105,7 @@ method init*(v: EditorTreeView, r: Rect)=
                 textField.textColor = newColor(0.9, 0.69, 0.67)
 
         textField.text = if n.name.len == 0: "(node)" else: n.name
-        textField.text = textField.text & " [" & $n.childrenLen & "]"
+        textField.text = textField.text & " [" & $n.children.len & "]"
 
         # btn.onAction do():
         #     n.enabled = not n.enabled
@@ -177,7 +177,7 @@ method init*(v: EditorTreeView, r: Rect)=
 
         outlineView.expandRow(sip)
         discard n.newChild("New Node")
-        sip.add(n.childrenLen - 1)
+        sip.add(n.children.len - 1)
 
         v.onTreeChanged()
         outlineView.selectItemAtIndexPath(sip)
@@ -247,7 +247,7 @@ method onKeyDown*(v: EditorTreeView, e: var Event): bool =
         v.outlineView.expandRow(sip)
         discard n.newChild("New Node")
         if not e.modifiers.anyShift():
-            sip.add(n.childrenLen - 1)
+            sip.add(n.children.len - 1)
             v.onTreeChanged()
             v.outlineView.selectItemAtIndexPath(sip)
 
