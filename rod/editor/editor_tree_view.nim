@@ -57,7 +57,7 @@ method init*(v: EditorTreeView, r: Rect)=
         if indexPath.len == 1:
             return newVariant(v.rootNode)
         else:
-            return newVariant(item.get(Node).children.getSeq()[indexPath[^1]])
+            return newVariant(item.get(Node).children[indexPath[^1]])
 
     outlineView.createCell = proc(): TableViewCell =
         var lbl = newLabel(newRect(0, 0, 100, 20))
