@@ -22,11 +22,7 @@ type
         name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
-        mMatrix*: Matrix4
-        worldMatrix*: Matrix4
-        alpha*: Coord
         composition*: Composition
-        mFlags*: set[NodeFlags]
 
         mIndex*: NodeIndex
         mWorld*: World
@@ -74,6 +70,9 @@ type
         nodes*: seq[Node]
         hierarchy*: seq[NodeHierarchy]
         transform*: seq[NodeTransform]
+        worldMatrixes*: seq[Matrix4]
+        alpha*: seq[Coord]
+        flags*: seq[set[NodeFlags]]
         isDirty*: bool
 
     SceneView* = ref object of View

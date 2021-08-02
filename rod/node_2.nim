@@ -14,6 +14,9 @@ proc initWorldInEmptyNodeCompat*(n: Node) =
   n.mWorld.nodes.add(n)
   n.mWorld.hierarchy.add(NodeHierarchy(parent: InvalidNodeIndex, prev: InvalidNodeIndex, next: InvalidNodeIndex, firstChild: InvalidNodeIndex))
   n.mWorld.transform.setLen(1)
+  n.mWorld.worldMatrixes.setLen(1)
+  n.mWorld.alpha.setLen(1)
+  n.mWorld.flags.setLen(1)
 
 proc getNode(w: World, i: NodeIndex): Node =
   if i < w.nodes.len.NodeIndex:
@@ -247,13 +250,17 @@ proc moveToWorld(n: Node, w: World) =
   for oldIndex in indexes:
     oldWorld.nodes[oldIndex] = nil
 
-  # 5. Copy transform
-  w.transform.setLen(wNewSz)
-  newIndex = wPrevSz.NodeIndex
-  for oldIndex in indexes:
-    w.transform[newIndex] = oldWorld.transform[oldIndex]
-    inc newIndex
+  template copyComponents(component: untyped) =
+    w.component.setLen(wNewSz)
+    newIndex = wPrevSz.NodeIndex
+    for oldIndex in indexes:
+      w.component[newIndex] = oldWorld.component[oldIndex]
+      inc newIndex
 
+  copyComponents(transform)
+  copyComponents(worldMatrixes)
+  copyComponents(alpha)
+  copyComponents(flags)
   # w.dump("after ")
 
 proc removeFromParent2*(ch: Node) =
@@ -350,11 +357,17 @@ proc reorder*(w: World, indexes: openarray[NodeIndex]) =
   swap(w.nodes, nodes)
   swap(w.hierarchy, hierarchy)
 
-  var transform = newSeq[NodeTransform](indexes.len)
-  for newIndex, oldIndex in indexes:
-    transform[newIndex] = w.transform[oldIndex]
+  template reorderComponents(component: untyped) =
+    var component = newSeq[typeof(w.component[0])](indexes.len)
+    for newIndex, oldIndex in indexes:
+      component[newIndex] = w.component[oldIndex]
 
-  w.transform = @[]
-  swap(w.transform, transform)
+    w.component = @[]
+    swap(w.component, component)
+
+  reorderComponents(transform)
+  reorderComponents(worldMatrixes)
+  reorderComponents(alpha)
+  reorderComponents(flags)
 
   w.isDirty = false
