@@ -153,8 +153,8 @@ proc `anchor=`*(n: Node, v: Vector3) =
     n.mAnchorPoint = v
     n.setDirty()
 
-proc anchor*(n: Node): Vector3 =
-    result = n.mAnchorPoint
+template anchor*(n: Node): Vector3 =
+    n.mAnchorPoint
 
 proc parent*(n: Node): Node = n.mParent
 proc `parent=`*(n: Node, p: Node) =
