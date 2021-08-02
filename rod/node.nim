@@ -37,6 +37,7 @@ proc removeAnimation*(n: Node, a: Animation) =
 
 proc newNode*(name: string = ""): Node =
     result.new()
+    initWorldInEmptyNodeCompat(result)
     result.mScale = newVector3(1, 1, 1)
     result.mRotation = newQuaternion()
 
@@ -47,17 +48,13 @@ proc newNode*(name: string = ""): Node =
     result.affectsChildren = true
     result.isSerializable = true
 
-    result.mParent = InvalidNodeIndex
-    result.mIndex = InvalidNodeIndex
-    result.mNext = InvalidNodeIndex
-    result.mPrev = InvalidNodeIndex
-    result.mFirstChild = InvalidNodeIndex
+    result.mIndex = 0
 
+proc mTranslation(n: Node): var Vector3 = n.mWorld.transform[n.mIndex].translation
 
-
-template translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
+proc translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
 proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
-    n.mTranslation = p
+    n.mTranslation() = p
     n.setDirty()
 
 template enabled*(n: Node): bool = n.isEnabled
@@ -66,34 +63,34 @@ proc `enabled=`*(n: Node, v: bool) =
     n.setDirty()
 
 proc `translate=`*(n: Node, p: Vector3) =
-    n.mTranslation += p
+    n.mTranslation() += p
     n.setDirty()
 proc `translateX=`*(n: Node, vx: float) =
-    n.mTranslation.x += vx
+    n.mWorld.transform[n.mIndex].translation.x += vx
     n.setDirty()
 proc `translateY=`*(n: Node, vy: float) =
-    n.mTranslation.y += vy
+    n.mWorld.transform[n.mIndex].translation.y += vy
     n.setDirty()
 proc `translateZ=`*(n: Node, vz: float) =
-    n.mTranslation.z += vz
+    n.mWorld.transform[n.mIndex].translation.z += vz
     n.setDirty()
 
-proc position*(n: Node): Vector3 = n.mTranslation
-proc positionX*(n: Node): Coord = n.mTranslation.x
-proc positionY*(n: Node): Coord = n.mTranslation.y
-proc positionZ*(n: Node): Coord = n.mTranslation.z
+proc position*(n: Node): Vector3 = n.mWorld.transform[n.mIndex].translation
+proc positionX*(n: Node): Coord = n.mWorld.transform[n.mIndex].translation.x
+proc positionY*(n: Node): Coord = n.mWorld.transform[n.mIndex].translation.y
+proc positionZ*(n: Node): Coord = n.mWorld.transform[n.mIndex].translation.z
 
 proc `position=`*(n: Node, p: Vector3) =
-    n.mTranslation = p
+    n.mWorld.transform[n.mIndex].translation = p
     n.setDirty()
 proc `positionX=`*(n: Node, x: Coord) =
-    n.mTranslation.x = x
+    n.mWorld.transform[n.mIndex].translation.x = x
     n.setDirty()
 proc `positionY=`*(n: Node, y: Coord) =
-    n.mTranslation.y = y
+    n.mWorld.transform[n.mIndex].translation.y = y
     n.setDirty()
 proc `positionZ=`*(n: Node, z: Coord) =
-    n.mTranslation.z = z
+    n.mWorld.transform[n.mIndex].translation.z = z
     n.setDirty()
 
 proc rotation*(n: Node): Quaternion = n.mRotation
@@ -316,7 +313,13 @@ proc drawNode*(n: Node, recursive: bool) =
 
     c.alpha = oldAlpha
 
-template recursiveDraw*(n: Node) =
+proc recursiveDraw*(n: Node) =
+    let w = n.mWorld
+    if w.isDirty:
+        echo "REORDER!!!"
+        var newOrder = newSeqOfCap[NodeIndex](w.nodes.len)
+        w.nodes[0].getOrder(newOrder)
+        w.reorder(newOrder)
     n.drawNode(true)
 
 iterator allNodes*(n: Node): Node =
@@ -453,18 +456,13 @@ proc removeFromParent*(n: Node) =
 #         n.parent.removeChild(n)
 #         n.parent = nil
 
-#todo: think about it
 proc removeAllChildren*(n: Node) =
-    var toRemove: seq[Node]
-    for c in n.children:
-        toRemove.add(n)
-
-    var i = 0
-    while i < toRemove.len:
-        toRemove[i].removeFromParent()
-        inc i
+    for c in n.seqOfChildren():
+        c.removeFromParent()
 
 proc addChild*(n, c: Node) =
+    assert(not n.isNil)
+    assert(not c.isNil)
     n.addChild2(c)
     # c.removeFromParent()
     # n.children.add(c)
@@ -590,7 +588,7 @@ proc reparentTo*(n, newParent: Node) {.deprecated.} =
     let oldWorldTransform = n.worldTransform
     newParent.addChild(n)
     let newTransform = newParent.worldTransform.inversed() * oldWorldTransform
-    n.mTranslation = translationFromMatrix(newTransform)
+    n.mWorld.transform[n.mIndex].translation = translationFromMatrix(newTransform)
 
 proc reattach*(n, newParent: Node, index = -1) =
     let worldTransform = n.worldTransform
@@ -696,8 +694,9 @@ proc loadComposition*(comp: Composition, onComplete: proc() = nil) =
             try:
                 let theNode = newNode(bd, path)
                 comp.node[] = theNode[]
-                for c in comp.node.children:
-                    c.parent = comp.node
+                # TODO: Why was this code needed?
+                # for c in comp.node.children:
+                #     c.parent = comp.node
                 for c in comp.node.components:
                     c.node = comp.node
 
@@ -985,7 +984,7 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
             tmpBuf = b.getBuffer(int16, count)
             let translations = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].mTranslation = translations[i]
+                nodes[tmpBuf[i]].mTranslation() = translations[i]
         of $bicScale:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
