@@ -54,6 +54,33 @@ proc world*(n: Node): World =
   assert(not n.mWorld.isNil)
   n.mWorld
 
+proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: NodeIndex): NodeIndex {.inline.} =
+  let h = hierarchy[n]
+  if h.firstChild != InvalidNodeIndex:
+    result = h.firstChild
+  elif h.next != InvalidNodeIndex:
+    result = h.next
+  elif h.parent == root or h.parent == InvalidNodeIndex:
+    result = InvalidNodeIndex
+  else:
+    var hp = hierarchy[h.parent]
+    while hp.next == InvalidNodeIndex:
+      if hp.parent == root:
+        return InvalidNodeIndex
+      hp = hierarchy[hp.parent]
+    result = hp.next
+
+iterator dfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
+  if hierarchy.len != 0:
+    let root = root
+    var n = root
+    # These casts are here for a more performant godegen.
+    let pArr = cast[ptr UncheckedArray[NodeHierarchy]](unsafeAddr hierarchy[0])
+    let h = hierarchy.high
+    while n != InvalidNodeIndex:
+      yield n
+      n = dfsOrderNext(toOpenArray(pArr, 0, h), root, n)
+
 proc first*(n: Node): Node =
   return n.world.getNode(n.mFirstChild)
 
@@ -153,15 +180,17 @@ proc setDirty*(n: Node) =
     for c in n.children:
       c.setDirty()
 
-proc getOrder(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var seq[NodeIndex]) =
+proc getOrderRecursive(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var seq[NodeIndex]) =
+  # Does the same what `getOrder` does, but with a recursive algorithm. Who knows if it's needed...
   order.add(node)
   var c = hierarchy[node].firstChild
   while c != InvalidNodeIndex:
-    getOrder(c, hierarchy, order)
+    getOrderRecursive(c, hierarchy, order)
     c = hierarchy[c].next
 
 proc getOrder*(node: Node, order: var seq[NodeIndex]) =
-  getOrder(node.mIndex, node.mWorld.hierarchy, order)
+  for n in dfsOrder(node.mWorld.hierarchy, node.mIndex):
+    order.add(n)
 
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
