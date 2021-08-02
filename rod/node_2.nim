@@ -74,6 +74,7 @@ iterator dfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeInd
   if hierarchy.len != 0:
     let root = root
     var n = root
+    # These casts are here for a more performant godegen.
     let pArr = cast[ptr UncheckedArray[NodeHierarchy]](unsafeAddr hierarchy[0])
     let h = hierarchy.high
     while n != InvalidNodeIndex:
@@ -179,44 +180,17 @@ proc setDirty*(n: Node) =
     for c in n.children:
       c.setDirty()
 
-proc getOrder(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var openarray[NodeIndex], i: var int) =
-  order[i] = node
-  inc i
-  # order.add(node)
+proc getOrderRecursive(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var seq[NodeIndex]) =
+  # Does the same what `getOrder` does, but with a recursive algorithm. Who knows if it's needed...
+  order.add(node)
   var c = hierarchy[node].firstChild
   while c != InvalidNodeIndex:
-    getOrder(c, hierarchy, order, i)
+    getOrderRecursive(c, hierarchy, order)
     c = hierarchy[c].next
 
-import std/monotimes
-
-var total1 = 0'i64
-var total2 = 0'i64
-
-var o1: array[32000, NodeIndex]
-var o2: array[32000, NodeIndex]
-
 proc getOrder*(node: Node, order: var seq[NodeIndex]) =
-  let o1b = getMonotime().ticks
-  var i1 = 0
-  getOrder(node.mIndex, node.mWorld.hierarchy, o1, i1)
-  let o1e = getMonotime().ticks
-  let o2b = getMonotime().ticks
-  var i2 = 0
   for n in dfsOrder(node.mWorld.hierarchy, node.mIndex):
-    o2[i2] = n
-    inc i2
-    # o2.add(n)
-  let o2e = getMonotime().ticks
-  assert(o1 == o2)
-  assert(i2 == i1)
-
-  total1 += o1e - o1b
-  total2 += o2e - o2b
-
-  order = o1[0 .. i1 - 1]
-
-  echo "2 IS BETTER THAN 1 by ", int(o1e - o1b) / int(o2e - o2b), " TOTAL: ", total1.int / total2.int, " N: ", i1
+    order.add(n)
 
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
