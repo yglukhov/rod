@@ -832,7 +832,7 @@ proc serialize*(n: Node, s: JsonSerializer) =
             jcomps.add(s.node)
         s.node = jn
 
-    if n.children.len > 0:
+    if n.hasChildren:
         let jn = s.node
         let jchildren = newJArray()
         jn["children"] = jchildren

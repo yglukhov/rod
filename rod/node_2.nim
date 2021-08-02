@@ -136,6 +136,9 @@ proc find*(p: NodeChildrenIteratorProxy, n: Node): int =
     if ch == n: return i
   result = -1
 
+proc hasChildren*(n: Node): bool =
+  n.mFirstChild != InvalidNodeIndex
+
 proc printTree(n: Node, ident: string = "") =
   if n.isNil: return
   if ident.len == 0:
