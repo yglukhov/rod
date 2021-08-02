@@ -111,7 +111,7 @@ else:
 
 when defined(rodedit):
     proc makeCompositionRefsRelative(e: Editor, n: Node, path: string) =
-        var children = n.seqOfChildren
+        var children = n.children.getSeq
         var nextChildren: seq[Node]
 
         while children.len > 0:
@@ -122,11 +122,11 @@ when defined(rodedit):
                     ch.composition.url = relativeUrl(ch.composition.url, path.parentDir()).replace(".jcomp", "")
                     echo "fix compref ", ch.composition.originalUrl, " >> ", ch.composition.url, " base ", path
                 else:
-                    nextChildren.add(ch.seqOfChildren)
+                    nextChildren.add(ch.children.getSeq)
             children = nextChildren
 
     proc revertComposotionRef(e: Editor, n: Node) =
-        var children = n.seqOfChildren
+        var children = n.children.getSeq
         var nextChildren: seq[Node]
 
         while children.len > 0:
@@ -136,7 +136,7 @@ when defined(rodedit):
                     ch.composition.url = ch.composition.originalUrl
                     ch.composition.originalUrl.setLen(0)
                 else:
-                    nextChildren.add(ch.seqOfChildren)
+                    nextChildren.add(ch.children.getSeq)
             children = nextChildren
 
 

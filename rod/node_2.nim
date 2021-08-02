@@ -131,27 +131,13 @@ proc getSeq*(p: NodeChildrenIteratorProxy): seq[Node] =
   for ch in p:
     result.add(ch)
 
-proc hasChildren*(n: Node): bool =
-  n.mFirstChild != InvalidNodeIndex
-
-proc seqOfChildren*(n: Node): seq[Node] =
-  for ch in n.children:
-    result.add(ch)
-
-proc indexOf*(n: Node, c: Node): int =
-  for ch in n.children:
-    if ch == c: return
-    inc result
+proc find*(p: NodeChildrenIteratorProxy, n: Node): int =
+  for i, ch in p:
+    if ch == n: return i
   result = -1
 
-proc childAt*(n: Node, i: int): Node =
-  for q, ch in n.children:
-    if q == i: return ch
-  assert(false, "out of bounds")
-
-proc childrenLen*(n: Node): int =
-  for ch in n.children:
-    inc result
+proc hasChildren*(n: Node): bool =
+  n.mFirstChild != InvalidNodeIndex
 
 proc printTree(n: Node, ident: string = "") =
   if n.isNil: return

@@ -457,7 +457,7 @@ proc removeFromParent*(n: Node) =
 #         n.parent = nil
 
 proc removeAllChildren*(n: Node) =
-    for c in n.seqOfChildren():
+    for c in n.children.getSeq():
         c.removeFromParent()
 
 proc addChild*(n, c: Node) =
@@ -895,8 +895,8 @@ proc getTreeDistance*(x, y: Node): int =
 
     assert(not cx.isNil and not cy.isNil)
 
-    let ix = px.indexOf(cx)
-    let iy = px.indexOf(cy)
+    let ix = px.children.find(cx)
+    let iy = px.children.find(cy)
 
     result = iy - ix
 
@@ -1008,7 +1008,7 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
                 let subComp = newNodeWithResource(compRef)
                 let old = nodes[tmpBuf[i]]
 
-                var subCompCh = subComp.seqOfChildren
+                var subCompCh = subComp.children.getSeq
                 for i, ch in subCompCh:
                     old.insertChild2(ch, i)
 
