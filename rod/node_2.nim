@@ -54,6 +54,30 @@ proc world*(n: Node): World =
   assert(not n.mWorld.isNil)
   n.mWorld
 
+proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: var NodeIndex) {.inline.} =
+  let h = hierarchy[n]
+  if h.firstChild != InvalidNodeIndex:
+    n = h.firstChild
+  elif h.next != InvalidNodeIndex:
+    n = h.next
+  elif h.parent == root or h.parent == InvalidNodeIndex:
+    n = InvalidNodeIndex
+  else:
+    var hp = hierarchy[h.parent]
+    while hp.next == InvalidNodeIndex:
+      if hp.parent == root:
+        n = InvalidNodeIndex
+        return
+      hp = hierarchy[hp.parent]
+    n = hp.next
+
+iterator dfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
+  let root = root
+  var n = root
+  while n != InvalidNodeIndex:
+    yield n
+    dfsOrderNext(hierarchy, root, n)
+
 proc first*(n: Node): Node =
   return n.world.getNode(n.mFirstChild)
 
@@ -153,15 +177,44 @@ proc setDirty*(n: Node) =
     for c in n.children:
       c.setDirty()
 
-proc getOrder(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var seq[NodeIndex]) =
-  order.add(node)
+proc getOrder(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var openarray[NodeIndex], i: var int) =
+  order[i] = node
+  inc i
+  # order.add(node)
   var c = hierarchy[node].firstChild
   while c != InvalidNodeIndex:
-    getOrder(c, hierarchy, order)
+    getOrder(c, hierarchy, order, i)
     c = hierarchy[c].next
 
+import times
+
+var total1 = 0.0
+var total2 = 0.0
+
+var o1: array[32000, NodeIndex]
+var o2: array[32000, NodeIndex]
+
 proc getOrder*(node: Node, order: var seq[NodeIndex]) =
-  getOrder(node.mIndex, node.mWorld.hierarchy, order)
+  let o2b = cpuTime()
+  var i2 = 0
+  for n in dfsOrder(node.mWorld.hierarchy, node.mIndex):
+    o2[i2] = n
+    inc i2
+    # o2.add(n)
+  let o2e = cpuTime()
+  let o1b = cpuTime()
+  var i1 = 0
+  getOrder(node.mIndex, node.mWorld.hierarchy, o1, i1)
+  let o1e = cpuTime()
+  assert(o1 == o2)
+  assert(i2 == i1)
+
+  total1 += o1e - o1b
+  total2 += o2e - o2b
+
+  order = o1[0 .. i1 - 1]
+
+  echo "2 IS BETTER THAT 1 by ", (o2e - o2b) / (o1e - o1b), " TOTAL: ", total2 / total1, " N: ", i1
 
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
