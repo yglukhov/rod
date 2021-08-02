@@ -38,8 +38,8 @@ proc removeAnimation*(n: Node, a: Animation) =
 proc newNode*(name: string = ""): Node =
     result.new()
     initWorldInEmptyNodeCompat(result)
-    result.mScale = newVector3(1, 1, 1)
-    result.mRotation = newQuaternion()
+    result.mWorld.transform[result.mIndex].scale = newVector3(1, 1, 1)
+    result.mWorld.transform[result.mIndex].rotation = newQuaternion()
 
     result.name = name
     result.alpha = 1.0
@@ -48,92 +48,89 @@ proc newNode*(name: string = ""): Node =
     result.affectsChildren = true
     result.isSerializable = true
 
-    result.mIndex = 0
-
-proc mTranslation(n: Node): var Vector3 = n.mWorld.transform[n.mIndex].translation
-
-proc translation*(n: Node): Vector3 {.deprecated.} = n.mTranslation
-proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
-    n.mTranslation() = p
-    n.setDirty()
-
 template enabled*(n: Node): bool = n.isEnabled
 proc `enabled=`*(n: Node, v: bool) =
     n.isEnabled = v
     n.setDirty()
 
-proc `translate=`*(n: Node, p: Vector3) =
-    n.mTranslation() += p
-    n.setDirty()
-proc `translateX=`*(n: Node, vx: float) =
-    n.mWorld.transform[n.mIndex].translation.x += vx
-    n.setDirty()
-proc `translateY=`*(n: Node, vy: float) =
-    n.mWorld.transform[n.mIndex].translation.y += vy
-    n.setDirty()
-proc `translateZ=`*(n: Node, vz: float) =
-    n.mWorld.transform[n.mIndex].translation.z += vz
-    n.setDirty()
 
-proc position*(n: Node): Vector3 = n.mWorld.transform[n.mIndex].translation
-proc positionX*(n: Node): Coord = n.mWorld.transform[n.mIndex].translation.x
-proc positionY*(n: Node): Coord = n.mWorld.transform[n.mIndex].translation.y
-proc positionZ*(n: Node): Coord = n.mWorld.transform[n.mIndex].translation.z
+template position*(n: Node): Vector3 = n.mWorld.transform[n.mIndex].translation
+proc positionX*(n: Node): Coord = n.position.x
+proc positionY*(n: Node): Coord = n.position.y
+proc positionZ*(n: Node): Coord = n.position.z
 
 proc `position=`*(n: Node, p: Vector3) =
     n.mWorld.transform[n.mIndex].translation = p
     n.setDirty()
 proc `positionX=`*(n: Node, x: Coord) =
-    n.mWorld.transform[n.mIndex].translation.x = x
+    n.position.x = x
     n.setDirty()
 proc `positionY=`*(n: Node, y: Coord) =
-    n.mWorld.transform[n.mIndex].translation.y = y
+    n.position.y = y
     n.setDirty()
 proc `positionZ=`*(n: Node, z: Coord) =
-    n.mWorld.transform[n.mIndex].translation.z = z
+    n.position.z = z
     n.setDirty()
 
-proc rotation*(n: Node): Quaternion = n.mRotation
+proc translation*(n: Node): Vector3 {.deprecated.} = n.position
+proc `translation=`*(n: Node, p: Vector3) {.deprecated.} =
+    n.position = p
+    n.setDirty()
+
+proc `translate=`*(n: Node, p: Vector3) =
+    n.position += p
+    n.setDirty()
+proc `translateX=`*(n: Node, vx: float) =
+    n.position.x += vx
+    n.setDirty()
+proc `translateY=`*(n: Node, vy: float) =
+    n.position.y += vy
+    n.setDirty()
+proc `translateZ=`*(n: Node, vz: float) =
+    n.position.z += vz
+    n.setDirty()
+
+template rotation*(n: Node): Quaternion = n.mWorld.transform[n.mIndex].rotation
 proc `rotation=`*(n: Node, r: Quaternion) =
-    n.mRotation = r
+    n.mWorld.transform[n.mIndex].rotation = r
     n.setDirty()
 proc `rotationX=`*(n: Node, vx: float) =
-    n.mRotation.x = vx
+    n.rotation.x = vx
     n.setDirty()
 proc `rotationY=`*(n: Node, vy: float) =
-    n.mRotation.y = vy
+    n.rotation.y = vy
     n.setDirty()
 proc `rotationZ=`*(n: Node, vz: float) =
-    n.mRotation.z = vz
+    n.rotation.z = vz
     n.setDirty()
 proc `rotationW=`*(n: Node, vw: float) =
-    n.mRotation.w = vw
+    n.rotation.w = vw
     n.setDirty()
 
-template scale*(n: Node): Vector3 = n.mScale
-proc scaleX*(n: Node): Coord = n.mScale.x
-proc scaleY*(n: Node): Coord = n.mScale.y
-proc scaleZ*(n: Node): Coord = n.mScale.z
+template scale*(n: Node): Vector3 = n.mWorld.transform[n.mIndex].scale
+proc scaleX*(n: Node): Coord = n.scale.x
+proc scaleY*(n: Node): Coord = n.scale.y
+proc scaleZ*(n: Node): Coord = n.scale.z
 
 proc `scale=`*(n: Node, s: Vector3) =
-    n.mScale = s
+    n.mWorld.transform[n.mIndex].scale = s
     n.setDirty()
 proc `scaleX=`*(n: Node, value: Coord) =
-    n.mScale.x = value
+    n.scale.x = value
     n.setDirty()
 proc `scaleY=`*(n: Node, value: Coord) =
-    n.mScale.y = value
+    n.scale.y = value
     n.setDirty()
 proc `scaleZ=`*(n: Node, value: Coord) =
-    n.mScale.z = value
+    n.scale.z = value
     n.setDirty()
 
 proc `anchor=`*(n: Node, v: Vector3) =
-    n.mAnchorPoint = v
+    n.mWorld.transform[n.mIndex].anchorPoint = v
     n.setDirty()
 
-proc anchor*(n: Node): Vector3 =
-    result = n.mAnchorPoint
+template anchor*(n: Node): Vector3 =
+    n.mWorld.transform[n.mIndex].anchorPoint
 
 proc createComponentForNode(n: Node, name: string): Component =
     result = createComponent(name)
@@ -237,20 +234,23 @@ proc recursiveUpdate*(n: Node, dt: float) =
         c.recursiveUpdate(dt)
 
 proc anchorMatrix(n: Node): Matrix4=
+    let a = n.anchor
     result[0] = 1; result[1] = 0; result[2] = 0;
     result[4] = 0; result[5] = 1; result[6] = 0;
     result[8] = 0; result[9] = 0; result[10] = 1;
-    result[12] = -n.mAnchorPoint.x;  result[13] = -n.mAnchorPoint.y; result[14] = -n.mAnchorPoint.z;
+    result[12] = -a.x;  result[13] = -a.y; result[14] = -a.z;
     result[15] = 1;
 
 proc makeTransform(n: Node): Matrix4 =
-    var rot = n.mRotation.toMatrix4()
+    var rot = n.rotation.toMatrix4()
 
     # // Set up final matrix with scale, rotation and translation
-    result[0] = n.mScale.x * rot[0]; result[1] = n.mScale.x * rot[1]; result[2] = n.mScale.x * rot[2];
-    result[4] = n.mScale.y * rot[4]; result[5] = n.mScale.y * rot[5]; result[6] = n.mScale.y * rot[6];
-    result[8] = n.mScale.z * rot[8]; result[9] = n.mScale.z * rot[9]; result[10] = n.mScale.z * rot[10];
-    result[12] = n.position.x;  result[13] = n.position.y; result[14] = n.position.z;
+    let s = n.scale
+    let p = n.position
+    result[0] = s.x * rot[0]; result[1] = s.x * rot[1]; result[2] = s.x * rot[2]
+    result[4] = s.y * rot[4]; result[5] = s.y * rot[5]; result[6] = s.y * rot[6]
+    result[8] = s.z * rot[8]; result[9] = s.z * rot[9]; result[10] = s.z * rot[10]
+    result[12] = p.x;  result[13] = p.y; result[14] = p.z
 
     # // No projection term
     result[3] = 0; result[7] = 0; result[11] = 0; result[15] = 1;
@@ -520,7 +520,7 @@ proc tryWorldToLocal*(n: Node, p: Vector3, res: var Vector3): bool =
         result = true
 
 proc worldPos*(n: Node): Vector3 =
-    result = n.localToWorld(n.mAnchorPoint)
+    result = n.localToWorld(n.anchor)
 
 proc `worldPos=`*(n: Node, p: Vector3) =
     if n.parent.isNil:
@@ -754,10 +754,10 @@ proc deserialize*(n: Node, s: JsonDeserializer) =
         newComposition("file://" & p, n).loadComposition()
 
     s.visit(n.name, "name")
-    s.visit(n.mTranslation, "translation")
-    s.visit(n.mScale, "scale")
-    s.visit(n.mRotation, "rotation")
-    s.visit(n.mAnchorPoint, "anchor")
+    s.visit(n.position, "translation")
+    s.visit(n.scale, "scale")
+    s.visit(n.rotation, "rotation")
+    s.visit(n.anchor, "anchor")
     s.visit(n.alpha, "alpha")
     n.isEnabled = s.node{"enabled"}.getBool(true)
     n.affectsChildren = s.node{"affectsChildren"}.getBool(true)
@@ -978,25 +978,25 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
             tmpBuf = b.getBuffer(int16, count)
             let anchorPoints = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].mAnchorPoint = anchorPoints[i]
+                nodes[tmpBuf[i]].anchor = anchorPoints[i]
         of $bicTranslation:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             let translations = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].mTranslation() = translations[i]
+                nodes[tmpBuf[i]].position = translations[i]
         of $bicScale:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             let scales = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].mScale = scales[i]
+                nodes[tmpBuf[i]].scale = scales[i]
         of $bicRotation:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             let rotations = b.getBuffer(Quaternion, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].mRotation = rotations[i]
+                nodes[tmpBuf[i]].rotation = rotations[i]
         of $bicName:
             for i in 0 ..< nodesCount:
                 nodes[i].name = b.readStr()
