@@ -225,8 +225,7 @@ proc updateComprRef(c: Composition) =
     n = newNodeWithURL(c.url)
     if not n.isNil:
         c.node.removeAllChildren()
-        #todo: fix this...
-        while n.children.len > 0:
+        while n.hasChildren:
             c.node.addChild(n.first)
 
 method onCompositionSaved*(v: EditorSceneView, comp: CompositionDocument) =
