@@ -71,11 +71,14 @@ proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: NodeI
     result = hp.next
 
 iterator dfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
-  let root = root
-  var n = root
-  while n != InvalidNodeIndex:
-    yield n
-    n = dfsOrderNext(hierarchy, root, n)
+  if hierarchy.len != 0:
+    let root = root
+    var n = root
+    let pArr = cast[ptr UncheckedArray[NodeHierarchy]](unsafeAddr hierarchy[0])
+    let h = hierarchy.high
+    while n != InvalidNodeIndex:
+      yield n
+      n = dfsOrderNext(toOpenArray(pArr, 0, h), root, n)
 
 proc first*(n: Node): Node =
   return n.world.getNode(n.mFirstChild)
@@ -213,7 +216,7 @@ proc getOrder*(node: Node, order: var seq[NodeIndex]) =
 
   order = o1[0 .. i1 - 1]
 
-  echo "2 IS BETTER THAT 1 by ", int(o2e - o2b) / int(o1e - o1b), " TOTAL: ", total2.int / total1.int, " N: ", i1
+  echo "2 IS BETTER THAN 1 by ", int(o1e - o1b) / int(o2e - o2b), " TOTAL: ", total1.int / total2.int, " N: ", i1
 
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
