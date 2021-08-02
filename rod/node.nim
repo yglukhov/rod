@@ -15,6 +15,8 @@ export Node
 type NodeAnchorAUX* = ref object
     node*: Node
 
+
+template getSeq*(arr: seq[Node]): seq[Node] = arr
 proc sceneView*(n: Node): SceneView = n.mSceneView
 proc getGlobalAlpha*(n: Node): float32
 proc worldTransform*(n: Node): Matrix4
