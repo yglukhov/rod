@@ -57,7 +57,7 @@ method init*(v: EditorTreeView, r: Rect)=
         if indexPath.len == 1:
             return newVariant(v.rootNode)
         else:
-            return newVariant(item.get(Node).seqOfChildren[indexPath[^1]])
+            return newVariant(item.get(Node).children.getSeq()[indexPath[^1]])
 
     outlineView.createCell = proc(): TableViewCell =
         var lbl = newLabel(newRect(0, 0, 100, 20))
@@ -140,7 +140,7 @@ method init*(v: EditorTreeView, r: Rect)=
         let t = outlineView.itemAtIndexPath(tos).get(Node)
         let toIndex = toIp[^1]
         if f.parent == t:
-            let cIndex = t.indexOf(f)
+            let cIndex = t.children.find(f)
             if toIndex < cIndex:
                 t.insertChild2(f, toIndex)
             elif toIndex > cIndex:
@@ -281,7 +281,7 @@ proc getTreeViewIndexPathForNode(v: EditorTreeView, n: Node, indexPath: var seq[
         var p = n.parent
         var n = n
         while not p.isNil and n != rootParent:
-            indexPath.insert(p.indexOf(n), 0)
+            indexPath.insert(p.children.find(n), 0)
             n = p
             p = p.parent
 
