@@ -54,29 +54,28 @@ proc world*(n: Node): World =
   assert(not n.mWorld.isNil)
   n.mWorld
 
-proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: var NodeIndex) {.inline.} =
+proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: NodeIndex): NodeIndex {.inline.} =
   let h = hierarchy[n]
   if h.firstChild != InvalidNodeIndex:
-    n = h.firstChild
+    result = h.firstChild
   elif h.next != InvalidNodeIndex:
-    n = h.next
+    result = h.next
   elif h.parent == root or h.parent == InvalidNodeIndex:
-    n = InvalidNodeIndex
+    result = InvalidNodeIndex
   else:
     var hp = hierarchy[h.parent]
     while hp.next == InvalidNodeIndex:
       if hp.parent == root:
-        n = InvalidNodeIndex
-        return
+        return InvalidNodeIndex
       hp = hierarchy[hp.parent]
-    n = hp.next
+    result = hp.next
 
 iterator dfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
   let root = root
   var n = root
   while n != InvalidNodeIndex:
     yield n
-    dfsOrderNext(hierarchy, root, n)
+    n = dfsOrderNext(hierarchy, root, n)
 
 proc first*(n: Node): Node =
   return n.world.getNode(n.mFirstChild)
@@ -186,26 +185,26 @@ proc getOrder(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var o
     getOrder(c, hierarchy, order, i)
     c = hierarchy[c].next
 
-import times
+import std/monotimes
 
-var total1 = 0.0
-var total2 = 0.0
+var total1 = 0'i64
+var total2 = 0'i64
 
 var o1: array[32000, NodeIndex]
 var o2: array[32000, NodeIndex]
 
 proc getOrder*(node: Node, order: var seq[NodeIndex]) =
-  let o2b = cpuTime()
+  let o1b = getMonotime().ticks
+  var i1 = 0
+  getOrder(node.mIndex, node.mWorld.hierarchy, o1, i1)
+  let o1e = getMonotime().ticks
+  let o2b = getMonotime().ticks
   var i2 = 0
   for n in dfsOrder(node.mWorld.hierarchy, node.mIndex):
     o2[i2] = n
     inc i2
     # o2.add(n)
-  let o2e = cpuTime()
-  let o1b = cpuTime()
-  var i1 = 0
-  getOrder(node.mIndex, node.mWorld.hierarchy, o1, i1)
-  let o1e = cpuTime()
+  let o2e = getMonotime().ticks
   assert(o1 == o2)
   assert(i2 == i1)
 
@@ -214,7 +213,7 @@ proc getOrder*(node: Node, order: var seq[NodeIndex]) =
 
   order = o1[0 .. i1 - 1]
 
-  echo "2 IS BETTER THAT 1 by ", (o2e - o2b) / (o1e - o1b), " TOTAL: ", total2 / total1, " N: ", i1
+  echo "2 IS BETTER THAT 1 by ", int(o2e - o2b) / int(o1e - o1b), " TOTAL: ", total2.int / total1.int, " N: ", i1
 
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
