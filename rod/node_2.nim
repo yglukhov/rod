@@ -62,8 +62,6 @@ proc next(n: Node): Node =
 
 proc `next=`(n: Node, nn: Node) =
   if nn.isNil:
-    # if not n.next.isNil:
-
     n.mNext = InvalidNodeIndex
     return
   n.mNext = nn.mIndex
@@ -92,7 +90,7 @@ proc last(n: Node): Node =
 
 type NodeChildrenIteratorProxy = distinct Node
 
-proc children*(n: Node): NodeChildrenIteratorProxy =  NodeChildrenIteratorProxy(n)
+proc children*(n: Node): NodeChildrenIteratorProxy = NodeChildrenIteratorProxy(n)
 
 iterator items*(p: NodeChildrenIteratorProxy): Node =
   let n = p.Node
@@ -116,6 +114,22 @@ iterator pairs*(p: NodeChildrenIteratorProxy): (int, Node) =
       raise newException(Exception, "looped ")
     inc iters
 
+proc len*(p: NodeChildrenIteratorProxy): int =
+  for i, ch in p:
+    inc result
+
+proc `[]`*(p: NodeChildrenIteratorProxy, i: int): Node =
+  for q, ch in p:
+    if q == i: return ch
+
+proc `[]`*(p: NodeChildrenIteratorProxy, i: BackwardsIndex): Node =
+  let len = p.len
+  for q, ch in p:
+    if len - q == int(i): return ch
+
+proc getSeq*(p: NodeChildrenIteratorProxy): seq[Node] =
+  for ch in p:
+    result.add(ch)
 
 proc hasChildren*(n: Node): bool =
   n.mFirstChild != InvalidNodeIndex
@@ -229,7 +243,6 @@ proc moveToWorld(n: Node, w: World) =
 
 proc removeFromParent2*(ch: Node) =
   # echo "removeFromParent2 ", n.name
-
   let h = addr ch.mWorld.hierarchy[ch.mIndex]
   if h.parent == InvalidNodeIndex:
     # echo "* removeFromParent2 ", n.name, " parent isNil"
@@ -246,7 +259,6 @@ proc removeFromParent2*(ch: Node) =
   h.parent = InvalidNodeIndex
   h.prev = InvalidNodeIndex
   h.next = InvalidNodeIndex
-
   # echo "remove ", ch.name, " from ", n.name
   ch.moveToWorld(newWorld())
 

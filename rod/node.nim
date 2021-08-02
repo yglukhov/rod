@@ -408,10 +408,9 @@ proc nodeWillBeRemovedFromSceneView*(n: Node) =
         n.scriptComponents.removedAUX()
 
 
-    let children = n.seqOfChildren
     var ci = 0
-    while ci < children.len:
-        children[ci].nodeWillBeRemovedFromSceneView()
+    while ci < n.children.len:
+        n.children[ci].nodeWillBeRemovedFromSceneView()
         inc ci
     n.mSceneView = nil
 
@@ -429,10 +428,9 @@ proc nodeWasAddedToSceneView*(n: Node, v: SceneView) =
             n.renderComponents.addedAUX()
             n.scriptComponents.addedAUX()
 
-        let children = n.seqOfChildren
         var ci = 0
-        while ci < children.len:
-            children[ci].nodeWasAddedToSceneView(v)
+        while ci < n.children.len:
+            n.children[ci].nodeWasAddedToSceneView(v)
             inc ci
     else:
         # There may be cases where this proc has already been called.
