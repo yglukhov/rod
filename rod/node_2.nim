@@ -5,15 +5,43 @@ proc setDirty*(n: Node)
 
 const InvalidNodeIndex* = high(NodeIndex)
 
-proc addNode(w: World, n: Node): NodeIndex =
-  result = w.nodes.len.NodeIndex
-  w.nodes.add(n)
-  w.isDirty = true
+proc newWorld*(): World =
+  # COMPAT, should not be used
+  World(isDirty: true)
+
+proc initWorldInEmptyNodeCompat*(n: Node) =
+  n.mWorld = newWorld()
+  n.mWorld.nodes.add(n)
+  n.mWorld.hierarchy.add(NodeHierarchy(parent: InvalidNodeIndex, prev: InvalidNodeIndex, next: InvalidNodeIndex, firstChild: InvalidNodeIndex))
+  n.mWorld.transform.setLen(1)
 
 proc getNode(w: World, i: NodeIndex): Node =
   if i < w.nodes.len.NodeIndex:
     return w.nodes[i]
 
+# These are just quick compat glue. TODO: get rid of them
+proc mParent(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].parent
+proc mNext(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].next
+proc mPrev(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].prev
+proc mFirstChild(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].firstChild
+proc `mParent=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].parent = v
+proc `mNext=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].next = v
+proc `mPrev=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].prev = v
+proc `mFirstChild=`(n: Node, v: NodeIndex) = n.mWorld.hierarchy[n.mIndex].firstChild = v
+
+when not defined(release):
+  proc debugVerifyConsistency*(w: World) =
+    for i, n in w.nodes:
+      if not n.isNil:
+        assert(n.mIndex == i.NodeIndex)
+        if i != 0:
+          let h = w.hierarchy[i]
+          assert(h.parent != InvalidNodeIndex)
+          if h.prev == InvalidNodeIndex:
+            assert(w.nodes[h.parent].mFirstChild == i.NodeIndex)
+
+  proc debugVerifyConsistency*(n: Node) =
+    debugVerifyConsistency(n.mWorld)
 
 proc dump*(w: World, prefix: string = "") =
   for i, n in w.nodes:
@@ -22,15 +50,9 @@ proc dump*(w: World, prefix: string = "") =
       continue
     echo "[", prefix, ":", i, "]: ", n.mIndex, " : ", n.name, " [par ", n.mParent, ", fst ", n.mFirstChild, ", prv ", n.mPrev, ", nxt ", n.mNext, "]"
 
-proc parent*(n: Node): Node
-
 proc world*(n: Node): World =
-  if not n.mWorld.isNil:
-    return n.mWorld
-  n.mWorld = new(World)
-  n.mWorld.isDirty = true
-  n.mIndex = n.mWorld.addNode(n)
-  result = n.mWorld
+  assert(not n.mWorld.isNil)
+  n.mWorld
 
 proc first*(n: Node): Node =
   return n.world.getNode(n.mFirstChild)
@@ -40,8 +62,6 @@ proc next(n: Node): Node =
 
 proc `next=`(n: Node, nn: Node) =
   if nn.isNil:
-    # if not n.next.isNil:
-
     n.mNext = InvalidNodeIndex
     return
   n.mNext = nn.mIndex
@@ -53,7 +73,7 @@ proc prev(n: Node): Node =
 proc parent*(n: Node): Node =
   return n.world.getNode(n.mParent)
 
-proc `parent=`*(n: Node, p: Node) =
+proc `parent=`(n: Node, p: Node) =
   if p.isNil:
     # echo n.name, " parent= nil"
     n.mParent = InvalidNodeIndex
@@ -62,7 +82,7 @@ proc `parent=`*(n: Node, p: Node) =
     n.mParent = p.mIndex
   n.setDirty()
 
-proc last*(n: Node): Node =
+proc last(n: Node): Node =
   result = n.first
   if result.isNil: return
   while not result.next.isNil:
@@ -70,7 +90,7 @@ proc last*(n: Node): Node =
 
 type NodeChildrenIteratorProxy = distinct Node
 
-proc children*(n: Node): NodeChildrenIteratorProxy =  NodeChildrenIteratorProxy(n)
+proc children*(n: Node): NodeChildrenIteratorProxy = NodeChildrenIteratorProxy(n)
 
 iterator items*(p: NodeChildrenIteratorProxy): Node =
   let n = p.Node
@@ -94,6 +114,22 @@ iterator pairs*(p: NodeChildrenIteratorProxy): (int, Node) =
       raise newException(Exception, "looped ")
     inc iters
 
+proc len*(p: NodeChildrenIteratorProxy): int =
+  for i, ch in p:
+    inc result
+
+proc `[]`*(p: NodeChildrenIteratorProxy, i: int): Node =
+  for q, ch in p:
+    if q == i: return ch
+
+proc `[]`*(p: NodeChildrenIteratorProxy, i: BackwardsIndex): Node =
+  let len = p.len
+  for q, ch in p:
+    if len - q == int(i): return ch
+
+proc getSeq*(p: NodeChildrenIteratorProxy): seq[Node] =
+  for ch in p:
+    result.add(ch)
 
 proc hasChildren*(n: Node): bool =
   n.mFirstChild != InvalidNodeIndex
@@ -109,10 +145,9 @@ proc indexOf*(n: Node, c: Node): int =
   result = -1
 
 proc childAt*(n: Node, i: int): Node =
-  var q = 0
-  for ch in n.children:
+  for q, ch in n.children:
     if q == i: return ch
-    inc q
+  assert(false, "out of bounds")
 
 proc childrenLen*(n: Node): int =
   for ch in n.children:
@@ -132,97 +167,100 @@ proc setDirty*(n: Node) =
     for c in n.children:
       c.setDirty()
 
+proc getOrder(node: NodeIndex, hierarchy: openarray[NodeHierarchy], order: var seq[NodeIndex]) =
+  order.add(node)
+  var c = hierarchy[node].firstChild
+  while c != InvalidNodeIndex:
+    getOrder(c, hierarchy, order)
+    c = hierarchy[c].next
+
 proc getOrder*(node: Node, order: var seq[NodeIndex]) =
-  order.add(node.mIndex)
-  # echo "getOrder ", node.name
-  for ch in node.children:
-    getOrder(ch, order)
+  getOrder(node.mIndex, node.mWorld.hierarchy, order)
 
 proc getOrder*(node: Node): seq[NodeIndex] =
   node.getOrder(result)
 
-proc setWorld(n: Node, w: World) =
-  n.mWorld = w
-  for ch in n.children:
-    ch.setWorld(w)
-
 proc moveToWorld(n: Node, w: World) =
   # echo "moveToWorld ", n.name, " world ", w.nodes.len
-  if n.mWorld.isNil:
-    n.mIndex = w.addNode(n)
-    n.setWorld(w)
-    w.isDirty = true
-    return
-
-  if n.mWorld == w:
-    w.isDirty = true
-    return
+  assert(not n.mWorld.isNil)
 
   w.isDirty = true
+  if n.mWorld == w:
+    return
+
   let oldWorld = n.mWorld
   oldWorld.isDirty = true
   var indexes: seq[NodeIndex]
 
   # oldWorld.dump("before ")
 
+  # 1. Get indexes in old world of nodes to move
   getOrder(n, indexes)
-  # echo "indexes ", indexes
 
+  let wPrevSz = w.nodes.len
+  let wNewSz = wPrevSz + indexes.len
+  var newIndex = wPrevSz.NodeIndex
+
+  # 2. Copy node refs
+  w.nodes.setLen(wNewSz)
   for idx in indexes:
     let node = oldWorld.nodes[idx]
-    let newIndex = w.addNode(node)
+    w.nodes[newIndex] = node
+    node.mWorld = w
     node.mIndex = newIndex
+    inc newIndex
+
+  # 3. Copy hieararchy
+  w.hierarchy.setLen(wNewSz)
 
   template offset(world: World, v: var NodeIndex) =
     if v != InvalidNodeIndex:
       # echo "offset ", v, " world ", world.nodes.len
       v = world.nodes[v].mIndex
 
+  newIndex = wPrevSz.NodeIndex
   for oldIndex in indexes:
-    oldWorld.offset(oldWorld.nodes[oldIndex].mParent)
-    oldWorld.offset(oldWorld.nodes[oldIndex].mPrev)
-    oldWorld.offset(oldWorld.nodes[oldIndex].mNext)
-    oldWorld.offset(oldWorld.nodes[oldIndex].mFirstChild)
+    var h = oldWorld.hierarchy[oldIndex]
+    oldWorld.offset(h.parent)
+    oldWorld.offset(h.prev)
+    oldWorld.offset(h.next)
+    oldWorld.offset(h.firstChild)
+    w.hierarchy[newIndex] = h
+    inc newIndex
 
+  # 4. Mark nodes dead in their old world, by setting ref to nil
   for oldIndex in indexes:
     oldWorld.nodes[oldIndex] = nil
-    # oldWorld.offset(oldWorld.nodes[idx].mParent)
-    # oldWorld.nodes[oldIndex] = nil
 
-  n.setWorld(w)
+  # 5. Copy transform
+  w.transform.setLen(wNewSz)
+  newIndex = wPrevSz.NodeIndex
+  for oldIndex in indexes:
+    w.transform[newIndex] = oldWorld.transform[oldIndex]
+    inc newIndex
+
   # w.dump("after ")
 
-
-proc claimChildren(n: Node) =
-  var newWorld = new(World)
-  newWorld.isDirty = true
-  # n.world.dump(n.name & " pre claimChildren " )
-  n.moveToWorld(newWorld)
-  # newWorld.dump(n.name & " claimChildren " )
-
-proc removeChild(n: Node, ch: Node) =
-  if ch.prev.isNil:
-    n.mFirstChild = ch.mNext
-    if not ch.next.isNil:
-      ch.next.mPrev = InvalidNodeIndex
-  else:
-    ch.prev.next = ch.next
-
-
-  ch.parent = nil
-  ch.mPrev = InvalidNodeIndex
-  ch.mNext = InvalidNodeIndex
-
-  # echo "remove ", ch.name, " from ", n.name
-  ch.claimChildren()
-
-proc removeFromParent2*(n: Node) =
+proc removeFromParent2*(ch: Node) =
   # echo "removeFromParent2 ", n.name
-  let parent = n.parent
-  if parent.isNil:
+  let h = addr ch.mWorld.hierarchy[ch.mIndex]
+  if h.parent == InvalidNodeIndex:
     # echo "* removeFromParent2 ", n.name, " parent isNil"
     return
-  parent.removeChild(n)
+
+  if h.prev == InvalidNodeIndex:
+    ch.parent.mFirstChild = ch.mNext
+  else:
+    ch.prev.mNext = ch.mNext
+
+  if h.next != InvalidNodeIndex:
+    ch.next.mPrev = h.prev
+
+  h.parent = InvalidNodeIndex
+  h.prev = InvalidNodeIndex
+  h.next = InvalidNodeIndex
+  # echo "remove ", ch.name, " from ", n.name
+  ch.moveToWorld(newWorld())
 
 proc addChild2*(n: Node, ch: Node) =
   if not ch.parent.isNil:
@@ -232,14 +270,14 @@ proc addChild2*(n: Node, ch: Node) =
   ch.moveToWorld n.world
   ch.parent = n
 
-  if n.first.isNil:
+  if n.mFirstChild == InvalidNodeIndex:
     n.mFirstChild = ch.mIndex
     ch.mPrev = InvalidNodeIndex
   else:
     n.last.next = ch
 
 proc insertChild2*(n: Node, ch: Node, i: int) =
-  if not ch.parent.isNil:
+  if ch.mParent != InvalidNodeIndex:
     ch.removeFromParent2()
     # ch.mIndex = InvalidNodeIndex
 
@@ -271,28 +309,37 @@ proc getRoot(w: World): Node =
   w.nodes[0]
 
 proc reorder*(w: World, indexes: openarray[NodeIndex]) =
-  if not w.isDirty or w.nodes.len == 0: return
-
-  template fixUP(v: var NodeIndex) =
+  template fixUP(v: untyped) =
     if v != InvalidNodeIndex:
       # echo "fixup ", v
       v = w.nodes[int(v)].mIndex
 
-  var nodes = newSeqOfCap[Node](indexes.len)
+  var nodes = newSeq[Node](indexes.len)
+  var hierarchy = newSeq[NodeHierarchy](indexes.len)
 
   for newIndex, oldIndex in indexes:
     let n = w.nodes[int(oldIndex)]
     n.mIndex = NodeIndex(newIndex)
-    nodes.add(n)
+    nodes[newIndex] = n
 
-  for i, n in nodes:
-    n.mIndex = NodeIndex(i)
-    n.mParent.fixUP()
-    n.mPrev.fixUP()
-    n.mNext.fixUP()
-    n.mFirstChild.fixUP()
+  for newIndex, oldIndex in indexes:
+    var h = w.hierarchy[int(oldIndex)]
+    fixUP(h.parent)
+    fixUP(h.prev)
+    fixUP(h.next)
+    fixUP(h.firstChild)
+    hierarchy[newIndex] = h
 
-  w.nodes.setLen(0)
-  w.nodes = nodes
+  w.nodes = @[]
+  w.hierarchy = @[]
+  swap(w.nodes, nodes)
+  swap(w.hierarchy, hierarchy)
+
+  var transform = newSeq[NodeTransform](indexes.len)
+  for newIndex, oldIndex in indexes:
+    transform[newIndex] = w.transform[oldIndex]
+
+  w.transform = @[]
+  swap(w.transform, transform)
 
   w.isDirty = false

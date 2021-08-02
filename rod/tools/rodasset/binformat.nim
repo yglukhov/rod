@@ -194,7 +194,7 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, comp
                 s(foundNode)
 
     c.serialize(b)
-    n.children = @[] # Break cycle to let gc collect it faster
+    # n.children = @[] # Break cycle to let gc collect it faster
 
 proc writeAECompositionComponent(b: BinSerializer, j: JsonNode, nodes: seq[JsonNode]) =
     let jbufs = j{"buffers"}

@@ -17,7 +17,6 @@ type
     NodeIndex* = uint16
 
     Node* = ref object
-        mTranslation*: Vector3
         mRotation*: Quaternion
         mScale*: Vector3
         renderComponents*: seq[RenderComponent]
@@ -37,13 +36,19 @@ type
         #todo: move it
         isRemoved*: bool
         mIndex*: NodeIndex
-        mParent*: NodeIndex
-        mNext*: NodeIndex
-        mPrev*: NodeIndex
-        mFirstChild*: NodeIndex
         mWorld*: World
         when defined(rodedit):
             jAnimations*: JsonNode
+
+    NodeHierarchy* = object
+        parent*: NodeIndex
+        next*: NodeIndex
+        prev*: NodeIndex
+        firstChild*: NodeIndex
+
+    NodeTransform* = object
+        translation*: Vector3
+
 
     BBox* = object
         minPoint*: Vector3
@@ -72,6 +77,8 @@ type
 
     World* = ref object
         nodes*: seq[Node]
+        hierarchy*: seq[NodeHierarchy]
+        transform*: seq[NodeTransform]
         isDirty*: bool
 
     SceneView* = ref object of View

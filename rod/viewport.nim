@@ -119,8 +119,6 @@ method draw*(v: SceneView, r: Rect) =
         s.draw()
 
     if v.rootNode.isNil: return
-    # v.rootNode.world.reorder(v.rootNode.getOrder())
-
     let c = currentContext()
 
     v.viewProjMatrix = v.getViewProjectionMatrix()
