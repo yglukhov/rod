@@ -264,55 +264,55 @@ template alpha*(n: Node): Coord =
 proc `alpha=`*(n: Node, v: Coord) =
     n.mWorld.alpha[n.mIndex] = v
 
-proc drawNode*(n: Node, recursive: bool) =
-    if n.alpha < 0.0000001 or not n.enabled: return
+# proc drawNode(n: Node, recursive: bool) =
+#     if n.alpha < 0.0000001 or not n.enabled: return
 
-    var tr: Transform3d
-    let c = currentContext()
+#     var tr: Transform3d
+#     let c = currentContext()
 
-    let oldAlpha = c.alpha
-    c.alpha *= n.alpha
+#     let oldAlpha = c.alpha
+#     c.alpha *= n.alpha
 
-    var lastDrawComp = -1
-    var hasPosteffectComponent = false
+#     var lastDrawComp = -1
+#     var hasPosteffectComponent = false
 
-    var compLen = n.renderComponents.len
-    var componentInterruptedDrawing = false
+#     var compLen = n.renderComponents.len
+#     var componentInterruptedDrawing = false
 
-    if compLen > 0:
-        tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-        c.withTransform tr:
-            for c in n.renderComponents:
-                inc lastDrawComp
-                if c.beforeDraw(lastDrawComp):
-                    componentInterruptedDrawing = true
-                    break
+#     if compLen > 0:
+#         tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+#         c.withTransform tr:
+#             for c in n.renderComponents:
+#                 inc lastDrawComp
+#                 if c.beforeDraw(lastDrawComp):
+#                     componentInterruptedDrawing = true
+#                     break
 
-            # Legacy api support. Will be removed soon.
-            for c in n.renderComponents:
-                c.draw()
-                when defined(rodedit):
-                    c.onDrawGizmo()
-                hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
+#             # Legacy api support. Will be removed soon.
+#             for c in n.renderComponents:
+#                 c.draw()
+#                 when defined(rodedit):
+#                     c.onDrawGizmo()
+#                 hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
 
-    let shouldDrawChildren = recursive and not hasPosteffectComponent
+#     let shouldDrawChildren = recursive and not hasPosteffectComponent
 
-    if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
-        for c in n.children:
-            c.drawNode(recursive)
+#     if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
+#         for c in n.children:
+#             c.drawNode(recursive)
 
-    assert(compLen == n.renderComponents.len, "Components changed during drawing.")
-    if compLen > 0:
-        c.withTransform tr:
-            while lastDrawComp >= 0:
-                n.renderComponents[lastDrawComp].afterDraw(lastDrawComp)
-                dec lastDrawComp
+#     assert(compLen == n.renderComponents.len, "Components changed during drawing.")
+#     if compLen > 0:
+#         c.withTransform tr:
+#             while lastDrawComp >= 0:
+#                 n.renderComponents[lastDrawComp].afterDraw(lastDrawComp)
+#                 dec lastDrawComp
 
-    if shouldDrawChildren and not n.affectsChildren:
-        for c in n.children:
-            c.drawNode(recursive)
+#     if shouldDrawChildren and not n.affectsChildren:
+#         for c in n.children:
+#             c.drawNode(recursive)
 
-    c.alpha = oldAlpha
+#     c.alpha = oldAlpha
 
 proc recursiveDraw*(n: Node) =
     let w = n.mWorld
@@ -321,7 +321,55 @@ proc recursiveDraw*(n: Node) =
         var newOrder = newSeqOfCap[NodeIndex](w.nodes.len)
         w.nodes[0].getOrder(newOrder)
         w.reorder(newOrder)
-    n.drawNode(true)
+
+    var tr: Transform3d
+    let c = currentContext()
+
+    for n in dfsOrder(w.hieararchy, n.mIndex):
+        let oldAlpha = c.alpha
+        c.alpha *= n.alpha
+
+        var lastDrawComp = -1
+        var hasPosteffectComponent = false
+        var compLen = n.renderComponents.len
+        var componentInterruptedDrawing = false
+
+        if compLen > 0:
+            tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+            c.withTransform tr:
+                for c in n.renderComponents:
+                    inc lastDrawComp
+                    if c.beforeDraw(lastDrawComp):
+                        componentInterruptedDrawing = true
+                        break
+
+                # Legacy api support. Will be removed soon.
+                for c in n.renderComponents:
+                    c.draw()
+                    when defined(rodedit):
+                        c.onDrawGizmo()
+                    hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
+
+        let shouldDrawChildren = recursive and not hasPosteffectComponent
+        if not shouldDrawChildren:
+            break
+
+        # if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
+        #     for c in n.children:
+        #         c.drawNode(recursive)
+
+        assert(compLen == n.renderComponents.len, "Components changed during drawing.")
+        if compLen > 0:
+            c.withTransform tr:
+                while lastDrawComp >= 0:
+                    n.renderComponents[lastDrawComp].afterDraw(lastDrawComp)
+                    dec lastDrawComp
+
+        if shouldDrawChildren and not n.affectsChildren:
+            for c in n.children:
+                c.drawNode(recursive)
+
+        c.alpha = oldAlpha
 
 iterator allNodes*(n: Node): Node =
     let w = n.mWorld

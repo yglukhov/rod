@@ -88,7 +88,7 @@ proc updateGizmo(v: EditorSceneView)=
         v.gizmo = newMoveGizmo()
         v.gizmo.gizmoNode.nodeWasAddedToSceneView(v.sceneView)
     v.gizmo.updateGizmo()
-    v.gizmo.gizmoNode.drawNode(true)
+    v.gizmo.gizmoNode.recursiveDraw()
 
 method init*(v: EditorSceneView, r: Rect)=
     procCall v.View.init(r)
