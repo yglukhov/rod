@@ -5,7 +5,7 @@ import rod / [ asset_bundle ]
 import rod / tools / serializer
 import rod / [ node_2, node_flags ]
 import quaternion, ray, rod_types
-import tables, typetraits, json, strutils, math, os
+import tables, typetraits, json, strutils, math, os, sequtils
 export node_2, node_flags
 
 when defined(rodedit):
@@ -940,6 +940,9 @@ type
         bicScale = "s"
         bicTranslation = "t"
 
+proc newNodeInWorld(w: World, idx: NodeIndex): Node =
+    Node(mWorld: w, mIndex: idx)
+
 proc newNode*(b: BinDeserializer, compName: string): Node =
     let oldPos = b.getPosition()
     let oldPath = b.curCompPath
@@ -951,17 +954,47 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
 
     b.rewindToComposition(compName)
     let nodesCount = b.readInt16()
-    var nodes = newSeq[Node](nodesCount)
-    for i in 0 ..< nodesCount: nodes[i] = newNode()
+    var world = newWorld()
+    world.nodes.setLen(nodesCount)
+    world.hierarchy.setLen(nodesCount)
+    world.transform.setLen(nodesCount)
+    world.worldMatrixes.setLen(nodesCount)
+    world.alpha.setLen(nodesCount)
+    world.flags.setLen(nodesCount)
+
+    # init transform components with default values
+    for v in world.transform.mitems:
+        v.scale = newVector3(1, 1, 1)
+        v.rotation = newQuaternion()
+    # init alpha with default value. technically this is not needed if alpha is in binformat
+    for v in world.alpha.mitems: v = 1.0
+    # init flag with default value. technically this is not needed if flag is in binformat
+    for v in world.flags.mitems: v = {NodeFlags.enabled, NodeFlags.affectsChildren, NodeFlags.dirty, NodeFlags.serializable}
+
+    # allocate nodes. TODO: Nodes should be allocated lazily later on.
+    for i in 0 ..< nodesCount: world.nodes[i] = newNodeInWorld(world, NodeIndex(i))
+
+    # Temporary array to track last child, while restoring hierarchy
+    var lastChild = newSeqWith(nodesCount, InvalidNodeIndex)
 
     var tmpBuf = b.getBuffer(int16, nodesCount - 1)
     # Read child-parent relations
+    world.hierarchy[0] = NodeHierarchy(firstChild: InvalidNodeIndex, prev: InvalidNodeIndex, next: InvalidNodeIndex, parent: InvalidNodeIndex)
     for i in 1 ..< nodesCount:
-        let ch = nodes[i]
-        let p = nodes[tmpBuf[i - 1]]
-        #todo: fix this
-        p.addChild2(ch)
-        # ch.parent = p
+        let iThis = NodeIndex(i)
+        var h: NodeHierarchy
+        h.parent = NodeIndex(tmpBuf[i - 1])
+        h.firstChild = InvalidNodeIndex
+        h.next = InvalidNodeIndex
+        h.prev = lastChild[h.parent]
+        lastChild[h.parent] = iThis
+        if h.prev == InvalidNodeIndex:
+            world.hierarchy[h.parent].firstChild = iThis
+        else:
+            world.hierarchy[h.prev].next = iThis
+        world.hierarchy[i] = h
+
+    lastChild = @[]
 
     let compsCount = b.readInt16()
     for i in 0 ..< compsCount:
@@ -970,46 +1003,48 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
         of $bicAlpha:
             let alphas = b.getBuffer(uint8, nodesCount)
             for i in 0 ..< nodesCount:
-                nodes[i].alpha = float32(alphas[i]) / 255
+                world.alpha[i] = float32(alphas[i]) / 255
         of $bicFlags:
             let flags = b.getBuffer(uint8, nodesCount)
             for i in 0 ..< nodesCount:
-                nodes[i].isEnabled = (flags[i] and (1.uint8 shl NodeFlags.enabled.uint8)) != 0
-                nodes[i].affectsChildren = (flags[i] and (1.uint8 shl NodeFlags.affectsChildren.uint8)) != 0
+                var f = {NodeFlags.dirty, NodeFlags.serializable}
+                if (flags[i] and (1.uint8 shl NodeFlags.enabled.uint8)) != 0: f.incl(NodeFlags.enabled)
+                if (flags[i] and (1.uint8 shl NodeFlags.affectsChildren.uint8)) != 0: f.incl(NodeFlags.affectsChildren)
+                world.flags[i] = f
         of $bicAnchorPoint:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             let anchorPoints = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].anchor = anchorPoints[i]
+                world.transform[tmpBuf[i]].anchorPoint = anchorPoints[i]
         of $bicTranslation:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             let translations = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].position = translations[i]
+                world.transform[tmpBuf[i]].translation = translations[i]
         of $bicScale:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             let scales = b.getBuffer(Vector3, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].scale = scales[i]
+                world.transform[tmpBuf[i]].scale = scales[i]
         of $bicRotation:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             let rotations = b.getBuffer(Quaternion, count)
             for i in 0 ..< count:
-                nodes[tmpBuf[i]].rotation = rotations[i]
+                world.transform[tmpBuf[i]].rotation = rotations[i]
         of $bicName:
             for i in 0 ..< nodesCount:
-                nodes[i].name = b.readStr()
+                world.nodes[i].name = b.readStr()
         of $bicCompRef:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             for i in 0 ..< count:
                 let compRef = b.readStr()
                 let subComp = newNodeWithResource(compRef)
-                let old = nodes[tmpBuf[i]]
+                let old = world.nodes[tmpBuf[i]]
 
                 var subCompCh = subComp.children.getSeq
                 for i, ch in subCompCh:
@@ -1024,10 +1059,10 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
             for i in 0 ..< count:
-                let comp = nodes[tmpBuf[i]].addComponent(name)
+                let comp = world.nodes[tmpBuf[i]].addComponent(name)
                 comp.deserialize(b)
 
-    result = nodes[0]
+    result = world.nodes[0]
 
     let animationsCount = b.readInt16()
     if animationsCount > 0:
