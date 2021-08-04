@@ -250,6 +250,8 @@ method componentNodeWillBeRemovedFromSceneView*(rti: RTI) =
         rti.imageRenderTarget.dispose()
         rti.imageRenderTarget = nil
 
+method interceptDraw*(c: RTI): bool = true
+
 method beforeDraw*(rti: RTI, index: int): bool =
     result = true
 
