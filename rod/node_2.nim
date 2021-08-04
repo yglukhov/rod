@@ -17,10 +17,13 @@ proc initWorldInEmptyNodeCompat*(n: Node) =
   n.mWorld.worldMatrixes.setLen(1)
   n.mWorld.alpha.setLen(1)
   n.mWorld.flags.setLen(1)
+  n.mWorld.names.setLen(1)
 
 proc getNode(w: World, i: NodeIndex): Node =
   if i < w.nodes.len.NodeIndex:
     return w.nodes[i]
+
+template name*(n: Node): string = n.mWorld.names[n.mIndex]
 
 # These are just quick compat glue. TODO: get rid of them
 proc mParent(n: Node): NodeIndex = n.mWorld.hierarchy[n.mIndex].parent
@@ -63,7 +66,7 @@ proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: NodeI
     result = h.firstChild
   elif h.next != InvalidNodeIndex:
     result = h.next
-  elif h.parent == root or h.parent == InvalidNodeIndex:
+  elif h.parent == root or h.parent == InvalidNodeIndex or n == root:
     result = InvalidNodeIndex
   else:
     var hp = hierarchy[h.parent]
@@ -73,7 +76,7 @@ proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: NodeI
       hp = hierarchy[hp.parent]
     result = hp.next
 
-iterator dfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
+iterator dfsOrder*(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
   if hierarchy.len != 0:
     let root = root
     var n = root
@@ -83,6 +86,24 @@ iterator dfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeInd
     while n != InvalidNodeIndex:
       yield n
       n = dfsOrderNext(toOpenArray(pArr, 0, h), root, n)
+
+when false:
+  # Currently bfs order is not needed by anyone
+  iterator children(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
+    var c = hierarchy[root].firstChild
+    while c != InvalidNodeIndex:
+      yield c
+      c = hierarchy[c].next
+
+  iterator bfsOrder(hierarchy: openarray[NodeHierarchy], root: NodeIndex): NodeIndex =
+    var s = @[root]
+    var i = 0
+    while i < s.len:
+      let n = s[i]
+      inc i
+      yield n
+      for c in children(hierarchy, n):
+        s.add(c)
 
 proc first*(n: Node): Node =
   return n.world.getNode(n.mFirstChild)
@@ -261,6 +282,7 @@ proc moveToWorld(n: Node, w: World) =
   copyComponents(worldMatrixes)
   copyComponents(alpha)
   copyComponents(flags)
+  copyComponents(names)
   # w.dump("after ")
 
 proc removeFromParent2*(ch: Node) =
@@ -369,5 +391,6 @@ proc reorder*(w: World, indexes: openarray[NodeIndex]) =
   reorderComponents(worldMatrixes)
   reorderComponents(alpha)
   reorderComponents(flags)
+  reorderComponents(names)
 
   w.isDirty = false

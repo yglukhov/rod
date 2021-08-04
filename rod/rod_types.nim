@@ -19,7 +19,6 @@ type
     Node* = ref object
         renderComponents*: seq[RenderComponent]
         scriptComponents*: seq[ScriptComponent]
-        name*: string
         animations*: TableRef[string, Animation]
         mSceneView*: SceneView
         composition*: Composition
@@ -73,6 +72,7 @@ type
         worldMatrixes*: seq[Matrix4]
         alpha*: seq[Coord]
         flags*: seq[set[NodeFlags]]
+        names*: seq[string]
         isDirty*: bool
 
     SceneView* = ref object of View
