@@ -123,7 +123,7 @@ method draw*(v: SceneView, r: Rect) =
 
     v.viewProjMatrix = v.getViewProjectionMatrix()
     c.withTransform v.viewProjMatrix:
-        v.rootNode.recursiveDraw()
+        v.rootNode.drawRootNode()
 
         if not v.afterDrawProc.isNil:
             v.afterDrawProc()

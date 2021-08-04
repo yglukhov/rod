@@ -133,6 +133,7 @@ proc createComponentForNode(n: Node, name: string): Component =
 
     if not n.mSceneView.isNil:
         result.componentNodeWasAddedToSceneView()
+    # n.mWorld.isDirty = true
 
 proc addComponent*(n: Node, name: string): Component =
     result = createComponentForNode(n, name)
@@ -140,10 +141,12 @@ proc addComponent*(n: Node, name: string): Component =
         n.renderComponents.add(result.RenderComponent)
     else:
         n.scriptComponents.add(result.ScriptComponent)
+    # n.mWorld.isDirty = true
 
 proc addComponent*(n: Node, T: typedesc): T =
     type TT = T
     result = n.addComponent(T.name).TT
+    # n.mWorld.isDirty = true
 
 proc insertComponent(n: Node, c: Component, index: int)
 proc addComponent*(n: Node, T: typedesc, index: int): T =
@@ -152,6 +155,7 @@ proc addComponent*(n: Node, T: typedesc, index: int): T =
     result.node = n
 
     n.insertComponent(result, index)
+    # n.mWorld.isDirty = true
 
 proc getComponent*(n: Node, name: string): Component =
     for v in n.components:
@@ -188,6 +192,8 @@ proc setComponent*(n: Node, name: string, c: Component) {.deprecated.} =
         n.renderComponents.add(c.RenderComponent)
     else:
         n.scriptComponents.add(c.ScriptComponent)
+    # n.mWorld.isDirty = true
+
 
 proc insertComponent(n: Node, c: Component, index: int) =
     template inserAUX(components: untyped, c: untyped, index: int) =
@@ -198,6 +204,7 @@ proc insertComponent(n: Node, c: Component, index: int) =
     else:
         n.scriptComponents.inserAUX(c.ScriptComponent, index)
     c.componentNodeWasAddedToSceneView()
+    # n.mWorld.isDirty = true
 
 proc removeComponent*(n: Node, c: Component) =
     template removeCompAUX(components: untyped, c: untyped) =
@@ -211,10 +218,12 @@ proc removeComponent*(n: Node, c: Component) =
         n.renderComponents.removeCompAUX(c.RenderComponent)
     else:
         n.scriptComponents.removeCompAUX(c.ScriptComponent)
+    # n.mWorld.isDirty = true
 
 proc removeComponent*(n: Node, name: string) =
     let c = n.getComponent(name)
     n.removeComponent(c)
+    # n.mWorld.isDirty = true
 
 proc removeComponent*(n: Node, T: typedesc[Component]) = n.removeComponent(T.name)
 
@@ -264,112 +273,210 @@ template alpha*(n: Node): Coord =
 proc `alpha=`*(n: Node, v: Coord) =
     n.mWorld.alpha[n.mIndex] = v
 
-# proc drawNode(n: Node, recursive: bool) =
-#     if n.alpha < 0.0000001 or not n.enabled: return
+proc getDrawCommands(n: Node, renderCmd: var seq[RenderCommand]) =
+    if n.alpha < 0.0000001 or not n.enabled: return
+    # let w = n.mWorld
+    var lastDrawComp = -1
+    var hasPosteffectComponent = false
 
-#     var tr: Transform3d
-#     let c = currentContext()
+    var compLen = n.renderComponents.len
+    var componentInterruptedDrawing = false
 
-#     let oldAlpha = c.alpha
-#     c.alpha *= n.alpha
+    if compLen > 0:
+        for i, c in n.renderComponents:
+            inc lastDrawComp
+            renderCmd.add(
+                RenderCommand(
+                    ni: n.mIndex,
+                    ci: i.NodeIndex,
+                    cmd: RenderCall.before
+                )
+            )
+            if c.interceptDraw():
+                componentInterruptedDrawing = true
+                break
 
-#     var lastDrawComp = -1
-#     var hasPosteffectComponent = false
+        # Legacy api support. Will be removed soon.
+        for i, c in n.renderComponents:
+            renderCmd.add(
+                RenderCommand(
+                    ni: n.mIndex,
+                    ci: i.NodeIndex,
+                    cmd: RenderCall.draw
+                )
+            )
+            hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
 
-#     var compLen = n.renderComponents.len
-#     var componentInterruptedDrawing = false
+    let shouldDrawChildren = not hasPosteffectComponent
 
-#     if compLen > 0:
-#         tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-#         c.withTransform tr:
-#             for c in n.renderComponents:
-#                 inc lastDrawComp
-#                 if c.beforeDraw(lastDrawComp):
-#                     componentInterruptedDrawing = true
-#                     break
+    if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
+        for c in n.children:
+            c.getDrawCommands(renderCmd)
 
-#             # Legacy api support. Will be removed soon.
-#             for c in n.renderComponents:
-#                 c.draw()
-#                 when defined(rodedit):
-#                     c.onDrawGizmo()
-#                 hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
+    assert(compLen == n.renderComponents.len, "Components changed during drawing.")
+    if compLen > 0:
+        while lastDrawComp >= 0:
+            renderCmd.add(
+                RenderCommand(
+                    ni: n.mIndex,
+                    ci: lastDrawComp.NodeIndex,
+                    cmd: RenderCall.after
+                )
+            )
+            dec lastDrawComp
 
-#     let shouldDrawChildren = recursive and not hasPosteffectComponent
+    if shouldDrawChildren and not n.affectsChildren:
+        for c in n.children:
+            c.getDrawCommands(renderCmd)
 
-#     if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
-#         for c in n.children:
-#             c.drawNode(recursive)
-
-#     assert(compLen == n.renderComponents.len, "Components changed during drawing.")
-#     if compLen > 0:
-#         c.withTransform tr:
-#             while lastDrawComp >= 0:
-#                 n.renderComponents[lastDrawComp].afterDraw(lastDrawComp)
-#                 dec lastDrawComp
-
-#     if shouldDrawChildren and not n.affectsChildren:
-#         for c in n.children:
-#             c.drawNode(recursive)
-
-#     c.alpha = oldAlpha
-
-proc recursiveDraw*(n: Node) =
-    let w = n.mWorld
-    if w.isDirty:
-        echo "REORDER!!!"
-        var newOrder = newSeqOfCap[NodeIndex](w.nodes.len)
-        w.nodes[0].getOrder(newOrder)
-        w.reorder(newOrder)
+proc drawNode(n: Node, recursive: bool) =
+    if n.alpha < 0.0000001 or not n.enabled: return
 
     var tr: Transform3d
     let c = currentContext()
 
-    for n in dfsOrder(w.hieararchy, n.mIndex):
-        let oldAlpha = c.alpha
-        c.alpha *= n.alpha
+    let oldAlpha = c.alpha
+    c.alpha *= n.alpha
 
-        var lastDrawComp = -1
-        var hasPosteffectComponent = false
-        var compLen = n.renderComponents.len
-        var componentInterruptedDrawing = false
+    var lastDrawComp = -1
+    var hasPosteffectComponent = false
 
-        if compLen > 0:
-            tr = n.mSceneView.viewProjMatrix * n.worldTransform()
-            c.withTransform tr:
-                for c in n.renderComponents:
-                    inc lastDrawComp
-                    if c.beforeDraw(lastDrawComp):
-                        componentInterruptedDrawing = true
-                        break
+    var compLen = n.renderComponents.len
+    var componentInterruptedDrawing = false
 
-                # Legacy api support. Will be removed soon.
-                for c in n.renderComponents:
-                    c.draw()
-                    when defined(rodedit):
-                        c.onDrawGizmo()
-                    hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
+    if compLen > 0:
+        tr = n.mSceneView.viewProjMatrix * n.worldTransform()
+        c.withTransform tr:
+            for c in n.renderComponents:
+                inc lastDrawComp
+                if c.beforeDraw(lastDrawComp):
+                    componentInterruptedDrawing = true
+                    break
 
-        let shouldDrawChildren = recursive and not hasPosteffectComponent
-        if not shouldDrawChildren:
-            break
+            # Legacy api support. Will be removed soon.
+            for c in n.renderComponents:
+                c.draw()
+                when defined(rodedit):
+                    c.onDrawGizmo()
+                hasPosteffectComponent = hasPosteffectComponent or c.isPosteffectComponent()
 
-        # if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
-        #     for c in n.children:
-        #         c.drawNode(recursive)
+    let shouldDrawChildren = recursive and not hasPosteffectComponent
 
-        assert(compLen == n.renderComponents.len, "Components changed during drawing.")
-        if compLen > 0:
-            c.withTransform tr:
-                while lastDrawComp >= 0:
-                    n.renderComponents[lastDrawComp].afterDraw(lastDrawComp)
-                    dec lastDrawComp
+    if shouldDrawChildren and n.affectsChildren and not componentInterruptedDrawing:
+        for c in n.children:
+            c.drawNode(recursive)
 
-        if shouldDrawChildren and not n.affectsChildren:
-            for c in n.children:
-                c.drawNode(recursive)
+    assert(compLen == n.renderComponents.len, "Components changed during drawing.")
+    if compLen > 0:
+        c.withTransform tr:
+            while lastDrawComp >= 0:
+                n.renderComponents[lastDrawComp].afterDraw(lastDrawComp)
+                dec lastDrawComp
 
-        c.alpha = oldAlpha
+    if shouldDrawChildren and not n.affectsChildren:
+        for c in n.children:
+            c.drawNode(recursive)
+
+    c.alpha = oldAlpha
+
+import times, strutils, std/monotimes
+template dlog(sym: untyped, args: varargs[string, `$`]) =
+    var `st sym` {.global.} = epochTime()
+    if epochTime() - `st sym` > 1.0:
+        echo args.join(" ")
+        `st sym` = epochTime()
+
+template bench(sym: untyped, body: untyped) =
+    let st = getMonotime().ticks
+    body
+    let e = getMonotime().ticks
+    dlog(sym, astToStr(sym), " done in ", e - st)
+
+proc recursiveDraw*(n: Node) =
+    let w = n.mWorld
+    if w.isDirty:
+        echo "REORDER!!! "
+        var newOrder = newSeqOfCap[NodeIndex](w.nodes.len)
+        w.nodes[0].getOrder(newOrder)
+        w.reorder(newOrder)
+
+        w.mvpMatrixes = newSeq[Matrix4](w.nodes.len)
+        w.skipDraw = newSeq[bool](w.nodes.len)
+
+        # w.nodes[0].getDrawCommands(w.renderCmd)
+
+    var cmds: seq[RenderCommand]
+    let isRoot = n == w.nodes[0]
+    # bench(getcmds):
+    #     n.getDrawCommands(cmds)
+
+    if isRoot:
+        bench(getcmds):
+            n.getDrawCommands(cmds)
+        #[
+            skip  done in  208400
+            mvp  done in  50200
+        ]#
+        # bench(skip):
+        #     for n in w.nodes:
+        #         w.skipDraw[n.mIndex] = (not n.parent.isNil and w.skipDraw[n.parent.mIndex]) or n.alpha < 0.00001 or not n.enabled
+
+        bench(mvp):
+            for cmd in cmds:
+                # w.skipDraw[n.mIndex] = (not n.parent.isNil and w.skipDraw[n.parent.mIndex]) or n.alpha < 0.00001 or not n.enabled
+                # if w.skipDraw[cmd.ni]: continue
+                let n = w.nodes[cmd.ni]
+                w.mvpMatrixes[cmd.ni] = n.mSceneView.viewProjMatrix * n.worldTransform()
+    else:
+        # for cmd in cmds:
+        #     let n = w.nodes[cmd.ni]
+        #     w.skipDraw[cmd.ni] = (not n.parent.isNil and w.skipDraw[n.parent.mIndex]) or n.alpha < 0.00001 or not n.enabled
+        n.getDrawCommands(cmds)
+        for cmd in cmds:
+            # if w.skipDraw[cmd.ni]: continue
+            let n = w.nodes[cmd.ni]
+            w.mvpMatrixes[cmd.ni] = n.mSceneView.viewProjMatrix * n.worldTransform()
+
+    # if isRoot:
+    #     cmds = w.renderCmd
+    #     for n in w.nodes:
+    #         w.skipDraw[n.mIndex] = (not n.parent.isNil and w.skipDraw[n.parent.mIndex]) or n.alpha < 0.00001 or not n.enabled
+    # else:
+    #     n.getDrawCommands(cmds)
+    #     for cmd in cmds:
+    #         let n = w.nodes[cmd.ni]
+    #         w.skipDraw[cmd.ni] = (not n.parent.isNil and w.skipDraw[n.parent.mIndex]) or n.alpha < 0.00001 or not n.enabled
+    # echo "renderCmd ", cmds.len
+    let ctx = currentContext()
+
+    var drawCalls = 0
+    for cmd in cmds:
+        # if w.skipDraw[cmd.ni] or int(cmd.ni) >= w.nodes.len: continue
+        let n = w.nodes[cmd.ni]
+        if int(cmd.ci) >= n.renderComponents.len: continue #callbacks\logic in draw functions?
+        let c = n.renderComponents[cmd.ci]
+        let oldAlpha = ctx.alpha
+        ctx.alpha *= n.alpha
+        let tr = w.mvpMatrixes[cmd.ni]
+        case cmd.cmd
+        of RenderCall.before:
+            ctx.withTransform tr:
+                discard c.beforeDraw(1)
+        of RenderCall.draw:
+            ctx.withTransform tr:
+                c.draw()
+        of RenderCall.after:
+            ctx.withTransform tr:
+                c.afterDraw(1)
+        ctx.alpha = oldAlpha
+        inc drawCalls
+
+    if isRoot:
+        dlog(draws, "draw ", drawCalls, " total ", cmds.len)
+
+proc drawRootNode*(n: Node) =
+    # n.mWorld.renderCmd.setLen(0)
+    n.recursiveDraw()
 
 iterator allNodes*(n: Node): Node =
     let w = n.mWorld

@@ -67,11 +67,12 @@ method isRenderComponent*(c: RenderComponent): bool = true
 method draw*(c: RenderComponent) {.base.} = discard # Deprecated.
 method beforeDraw*(c: RenderComponent, index: int): bool {.base.} = discard
 method afterDraw*(c: RenderComponent, index: int) {.base.} = discard
+method isPosteffectComponent*(c: RenderComponent): bool {.base.} = false
+method interceptDraw*(c: RenderComponent): bool {.base.} = discard
 
 method update*(c: ScriptComponent, dt: float) {.base.} = discard
 method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
 method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
-method isPosteffectComponent*(c: RenderComponent): bool {.base.} = false
 
 method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
 method getBBox*(c: Component): BBox {.base.} = discard
