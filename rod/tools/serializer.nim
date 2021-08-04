@@ -1,6 +1,6 @@
 import nimx/[image, types, pathutils, matrixes, portable_gl, assets/asset_loading]
 import rod/utils/[json_serializer, json_deserializer]
-import rod/[rod_types, quaternion]
+import rod/[rod_types, quaternion, node_2]
 import json, tables, typetraits, streams, strutils, os
 
 

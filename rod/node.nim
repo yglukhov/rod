@@ -42,13 +42,12 @@ proc newNode*(name: string = ""): Node =
     result.mWorld.transform[result.mIndex].rotation = newQuaternion()
     result.mWorld.alpha[result.mIndex] = 1.0
     result.mWorld.flags[result.mIndex] = {NodeFlags.dirty, NodeFlags.enabled, NodeFlags.affectsChildren, NodeFlags.serializable}
-    result.name = name
+    result.mWorld.names[result.mIndex] = name
 
 template enabled*(n: Node): bool = n.isEnabled
 proc `enabled=`*(n: Node, v: bool) =
     n.isEnabled = v
     n.setDirty()
-
 
 template position*(n: Node): Vector3 = n.mWorld.transform[n.mIndex].translation
 proc positionX*(n: Node): Coord = n.position.x
@@ -325,26 +324,22 @@ proc recursiveDraw*(n: Node) =
     n.drawNode(true)
 
 iterator allNodes*(n: Node): Node =
-    var s = @[n]
-    var i = 0
-    while i < s.len:
-        let n = s[i]
-        yield n
-        for ch in n.children:
-            s.add(ch)
-        inc i
+    let w = n.mWorld
+    for c in dfsOrder(w.hierarchy, n.mIndex):
+        yield w.nodes[c]
 
 proc findNode*(n: Node, p: proc(n: Node): bool): Node =
-    if p(n):
-        result = n
-    else:
-        for c in n.children:
-            result = c.findNode(p)
-            if not result.isNil: break
+    let w = n.mWorld
+    for i in dfsOrder(w.hierarchy, n.mIndex):
+        let c = w.nodes[i]
+        if p(c):
+            return c
 
 proc findNode*(n: Node, name: string): Node =
-    n.findNode proc(n: Node): bool =
-        n.name == name
+    let w = n.mWorld
+    for i in dfsOrder(w.hierarchy, n.mIndex):
+        if w.names[i] == name:
+            return w.nodes[i]
 
 proc findNode*(n: Node, parts: openarray[string]): Node =
     if parts.len == 0:
@@ -562,6 +557,8 @@ proc nodeBounds*(n: Node): BBox =
     result.minPoint = newVector3(high(int).float, high(int).float, high(int).float)
     result.maxPoint = newVector3(low(int).float, low(int).float, low(int).float)
     n.nodeBounds(result.minPoint, result.maxPoint)
+
+proc `name=`*(n: Node, v: string) = n.mWorld.names[n.mIndex] = v
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
@@ -961,6 +958,7 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
     world.worldMatrixes.setLen(nodesCount)
     world.alpha.setLen(nodesCount)
     world.flags.setLen(nodesCount)
+    world.names.setLen(nodesCount)
 
     # init transform components with default values
     for v in world.transform.mitems:
@@ -1037,7 +1035,7 @@ proc newNode*(b: BinDeserializer, compName: string): Node =
                 world.transform[tmpBuf[i]].rotation = rotations[i]
         of $bicName:
             for i in 0 ..< nodesCount:
-                world.nodes[i].name = b.readStr()
+                world.names[i] = b.readStr()
         of $bicCompRef:
             let count = b.readInt16()
             tmpBuf = b.getBuffer(int16, count)
