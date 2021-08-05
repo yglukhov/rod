@@ -64,9 +64,11 @@ proc dfsOrderNext(hierarchy: openarray[NodeHierarchy], root: NodeIndex, n: NodeI
   let h = hierarchy[n]
   if h.firstChild != InvalidNodeIndex:
     result = h.firstChild
+  elif n == root:
+    result = InvalidNodeIndex
   elif h.next != InvalidNodeIndex:
     result = h.next
-  elif h.parent == root or h.parent == InvalidNodeIndex or n == root:
+  elif h.parent == root:
     result = InvalidNodeIndex
   else:
     var hp = hierarchy[h.parent]
