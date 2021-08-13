@@ -82,7 +82,13 @@ template worldToWindow(c: Mask, w: Vector3): Point =
 proc drawMaskNode(c: Mask, mskN: Node) =
   let e = mskN.enabled
   mskN.enabled = true
+  let gl = currentContext().gl
+  let sc = gl.getParamb(gl.SCISSOR_TEST)
+  if sc:
+    gl.disable(gl.SCISSOR_TEST)
   recursiveDraw(mskN)
+  if sc:
+    gl.enable(gl.SCISSOR_TEST)
   mskN.enabled = e
 
 var theQuad {.noinit.}: array[4, GLfloat]
