@@ -7,7 +7,7 @@ type
         valueType*: TypeId
 
     AnimationSampler*[T] = ref object of AbstractAnimationSampler
-        sampleImpl: proc(s: AnimationSampler[T], p: float): T
+        sampleImpl: proc(s: AnimationSampler[T], p: float): T {.gcsafe.}
 
     BufferAnimationSampler*[T, B] = ref object of AnimationSampler[T]
         values: B
@@ -17,12 +17,12 @@ type
     KeyFrame*[T] = object
         p*: float
         v*: T
-        tf*: proc(p:float):float
+        tf*: proc(p:float):float {.gcsafe.}
 
     KeyFrameAnimationSampler*[T] = ref object of AnimationSampler[T]
         keys*: seq[KeyFrame[T]]
 
-proc keyFrame*[T](p: float, v: T, tf: proc(p: float): float = nil): KeyFrame[T] =
+proc keyFrame*[T](p: float, v: T, tf: proc(p: float): float {.gcsafe.} = nil): KeyFrame[T] =
     KeyFrame[T](p: p, v: v, tf: tf)
 
 proc newBufferAnimationSampler*[T, B](values: B, lerpBetweenFrames = true, originalLen: int = -1, cutFront: int = 0): BufferAnimationSampler[T, B] =
@@ -33,7 +33,7 @@ proc newBufferAnimationSampler*[T, B](values: B, lerpBetweenFrames = true, origi
 
     if lerpBetweenFrames:
         if originalLen == -1:
-            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T {.gcsafe.} =
                 let s = cast[BufferAnimationSampler[T, B]](sampler)
                 let ln = s.values.len - 1
                 let index = clamp(p * ln.float, 0.float, ln.float)
@@ -45,7 +45,7 @@ proc newBufferAnimationSampler*[T, B](values: B, lerpBetweenFrames = true, origi
                     result = interpolate(s.values[i], s.values[i + 1], m)
 
         else:
-            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T {.gcsafe.} =
                 let s = cast[BufferAnimationSampler[T, B]](sampler)
                 let ln = originalLen - 1
                 let index = clamp(p * ln.float, 0.float, ln.float)
@@ -60,13 +60,13 @@ proc newBufferAnimationSampler*[T, B](values: B, lerpBetweenFrames = true, origi
                     result = interpolate(s.values[i], s.values[i + 1], m)
     else:
         if originalLen == -1:
-            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T {.gcsafe.} =
                 let s = cast[BufferAnimationSampler[T, B]](sampler)
                 let ln = s.values.len - 1
                 let index = clamp(int(p * ln.float), 0, ln)
                 result = s.values[index]
         else:
-            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+            r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T {.gcsafe.} =
                 let s = cast[BufferAnimationSampler[T, B]](sampler)
                 let ln = originalLen - 1
                 let index = clamp(int(p * ln.float), 0, ln)
@@ -82,7 +82,7 @@ proc newKeyFrameAnimationSampler*[T](keys: seq[KeyFrame[T]]): KeyFrameAnimationS
     result.valueType = getTypeId(T)
 
     let r = cast[AnimationSampler[T]](result)
-    r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T =
+    r.sampleImpl = proc(sampler: AnimationSampler[T], p: float): T {.gcsafe.} =
         let s = cast[KeyFrameAnimationSampler[T]](sampler)
         if s.keys.len == 0: return
         if p < 0:
@@ -94,7 +94,7 @@ proc newKeyFrameAnimationSampler*[T](keys: seq[KeyFrame[T]]): KeyFrameAnimationS
         k.p = p
         let lb = lowerBound(s.keys, k) do(a, b: KeyFrame[T]) -> int:
             cmp(a.p, b.p)
-        
+
         if lb == s.keys.len: return s.keys[^1].v
 
         var a, b : int
@@ -106,7 +106,7 @@ proc newKeyFrameAnimationSampler*[T](keys: seq[KeyFrame[T]]): KeyFrameAnimationS
             b = lb + 1
         else:
             return s.keys[lb].v
-        
+
         if a == -1 or b == -1: return s.keys[0].v
 
         let normalizedP = (p - s.keys[a].p) / (s.keys[b].p - s.keys[a].p)

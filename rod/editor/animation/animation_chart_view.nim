@@ -13,8 +13,8 @@ type AnimationChartView* = ref object of View
     gridSize*: Size
     gridColor*: Color
     mSampleRate: int
-    mouseTrackingHandler*: proc(e: Event): bool
-    onCursorPosChange*: proc()
+    mouseTrackingHandler*: proc(e: Event): bool {.gcsafe.}
+    onCursorPosChange*: proc() {.gcsafe.}
 
 proc `sampleRate=`*(v: AnimationChartView, s: int) =
     v.mSampleRate = s
@@ -128,8 +128,8 @@ proc drawCursor*(v: AnimationChartView) =
 proc curveRoundToGrid*(v: AnimationChartView, p: var Coord) =
     p = round(p / v.gridSize.width) * v.gridSize.width
 
-proc cursorTrackingHandler*(v: AnimationChartView): proc(e: Event): bool =
-    result = proc(e: Event): bool =
+proc cursorTrackingHandler*(v: AnimationChartView): proc(e: Event): bool {.gcsafe.} =
+    result = proc(e: Event): bool {.gcsafe.}=
         v.cursorPos = v.localPointToCurve(e.localPosition).x
         # Snap to grid
         v.cursorPos = round(v.cursorPos / v.gridSize.width) * v.gridSize.width

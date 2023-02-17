@@ -219,7 +219,7 @@ proc createChangeBackgroundColorButton(w: WorkspaceView) =
             cPicker.removeFromSuperview()
             cPicker = nil
 
-proc toggleEditTab(w: WorkspaceView, tab:EditViewEntry): proc() =
+proc toggleEditTab(w: WorkspaceView, tab:EditViewEntry): proc() {.gcsafe.} =
     result = proc() =
         var tabindex = -1
         var tabview: EditorTabView

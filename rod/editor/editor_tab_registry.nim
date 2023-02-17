@@ -6,15 +6,16 @@ const RodInternalTab* = "RodInternalTab"
 type
    EditViewEntry* = tuple
       name: string
-      create: proc(): View
+      create: proc(): View {.gcsafe.}
 
-var gRegisteredViews = newSeq[EditViewEntry]()
+var gRegisteredViews {.threadvar.}: seq[EditViewEntry]
+gRegisteredViews = newSeq[EditViewEntry]()
 
 proc registerEditorTabAux(tn: string, t: typedesc) =
     var evr: EditViewEntry
     evr.name = tn
     let typename = typetraits.name(t)
-    evr.create = proc(): View =
+    evr.create = proc(): View {.gcsafe.} =
         result = newObjectOfClass(typename).View
         result.name = evr.name
 

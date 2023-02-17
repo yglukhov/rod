@@ -38,16 +38,16 @@ method urlForPath*(ab: AssetBundle, path: string): string =
     else:
         result = ab.realUrlForPath(path)
 
-proc init(ab: AssetBundle, handler: proc()) {.inline.} =
+proc init(ab: AssetBundle, handler: proc() {.gcsafe.}) {.inline.} =
     var indexComplete = false
     var compsComplete = false
 
-    proc onComplete() =
+    proc onComplete() {.gcsafe.} =
         if not ab.binDeserializer.isNil:
             ab.binDeserializer.images = ab.index["packedImages"]
         handler()
 
-    openStreamForUrl(ab.mBaseUrl & '/' & "comps.rodpack") do(s: Stream, err: string):
+    openStreamForUrl(ab.mBaseUrl & '/' & "comps.rodpack") do(s: Stream, err: string) {.gcsafe.}:
         if not s.isNil:
             var ss = s
             when not defined(js):
@@ -63,7 +63,7 @@ proc init(ab: AssetBundle, handler: proc()) {.inline.} =
         compsComplete = true
         if indexComplete and compsComplete: onComplete()
 
-    loadJsonFromURL(ab.realUrlForPath("index.rodpack")) do(j: JsonNode):
+    loadJsonFromURL(ab.realUrlForPath("index.rodpack")) do(j: JsonNode) {.gcsafe.}:
         ab.index = j
         ab.spriteSheets = initTable[string, seq[JsonNode]]()
         let packedImages = ab.index["packedImages"]
@@ -197,9 +197,9 @@ proc assetsBundleCacheDir*(): string {.inline.} =
     else:
         "/tmp/rodappcache"
 
-var onRodAssetBundleDownloadingStart*: proc(asset: string)
-var onRodAssetBundleDownloadingEnd*: proc(asset: string, error: string)
-var onRodAssetBundleDownloadingProgress*: proc(asset: string, p: float)
+var onRodAssetBundleDownloadingStart* {.threadvar.}: proc(asset: string) {.gcsafe.}
+var onRodAssetBundleDownloadingEnd* {.threadvar.}: proc(asset: string, error: string) {.gcsafe.}
+var onRodAssetBundleDownloadingProgress* {.threadvar.}: proc(asset: string, p: float) {.gcsafe.}
 
 when not defined(js) and not defined(emscripten) and not defined(windows):
     import os, threadpool, httpclient, net
@@ -278,7 +278,7 @@ proc isDownloaded*(abd: AssetBundleDescriptor): bool =
         if abd.isDownloadable:
             result = dirExists(abd.downloadedAssetsDir) and not fileExists(abd.downloadedAssetsDir & ".gz")
 
-var getURLForAssetBundle*: proc(hash: string): string
+var getURLForAssetBundle* {.threadvar.}: proc(hash: string): string {.gcsafe.}
 
 proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)) =
     if abd.isDownloadable:
@@ -323,7 +323,7 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
             else:
                 result = newNativeAssetBundle(abd.path)
 
-proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string)) =
+proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string) {.gcsafe.}) =
     abd.downloadAssetBundle() do(err: string):
         if err.len == 0:
             let ab = newAssetBundle(abd)
@@ -333,13 +333,13 @@ proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: strin
             warn "Asset bundle error for ", abd.hash, " (", abd.path, "): " , err
             handler(abd.path, nil, err)
 
-proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle)) {.deprecated.}  =
+proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle) {.gcsafe.}) {.deprecated.}  =
     let newHandler = proc(mountPaths: string, ab: AssetBundle, err: string) =
         if not handler.isNil: handler(mountPaths, ab)
 
     loadAssetBundle(abd, newHandler)
 
-proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle], err: string)) =
+proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle], err: string) {.gcsafe.}) =
     var mountPaths = newSeq[string](abds.len)
     var abs = newSeq[AssetBundle](abds.len)
     let abds = @abds
@@ -360,13 +360,13 @@ proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mou
                     load()
     load()
 
-proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle])) {.deprecated.} =
+proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mountPaths: openarray[string], abs: openarray[AssetBundle]) {.gcsafe.}) {.deprecated.} =
     let newHandler = proc(mountPaths: openarray[string], abs: openarray[AssetBundle], err: string) =
         if not handler.isNil: handler(mountPaths, abs)
 
     loadAssetBundles(abds, newHandler)
 
-registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tga", "webp"]) do(url, path: string, cache: AssetCache, handler: proc()):
+registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tga", "webp"]) do(url, path: string, cache: AssetCache, handler: proc() {.gcsafe.}):
     const prefix = "rod_ss://"
     let resPath = url.substr(prefix.len)
     let am = sharedAssetManager()
@@ -377,7 +377,7 @@ registerAssetLoader(["rod_ss"], ["png", "jpg", "jpeg", "gif", "tif", "tiff", "tg
         # echo "relPath: ", relPath
         let ssUrl = rab.realUrlForPath(path)
         # echo "ssUrl: ", ssUrl
-        loadAsset(ssUrl, path, cache) do():
+        loadAsset(ssUrl, path, cache) do() {.gcsafe.}:
             let i = cache[path].get(Image)
             for j in rab.spriteSheets[path]:
                 let jt = j["tex"]

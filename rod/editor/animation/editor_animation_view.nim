@@ -37,9 +37,9 @@ proc editedAnimation(v: AnimationEditView): EditedAnimation =
     if not currComp.isNil:
         result = currComp.currentAnimation
 
-proc reload(v: AnimationEditView)
+proc reload(v: AnimationEditView) {.gcsafe.}
 
-proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
+proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation) {.gcsafe.} =
     if val != nil:
         v.dopesheetView.editedAnimation = val
         v.dopesheetView.sampleRate = val.sampleRate()
@@ -57,7 +57,7 @@ proc `editedAnimation=`(v: AnimationEditView, val: EditedAnimation)=
         currComp.currentAnimation = val
     v.reload()
 
-proc newEditedAnimation(v: AnimationEditView) =
+proc newEditedAnimation(v: AnimationEditView) {.gcsafe.} =
     var currComp = v.editor.currentComposition
     if not currComp.isNil:
         var a = new(EditedAnimation)
@@ -86,7 +86,7 @@ proc deleteEditedAnimation(v: AnimationEditView)=
             currComp.animations.del(i)
         v.editedAnimation = nil
 
-let colors = [
+const colors = [
     newColor(1, 0, 0),
     newColor(0, 1, 0),
     newColor(0, 0, 1),
@@ -117,7 +117,7 @@ proc playEditedAnimation(v: AnimationEditView) =
     if not v.cachedAnimation.isNil:
         v.window.addAnimation(v.cachedAnimation)
 
-proc reload(v: AnimationEditView) =
+proc reload(v: AnimationEditView) {.gcsafe.} =
     v.propertyTableView.reloadData()
     v.rebuildAnimation()
     var currComp = v.editor.currentComposition

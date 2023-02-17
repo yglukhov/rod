@@ -15,7 +15,7 @@ type Icosphere* = ref object of MeshComponent
     steps*: int
     radius*: float
 
-proc icosahedron(r: float):MeshInfo
+proc icosahedron(r: float):MeshInfo {.gcsafe.}
 
 proc addTriangle(m: MeshInfo, tr: varargs[int])=
     for t in tr:
@@ -106,7 +106,7 @@ proc debugInfo(m: MeshInfo)=
 
     echo "total vertices ", m.vertices.len, " total trinagles ", m.triangles.len div 3
 
-proc genMesh(s: Icosphere)=
+proc genMesh(s: Icosphere) {.gcsafe.} =
 
     var meshes: array[2, MeshInfo]
     meshes[0] = icosahedron(s.radius)
@@ -170,7 +170,7 @@ method visitProperties*(c: Icosphere, p: var PropertyVisitor) =
     p.visitProperty("radius", c.radiusAux)
     p.visitProperty("steps", c.segmentsAux)
 
-proc icosahedron(r: float):MeshInfo =
+proc icosahedron(r: float):MeshInfo {.gcsafe.} =
     result.new()
 
     result.vertices = @[]

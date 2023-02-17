@@ -57,7 +57,7 @@ method init*(i: InspectorView, r: Rect) =
 
     i.addSubView(autoVisitView)
 
-proc createComponentsView(inspector: InspectorView, n: Node)
+proc createComponentsView(inspector: InspectorView, n: Node) {.gcsafe.}
 
 
 proc visitProperties*(i: InspectorView, c: Composition, p: var PropertyVisitor) =
@@ -196,7 +196,7 @@ proc createComponentButtons(i: InspectorView, components_list: seq[string]): Sta
 
     result = menu
 
-proc createComponentsView(inspector: InspectorView, n: Node) =
+proc createComponentsView(inspector: InspectorView, n: Node) {.gcsafe.} =
     let stackView = newStackView(newRect(0, 20, componentsViewSize.width, 400))
     var isFirst = true
     for key, value in componentGroupsTable:

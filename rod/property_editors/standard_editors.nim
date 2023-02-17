@@ -30,7 +30,7 @@ when not defined(android) and not defined(ios):
     type ImagePercent = tuple
         s: Image
         v: float32
-    proc newMaterialImagePropertyView(setter: proc(t: ImagePercent), getter: proc(): ImagePercent): PropertyEditorView =
+    proc newMaterialImagePropertyView(setter: proc(t: ImagePercent) {.gcsafe.}, getter: proc(): ImagePercent {.gcsafe.}): PropertyEditorView =
         let pv = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
 
         var loadedImage = getter().s
@@ -94,7 +94,7 @@ when not defined(android) and not defined(ios):
 
     registerPropertyEditor(newMaterialImagePropertyView)
 
-proc newNodePropertyView(editedObject: Variant, setter: proc(s: Node), getter: proc(): Node): PropertyEditorView =
+proc newNodePropertyView(editedObject: Variant, setter: proc(s: Node) {.gcsafe.}, getter: proc(): Node {.gcsafe.}): PropertyEditorView =
     let textField = newTextField(newRect(0, 0, 200, editorRowHeight))
     textField.font = editorFont()
     textField.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
@@ -109,7 +109,7 @@ proc newNodePropertyView(editedObject: Variant, setter: proc(s: Node), getter: p
     result = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
     result.addSubview(textField)
 
-proc newQuaternionPropertyView(setter: proc(s: Quaternion), getter: proc(): Quaternion): PropertyEditorView =
+proc newQuaternionPropertyView(setter: proc(s: Quaternion) {.gcsafe.}, getter: proc(): Quaternion {.gcsafe.}): PropertyEditorView =
     result = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight))
     const vecLen = 3
 
@@ -117,7 +117,7 @@ proc newQuaternionPropertyView(setter: proc(s: Quaternion), getter: proc(): Quat
     horLayout.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
     result.addSubview(horLayout)
 
-    proc complexSetter() =
+    proc complexSetter() {.gcsafe.} =
         var val: Quaternion
         var euler = newVector3(0.0, 0.0, 0.0)
         for i in 0 ..< horLayout.subviews.len:
@@ -139,7 +139,7 @@ proc newQuaternionPropertyView(setter: proc(s: Quaternion), getter: proc(): Quat
         textField.onAction complexSetter
         horLayout.addSubview(textField)
 
-proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEComposition): PropertyEditorView =
+proc newAEMarkerPropertyView(setter: proc(s: AEComposition) {.gcsafe.}, getter: proc(): AEComposition {.gcsafe.}): PropertyEditorView {.gcsafe.} =
     let compos = getter()
     result = PropertyEditorView.new(newRect(0, 0, 208, (editorRowHeight * 3 + 10.0) * compos.markers.len().float + 20))
     var y = 0.0
@@ -225,7 +225,7 @@ proc newAEMarkerPropertyView(setter: proc(s: AEComposition), getter: proc(): AEC
                         a.onComplete() do():
                             pb.title = "play"
 
-proc newCompositionPropertyView(setter: proc(s: rod_types.Composition), getter: proc(): rod_types.Composition): PropertyEditorView =
+proc newCompositionPropertyView(setter: proc(s: rod_types.Composition) {.gcsafe.}, getter: proc(): rod_types.Composition {.gcsafe.}): PropertyEditorView =
     result = PropertyEditorView.new(newRect(0, 0, 208, editorRowHeight * 3))
 
     # let horLayout = newHorizontalLayout(newRect(0, 0, 208, editorRowHeight * 3))

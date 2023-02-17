@@ -11,13 +11,13 @@ type AssetContainerView* = ref object of CollectionView
     selectionOrigin: Point
     dragStarted: bool
     selectedItems*: seq[int]
-    onItemDeselected*: proc(item: int)
-    onItemSelected*: proc(item: int)
-    onItemDoubleClick*: proc(item: int)
-    onItemsDelete*: proc(item:seq[int])
-    onBackspace*: proc()
-    onItemsDragStart*: proc(item: seq[int])
-    onItemRenamed*: proc(item:int)
+    onItemDeselected*: proc(item: int) {.gcsafe.}
+    onItemSelected*: proc(item: int) {.gcsafe.}
+    onItemDoubleClick*: proc(item: int) {.gcsafe.}
+    onItemsDelete*: proc(item:seq[int]) {.gcsafe.}
+    onBackspace*: proc() {.gcsafe.}
+    onItemsDragStart*: proc(item: seq[int]) {.gcsafe.}
+    onItemRenamed*: proc(item:int) {.gcsafe.}
     mIsCompact: bool
 
 proc newAssetContainerView*(r: Rect): AssetContainerView=

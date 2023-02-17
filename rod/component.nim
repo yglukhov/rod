@@ -9,7 +9,8 @@ export Component, ScriptComponent, RenderComponent
 
 method init*(c: Component) {.base.} = discard
 
-var componentGroupsTable* = initTable[string, seq[string]]()
+var componentGroupsTable* {.threadvar.}: Table[string, seq[string]]
+componentGroupsTable = initTable[string, seq[string]]()
 
 proc registerComponentGroup(group, component: string = "") =
     var validatedGroup = group
@@ -52,14 +53,14 @@ template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: stri
         registerClass(T, creator)
         registerComponentGroup(group, typetraits.name(T))
 
-proc createComponent*(name: string): Component =
+proc createComponent*(name: string): Component {.gcsafe.} =
     if isClassRegistered(name) == false:
         raise newException(Exception, "Component " & name & " is not registered")
 
     result = newObjectOfClass(name).Component
     result.init()
 
-proc createComponent*[T](): T = createComponent(T.name).T
+proc createComponent*[T](): T {.gcsafe.} = createComponent(T.name).T
 
 method isRenderComponent*(c: Component): bool {.base.} = discard
 method isRenderComponent*(c: RenderComponent): bool = true

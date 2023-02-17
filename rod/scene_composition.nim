@@ -215,7 +215,7 @@ proc getNodeByName(cnode: ColladaNode, name: string): ColladaNode =
     for child in cnode.children:
         return child.getNodeByName(name)
 
-proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string): Node
+proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string): Node {.gcsafe.}
 
 proc loadBones(bone: var Bone, animDuration: var float, node: var Node,
                 cn: ColladaNode, colladaScene: ColladaScene,
@@ -378,7 +378,7 @@ proc setupMaterialFromCollada(nodeMesh: var MeshComponent, cm: ColladaMaterial, 
         if texName.len > 0:
             nodeMesh.material.normalTexture = imageWithResource(texName.toAbsolutePath(resourcePath))
 
-proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string): Node =
+proc setupFromColladaNode(cn: ColladaNode, colladaScene: ColladaScene, resourcePath: string): Node {.gcsafe.} =
     var node = newNode(cn.name)
     var materialInited = false
     var geometryInited = false
@@ -434,14 +434,14 @@ proc loadColladaFromStream(s: Stream): ColladaScene =
     s.close()
 
 # --------------- TODO ------
-proc loadSceneAsync*(resourcePath: string, handler: proc(n: Node)) =
-    sharedAssetManager().getAssetAtPath(resourcePath) do(colladaScene: ColladaScene, err: string):
+proc loadSceneAsync*(resourcePath: string, handler: proc(n: Node){.gcsafe.}) =
+    sharedAssetManager().getAssetAtPath(resourcePath) do(colladaScene: ColladaScene, err: string) {.gcsafe.}:
         let res = setupFromColladaNode(colladaScene.rootNode, colladaScene, resourcePath)
         for anim in colladaScene.animations:
             discard animationWithCollada(res, anim)
         handler(res)
 
-registerAssetLoader(["dae"]) do(url: string, callback: proc(s: ColladaScene)):
-    openStreamForUrl(url) do(s: Stream, err: string):
+registerAssetLoader(["dae"]) do(url: string, callback: proc(s: ColladaScene){.gcsafe.}):
+    openStreamForUrl(url) do(s: Stream, err: string) {.gcsafe.}:
         let colladaScene = loadColladaFromStream(s)
         callback(colladaScene)

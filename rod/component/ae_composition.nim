@@ -52,7 +52,7 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     result.animate prog in pStart..pEnd:
         c.allCompAnim.onAnimate(prog)
 
-proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = @[]): Animation
+proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = @[]): Animation {.gcsafe.}
 
 proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, exceptions: seq[string] = @[]): ComposeMarker=
     let lc = cl.node.componentIfAvailable(AEComposition)
@@ -84,7 +84,7 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, except
 
         result = newComposeMarker(max(0.0, layerIn), min(layerOut, 1.0), prop)
 
-proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = @[]): Animation =
+proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = @[]): Animation {.gcsafe.} =
     var marker: AEMarker
     for m in c.markers:
         if m.name == marker_name:

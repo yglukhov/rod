@@ -13,7 +13,7 @@ import node
 import component
 import quaternion
 
-type AnimProcSetter = proc(progress: float)
+type AnimProcSetter = proc(progress: float) {.gcsafe.}
 
 proc findAnimatableProperty(n: Node, propName: string): Variant =
     var res : Variant
@@ -21,7 +21,7 @@ proc findAnimatableProperty(n: Node, propName: string): Variant =
     visitor.requireName = true
     visitor.requireSetter = true
     visitor.flags = { pfAnimatable }
-    visitor.commit = proc() =
+    visitor.commit = proc() {.gcsafe.} =
         if res.isEmpty:
             if visitor.name == propName:
                 res = visitor.setterAndGetter
@@ -35,13 +35,13 @@ proc findAnimatableProperty(n: Node, propName: string): Variant =
 
     result = res
 
-proc createProgressSetterWithPropSetter[T](setter: proc(v: T), parsedValues: seq[T]): AnimProcSetter =
+proc createProgressSetterWithPropSetter[T](setter: proc(v: T) {.gcsafe.} , parsedValues: seq[T]): AnimProcSetter =
     let
         fromValue = 0.0
         toValue = (parsedValues.len - 1).float
     var propValues = parsedValues
 
-    result = proc(p: float) =
+    result = proc(p: float) {.gcsafe.} =
         let i = interpolate(fromValue, toValue - 1, p)
         let index = floor(i).int
         let m = i mod 1.0

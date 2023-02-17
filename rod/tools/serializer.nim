@@ -7,7 +7,7 @@ import json, tables, typetraits, streams, strutils, os
 type Serializer* = ref object
     url*: string
     asyncOps: int
-    onComplete*: proc()
+    onComplete*: proc() {.gcsafe.}
     finished: bool
     jser*: JsonSerializer # Migration to new serialization
     jdeser*: JsonDeserializer # Migration to new serialization
@@ -29,7 +29,7 @@ proc getRelativeResourcePath*(baseUrl, path: string): string =
     when not defined(js) and not defined(android) and not defined(ios):
         resourcePath = urlParentDir(baseUrl)
         resourcePath.removePrefix("file://")
-    
+
     var fixedPath = path
     fixedPath.removePrefix("file://")
     result = relativePathToPath(resourcePath, fixedPath)
@@ -148,7 +148,7 @@ proc finish*(s: Serializer) =
 
 proc isAsyncOperation*(s: Serializer): bool = s.asyncOps != 0
 
-proc deserializeImage*(j: JsonNode, s: Serializer, clbck: proc(img: Image, err: string)) =
+proc deserializeImage*(j: JsonNode, s: Serializer, clbck: proc(img: Image, err: string) {.gcsafe.}) =
     if j.isNil:
         discard
     elif j.kind == JString:

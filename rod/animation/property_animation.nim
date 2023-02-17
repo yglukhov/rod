@@ -19,7 +19,7 @@ type
         compIndex*: int
         sampler*: AbstractAnimationSampler
         scale*: float
-        progressSetter*: proc(p: float)
+        progressSetter*: proc(p: float) {.gcsafe.}
 
     PropertyAnimation* = ref object of Animation
         animatedProperties*: seq[AnimatedProperty]
@@ -225,11 +225,11 @@ proc findAnimatablePropertyForSubtree*(n: Node, nodeName: string, compIndex: int
     if result.isEmpty:
         raise newException(Exception, "Animated property not found: " & nodeName & "." & $compIndex & "." & rawPropName)
 
-proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: float) =
+proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: float) {.gcsafe.} =
     template makeSetter(T: typedesc) =
         let setter = sng.get(SetterAndGetter[T]).setter
         let sampler = AnimationSampler[T](s)
-        result = proc(p: float) =
+        result = proc(p: float) {.gcsafe.} =
             setter(sampler.sample(p))
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
     switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, makeSetter)

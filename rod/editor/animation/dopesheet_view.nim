@@ -16,8 +16,8 @@ type
         draggedKey: DopesheetSelectedKey
         selectedCurve*: int
         selectedKey*: int
-        onKeysChanged*: proc(keys: seq[DopesheetSelectedKey])
-        onKeysSelected*: proc(keys: seq[DopesheetSelectedKey])
+        onKeysChanged*: proc(keys: seq[DopesheetSelectedKey]) {.gcsafe.}
+        onKeysSelected*: proc(keys: seq[DopesheetSelectedKey]) {.gcsafe.}
 
 proc selectedKeys*(v: DopesheetView): seq[DopesheetSelectedKey] =
     result = toSeq(v.mSelectedKeys)
@@ -81,8 +81,8 @@ method draw*(v: DopesheetView, r: Rect) =
         c.drawRect(v.selectionRect)
 
 
-proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool =
-    result = proc(e: Event): bool =
+proc dopesheetSelectionTrackingHandler(v: DopesheetView): proc(e: Event): bool {.gcsafe.} =
+    result = proc(e: Event): bool {.gcsafe.} =
         result = true
         if v.editedAnimation.isNil: return
         if e.buttonState == bsDown:
