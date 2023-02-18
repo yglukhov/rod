@@ -19,7 +19,7 @@ type AnimatioKeyInspectorView* = ref object of View
     propView: LinearLayout
     scView: ScrollView
     autoUpdate: bool
-    onKeyChanged*: proc(k: EditedKey)
+    onKeyChanged*: proc(k: EditedKey) {.gcsafe.}
 
 method init*(i: AnimatioKeyInspectorView, r: Rect) =
     procCall i.View.init(r)
@@ -106,7 +106,7 @@ proc `inspectedKeys=`*(v: AnimatioKeyInspectorView, keys: seq[EditedKey]) =
     scrollBar.sendAction()
 
 
-proc newInterpolationPropertyView(setter: proc(s: EInterpolation), getter: proc(): EInterpolation): PropertyEditorView =
+proc newInterpolationPropertyView(setter: proc(s: EInterpolation) {.gcsafe.}, getter: proc(): EInterpolation {.gcsafe.}): PropertyEditorView =
     var r = PropertyEditorView.new(newRect(0, 0, 250, editorRowHeight + 270))
     var bezierPoints:array[4, float]
 

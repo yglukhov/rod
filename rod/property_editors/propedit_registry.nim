@@ -6,5 +6,5 @@ export npr
 import rod/node
 import variant
 
-proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCallback, changeInspectorCallback: proc()): View =
+proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCallback, changeInspectorCallback: proc() {.gcsafe.}): View =
     propertyEditorForProperty(newVariant(n), title, v, onChangeCallback, changeInspectorCallback)

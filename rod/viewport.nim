@@ -113,7 +113,7 @@ proc update(v: SceneView, dt: float) =
     for s in v.systems:
         s.update(dt)
 
-method draw*(v: SceneView, r: Rect) =
+method draw*(v: SceneView, r: Rect) {.gcsafe.} =
     procCall v.View.draw(r)
 
     for s in v.systems:

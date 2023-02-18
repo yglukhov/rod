@@ -58,7 +58,7 @@ type
         anchors*: array[4, TabView]
         horizontalLayout*: LinearLayout
         verticalLayout*: LinearLayout
-        onKeyDown*: proc(e: var Event): bool
+        onKeyDown*: proc(e: var Event): bool {.gcsafe.}
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 

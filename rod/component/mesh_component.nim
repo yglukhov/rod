@@ -21,7 +21,7 @@ type
     MeshComponent* = ref object of RenderComponent
         resourceName*: string
         vboData*: VBOData
-        loadFunc: proc()
+        loadFunc: proc() {.gcsafe.}
         material*: Material
         bProccesPostEffects*: bool
         prevTransform*: Matrix4
@@ -88,7 +88,8 @@ MeshComponent.properties:
 
     indices(phantom = seq[uint16])
 
-var vboCache* = initTable[string, VBOData]()
+var vboCache* {.threadvar.}: Table[string, VBOData]
+vboCache = initTable[string, VBOData]()
 
 method init*(m: MeshComponent) =
     m.bProccesPostEffects = true
@@ -168,8 +169,8 @@ proc createVBO*(m: MeshComponent, indexData: seq[GLushort], vertexAttrData: seq[
 
 proc loadMeshComponent(m: MeshComponent, resourceName: string) =
     if not vboCache.contains(m.resourceName):
-        openStreamForURL("res://" & resourceName) do(s: Stream, err: string):
-            let loadFunc = proc() =
+        openStreamForURL("res://" & resourceName) do(s: Stream, err: string) {.gcsafe.}:
+            let loadFunc = proc() {.gcsafe.} =
                 var loader: ObjLoader
                 var vertexData = newSeq[GLfloat]()
                 var texCoordData = newSeq[GLfloat]()

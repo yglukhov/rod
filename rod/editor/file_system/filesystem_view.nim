@@ -22,11 +22,11 @@ type FileSystemView* = ref object of View
     lastFSReload*: float
     lastFSHash*: string
 
-    mFilter: proc(pathEntry: tuple[kind: PathComponent, path: string]):bool
-    mFilterContent: proc(path: string): bool
-    mOnDragStart: proc(items: seq[FilePreview])
-    mOnDoubleClicked: proc(item: FilePreview)
-    mOnPathChanged: proc(np: string)
+    mFilter: proc(pathEntry: tuple[kind: PathComponent, path: string]):bool {.gcsafe.}
+    mFilterContent: proc(path: string): bool {.gcsafe.}
+    mOnDragStart: proc(items: seq[FilePreview]) {.gcsafe.}
+    mOnDoubleClicked: proc(item: FilePreview) {.gcsafe.}
+    mOnPathChanged: proc(np: string) {.gcsafe.}
     mCurrentPath: string
 
 proc `currentPath=`(v: FileSystemView, val:string)=
@@ -35,24 +35,24 @@ proc `currentPath=`(v: FileSystemView, val:string)=
         if not v.mOnPathChanged.isNil:
             v.mOnPathChanged(v.mCurrentPath)
 
-proc reloadFileSystem(v: FileSystemView)
-proc onFilter*(v: FileSystemView, cb: proc(pathEntry: tuple[kind: PathComponent, path: string]): bool)=
+proc reloadFileSystem(v: FileSystemView) {.gcsafe.}
+proc onFilter*(v: FileSystemView, cb: proc(pathEntry: tuple[kind: PathComponent, path: string]): bool {.gcsafe.})=
     v.mFilter = cb
     v.reloadFileSystem()
     v.fileSystemTree.reloadData()
     v.contentView.reload()
 
-proc onFilterContent*(v: FileSystemView, cb: proc(path: string): bool) =
+proc onFilterContent*(v: FileSystemView, cb: proc(path: string): bool {.gcsafe.}) =
     v.mFilterContent = cb
     v.contentView.reload()
 
-proc onDragStart*(v: FileSystemView, cb: proc(items: seq[FilePreview]))=
+proc onDragStart*(v: FileSystemView, cb: proc(items: seq[FilePreview]) {.gcsafe.})=
     v.mOnDragStart = cb
 
-proc onDoubleClicked*(v: FileSystemView, cb: proc(item: FilePreview))=
+proc onDoubleClicked*(v: FileSystemView, cb: proc(item: FilePreview) {.gcsafe.})=
     v.mOnDoubleClicked = cb
 
-proc onPathChanged*(v: FileSystemView, cb: proc(np: string))=
+proc onPathChanged*(v: FileSystemView, cb: proc(np: string) {.gcsafe.})=
     v.mOnPathChanged = cb
 
 proc `currentPathNode=`(v: FileSystemView, node: PathNode)=
@@ -93,7 +93,7 @@ proc directoryContent(v: FileSystemView, path: string, hashstr: var string): Pat
 
     result.contentHash = hashstr
 
-proc reloadFileSystem(v: FileSystemView)=
+proc reloadFileSystem(v: FileSystemView) {.gcsafe.} =
     v.resourceRoot = v.directoryContent(v.rootPath, v.lastFSHash)
     v.cachedResources = initTable[string, FilePreview]()
     v.lastFSReload = epochTime()
@@ -107,7 +107,7 @@ proc currentPathNodeChildren(v: FileSystemView): seq[PathNode] =
     for n in v.mCurrentPathNode.children:
         if v.mFilterContent(n.fullPath):
             result.add(n)
-    
+
 method init*(v: FileSystemView, r: Rect)=
     procCall v.View.init(r)
 
@@ -162,7 +162,7 @@ method init*(v: FileSystemView, r: Rect)=
                 return true
             return n.hasContent
 
-        v.fileSystemTree.onSelectionChanged = proc() =
+        v.fileSystemTree.onSelectionChanged = proc() {.gcsafe.} =
             v.cachedResources.clear()
             let ip = v.fileSystemTree.selectedIndexPath
             let n = if ip.len > 0:
@@ -190,7 +190,7 @@ method init*(v: FileSystemView, r: Rect)=
             v.currentPath = v.mCurrentPathNode.fullPath
             return v.currentPathNodeChildren().len
 
-    v.contentView.viewForItem = proc(i: int): View =
+    v.contentView.viewForItem = proc(i: int): View {.gcsafe.} =
         let n = v.currentPathNodeChildren()[i]
         var size = v.contentView.itemSize
         var filePreview = v.cachedResources.getOrDefault(n.fullPath)
@@ -278,4 +278,4 @@ proc createFSView*(rootPath: string, r: Rect):FileSystemView=
     result.init(r)
 
 proc reloadIfNeeded*(v: FileSystemView)=
-    if true: return 
+    if true: return

@@ -134,7 +134,7 @@ method init*(v: EditorSceneView, r: Rect)=
         clipView.addSubview(v.sceneView)
 
     v.cameraController = newEditorCameraController(v.sceneView)
-    v.sceneView.afterDrawProc = proc()=
+    v.sceneView.afterDrawProc = proc() {.gcsafe.} =
         currentContext().gl.clearDepthStencil()
         v.updateGizmo()
         v.nodeSelector.draw()

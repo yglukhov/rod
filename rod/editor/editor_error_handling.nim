@@ -47,6 +47,7 @@ proc dump*(logger: EditorLogger, level: Level):seq[string]=
         var dump = logger.msgDump.getOrDefault(level)
         result.add(dump)
 
-var gEditorLogger* = new(EditorLogger)
+var gEditorLogger* {.threadvar.}: EditorLogger
+gEditorLogger.new()
 
 addHandler(gEditorLogger)

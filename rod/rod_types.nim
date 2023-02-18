@@ -71,7 +71,7 @@ type
         uiComponents*: seq[UIComponent]
         postprocessContext*: PostprocessContext
         editing*: bool
-        afterDrawProc*: proc() # PRIVATE DO NOT USE!!!
+        afterDrawProc*: proc() {.gcsafe.} # PRIVATE DO NOT USE!!!
 
     Composition* = ref object
         url*: string

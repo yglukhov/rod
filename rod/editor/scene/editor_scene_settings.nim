@@ -19,7 +19,7 @@ type SceneSettingsView* = ref object of EditorTabView
     currSceneView: SceneView
     autoUpdate: bool
 
-proc reloadEditScene(v: SceneSettingsView)
+proc reloadEditScene(v: SceneSettingsView) {.gcsafe.}
 
 method init*(i: SceneSettingsView, r: Rect) =
     procCall i.View.init(r)
@@ -108,7 +108,7 @@ proc getAllCameras(n: Node): seq[Node]=
     for ch in n.children:
         result.add(ch.getAllCameras)
 
-proc reloadEditScene(v: SceneSettingsView)=
+proc reloadEditScene(v: SceneSettingsView) {.gcsafe.} =
     while v.propView.subviews.len > 0:
         v.propView.subviews[0].removeFromSuperview()
 

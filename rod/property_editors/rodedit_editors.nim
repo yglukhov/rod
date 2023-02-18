@@ -13,7 +13,7 @@ type NodeAnchorView = ref object of View
   pX: float
   pY: float
   size: Size
-  onChanged: proc(p: Point)
+  onChanged: proc(p: Point) {.gcsafe.}
 
 proc ppx(v: NodeAnchorView): float = v.pX / v.size.width
 proc ppy(v: NodeAnchorView): float = v.pY / v.size.height
@@ -56,7 +56,7 @@ method onTouchEv*(v: NodeAnchorView, e: var Event): bool =
     v.onChanged(newPoint(v.pX, v.pY))
   result = true
 
-proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX), getter: proc(): NodeAnchorAUX): PropertyEditorView =
+proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX) {.gcsafe.}, getter: proc(): NodeAnchorAUX {.gcsafe.}): PropertyEditorView =
   let boxSize = 100.0
   result = PropertyEditorView.new(newRect(0, 0, 208, boxSize + 10))
   let n = getter().node
@@ -70,7 +70,7 @@ proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX), getter: proc()
   v.pX = n.anchor.x
   v.pY = n.anchor.y
   if v.size.width > 0 and v.size.height > 0:
-    v.onChanged = proc(p: Point) =
+    v.onChanged = proc(p: Point) {.gcsafe.} =
       n.anchor = newVector3(p.x, p.y)
   # echo "size ", v.size, " x ", v.pX, " y ", v.pY
   result.addSubview(v)
@@ -83,12 +83,12 @@ type NinePartView = ref object of View
   size: Size
   segmentsHighlight: array[4, bool]
   scale: float
-  mOnAction: proc()
+  mOnAction: proc() {.gcsafe.}
   prevTouch: Point
   editedSegment: int
 
-proc onAction(v: NinePartView, cb: proc()) =
-  v.mOnAction = proc()=
+proc onAction(v: NinePartView, cb: proc() {.gcsafe.} ) =
+  v.mOnAction = proc() =
     if not cb.isNil:
       cb()
 
@@ -197,7 +197,7 @@ method onMouseOver*(v: NinePartView, e: var Event) =
 method onMouseOut*(v: NinePartView, e: var Event) =
   v.clearHightlights()
 
-proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX), getter: proc(): NinePartSegmentsAUX): PropertyEditorView =
+proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX) {.gcsafe.}, getter: proc(): NinePartSegmentsAUX {.gcsafe.}): PropertyEditorView =
   let boxSize = 170.0
   let pv = PropertyEditorView.new(newRect(0,0,208, boxSize + 30))
   let n = getter()

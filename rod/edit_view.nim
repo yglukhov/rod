@@ -206,14 +206,14 @@ when loadingAndSavingAvailable:
             error "Exception caught: ", getCurrentExceptionMsg()
             error "stack trace: ", getCurrentException().getStackTrace()
 
-    proc loadCompositionDocument*(e: Editor, path: string, cb: proc(r: CompositionDocument)) =
+    proc loadCompositionDocument*(e: Editor, path: string, cb: proc(r: CompositionDocument) {.gcsafe.}) =
         try:
             var p = path
             if p.find("file://") == -1:
                 p = "file://" & p
 
             var comp = newComposition(p)
-            comp.loadComposition do():
+            comp.loadComposition do() {.gcsafe.}:
                 let n = comp.node
                 var c = new(CompositionDocument)
                 c.path = p
@@ -259,7 +259,7 @@ when loadingAndSavingAvailable:
                 e.workspaceView.addTab(tbv)
                 e.workspaceView.selectTab(tbv)
 
-    proc loadCompositionToScene*(e: Editor, p: string, cb: proc(c: CompositionDocument) = nil) =
+    proc loadCompositionToScene*(e: Editor, p: string, cb: proc(c: CompositionDocument) {.gcsafe.} = nil) =
         e.loadCompositionDocument(p) do(c: CompositionDocument):
             if not e.currentComposition.isNil:
                 var p = e.currentComposition.selectedNode
@@ -273,7 +273,7 @@ else:
     proc currentProjectPath*(e: Editor): string = discard
     proc saveComposition*(e: Editor, c: CompositionDocument, saveAs = false, autosave = false): string {.discardable.} = discard
     proc openComposition*(e: Editor, p: string) = discard
-    proc loadCompositionToScene*(e: Editor, p: string, cb: proc(c: CompositionDocument) = nil) = discard
+    proc loadCompositionToScene*(e: Editor, p: string, cb: proc(c: CompositionDocument) {.gcsafe.} = nil) = discard
 
 proc selectNode*(editor: Editor, node: Node) =
     editor.selectedNode = node
@@ -296,7 +296,7 @@ proc endEditing*(e: Editor) =
     e.sceneView.editing = false
     discard e.sceneView.makeFirstResponder()
 
-proc createCloseEditorButton(e: Editor, cb: proc()) =
+proc createCloseEditorButton(e: Editor, cb: proc() {.gcsafe.} ) =
     e.workspaceView.newToolbarButton("x").onAction do():
         e.sceneView.dragDestination = nil
         e.endEditing()
@@ -324,7 +324,7 @@ proc cutNode*(e: Editor, n: Node = nil)=
         cn.removeFromParent()
         e.sceneTreeDidChange()
 
-proc pasteNode*(e: Editor, n: Node = nil)=
+proc pasteNode*(e: Editor, n: Node = nil) {.gcsafe.} =
     var data:seq[byte]
     if not clipboardWithName(CboardGeneral).readData(NodePboardKind, data):
         return
@@ -413,7 +413,7 @@ proc initNotifHandlers(e: Editor)=
         else:
             discard
 
-proc onKeyDown(ed: Editor, e: var Event): bool =
+proc onKeyDown(ed: Editor, e: var Event): bool {.gcsafe.} =
     # echo "editor onKeyDown ", e.keyCode
     case commandFromEvent(e)
     of kcCopy:
@@ -433,7 +433,7 @@ proc onKeyDown(ed: Editor, e: var Event): bool =
 
 proc createWorkspace(w: Window, e: Editor): WorkspaceView =
     result = createWorkspaceLayout(w, e)
-    result.onKeyDown = proc(ev: var Event): bool =
+    result.onKeyDown = proc(ev: var Event): bool {.gcsafe.} =
         e.onKeyDown(ev)
 
 proc startEditorForProject*(w: Window, p: EditorProject): Editor=
@@ -488,7 +488,7 @@ proc startEditingNodeInView*(n: Node, v: View, startFromGame: bool = true): Edit
 # default tabs hacky registering
 import nimx/assets/[asset_loading, json_loading]
 
-registerAssetLoader(["json", "jcomp"]) do(url: string, callback: proc(j: JsonNode)):
+registerAssetLoader(["json", "jcomp"]) do(url: string, callback: proc(j: JsonNode){.gcsafe.}):
     loadJsonFromURL(url, callback)
 
 import rod/editor/editor_default_tabs

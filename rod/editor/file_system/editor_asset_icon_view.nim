@@ -22,7 +22,8 @@ type AssetKind* = enum
     akText
     akComposition
 
-var filesExtensions = newTable[string, AssetKind]()
+var filesExtensions {.threadvar.}: TableRef[string, AssetKind]
+filesExtensions = newTable[string, AssetKind]()
 
 filesExtensions[".png"] = akImage
 filesExtensions[".jpg"] = akImage
@@ -39,7 +40,7 @@ type FilePreview* = ref object of View
     nameField*: TextField
     icon*: View
     selectionView: View
-    onDoubleClicked*: proc()
+    onDoubleClicked*: proc() {.gcsafe.}
     isCompact*: bool
 
     case kind*: AssetKind
@@ -81,7 +82,7 @@ method draw*(v: ImageIconView, r: Rect)=
         let orig = newPoint(r.x + (r.width - v.image.size.width) * 0.5, r.y + (r.height - v.image.size.height) * 0.5)
         c.drawImage(v.image, newRect(orig, v.image.size))
 
-proc imageViewWithIconForPath(path: string, frame: Rect): ImageIconView =
+proc imageViewWithIconForPath(path: string, frame: Rect): ImageIconView {.gcsafe.} =
     let img_data = iconBitmapForFile(path, 128, 128)
     if img_data.len > 0:
         let img = imageWithBitmap(cast[ptr uint8](unsafeAddr img_data[0]), 128, 128, 4)
@@ -90,7 +91,7 @@ proc imageViewWithIconForPath(path: string, frame: Rect): ImageIconView =
         result.makeThumb = true
         result.image = img
 
-proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview =
+proc createFilePreview*(p: PathNode, r: Rect, compact: bool): FilePreview {.gcsafe.} =
     let sp = p.fullPath.splitFile()
 
     result = FilePreview(kind:
@@ -180,7 +181,7 @@ proc doubleClicked*(v: FilePreview)=
     else:
         openInDefaultApp(v.path)
 
-proc rename*(v: FilePreview, cb:proc(name: string))=
+proc rename*(v: FilePreview, cb:proc(name: string){.gcsafe.})=
     if not v.selectionView.isNil:
         discard v.window.makeFirstResponder(v.selectionView)
         let tf = v.selectionView.TextField

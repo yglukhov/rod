@@ -13,7 +13,7 @@ type EditorConsole* = ref object of EditorTabView
     scView: ScrollView
     currentLevel: Level
 
-proc reloadConsole(v: EditorConsole)=
+proc reloadConsole(v: EditorConsole) =
     var msgs = gEditorLogger.dump(v.currentLevel)
 
     while v.contentView.subviews.len > 0:
