@@ -1,9 +1,13 @@
 import nimx/[view, types, button, animation, mini_profiler, matrixes, view_event_handling]
 import rod/[viewport, rod_types, node, component, component/ui_component, edit_view]
+import asset_loader
+
+export asset_loader, viewport
 
 const viewportSize = newSize(1920, 1080)
 
 type GameScene* = ref object of SceneView
+    assetLoader: AssetsLoader
 
 proc centerOrthoCameraPosition*(gs: GameScene) =
     assert(not gs.camera.isNil, "GameSceneBase's camera is nil")
@@ -29,40 +33,24 @@ method onKeyDown*(gs: GameScene, e: var Event): bool =
         discard startEditingNodeInView(gs.rootNode, gs)
         result = true
 
+method assetBundles*(gs: GameScene): seq[AssetBundleDescriptor] {.base.} = discard
+method onResourcesLoaded*(gs: GameScene) {.base.} = discard
+
 method init*(gs: GameScene, frame: Rect)=
     procCall gs.SceneView.init(frame)
     gs.rootNode = newNode("root")
     gs.addDefaultOrthoCamera("camera")
 
-## viewOnEnter called when SceneView was added to Window
-method viewOnEnter*(gs: GameScene)=
-    let gui = gs.rootNode.newChild("Gui")
+    proc afterResourcesPreloaded() =
+        gs.onResourcesLoaded()
 
-    ## load seialized node from json, constructed in editor
-    let hello = newNodeWithResource("helloworld")
-    gui.addChild(hello)
+    let abd = gs.assetBundles()
+    if abd.len > 0:
+        gs.assetLoader.load(abd, onLoadProgress = nil, onLoaded = afterResourcesPreloaded)
+    else:
+        afterResourcesPreloaded()
 
-    let btnExit = newButton(newRect(0, 0, 200, 50))
-    btnExit.title = "Exit"
-    btnExit.onAction do():
-        quit()
+method viewOnExit*(gs: GameScene) =
+    if gs.assetBundles().len > 0:
+        gs.assetLoader.free()
 
-    let btnParent = newNode()
-    btnParent.position = newVector3(1920.0, 1080.0)
-    btnParent.anchor = newVector3(220.0, 70.0)
-    gui.addChild(btnParent)
-
-    btnParent.addComponent(UIComponent).view = btnExit
-
-    let logo = hello.findNode("nimlogo")
-
-    let logoScale = logo.scale
-
-    let anim = newAnimation()
-    anim.loopDuration = 2.0
-    anim.numberOfLoops = -1
-    anim.loopPattern = lpStartToEndToStart
-    anim.onAnimate = proc(p: float) =
-        logo.scale = interpolate(logoScale, logoScale * 1.1, backEaseInOut(p))
-
-    gs.addAnimation(anim)

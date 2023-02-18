@@ -187,11 +187,12 @@ proc writeSingleComponent(b: BinSerializer, className: string, j: JsonNode, comp
 
     # Resolve node refs
     for k, v in nodeLoadRefTable:
-        if k.len != 0:
-            let foundNode = newNode(k)
-            for s in v:
-                echo "Resolve node ref: ", k
-                s(foundNode)
+        if k.len == 0:
+            continue
+        let foundNode = newNode(k)
+        for s in v:
+            echo "Resolve node ref: ", k
+            s(foundNode)
 
     c.serialize(b)
     n.children = @[] # Break cycle to let gc collect it faster
@@ -501,13 +502,20 @@ proc writeCompositions(b: BinSerializer, comps: openarray[JsonNode], paths: open
     b.stringEntries = newSeqOfCap[int32](256)
     b.compsTable = initTable[string, int32]()
     b.images = images
-
+    echo "writeCompositions 0"
     for i, c in comps:
         let pathWithoutExt = changeFileExt(paths[i], "")
+        echo "writeCompositions 0.1"
         discard b.newString(pathWithoutExt)
+        echo "writeCompositions 0.2"
         b.align(sizeof(int16))
+        echo "writeCompositions 0.3"
         b.compsTable[pathWithoutExt] = int32(b.stream.getPosition())
+        echo "writeCompositions 0.4"
         b.writeComposition(c, pathWithoutExt)
+        echo "writeCompositions 0.5"
+
+    echo "writeCompositions 1"
 
     b.writeStringTable(s)
     s.align(sizeof(int16))
