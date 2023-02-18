@@ -1,5 +1,5 @@
 import nimx/[view, app, scroll_view, table_view, text_field, autotest, window]
-import src/game_scene
+import src/game/example_scene
 
 const isMobile = defined(ios) or defined(android)
 
@@ -14,7 +14,7 @@ proc startApplication() =
 
     mainWindow.title = "Template"
 
-    let gs = new(GameScene)
+    let gs = new(ExampleScene)
     gs.init(mainWindow.bounds)
     gs.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     mainWindow.addSubview(gs)

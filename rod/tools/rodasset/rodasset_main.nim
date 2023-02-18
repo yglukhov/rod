@@ -148,19 +148,24 @@ proc pack(cache: string = "", platform: string = "",
         webpLossless: bool = false,
         src, dst: string) =
     #addHandler(newConsoleLogger()) # Disable logger for now, because nimx provides its own. This will likely be changed.
-    let src = expandTilde(src)
-    let dst = expandTilde(dst)
-    let cache = getCache(cache)
-    let rabFile = src / "config.rab"
-    if fileExists(rabFile):
-        let s = parseConfig(rabFile)
-        updateSettingsWithCmdLine()
-        packSingleAssetBundle(s, cache, onlyCache, src, dst)
-    else:
-        for path, s in assetBundles(src):
-            if debug or not s.debugOnly:
-                updateSettingsWithCmdLine()
-                packSingleAssetBundle(s, cache, onlyCache, src & "/" & path, dst & "/" & path)
+    try:
+        let src = expandTilde(src)
+        let dst = expandTilde(dst)
+        let cache = getCache(cache)
+        let rabFile = src / "config.rab"
+        if fileExists(rabFile):
+            let s = parseConfig(rabFile)
+            updateSettingsWithCmdLine()
+            packSingleAssetBundle(s, cache, onlyCache, src, dst)
+        else:
+            for path, s in assetBundles(src):
+                if debug or not s.debugOnly:
+                    updateSettingsWithCmdLine()
+                    packSingleAssetBundle(s, cache, onlyCache, src & "/" & path, dst & "/" & path)
+    except Exception as e:
+        echo getStackTrace(e)
+        echo "Got exception ", e.msg
+        quit(1)
 
 proc ls(debug: bool = false, androidExternal: bool = false, resDir: string) =
     for path, ab in assetBundles(resDir, true):

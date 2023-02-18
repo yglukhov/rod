@@ -183,6 +183,7 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
     toStartButton.onAction do():
         if not v.cachedAnimation.isNil:
             v.cachedAnimation.cancel()
+            v.cachedAnimation.numberOfLoops = 1
             v.cachedAnimation.onProgress(0.0)
     w += bw + 1
     result.addSubview(toStartButton)
@@ -191,6 +192,7 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
     playButton.title = "P"
     playButton.onAction do():
         if not v.cachedAnimation.isNil:
+            v.cachedAnimation.numberOfLoops = 1
             v.cachedAnimation.cancel()
             v.window.addAnimation(v.cachedAnimation)
     w += bw + 1
@@ -200,15 +202,27 @@ proc createTopPanel(v: AnimationEditView, r: Rect): View =
     stopButton.title = "S"
     stopButton.onAction do():
         if not v.cachedAnimation.isNil:
+            v.cachedAnimation.numberOfLoops = 1
             v.cachedAnimation.cancel()
     w += bw + 1
     result.addSubview(stopButton)
+
+    var repeatButton = newButton(newRect(w, 1, bw, bh))
+    repeatButton.title = "R"
+    repeatButton.onAction do():
+        if not v.cachedAnimation.isNil:
+            v.cachedAnimation.cancel()
+            v.cachedAnimation.numberOfLoops = -1
+            v.window.addAnimation(v.cachedAnimation)
+    w += bw + 1
+    result.addSubview(repeatButton)
 
     var toEndButton = newButton(newRect(w, 1, bw, bh))
     toEndButton.title = "E"
     toEndButton.onAction do():
         if not v.cachedAnimation.isNil:
             v.cachedAnimation.cancel()
+            v.cachedAnimation.numberOfLoops = 1
             v.cachedAnimation.onProgress(1.0)
     w += bw + 20
     result.addSubview(toEndButton)

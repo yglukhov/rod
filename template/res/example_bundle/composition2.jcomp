@@ -1,0 +1,288 @@
+{
+  "name": "composition2",
+  "translation": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "scale": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "rotation": [
+    0.0,
+    0.0,
+    0.0,
+    1.0
+  ],
+  "anchor": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "alpha": 1.0,
+  "affectsChildren": true,
+  "enabled": true,
+  "children": [
+    {
+      "name": "node",
+      "translation": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "scale": [
+        1.0,
+        1.0,
+        1.0
+      ],
+      "rotation": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ],
+      "anchor": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "alpha": 1.0,
+      "affectsChildren": true,
+      "enabled": true,
+      "children": [
+        {
+          "name": "anim_acnhor",
+          "translation": [
+            960.0,
+            540.0,
+            0.0
+          ],
+          "scale": [
+            0.800000011920929,
+            0.800000011920929,
+            1.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "anchor": [
+            593.5,
+            450.0,
+            0.0
+          ],
+          "alpha": 1.0,
+          "affectsChildren": true,
+          "enabled": true,
+          "children": [
+            {
+              "name": "logo-crown",
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "anchor": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "alpha": 1.0,
+              "affectsChildren": true,
+              "enabled": true,
+              "components": [
+                {
+                  "_c": "Sprite",
+                  "fileNames": [
+                    "logo-crown.png"
+                  ],
+                  "currentFrame": 0,
+                  "offset": [
+                    0.0,
+                    0.0
+                  ]
+                }
+              ]
+            },
+            {
+              "name": "high",
+              "translation": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "scale": [
+                1.0,
+                1.0,
+                1.0
+              ],
+              "rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ],
+              "anchor": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "alpha": 0.0,
+              "affectsChildren": true,
+              "enabled": true,
+              "components": [
+                {
+                  "_c": "Sprite",
+                  "fileNames": [
+                    "logo-crown.png"
+                  ],
+                  "currentFrame": 0,
+                  "offset": [
+                    0.0,
+                    0.0
+                  ]
+                },
+                {
+                  "_c": "GradientFill",
+                  "startPoint": [
+                    0.0,
+                    0.0
+                  ],
+                  "endPoint": [
+                    1920.0,
+                    1080.0
+                  ],
+                  "startColor": [
+                    0.8999999761581421,
+                    0.949999988079071,
+                    0.03999999910593033,
+                    1.0
+                  ],
+                  "endColor": [
+                    0.07999999821186066,
+                    0.0,
+                    0.0,
+                    1.0
+                  ],
+                  "shape": "RadialRamp",
+                  "localCoords": false
+                },
+                {
+                  "_c": "VisualModifier"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "animations": {
+    "idle": {
+      "rodedit$metadata": {
+        "duration": 1.0,
+        "name": "idle",
+        "fps": 50
+      },
+      "high.alpha": {
+        "duration": 1.0,
+        "keys": [
+          {
+            "p": 0.0,
+            "v": 0.0,
+            "i": "eiLinear"
+          },
+          {
+            "p": 0.2800000011920929,
+            "v": 1.0,
+            "i": "eiLinear"
+          },
+          {
+            "p": 0.5600000023841858,
+            "v": 1.0,
+            "i": "eiLinear"
+          },
+          {
+            "p": 1.0,
+            "v": 0.0,
+            "i": "eiLinear"
+          }
+        ]
+      },
+      "anim_acnhor.scale": {
+        "duration": 1.0,
+        "keys": [
+          {
+            "p": 0.0,
+            "v": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "i": "eiBezier",
+            "f": [
+              0.3197115361690521,
+              0.636956512928009,
+              0.96875,
+              1.358173131942749
+            ]
+          },
+          {
+            "p": 0.3199999928474426,
+            "v": [
+              1.200000047683716,
+              1.200000047683716,
+              1.0
+            ],
+            "i": "eiBezier",
+            "f": [
+              0.6717391014099121,
+              -0.2108695656061172,
+              0.5,
+              0.5
+            ]
+          },
+          {
+            "p": 0.5199999809265137,
+            "v": [
+              1.0,
+              1.0,
+              1.0
+            ],
+            "i": "eiBezier",
+            "f": [
+              1.021634578704834,
+              -0.02391304261982441,
+              0.786057710647583,
+              0.7355769276618958
+            ]
+          },
+          {
+            "p": 1.0,
+            "v": [
+              0.800000011920929,
+              0.800000011920929,
+              1.0
+            ],
+            "i": "eiLinear"
+          }
+        ]
+      }
+    }
+  }
+}
