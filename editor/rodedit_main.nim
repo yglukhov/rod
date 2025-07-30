@@ -51,7 +51,7 @@ proc startApplication() =
     runAutoTestsIfNeeded()
 
 when defined(rodedit):
-    onUnhandledException = proc(msg: string) =
+    onUnhandledException = proc(msg: string) {.gcsafe.} =
         var msg = msg.indent(8)
         error "Exception caught:\n ", msg
 

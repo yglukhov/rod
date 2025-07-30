@@ -54,7 +54,7 @@ proc init(ab: AssetBundle, handler: proc() {.gcsafe.}) {.inline.} =
                 if not (s of StringStream):
                     var str = s.readAll()
                     s.close()
-                    shallow(str)
+                    # TODO: Reviseshallow(str)
                     ss = newStringStream(str)
             echo "Create bindeser: ", ab.mBaseUrl
             ab.binDeserializer = newBinDeserializer(ss)
@@ -280,7 +280,7 @@ proc isDownloaded*(abd: AssetBundleDescriptor): bool =
 
 var getURLForAssetBundle* {.threadvar.}: proc(hash: string): string {.gcsafe.}
 
-proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string)) =
+proc downloadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(err: string) {.gcsafe.}) =
     if abd.isDownloadable:
         if abd.isDownloaded:
             handler("")
@@ -323,7 +323,7 @@ proc newAssetBundle(abd: AssetBundleDescriptor): AssetBundle =
             else:
                 result = newNativeAssetBundle(abd.path)
 
-proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string) {.gcsafe.}) =
+proc loadAssetBundle*(abd: AssetBundleDescriptor, handler: proc(mountPath: string, ab: AssetBundle, err: string) {.gcsafe.})  =
     abd.downloadAssetBundle() do(err: string):
         if err.len == 0:
             let ab = newAssetBundle(abd)
@@ -345,7 +345,7 @@ proc loadAssetBundles*(abds: openarray[AssetBundleDescriptor], handler: proc(mou
     let abds = @abds
     var i = 0
 
-    proc load() =
+    proc load() {.gcsafe.} =
         if i == abds.len:
             handler(mountPaths, abs, "")
         else:

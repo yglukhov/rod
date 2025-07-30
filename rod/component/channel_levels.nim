@@ -21,7 +21,8 @@ ChannelLevels.properties:
     outWhiteV
     outBlackV
 
-var levelsPostEffect = newPostEffect("""
+var levelsPostEffect {.threadvar.}: PostEffect
+proc createLevelsPostEffect(): PostEffect = newPostEffect("""
 vec3 colorPow(vec3 i, vec3 p) {
     return vec3(pow(i.r, p.r), pow(i.g, p.g), pow(i.b, p.b));
 }
@@ -93,6 +94,8 @@ method deserialize*(c: ChannelLevels, j: JsonNode, s: Serializer) =
 method beforeDraw*(c: ChannelLevels, index: int): bool =
     c.active = not c.areValuesNormal()
     if c.active:
+        if levelsPostEffect.isNil:
+            levelsPostEffect = createLevelsPostEffect()
         pushPostEffect(levelsPostEffect, c.inWhiteV, c.inBlackV, c.inGammaV, c.outWhiteV, c.outBlackV, c.inWhite, c.inBlack, c.inGamma, c.outWhite, c.outBlack)
 
 method afterDraw*(c: ChannelLevels, index: int) =

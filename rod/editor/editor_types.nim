@@ -1,5 +1,5 @@
-import nimx / [view, button, editor/tab_view, linear_layout, popup_button,
-    toolbar, notification_center, event, animation ]
+import nimx / [view, button, editor/tab_view, popup_button,
+    notification_center, event, animation ]
 import rod / [node, viewport, editor/editor_project_settings]
 import rod / editor / animation / animation_editor_types
 
@@ -51,40 +51,40 @@ type
 
     WorkspaceView* = ref object of View
         editor*: Editor
-        toolbar*: Toolbar
+        toolbar*: View
         tabs*: seq[EditorTabView]
         tabViews*: seq[TabView]
         compositionEditors*: seq[EditorTabView]
         anchors*: array[4, TabView]
-        horizontalLayout*: LinearLayout
-        verticalLayout*: LinearLayout
+        # horizontalLayout*: LinearLayout
+        # verticalLayout*: LinearLayout
         onKeyDown*: proc(e: var Event): bool {.gcsafe.}
 
 template selectedNode*(e: Editor): Node = e.mSelectedNode
 
-method setEditedNode*(v: EditorTabView, n: Node) {.base.}=
+method setEditedNode*(v: EditorTabView, n: Node) {.gcsafe, base.}=
     discard
 
 method update*(v: EditorTabView) {.base.}= discard
 
-method tabSize*(v: EditorTabView, bounds: Rect): Size {.base.}=
+method tabSize*(v: EditorTabView, bounds: Rect): Size {.gcsafe, base.}=
     result = bounds.size
 
-method tabAnchor*(v: EditorTabView): EditorTabAnchor {.base.}=
+method tabAnchor*(v: EditorTabView): EditorTabAnchor {.gcsafe, base.}=
     result = etaCenter
 
-method onEditorTouchDown*(v: EditorTabView, e: var Event) {.base.}=
+method onEditorTouchDown*(v: EditorTabView, e: var Event) {.gcsafe, base.}=
     discard
 
-method onSceneChanged*(v: EditorTabView) {.base, deprecated.}=
+method onSceneChanged*(v: EditorTabView) {.gcsafe, base, deprecated.}=
     discard
 
-method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.base.} =
+method onCompositionChanged*(v: EditorTabView, comp: CompositionDocument) {.gcsafe, base.} =
     v.composition = comp
 
-method onCompositionSaved*(v: EditorTabView, comp: CompositionDocument) {.base.} = discard
+method onCompositionSaved*(v: EditorTabView, comp: CompositionDocument) {.gcsafe, base.} = discard
 
-method onEditModeChanged*(v: EditorTabView, mode: EditMode) {.base.} = discard
+method onEditModeChanged*(v: EditorTabView, mode: EditMode) {.gcsafe, base.} = discard
 
 # Notifications
 const RodEditorNotif_onCompositionOpen* = "RodEditorNotif_onCompositionOpen"

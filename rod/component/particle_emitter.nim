@@ -53,7 +53,7 @@ method init(p: ParticleEmitter) =
     p.currentParticles = 0
     p.oneShot = false
 
-method particleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) {.base.} =
+method particleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) {.gcsafe, base.} =
     var destination = origin - part.coord
     const rad = 1.0.float
     let rad_m_resetRadius = 1.01

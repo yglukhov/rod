@@ -87,7 +87,7 @@ when false:
 
 proc newValueSampler[T](j: JsonNode, lerpBetweenFrames: bool, originalLen, cutFront: int): ArrayAnimationSampler[T] {.inline.} =
     var vals = newSeq[T](j.len)
-    shallow(vals)
+    # TODO: Revise shallow(vals)
     var i = 0
     for v in j:
         vals[i] = elementFromJson(T, v)
@@ -136,7 +136,7 @@ proc newValueSampler(t: TypeId, j:JsonNode, lerpBetweenFrames: bool, originalLen
 
 proc newKeyframeSampler[T](j: JsonNode): KeyFrameAnimationSampler[T] {.inline.} =
     var keys = newSeq[KeyFrame[T]](j.len)
-    shallow(keys)
+    # TODO: Revise shallow(keys)
     var i = 0
     for v in j:
         keys[i].v = elementFromJson(T, v["v"])
@@ -155,7 +155,7 @@ proc newKeyframeSampler(t: TypeId, j: JsonNode): AbstractAnimationSampler =
 proc newKeyframeSampler[T](b: BinDeserializer): KeyFrameAnimationSampler[T] {.inline.} =
     let keysLen = b.readInt16()
     var keys = newSeq[KeyFrame[T]](keysLen)
-    shallow(keys)
+    # TODO: Revise shallow(keys)
     for i in 0 ..< keys.len:
         keys[i].p = b.readFloat32()
         b.visit(keys[i].v)
@@ -234,11 +234,11 @@ proc makeProgressSetter*(sng: Variant, s: AbstractAnimationSampler): proc(p: flo
     template getSetterAndGetterTypeId(T: typedesc): TypeId = getTypeId(SetterAndGetter[T])
     switchAnimatableTypeId(sng.typeId, getSetterAndGetterTypeId, makeSetter)
 
-proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation =
+proc newPropertyAnimation*(n: Node, j: JsonNode): PropertyAnimation  =
     var r = new(PropertyAnimation)
     r.init()
     r.animatedProperties = @[]
-    shallow(r.animatedProperties)
+    # TODO: Revise shallow(r.animatedProperties)
 
     r.loopDuration = 0.0 # TODO: Hack - remove
     for k, jp in j:
@@ -294,7 +294,7 @@ proc newPropertyAnimation*(n: Node, b: BinDeserializer, aeComp: bool): PropertyA
 
     let propsCount = b.readInt16()
     result.animatedProperties = newSeq[AnimatedProperty](propsCount)
-    shallow(result.animatedProperties)
+    # TODO: Revise shallow(result.animatedProperties)
 
     if not aeComp:
         result.loopDuration = b.readFloat32()

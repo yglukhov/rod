@@ -362,7 +362,7 @@ proc fillIBuffer(ps: ParticleSystem) =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ib, gl.STATIC_DRAW)
 
-var particleShader: Shader
+var particleShader {.threadvar.}: Shader
 
 proc initSystem(ps: ParticleSystem) =
     let gl = currentContext().gl
@@ -1020,7 +1020,7 @@ method init(h: PSHolder) =
     h.distance = 40.0
     h.speed = 9.0
 
-proc recursiveDoProc(n: Node, pr: proc(ps: ParticleSystem) ) =
+proc recursiveDoProc(n: Node, pr: proc(ps: ParticleSystem) {.gcsafe.} ) =
     let ps = n.getComponent(ParticleSystem)
     if not ps.isNil:
         ps.pr()

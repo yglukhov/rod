@@ -18,11 +18,17 @@ void main() { gl_FragColor = uColor; }
 """
 
 const greenColor = newColor(0.2, 1.0, 0.2, 1.0)
-var debugDrawShader = newShader(vertexShader, fragmentShader,
-            @[(0.GLuint, "aPosition")])
+var debugDrawShader {.threadvar.}: Shader
 
-let boxIndexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
-var boxIB: BufferRef
+const boxIndexData = [0.GLushort, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 3, 7, 2, 6, 0, 4, 1, 5]
+var boxIB {.threadvar.}: BufferRef
+
+template bindDebugShader(color: Color) =
+    if debugDrawShader == nil:
+        debugDrawShader = newShader(vertexShader, fragmentShader, @[(0.GLuint, "aPosition")])
+    debugDrawShader.bindShader()
+    debugDrawShader.setTransformUniform()
+    debugDrawShader.setUniform("uColor", color)
 
 proc DDdrawBox*(minPoint, maxPoint: Vector3, color: Color = greenColor) =
     let c = currentContext()
@@ -53,9 +59,10 @@ proc DDdrawBox*(minPoint, maxPoint: Vector3, color: Color = greenColor) =
     c.bindVertexData(24)
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
-    debugDrawShader.bindShader()
-    debugDrawShader.setTransformUniform()
-    debugDrawShader.setUniform("uColor", color)
+    # debugDrawShader.bindShader()
+    # debugDrawShader.setTransformUniform()
+    # debugDrawShader.setUniform("uColor", color)
+    bindDebugShader(color)
     gl.drawElements(gl.LINES, boxIndexData.len.GLsizei, gl.UNSIGNED_SHORT)
 
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, invalidBuffer)
@@ -80,9 +87,10 @@ proc DDdrawCircle*(pos: Vector3, radius: float32, color: Color = greenColor) =
     c.bindVertexData(pointsCount * 3)
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
-    debugDrawShader.bindShader()
-    debugDrawShader.setUniform("uColor", color)
-    debugDrawShader.setTransformUniform()
+    # debugDrawShader.bindShader()
+    # debugDrawShader.setUniform("uColor", color)
+    # debugDrawShader.setTransformUniform()
+    bindDebugShader(color)
     gl.drawArrays(gl.LINE_LOOP, 0, pointsCount)
 
 proc DDdrawCircleX*(pos: Vector3, radius: float32, color: Color = greenColor) =
@@ -100,9 +108,10 @@ proc DDdrawCircleX*(pos: Vector3, radius: float32, color: Color = greenColor) =
     c.bindVertexData(pointsCount * 3)
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
-    debugDrawShader.bindShader()
-    debugDrawShader.setUniform("uColor", color)
-    debugDrawShader.setTransformUniform()
+    # debugDrawShader.bindShader()
+    # debugDrawShader.setUniform("uColor", color)
+    # debugDrawShader.setTransformUniform()
+    bindDebugShader(color)
     gl.drawArrays(gl.LINE_LOOP, 0, pointsCount)
 
 proc DDdrawCircleZ*(pos: Vector3, radius: float32, color: Color = greenColor) =
@@ -120,9 +129,10 @@ proc DDdrawCircleZ*(pos: Vector3, radius: float32, color: Color = greenColor) =
     c.bindVertexData(pointsCount * 3)
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
-    debugDrawShader.bindShader()
-    debugDrawShader.setUniform("uColor", color)
-    debugDrawShader.setTransformUniform()
+    # debugDrawShader.bindShader()
+    # debugDrawShader.setUniform("uColor", color)
+    # debugDrawShader.setTransformUniform()
+    bindDebugShader(color)
     gl.drawArrays(gl.LINE_LOOP, 0, pointsCount)
 
 proc DDdrawLine*(p1, p2: Vector3, color: Color = greenColor) =
@@ -139,9 +149,10 @@ proc DDdrawLine*(p1, p2: Vector3, color: Color = greenColor) =
     c.bindVertexData(2 * 3)
     gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0)
 
-    debugDrawShader.bindShader()
-    debugDrawShader.setUniform("uColor", color)
-    debugDrawShader.setTransformUniform()
+    # debugDrawShader.bindShader()
+    # debugDrawShader.setUniform("uColor", color)
+    # debugDrawShader.setTransformUniform()
+    bindDebugShader(color)
     gl.drawArrays(gl.LINES, 0, 2)
 
 proc DDdrawArrow*(dist: float32, color: Color = greenColor) =
@@ -178,10 +189,10 @@ proc DDdrawGrid*(r: Rect, s: Size, o: Point = newPoint(0,0)) =
     let totalVetexes = (xLines + yLines) * 6
     let drawCalls = ceil(totalVetexes/c.vertexes.len).int
 
-    debugDrawShader.bindShader()
-    debugDrawShader.setTransformUniform()
-    debugDrawShader.setUniform("uColor", c.strokeColor)
-
+    # debugDrawShader.bindShader()
+    # debugDrawShader.setTransformUniform()
+    # debugDrawShader.setUniform("uColor", c.strokeColor)
+    bindDebugShader(c.strokeColor)
     gl.enableVertexAttribArray(0);
 
     # gl.depthMask(true)

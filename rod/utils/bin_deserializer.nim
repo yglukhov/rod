@@ -87,7 +87,7 @@ proc init(b: BinDeserializer) =
         # echo "len:", strLen
         b.strtab[i] = b.stream.readStr(strLen)
         # echo "str ", i, ": ", b.strtab[i]
-        shallow(b.strtab[i])
+        # TODO: Reviseshallow(b.strtab[i])
 
     b.compsTable = initTable[string, int32]()
     let compsLen = b.readInt16()

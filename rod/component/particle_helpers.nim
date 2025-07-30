@@ -82,10 +82,9 @@ PSModifierColor.properties:
 PSModifierSpiral.properties:
     force
 
-method generate*(pgs: PSGenShape): ParticleGenerationData {.base.} = discard
-
-method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.base.} = discard
-method updateParticle*(attr: PSModifier, part: var Particle) {.base.} = discard
+method generate*(pgs: PSGenShape): ParticleGenerationData {.gcsafe, base.} = discard
+method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.gcsafe, base.} = discard
+method updateParticle*(attr: PSModifier, part: var Particle) {.gcsafe, base.} = discard
 
 # -------------------- cone generator --------------------------
 method init(pgs: ConePSGenShape) =

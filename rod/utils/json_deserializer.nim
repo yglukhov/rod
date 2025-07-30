@@ -7,7 +7,7 @@ type JsonDeserializer* = ref object
     node*: JsonNode
     disableAwake*: bool
     compPath*: string # Path relative to bundle root
-    getImageForPath*: proc(path: string, offset: var Point): Image
+    getImageForPath*: proc(path: string, offset: var Point): Image {.gcsafe.}
 
 proc newJsonDeserializer*(): JsonDeserializer =
     result.new()

@@ -6,7 +6,7 @@ export System
 
 method init*(s: System) {.base.} = discard
 method update*(s: System, dt: float) {.base.} = discard
-method draw*(s: System) {.base.} = discard
+method draw*(s: System) {.gcsafe, base.} = discard
 
 proc createSystem*(name: string): System =
   if isClassRegistered(name) == false:

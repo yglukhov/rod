@@ -48,15 +48,12 @@ const lumaInvertedPostfix = """
 }
 """
 
+var theQuad {.threadvar, noinit.}: array[4, GLfloat]
+
 template maskPost(name, src: string): PostEffect =
   newPostEffect("void " & name & src, name, ["sampler2D", "vec4", "vec4", "vec2", "float"])
 
-var effectSprite = [
-  maskPost("maskAlphaEffect", comonSpritePrefix & alphaPostfix), # tmAlpha
-  maskPost("maskAlphaInvertedEffect", comonSpritePrefix & alphaInvertedPostfix), # tmAlphaInverted
-  maskPost("maskLumaEffect", comonSpritePrefix & lumaPostfix), # tmLuma
-  maskPost("maskLumaInvertedEffect", comonSpritePrefix & lumaInvertedPostfix) # tmLumaInverted
-]
+var effectSprite {.threadvar.}: array[4, PostEffect]
 
 type MaskType* = enum
   tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
@@ -72,7 +69,6 @@ Mask.properties:
   maskType
   layerName:
     phantom: string
-
 
 template worldToWindow(c: Mask, w: Vector3): Point =
   let s = c.node.sceneView
@@ -91,8 +87,15 @@ proc drawMaskNode(c: Mask, mskN: Node) =
     gl.enable(gl.SCISSOR_TEST)
   mskN.enabled = e
 
-var theQuad {.noinit.}: array[4, GLfloat]
 proc setupMskPost(c: Mask): bool =
+  if effectSprite[0].isNil:
+    effectSprite = [
+      maskPost("maskAlphaEffect", comonSpritePrefix & alphaPostfix), # tmAlpha
+      maskPost("maskAlphaInvertedEffect", comonSpritePrefix & alphaInvertedPostfix), # tmAlphaInverted
+      maskPost("maskLumaEffect", comonSpritePrefix & lumaPostfix), # tmLuma
+      maskPost("maskLumaInvertedEffect", comonSpritePrefix & lumaInvertedPostfix) # tmLumaInverted
+    ]
+
   if c.rti.isNil:
     c.rti = newImageRenderTarget()
 

@@ -1,5 +1,4 @@
-import nimx/[view, text_field, matrixes, image, button,
-    linear_layout, property_visitor, numeric_text_field,
+import nimx/[view, text_field, matrixes, image, button, property_visitor, numeric_text_field,
     slider, animation, context, view_event_handling, event
 ]
 import rod/component/[ae_composition, rti]

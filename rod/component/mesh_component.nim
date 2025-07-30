@@ -88,10 +88,12 @@ MeshComponent.properties:
 
     indices(phantom = seq[uint16])
 
-var vboCache* {.threadvar.}: Table[string, VBOData]
-vboCache = initTable[string, VBOData]()
+var vboCache* {.threadvar.}: TableRef[string, VBOData]
 
 method init*(m: MeshComponent) =
+    if vboCache == nil: # TODO: REVICE
+        vboCache = newTable[string, VBOData]()
+
     m.bProccesPostEffects = true
     m.material = newDefaultMaterial()
     m.prevTransform.loadIdentity()

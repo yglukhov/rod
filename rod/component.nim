@@ -7,7 +7,7 @@ import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
 
 export Component, ScriptComponent, RenderComponent
 
-method init*(c: Component) {.base.} = discard
+method init*(c: Component) {.gcsafe, base.} = discard
 
 var componentGroupsTable* {.threadvar.}: Table[string, seq[string]]
 componentGroupsTable = initTable[string, seq[string]]()
@@ -53,35 +53,35 @@ template registerComponent*(T: typedesc, creator: (proc(): RootRef), group: stri
         registerClass(T, creator)
         registerComponentGroup(group, typetraits.name(T))
 
-proc createComponent*(name: string): Component {.gcsafe.} =
+proc createComponent*(name: string): Component =
     if isClassRegistered(name) == false:
         raise newException(Exception, "Component " & name & " is not registered")
 
     result = newObjectOfClass(name).Component
     result.init()
 
-proc createComponent*[T](): T {.gcsafe.} = createComponent(T.name).T
+proc createComponent*[T](): T = createComponent(T.name).T
 
-method isRenderComponent*(c: Component): bool {.base.} = discard
+method isRenderComponent*(c: Component): bool {.gcsafe, base.} = discard
 method isRenderComponent*(c: RenderComponent): bool = true
 
-method draw*(c: RenderComponent) {.base.} = discard # Deprecated.
-method beforeDraw*(c: RenderComponent, index: int): bool {.base.} = discard
-method afterDraw*(c: RenderComponent, index: int) {.base.} = discard
+method draw*(c: RenderComponent) {.gcsafe, base.} = discard # Deprecated.
+method beforeDraw*(c: RenderComponent, index: int): bool {.gcsafe, base.} = discard
+method afterDraw*(c: RenderComponent, index: int) {.gcsafe, base.} = discard
 
-method update*(c: ScriptComponent, dt: float) {.base.} = discard
-method componentNodeWasAddedToSceneView*(c: Component) {.base.} = discard
-method componentNodeWillBeRemovedFromSceneView*(c: Component) {.base.} = discard
-method isPosteffectComponent*(c: RenderComponent): bool {.base.} = false
+method update*(c: ScriptComponent, dt: float) {.gcsafe, base.} = discard
+method componentNodeWasAddedToSceneView*(c: Component) {.gcsafe, base.} = discard
+method componentNodeWillBeRemovedFromSceneView*(c: Component) {.gcsafe, base.} = discard
+method isPosteffectComponent*(c: RenderComponent): bool {.gcsafe, base.} = false
 
-method visitProperties*(c: Component, p: var PropertyVisitor) {.base.} = discard
-method getBBox*(c: Component): BBox {.base.} = discard
+method visitProperties*(c: Component, p: var PropertyVisitor) {.gcsafe, base.} = discard
+method getBBox*(c: Component): BBox {.gcsafe, base.} = discard
 
-method serialize*(c: Component, s: Serializer): JsonNode {.base.} =
+method serialize*(c: Component, s: Serializer): JsonNode {.gcsafe, base.} =
     # Deprecated. If your compoenent hits this, override the new JsonSerializer serialization
     doAssert(false, "Not implemented")
 
-method deserialize*(c: Component, j: JsonNode, s: Serializer) {.base.} =
+method deserialize*(c: Component, j: JsonNode, s: Serializer) {.gcsafe, base.} =
     # Deprecated. If your compoenent hits this, override the new JsonDeserializer serialization
     doAssert(false, "Not implemented")
 
@@ -99,16 +99,16 @@ proc deserializeFromJson*(c: Component, b: BinDeserializer) =
         echo "error deserializing ", c.className
         raise
 
-method deserialize*(c: Component, b: BinDeserializer) {.base.} =
+method deserialize*(c: Component, b: BinDeserializer) {.gcsafe, base.} =
     c.deserializeFromJson(b)
 
-method deserialize*(c: Component, s: JsonDeserializer) {.base.} =
+method deserialize*(c: Component, s: JsonDeserializer) {.gcsafe, base.} =
     let ss = Serializer.new()
     ss.jdeser = s
     ss.url = s.compPath
     c.deserialize(s.node, ss)
 
-method serialize*(c: Component, s: JsonSerializer) {.base.} =
+method serialize*(c: Component, s: JsonSerializer) {.gcsafe, base.} =
     let ss = Serializer.new()
     ss.jser = s
     ss.url = s.url
@@ -116,7 +116,7 @@ method serialize*(c: Component, s: JsonSerializer) {.base.} =
     if "_c" notin s.node:
         s.node["_c"] = %className(c)
 
-method serialize*(c: Component, b: BinSerializer) {.base.} =
+method serialize*(c: Component, b: BinSerializer) {.gcsafe, base.} =
     let js = newJsonSerializer()
     js.node = newJObject()
     c.serialize(js)
@@ -128,13 +128,13 @@ method serialize*(c: Component, b: BinSerializer) {.base.} =
     b.write(s.len.int32)
     b.writeStrNoLen(s)
 
-method serializationHash*(c: Component, b: SerializationHashCalculator) {.base.} = discard
+method serializationHash*(c: Component, b: SerializationHashCalculator) {.gcsafe, base.} = discard
 
 type UpdateProcComponent = ref object of ScriptComponent
-    updateProc: proc()
+    updateProc: proc() {.gcsafe.}
 
 type DrawProcComponent = ref object of RenderComponent
-    drawProc: proc()
+    drawProc: proc() {.gcsafe.}
 
 template isEmpty*(b: BBox): bool =
     let d = b.maxPoint - b.minPoint
@@ -143,13 +143,13 @@ template isEmpty*(b: BBox): bool =
 template intersect*(f: Frustum, bbox: BBox): bool =
     f.minPoint.x < bbox.maxPoint.x and bbox.minPoint.x < f.maxPoint.x and f.minPoint.y < bbox.maxPoint.y and bbox.minPoint.y < f.maxPoint.y
 
-proc newComponentWithUpdateProc*(p: proc()): Component =
+proc newComponentWithUpdateProc*(p: proc() {.gcsafe.}): Component =
     var r : UpdateProcComponent
     r.new()
     r.updateProc = p
     result = r
 
-proc newComponentWithDrawProc*(p: proc()): Component =
+proc newComponentWithDrawProc*(p: proc() {.gcsafe.}): Component =
     var r : DrawProcComponent
     r.new()
     r.drawProc = p
@@ -161,7 +161,7 @@ method update*(c: UpdateProcComponent, dt: float) =
 method draw*(c: DrawProcComponent) =
     c.drawProc()
 
-method rayCast*(c: Component, r: Ray, distance: var float32): bool {.base.} =
+method rayCast*(c: Component, r: Ray, distance: var float32): bool {.gcsafe, base.} =
     let bbox = c.getBBox()
     if bbox.isEmpty:
         return false

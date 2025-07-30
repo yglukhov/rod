@@ -3,7 +3,7 @@ import rod/[rod_types, viewport, component ]
 import rod / utils / [ property_desc, serialization_codegen ]
 import json
 
-var blinkComposition = newComposition """
+const blinkComposition = newComposition """
 uniform Image uMask;
 uniform Image uLight;
 uniform vec2 uLightSize;

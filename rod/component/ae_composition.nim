@@ -50,7 +50,8 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     result.numberOfLoops = 1
     result.loopDuration = m.duration
     result.animate prog in pStart..pEnd:
-        c.allCompAnim.onAnimate(prog)
+        {.cast(gcsafe).}:
+            c.allCompAnim.onAnimate(prog)
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = @[]): Animation {.gcsafe.}
 
@@ -77,10 +78,11 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, except
         let oldCompAnimate = prop.onAnimate
 
         prop.animate prog in pIn..pOut:
-            if cl.timeRemapEnabled:
-                oldCompAnimate(cl.timeremap)
-            else:
-                oldCompAnimate(prog)
+            {.cast(gcsafe).}:
+                if cl.timeRemapEnabled:
+                    oldCompAnimate(cl.timeremap)
+                else:
+                    oldCompAnimate(prog)
 
         result = newComposeMarker(max(0.0, layerIn), min(layerOut, 1.0), prop)
 
@@ -119,7 +121,8 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
         result.loopDuration = marker.duration
         result.numberOfLoops = 1
         result.onAnimate = proc(p: float)=
-            ca.onProgress(p)
+            {.cast(gcsafe).}:
+                ca.onProgress(p)
 
 proc play*(c: AEComposition, name: string, exceptions: seq[string] = @[]): Animation {.discardable.} =
     result = c.compositionNamed(name, exceptions)

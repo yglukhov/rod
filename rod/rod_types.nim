@@ -52,8 +52,8 @@ type
 
     PostprocessContext* = ref object
         shader*: ProgramRef
-        setupProc*: proc(c: Component)
-        drawProc*: proc(c: Component)
+        setupProc*: proc(c: Component) {.gcsafe.}
+        drawProc*: proc(c: Component) {.gcsafe.}
         depthImage*: SelfContainedImage
         depthMatrix*: Matrix4
 

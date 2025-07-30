@@ -5,17 +5,19 @@ import nimx / [ matrixes, button, popup_button, key_commands, animation,
 
 import clipboard
 import rod_types, node
-import rod/scene_composition
-import rod / editor / [editor_project_settings, editor_tab_registry,
-        editor_workspace_view, editor_types, animation/animation_editor_types]
+import rod / [ scene_composition ]
+import rod / editor / [ editor_types, animation/animation_editor_types ]
+# import rod / editor / [editor_project_settings, editor_tab_registry,
+#         editor_workspace_view, editor_types, animation/animation_editor_types]
 
 import rod/utils/json_serializer
 export editor_types
 
-export editor_tab_registry
+# export editor_tab_registry
 
 import variant
 
+# const loadingAndSavingAvailable = false
 when loadingAndSavingAvailable:
     import os_files/dialog
     import os
@@ -197,7 +199,7 @@ when loadingAndSavingAvailable:
             if not autosave:
                 c.path = newPath
                 c.rootNode.name = c.name
-                e.workspaceView.setTabTitle(c.owner, c.name)
+                # e.workspaceView.setTabTitle(c.owner, c.name) #TODO: REVICE
 
                 e.onCompositionSaved(c)
             result = newPath
@@ -250,17 +252,18 @@ when loadingAndSavingAvailable:
                     c = tb.composition
                     c.rootNode = c.rootNode
                     tb.onCompositionChanged(c)
-                    e.workspaceView.selectTab(tb)
+                    # e.workspaceView.selectTab(tb) #TODO: REVICE
                     return
 
-            var tbv = e.workspaceView.createCompositionEditor(c)
-            if not tbv.isNil:
-                tbv.name = splitFile(c.path).name
-                e.workspaceView.addTab(tbv)
-                e.workspaceView.selectTab(tbv)
+            #TODO: REVICE
+            # var tbv = e.workspaceView.createCompositionEditor(c)
+            # if not tbv.isNil:
+            #     tbv.name = splitFile(c.path).name
+            #     e.workspaceView.addTab(tbv)
+            #     e.workspaceView.selectTab(tbv)
 
     proc loadCompositionToScene*(e: Editor, p: string, cb: proc(c: CompositionDocument) {.gcsafe.} = nil) =
-        e.loadCompositionDocument(p) do(c: CompositionDocument):
+        e.loadCompositionDocument(p) do(c: CompositionDocument) {.gcsafe.}:
             if not e.currentComposition.isNil:
                 var p = e.currentComposition.selectedNode
                 if p.isNil:
@@ -287,7 +290,7 @@ proc currentCamera*(e: Editor): Camera =
 proc endEditing*(e: Editor) =
     e.sceneView.afterDrawProc = nil
     e.sceneView.removeFromSuperview()
-    e.sceneView.setFrame(e.workspaceView.frame)
+    # e.sceneView.setFrame(e.workspaceView.frame) #TODO: REVICE
 
     if e.startFromGame:
         let rootEditorView = e.workspaceView.superview
@@ -296,11 +299,12 @@ proc endEditing*(e: Editor) =
     e.sceneView.editing = false
     discard e.sceneView.makeFirstResponder()
 
-proc createCloseEditorButton(e: Editor, cb: proc() {.gcsafe.} ) =
-    e.workspaceView.newToolbarButton("x").onAction do():
-        e.sceneView.dragDestination = nil
-        e.endEditing()
-        cb()
+proc createCloseEditorButton(e: Editor, cb: proc() {.gcsafe.} ) = discard
+    #TODO: REVICE
+    # e.workspaceView.newToolbarButton("x").onAction do():
+    #     e.sceneView.dragDestination = nil
+    #     e.endEditing()
+    #     cb()
 
 proc copyNode*(e: Editor, n: Node = nil)=
     var cn = n
@@ -431,10 +435,11 @@ proc onKeyDown(ed: Editor, e: var Event): bool {.gcsafe.} =
     else:
         discard
 
-proc createWorkspace(w: Window, e: Editor): WorkspaceView =
-    result = createWorkspaceLayout(w, e)
-    result.onKeyDown = proc(ev: var Event): bool {.gcsafe.} =
-        e.onKeyDown(ev)
+proc createWorkspace(w: Window, e: Editor): WorkspaceView = new (WorkspaceView)
+    #TODO: REVICE
+    # result = createWorkspaceLayout(w, e)
+    # result.onKeyDown = proc(ev: var Event): bool {.gcsafe.} =
+    #     e.onKeyDown(ev)
 
 proc startEditorForProject*(w: Window, p: EditorProject): Editor=
     result.new()

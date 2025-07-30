@@ -1,3 +1,6 @@
 .rodedit/
 build/
 *.exe
+nimble.develop
+nimble.paths
+nimbledeps

@@ -352,7 +352,7 @@ iterator allNodes*(n: Node): Node =
             s.add(n.children)
         inc i
 
-proc findNode*(n: Node, p: proc(n: Node): bool): Node =
+proc findNode*(n: Node, p: proc(n: Node): bool {.gcsafe.} ): Node =
     if p(n):
         result = n
     else:
@@ -408,7 +408,7 @@ template addNodeRef*(name: string, refNode: var Node) =
     addNodeRef(name) do(n: Node):
         refNode = n
 
-proc resolveNodeRefs(n: Node) {.gcsafe.}=
+proc resolveNodeRefs(n: Node) =
     assert(not nodeLoadRefTable.isNil)
     for k, v in nodeLoadRefTable:
         let foundNode = n.findNode(k)
@@ -511,7 +511,7 @@ proc setBoneMatrix*(n: Node, mat: Matrix4) =
 
 proc translationFromMatrix(m: Matrix4): Vector3 = [m[12], m[13], m[14]]
 
-proc worldTransform*(n: Node): Matrix4 {.gcsafe.} =
+proc worldTransform*(n: Node): Matrix4 =
     if n.isDirty:
         n.isDirty = false
         if n.parent.isNil:
@@ -655,12 +655,12 @@ proc isEnabledInTree*(n: Node): bool =
 # Serialization
 proc deserialize*(n: Node, s: JsonDeserializer) {.gcsafe.}
 
-proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "") {.gcsafe.} =
+proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "") =
     let deser = newJsonDeserializer()
     const prefix = "file://"
     doAssert(url.startsWith(prefix), "Internal error")
     deser.compPath = url[prefix.len ..  ^1]
-    deser.getImageForPath = proc(p: string, off: var Point): Image {.gcsafe.}=
+    deser.getImageForPath = proc(p: string, off: var Point): Image =
         when not defined(js) and not defined(emscripten):
             # TODO: We have to figure out smth about js...
             result = imageWithContentsOfFile(p)
@@ -673,7 +673,7 @@ proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "") {.gcsafe.} =
     n.deserialize(deser)
     n.resolveNodeRefs()
 
-proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "", onComplete: proc() {.gcsafe.}) {.gcsafe, deprecated.} =
+proc loadNodeFromJson*(n: Node, j: JsonNode, url: string = "", onComplete: proc() {.gcsafe.}) {.deprecated.} =
     n.loadNodeFromJson(j, url)
     if not onComplete.isNil: onComplete()
 
@@ -700,7 +700,7 @@ proc newComposition*(url: string, n: Node = nil): Composition =
     result.node = if not n.isNil: n else: newNode()
     result.node.composition = result
 
-proc loadComposition*(comp: Composition, onComplete: proc() {.gcsafe.} = nil) {.gcsafe.} =
+proc loadComposition*(comp: Composition, onComplete: proc() {.gcsafe.} = nil) =
     const prefix = "res://"
     if comp.url.startsWith(prefix):
         let path = comp.url.substr(prefix.len)
@@ -724,7 +724,7 @@ proc loadComposition*(comp: Composition, onComplete: proc() {.gcsafe.} = nil) {.
             echo "No BinDeserializer for ", path
 
     fixupCompositionUrlExtension(comp.url)
-    loadAsset(comp.url) do(j: JsonNode, err: string) {.gcsafe.}:
+    loadAsset(comp.url) do(j: JsonNode, err: string):
         assert err.len == 0, err
 
         try:
@@ -736,7 +736,7 @@ proc loadComposition*(comp: Composition, onComplete: proc() {.gcsafe.} = nil) {.
 
 import rod/animation/property_animation
 
-proc deserialize*(n: Node, s: JsonDeserializer) {.gcsafe.} =
+proc deserialize*(n: Node, s: JsonDeserializer) =
     assert(s.compPath.len != 0)
     let j = s.node
     var v = j{"children"}
@@ -951,7 +951,7 @@ type
         bicScale = "s"
         bicTranslation = "t"
 
-proc newNode*(b: BinDeserializer, compName: string): Node {.gcsafe.} =
+proc newNode*(b: BinDeserializer, compName: string): Node =
     let oldPos = b.getPosition()
     let oldPath = b.curCompPath
     b.curCompPath = compName

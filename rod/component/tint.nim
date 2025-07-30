@@ -14,7 +14,8 @@ Tint.properties:
     white
     amount
 
-var effect = newPostEffect("""
+var effect {.threadvar.}: PostEffect
+proc createEffect(): PostEffect = newPostEffect("""
 void tint_effect(vec4 black, vec4 white, float amount) {
     float b = (0.2126*gl_FragColor.r + 0.7152*gl_FragColor.g + 0.0722*gl_FragColor.b); // Maybe the koeffs should be adjusted
     float a = gl_FragColor.a;
@@ -32,6 +33,8 @@ method deserialize*(c: Tint, j: JsonNode, s: Serializer) =
     c.amount = j{"amount"}.getFloat(1)
 
 method beforeDraw*(c: Tint, index: int): bool =
+    if effect.isNil:
+        effect = createEffect()
     pushPostEffect(effect, c.black, c.white, c.amount)
 
 method afterDraw*(c: Tint, index: int) =

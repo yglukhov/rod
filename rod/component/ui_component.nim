@@ -7,7 +7,7 @@ type UICompView = ref object of View
     uiComp: UIComponent
     uiCompSubview: View
 
-method `enabled=`*(c: UIComponent, state: bool) {.base.}=
+method `enabled=`*(c: UIComponent, state: bool) {.gcsafe, base.}=
     c.mEnabled = state
 
 proc enabled*(c: UIComponent): bool =
@@ -65,7 +65,7 @@ proc `view=`*(c: UIComponent, v: View) =
         c.mView = nil
         return
 
-    let cv = UICompView.new(newRect(0, 0, 20, 20))
+    let cv = new(UICompView) #TODO: Revice , newRect(0, 0, 20, 20)
     cv.uiComp = c
     c.mView = cv
     c.enabled = true

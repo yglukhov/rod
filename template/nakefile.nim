@@ -15,7 +15,7 @@ beforeBuild = proc(b: Builder) =
     b.mainFile = "main.nim"
     b.originalResourcePath = "res"
     # b.resourcePath = "build"
-    b.additionalNimFlags.add(@["--path:res", "--path:src"])
+    b.additionalNimFlags.add(@["--path:res", "--path:src", "--mm:refc"])
 
 
 preprocessResources = proc(b: Builder) =

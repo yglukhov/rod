@@ -136,7 +136,7 @@ template genSerializationCodeForComponent*(c: typed) =
 template genJsonSerializationrFor*(c: typed) =
     import rod / utils / [ json_deserializer, json_serializer ]
 
-    proc toJson*(v: c): JsonNode=
+    proc toJson*(v: c): JsonNode =
         var b = newJsonSerializer()
         genSerializerProc(c, JsonSerializer, v, b, true, true, false, false)
         result = b.node
