@@ -28,9 +28,9 @@ iterator components*(n: Node): Component =
     for c in n.renderComponents: yield c
     for c in n.scriptComponents: yield c
 
-proc animationRunner(n: Node): AnimationRunnerComponent
+proc animationRunner(n: Node): AnimationRunnerComponent {.gcsafe.}
 
-proc addAnimation*(n: Node, a: Animation) =
+proc addAnimation*(n: Node, a: Animation) {.gcsafe.} =
     n.animationRunner.runner.pushAnimation(a)
 
 proc removeAnimation*(n: Node, a: Animation) =

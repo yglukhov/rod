@@ -16,6 +16,7 @@ beforeBuild = proc(b: Builder) =
     b.originalResourcePath = "res"
     # b.resourcePath = "build"
     b.additionalNimFlags.add(@["--path:res", "--path:src", "--mm:refc"])
+    b.additionalNimFlags.add(@["--path:../"])
 
 
 preprocessResources = proc(b: Builder) =

@@ -1,5 +1,5 @@
 import rod / [ rod_types, node, component ]
-import nimx / animation
+import nimx / [ animation ]
 import ..  / core / game_scene
 
 type
@@ -11,7 +11,7 @@ method assetBundles*(gs: ExampleScene): seq[AssetBundleDescriptor] =
     ]
     result = assetBundles
 
-method onResourcesLoaded*(gs: ExampleScene) =
+method onResourcesLoaded*(gs: ExampleScene) {.gcsafe.} =
     var comp = newNodeWithResource("example_bundle/composition2")
     var anim = comp.animationNamed("idle")
     anim.numberOfLoops = -1

@@ -15,12 +15,12 @@ proc startApplication() =
     mainWindow.title = "Template"
 
     let gs = new(ExampleScene)
-    gs.init(mainWindow.bounds)
-    gs.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
+    # gs.init(mainWindow.bounds)
+    # gs.autoresizingMask = { afFlexibleWidth, afFlexibleHeight }
     mainWindow.addSubview(gs)
 
-    gs.setFrame(mainWindow.bounds)
-    gs.resizeSubviews(mainWindow.bounds.size)
+    # gs.setFrame(mainWindow.bounds)
+    # gs.resizeSubviews(mainWindow.bounds.size)
 
 runApplication:
     startApplication()
