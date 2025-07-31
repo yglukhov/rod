@@ -1,11 +1,10 @@
 import tables, logging, strutils
 
-import nimx / [ matrixes, window, autotest ]
-import rod / [ edit_view ]
-import rod/editor/editor_error_handling
+import nimx / [ matrixes, window, autotest, layout ]
+# import rod / [ edit_view ]
 import rod/component/all_components
+import rod / editor / [ editor_view, editor_types, editor_error_handling, editor_project_settings]
 
-import rod/editor/editor_project_settings
 
 const rodPluginFile {.strdefine.} = ""
 when rodPluginFile.len != 0:
@@ -16,6 +15,9 @@ when rodPluginFile.len != 0:
 
 when defined(rodedit):
     import os
+
+when defined(debug):
+    echo "Running rodedit in DEBUG"
 
 const isMobile = defined(ios) or defined(android)
 
@@ -28,8 +30,14 @@ proc runAutoTestsIfNeeded() =
     when defined(runAutoTests):
         startRegisteredTests()
 
-proc switchToEditView(w: Window, proj: EditorProject)=
-    discard w.startEditorForProject(proj)
+proc switchToEditView(w: Window, proj: EditorProject) =
+    w.makeLayout:
+        title: "Project " & proj.name
+
+        - EditorView as editView:
+            origin == super
+            size == super
+    # discard w.startEditorForProject(proj)
 
 proc startApplication() =
     when isMobile or defined(js):
@@ -50,10 +58,10 @@ proc startApplication() =
 
     runAutoTestsIfNeeded()
 
-when defined(rodedit):
-    onUnhandledException = proc(msg: string) {.gcsafe.} =
-        var msg = msg.indent(8)
-        error "Exception caught:\n ", msg
+# when defined(rodedit):
+#     onUnhandledException = proc(msg: string) {.gcsafe.} =
+#         var msg = msg.indent(8)
+#         error "Exception caught:\n ", msg
 
 runApplication:
     startApplication()
