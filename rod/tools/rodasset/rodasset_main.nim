@@ -1,10 +1,10 @@
-import os, strutils, times, osproc, logging, macros
-import imgtool, asset_cache, migrator
-import settings except hash
-import json except hash
-import sets except hash
-import tempfile
+import std/[os, strutils, times, osproc, logging, macros]
+import std/sets except hash
+import std/json except hash
 import nimx/pathutils
+import tempfile
+import ./[imgtool, asset_cache, migrator]
+import ./settings except hash
 
 const rodPluginFile {.strdefine.} = ""
 when rodPluginFile.len != 0:

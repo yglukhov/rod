@@ -2,8 +2,9 @@ import nimx / [
   types, context, image, view, matrixes, composition,
   property_visitor, portable_gl, render_to_image, window
 ]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod / [ rod_types, node, component, viewport, component/camera ]
+import ../ utils / [ property_desc, serialization_codegen ]
+import ../[ rod_types, node, component, viewport]
+import ./camera
 
 const comonSpritePrefix = """
 (sampler2D maskTexture, vec4 texCoords, vec4 mask_bounds, vec2 vp_size, float msk_alpha) {

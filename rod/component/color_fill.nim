@@ -1,7 +1,8 @@
 import nimx/[types, context, composition, portable_gl, property_visitor]
-import rod / [component, tools/serializer]
-import rod / utils / [ property_desc, serialization_codegen ]
-import json
+import ../component
+import ../tools/serializer
+import ../ utils / [ property_desc, serialization_codegen ]
+import std/json
 
 type ColorFill* = ref object of RenderComponent
     color*: Color

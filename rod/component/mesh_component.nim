@@ -1,9 +1,9 @@
 import nimx / [ image, context, portable_gl, types, view, property_visitor, assets/url_stream ]
-import rod/[component, vertex_data_info, node, ray, rod_types]
-import rod/component/[material]
-import rod/utils/[property_desc, serialization_codegen]
-import animation/skeleton
-import tables, hashes, strutils, streams
+import ../[component, vertex_data_info, node, ray, rod_types]
+import ./material
+import ../utils/[property_desc, serialization_codegen]
+import ./animation/skeleton
+import std/[tables, hashes, strutils, streams]
 import opengl
 import nimasset/obj
 

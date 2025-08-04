@@ -1,8 +1,9 @@
-import json
+import std/json
 import nimx/[types, font, context, view, property_visitor, portable_gl, formatted_text]
-import rod / utils / [ property_desc, serialization_codegen, attributed_text ]
-import rod/[rod_types, node, component, viewport, component/camera]
-import rod/tools/debug_draw
+import ../ utils / [ property_desc, serialization_codegen, attributed_text ]
+import ../[rod_types, node, component, viewport]
+import ./camera
+import ../tools/debug_draw
 export formatted_text
 
 type

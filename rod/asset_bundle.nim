@@ -1,12 +1,12 @@
 import nimx / assets / [ url_stream, json_loading, asset_loading, asset_manager, asset_cache]
 import nimx / assets / abstract_asset_bundle as nab
 import nimx / [ image, types ]
-import rod/utils/bin_deserializer
-import strutils, os, json, tables, logging, streams
+import std/[strutils, os, json, tables, logging, streams]
 import variant
+import ./utils/bin_deserializer
 
 when not defined(js):
-    import os
+    import std/os
 
 
 type AssetBundle* = ref object of nab.AssetBundle
@@ -79,7 +79,7 @@ proc init(ab: AssetBundle, handler: proc() {.gcsafe.}) {.inline.} =
         if indexComplete and compsComplete: onComplete()
 
 when defined(js) or defined(emscripten):
-    import nimx.pathutils
+    import nimx/pathutils
     type WebAssetBundle* = ref object of AssetBundle
         mBasePath: string
 
@@ -95,7 +95,7 @@ when defined(js) or defined(emscripten):
             result.mBaseUrl = href & "/" & hash
 
 else:
-    import os
+    import std/os
 
     type
         FileAssetBundle* = ref object of AssetBundle
@@ -202,7 +202,7 @@ var onRodAssetBundleDownloadingEnd* {.threadvar.}: proc(asset: string, error: st
 var onRodAssetBundleDownloadingProgress* {.threadvar.}: proc(asset: string, p: float) {.gcsafe.}
 
 when not defined(js) and not defined(emscripten) and not defined(windows):
-    import os, threadpool, httpclient, net
+    import std/[os, threadpool, httpclient, net]
     import nimx/perform_on_main_thread
     import untar
 

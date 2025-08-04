@@ -1,10 +1,10 @@
 import nimx/[matrixes, animation, context, types, portable_gl, view, image, property_visitor]
-import rod/[quaternion, node, component, rod_types, viewport]
-import rod/component/[particle_helpers,camera]
-import rod/material/shader
-import rod/tools/serializer
-import rod / utils / [property_desc, serialization_codegen ]
-import times, math, random, json, tables
+import ../[quaternion, node, component, rod_types, viewport]
+import ./[particle_helpers,camera]
+import ../material/shader
+import ../tools/serializer
+import ../utils/[property_desc, serialization_codegen ]
+import std/[times, math, random, json, tables]
 
 
 const ParticleVertexShader = """

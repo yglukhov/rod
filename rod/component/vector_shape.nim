@@ -1,7 +1,8 @@
 import nimx/[types, context, matrixes, property_visitor]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod / [ rod_types, component, tools/serializer]
-import json
+import ../ utils / [ property_desc, serialization_codegen ]
+import ../ [ rod_types, component]
+import ../tools/serializer
+import std/json
 
 type VectorShapeType* = enum
     vsRectangle

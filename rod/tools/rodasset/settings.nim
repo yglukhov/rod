@@ -1,4 +1,4 @@
-import hashes, strutils, os
+import std/[hashes, strutils, os]
 
 type AudioSettings* = object
     extension*: string # Audio file extension

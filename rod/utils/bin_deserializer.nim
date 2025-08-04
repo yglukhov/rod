@@ -1,7 +1,7 @@
+import std/[streams, tables, json, strutils, os]
 import nimx / [ image, types, assets/asset_manager ]
-import rod / utils / [ property_desc, serialization_helpers ]
-import rod/quaternion
-import streams, tables, json, strutils, os
+import ./ [ property_desc, serialization_helpers ]
+import ../quaternion
 
 type
     BinDeserializer* = ref object

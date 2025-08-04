@@ -1,6 +1,6 @@
 import nimx / [ class_registry ]
-import rod / rod_types
-import tables
+import ./ rod_types
+import std/tables
 
 export System
 

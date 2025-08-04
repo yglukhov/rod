@@ -1,12 +1,12 @@
+import std/[strutils, tables, times, math]
+import variant
+import nimx/property_editors/standard_editors #used
 import nimx/[view, text_field, matrixes, image, button, property_visitor, numeric_text_field,
     slider, animation, context, view_event_handling, event
 ]
-import rod/component/[ae_composition, rti]
-import rod/property_editors/propedit_registry
-import nimx/property_editors/standard_editors #used
-import rod/[node, viewport, quaternion, rod_types]
-import strutils, tables, times, math
-import variant
+import ../component/[ae_composition, rti]
+import ../[node, viewport, quaternion, rod_types]
+import ./propedit_registry
 
 when defined(rodedit):
     import rod/property_editors/rodedit_editors

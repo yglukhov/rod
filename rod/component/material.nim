@@ -1,7 +1,7 @@
 import nimx / [ image, context, portable_gl, types, matrixes ]
-import rod/[node, quaternion, vertex_data_info, postprocess_context, rod_types ]
-import rod/component/[material_shaders, light ]
-import tables, hashes, streams
+import ../[node, quaternion, vertex_data_info, postprocess_context, rod_types ]
+import ./[material_shaders, light ]
+import std/[tables, hashes, streams]
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl

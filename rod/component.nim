@@ -1,8 +1,8 @@
-import typetraits, tables, json
+import std/[typetraits, tables, json]
 import nimx / [ types, property_visitor, matrixes, class_registry ]
-import rod / [ rod_types, ray ]
-import rod / tools / serializer
-import rod / utils / [bin_deserializer, json_deserializer, bin_serializer,
+import ./[ rod_types, ray ]
+import ./tools/serializer
+import ./utils/[ bin_deserializer, json_deserializer, bin_serializer,
                 json_serializer, serialization_hash_calculator ]
 
 export Component, ScriptComponent, RenderComponent

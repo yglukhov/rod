@@ -1,6 +1,6 @@
 import nimx/[matrixes, animation, context, types, property_visitor ]
-import rod/[quaternion, node, component, rod_types, viewport]
-import times, random
+import ../[quaternion, node, component, rod_types, viewport]
+import std/[times, random]
 
 type ParticleData* = tuple
     coord: Vector3

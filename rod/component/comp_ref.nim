@@ -1,8 +1,9 @@
 import nimx / [ types, matrixes, property_visitor ]
-import rod / [ node, rod_types, component, tools/serializer ]
-import rod / utils / [property_desc, serialization_codegen ]
-import rod/component/nine_part_sprite
-import json
+import ../ [ node, rod_types, component ]
+import ../tools/serializer
+import ../ utils / [property_desc, serialization_codegen ]
+import ./nine_part_sprite
+import std/json
 
 
 type CompRef* = ref object of ScriptComponent

@@ -1,2 +1,2 @@
 
-include rodedit_main
+include ./rodedit_main

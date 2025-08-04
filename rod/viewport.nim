@@ -1,10 +1,9 @@
 import nimx / [ context, types, image, portable_gl, window,
                 view, view_event_handling, animation ]
 
-import algorithm, logging, times, tables, strutils
-import rod_types, node, ray
-import component/camera
-import rod / [ component, systems ]
+import std/[algorithm, logging, times, tables, strutils]
+import ./[rod_types, node, ray, component, systems]
+import ./component/camera
 
 export SceneView
 

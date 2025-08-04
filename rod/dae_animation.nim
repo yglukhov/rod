@@ -1,17 +1,8 @@
-import tables
-import math
-import strutils
-
+import std/[tables, math, strutils]
 import variant
-
 import nimasset/collada
-
 import nimx/[animation, types, matrixes, property_visitor]
-
-import rod_types
-import node
-import component
-import quaternion
+import ./[rod_types, node, component, quaternion]
 
 type AnimProcSetter = proc(progress: float) {.gcsafe.}
 

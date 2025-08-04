@@ -1,6 +1,7 @@
 import nimx/[types, context, portable_gl]
-import rod/[component, tools/serializer]
-import rod / utils / [ property_desc, serialization_codegen ]
+import ../component
+import ../tools/serializer
+import ../ utils / [ property_desc, serialization_codegen ]
 import opengl, json
 
 type BlendMode * = enum

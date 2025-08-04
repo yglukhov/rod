@@ -1,4 +1,4 @@
-import logging, tables, strutils, times
+import std/[logging, tables, strutils, times]
 
 type EditorLogger* = ref object of Logger
   msgDump*: TableRef[Level, seq[string]]

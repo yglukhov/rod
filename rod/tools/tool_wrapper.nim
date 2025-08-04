@@ -1,4 +1,4 @@
-import os, osproc, strutils
+import std/[os, osproc, strutils]
 
 proc rodPluginFile(): string =
     result = getCurrentDir() / "rodplugin.nim"

@@ -1,6 +1,7 @@
 import nimx / [ view, types, layout, text_field, button, formatted_text ]
 
 type ToolBarView* = ref object of View
+  onViewClicked*: proc() {.gcsafe.}
 
 proc onFileClicked(v: ToolBarView) =
   echo "File Clicked"
@@ -10,6 +11,8 @@ proc onEditClicked(v: ToolBarView) =
 
 proc onViewClicked(v: ToolBarView) =
   echo "View Clicked"
+  if not v.onViewClicked.isNil:
+    v.onViewClicked()
 
 method init*(v: ToolBarView) =
   procCall v.View.init()

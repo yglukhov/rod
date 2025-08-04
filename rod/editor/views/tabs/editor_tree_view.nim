@@ -1,6 +1,5 @@
 import variant, sets, intsets, system, algorithm
 import nimx / [ outline_view, text_field, view, button, layout, types, table_view_cell, scroll_view ]
-import editor_tab_view
 import ../../../../rod/[ node ]
 import ../../editor_types
 
@@ -20,58 +19,50 @@ proc onAddNodeClicked(v: EditorTreeView) =
     return
 
   v.outlineView.expandRow(sip)
-  discard n.newChild("New Node")
-  sip.add(n.children.len - 1)
 
-  # v.onTreeChanged()
-  v.outlineView.reloadData()
-  # v.outlineView.selectItemAtIndexPath(sip)
+  var msg = EditorMessageAddNode.new()
+  msg.parentPath = sip
+  msg.nodeName = n.name
+  v.commandsQueue.post(EditorCommand.node, msg)
 
 proc onRemoveNodeClicked(v: EditorTreeView) =
-  echo "remove"
+  var sip = v.outlineView.selectedIndexPath
+  if sip.len == 0:
+    return
+
+  var msg = EditoMessageRemoveNode.new()
+  msg.path = sip
+  v.commandsQueue.post(EditorCommand.node, msg)
 
 proc onDragAndDrop(v:EditorTreeView, fromIp, toIp: openarray[int]) =
   # echo "drag from", fromIp, " to ", toIp
-  let f = v.outlineView.itemAtIndexPath(fromIp).get(Node)
-  var tos = @toIp
-  tos.setLen(tos.len - 1)
-  let t = v.outlineView.itemAtIndexPath(tos).get(Node)
-  let toIndex = toIp[^1]
-  echo "from ", fromIp, ":", f.name, " to ", toIp, ":", t.name, " toIndex ", toIndex, " isSame parent ", f.parent == t
-  if f.parent == t:
-    let cIndex = t.children.find(f)
-    if toIndex < cIndex:
-      t.children.delete(cIndex)
-      t.children.insert(f, toIndex)
-    elif toIndex > cIndex:
-      t.children.delete(cIndex)
-      t.children.insert(f, toIndex - 1)
-  else:
-    f.removeFromParent()
-    t.insertChild(f, toIndex)
+  var msg = EditorMessageReparentNode.new()
+  msg.fromPath = @fromIp
+  msg.toPath = @toIp
+  v.commandsQueue.post(EditorCommand.node, msg)
 
-  v.outlineView.reloadData()
+  # let f = v.outlineView.itemAtIndexPath(fromIp).get(Node)
+  # var tos = @toIp
+  # tos.setLen(tos.len - 1)
+  # let t = v.outlineView.itemAtIndexPath(tos).get(Node)
+  # let toIndex = toIp[^1]
+  # echo "from ", fromIp, ":", f.name, " to ", toIp, ":", t.name, " toIndex ", toIndex, " isSame parent ", f.parent == t
+  # if f.parent == t:
+  #   let cIndex = t.children.find(f)
+  #   if toIndex < cIndex:
+  #     t.children.delete(cIndex)
+  #     t.children.insert(f, toIndex)
+  #   elif toIndex > cIndex:
+  #     t.children.delete(cIndex)
+  #     t.children.insert(f, toIndex - 1)
+  # else:
+  #   f.removeFromParent()
+  #   t.insertChild(f, toIndex)
 
-proc initFakeComposition(): CompositionDocument =
-  result = new(CompositionDocument)
-  result.rootNode = newNode("123")
-  result.path = "123.s"
-
-  var root = newNode("root")
-  for i in 0..10:
-    var n = newNode($i)
-    root.addChild(n)
-
-    for q in 0..< i:
-      var ch = newNode($q)
-      n.addChild(ch)
-      n = ch
-
-  result.rootNode.addChild(root)
+  # v.outlineView.reloadData()
 
 method init*(v: EditorTreeView) =
   procCall v.EditorTabView.init()
-  v.composition = initFakeComposition()
 
   v.makeLayout:
     x == super.x
@@ -143,4 +134,7 @@ method init*(v: EditorTreeView) =
     #     height == 20
 
   v.outlineView = outline
-  outline.reloadData()
+
+method onCompositionChanged*(v: EditorTreeView, c: CompositionDocument) =
+  procCall v.EditorTabView.onCompositionChanged(c)
+  v.outlineView.reloadData()

@@ -1,6 +1,7 @@
-import rod/[rod_types, component, node, tools/serializer]
+import ../[rod_types, component, node]
+import ../tools/serializer
 import nimx/[types, matrixes, property_visitor]
-import json, tables, logging
+import std/[json, tables, logging]
 
 export LightSource
 

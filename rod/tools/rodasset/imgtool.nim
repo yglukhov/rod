@@ -1,4 +1,4 @@
-import os, osproc, json, strutils, times, settings, tables, sets, logging
+import std/[os, osproc, json, strutils, times, settings, tables, sets, logging]
 import nimx/pathutils
 
 const multithreaded = compileOption("threads")

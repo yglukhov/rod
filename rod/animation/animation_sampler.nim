@@ -1,4 +1,4 @@
-import math, algorithm
+import std / [ math, algorithm ]
 import nimx/[ animation, matrixes, types ]
 import variant
 

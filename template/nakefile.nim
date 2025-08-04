@@ -1,5 +1,5 @@
 import nimx/naketools
-import osproc, os
+import std/[osproc, os]
 
 
 const additionalFonts: seq[string] = @[]

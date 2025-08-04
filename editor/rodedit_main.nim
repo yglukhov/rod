@@ -1,9 +1,10 @@
-import tables, logging, strutils
+import std/[tables, logging, strutils]
 
 import nimx / [ matrixes, window, autotest, layout ]
 # import rod / [ edit_view ]
-import rod/component/all_components
-import rod / editor / [ editor_view, editor_types, editor_error_handling, editor_project_settings]
+import ../rod/component/ all_components
+import ../rod / editor / [ editor_view, editor_types, editor_error_handling, editor_project_settings]
+import ../rod / editor / editor
 
 
 const rodPluginFile {.strdefine.} = ""
@@ -44,17 +45,17 @@ proc startApplication() =
         var mainWindow = newFullscreenWindow()
     else:
         var mainWindow = newWindow(newRect(140, 40, 1600, 1000))
+
+    var proj: EditorProject
     when loadingAndSavingAvailable:
         when defined(rodedit):
-            var proj: EditorProject
             proj.name = getAppDir().lastPathPart
             proj.path = getAppDir()
             mainWindow.title = "Project " & proj.name
-            mainWindow.switchToEditView(proj)
     else:
-        var proj: EditorProject
         mainWindow.title = "Rod"
-        mainWindow.switchToEditView(proj)
+
+    let editor = createEditor(mainWindow, proj)
 
     runAutoTestsIfNeeded()
 

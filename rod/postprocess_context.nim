@@ -1,6 +1,6 @@
 import nimx/[types, portable_gl]
-import rod/component
-import rod_types
+import ./component
+import ./rod_types
 
 export PostprocessContext
 

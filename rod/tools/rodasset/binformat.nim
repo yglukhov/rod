@@ -1,7 +1,6 @@
-import json, streams, sequtils, sets, algorithm, tables, strutils, parseutils, os
-import tree_traversal
-
+import std/[json, streams, sequtils, sets, algorithm, tables, strutils, parseutils, os]
 import nimx / [ types, image, pathutils, class_registry ]
+import ./tree_traversal
 import ../../utils/[ bin_serializer, json_deserializer ]
 import ../../rod_types
 import ../../node

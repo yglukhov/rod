@@ -1,9 +1,9 @@
 import nimx / [ types, matrixes, animation, property_visitor ]
-import rod/animation/[animation_sampler, property_animation], rod / [ quaternion, rod_types ]
-import rod / utils / [ json_deserializer, json_serializer ]
-import rod / node
-import algorithm
-import variant, tables, json, math, strutils
+import ../../animation/[animation_sampler, property_animation]
+import ../../[node, quaternion, rod_types ]
+import ../../utils/[ json_deserializer, json_serializer ]
+import std/[algorithm,tables, json, math, strutils]
+import variant
 
 type
     EInterpolation* = object

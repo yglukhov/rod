@@ -1,5 +1,4 @@
 import nimx / [ view, button, layout, types, text_field, scroll_view ]
-import editor_tab_view
 import ../../../../rod/[ node ]
 import ../../editor_types
 
@@ -29,3 +28,8 @@ method init*(v: EditorInspectorView) =
       y == 20
       height == super - 20
       width == super
+
+
+method onCompositionChanged*(v: EditorInspectorView, c: CompositionDocument) =
+  procCall v.EditorTabView.onCompositionChanged(c)
+  echo "EditorInspectorView onCompositionChanged"

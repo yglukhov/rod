@@ -3,10 +3,10 @@ import nimx/[view, text_field, matrixes, image, button,
     slider, animation, context, view_event_handling, event,
     font
 ]
-import rod/component/[nine_part_sprite ]
-import rod/property_editors/propedit_registry
 import nimx/property_editors/standard_editors #used
-import rod/[node, viewport, quaternion, rod_types]
+import ../component/[nine_part_sprite ]
+import ../property_editors/propedit_registry
+import ../[node, viewport, quaternion, rod_types]
 import variant
 
 type NodeAnchorView = ref object of View

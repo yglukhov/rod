@@ -1,5 +1,5 @@
 import nimx / [ event ]
-import rod / [ rod_types ]
+import ../../../rod_types
 
 #will be called for all components
 method onDrawGizmo*(c: Component) {.gcsafe, base.} = discard

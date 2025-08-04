@@ -1,8 +1,6 @@
+import std/[strutils, unicode]
 import nimx/[types, formatted_text, font]
-import rod/utils/text_helpers
-import strutils
-import unicode
-
+import ./text_helpers
 
 type TextAttributeType* {.pure.} = enum
     color

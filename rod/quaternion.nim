@@ -1,4 +1,4 @@
-import math
+import std/math
 import nimx/types
 import nimx/matrixes
 
@@ -344,4 +344,3 @@ proc toLookAt*(targetLocation, eyeLocation, upDirection: Vector3): Matrix4 =
 #             quat = newQuaternion(src.y, - src.x, 0, quat.w)
 
 #     quat.Normalize()
-

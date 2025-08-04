@@ -1,9 +1,10 @@
 import nimx/[matrixes, types, property_visitor]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod/[vertex_data_info, component]
-import rod/component/[ mesh_component, material ]
-import rod/tools/serializer
-import opengl, math, json
+import ../../utils/[ property_desc, serialization_codegen ]
+import ../../[vertex_data_info, component]
+import ../../component/[ mesh_component, material ]
+import ../../tools/serializer
+import opengl
+import std/[math, json]
 
 type ConeComponent* = ref object of MeshComponent
     mRadius1: float32

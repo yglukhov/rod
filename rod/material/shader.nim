@@ -1,4 +1,5 @@
-import math, tables, hashes, sets, variant
+import std/[math, tables, hashes, sets]
+import variant
 import nimx/[types, portable_gl, context]
 
 type Shader* = ref object

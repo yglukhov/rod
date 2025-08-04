@@ -1,6 +1,6 @@
 import nimx / [ view, matrixes, view_event_handling, property_visitor ]
-import rod / [ component, ray, viewport, node, rod_types ]
-import logging
+import ../ [ component, ray, viewport, node, rod_types ]
+import std/logging
 export UIComponent
 
 type UICompView = ref object of View

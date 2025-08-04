@@ -1,4 +1,4 @@
-import editor_types
+import ./editor_types
 import nimx / [ types, view, split_view, layout, text_field ]
 import views / [ toolbar_view, leftpanel_view, rightpanel_view ]
 
@@ -7,13 +7,25 @@ type EditorView* = ref object of View
   leftPart: LeftPanelView
   centralPart: View
   bottomPart: View
-  rightPart: View
+  center: SplitView
+  rightPart: RightPanelView
+  commandsQueue: EditorCommandQueue
+  tabs: seq[EditorTabView]
+  bb: float
 
+proc setEditorCommandsHandler*(v: EditorView, c: EditorCommandQueue) =
+  v.commandsQueue = c
+  for tab in v.tabs:
+    tab.commandsQueue = c
 
-method init*(e: EditorView) =
-  procCall e.View.init()
+proc setCurrentComposition*(v: EditorView, c: CompositionDocument) =
+  for tab in v.tabs:
+    tab.onCompositionChanged(c)
 
-  e.makeLayout:
+method init*(v: EditorView) =
+  procCall v.View.init()
+
+  v.makeLayout:
     backgroundColor: newColor(0.0, 0.0, 0.0, 1.0)
     - ToolBarView as toolbar:
       origin == super
@@ -41,7 +53,7 @@ method init*(e: EditorView) =
         width >= 150
         backgroundColor: newColor(1.4, 0.8, 0.3, 1.0)
 
-        - SplitView:
+        - SplitView as center:
           x == super
           y == super
           width == super
@@ -72,8 +84,23 @@ method init*(e: EditorView) =
         self.width >= 150
         height == super
 
-  e.toolBar = toolbar
-  e.leftPart = leftPart
-  e.centralPart = centralPart
-  e.bottomPart = bottomPart
-  e.rightPart = rightPart
+  v.toolBar = toolbar
+  v.leftPart = leftPart
+  v.centralPart = centralPart
+  v.bottomPart = bottomPart
+  v.rightPart = rightPart
+  v.center = center
+
+  v.tabs.add(v.leftPart.tabs)
+  v.tabs.add(v.rightPart.tabs)
+
+  v.toolBar.onViewClicked = proc() =
+    # v.bottomPart.hidden = not v.bottomPart.hidden
+    if v.bottomPart.superview.isNil:
+      center.addSubview(v.bottomPart)
+      center.setDividerPosition(v.bb, 0)
+    else:
+      v.bb = center.dividerPosition(0)
+      v.bottomPart.removeFromSuperview()
+
+  echo "EditorView ini: ", v.leftPart != nil

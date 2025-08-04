@@ -1,7 +1,7 @@
-import nimx/[portable_gl, matrixes, types, context, formatted_text, font]
-import rod/material/shader
-import math
+import std/math
 import opengl
+import nimx/[portable_gl, matrixes, types, context, formatted_text, font]
+import ../material/shader
 
 const vertexShader = """
 attribute vec3 aPosition;

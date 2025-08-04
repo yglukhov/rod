@@ -1,4 +1,4 @@
-import macros, tables
+import std/[macros, tables]
 
 type
     PropertyDesc* = tuple

@@ -1,7 +1,9 @@
 import nimx / [ view, types, layout, text_field, button, formatted_text, segmented_control ]
-import tabs / [ editor_tab_view, editor_tree_view ]
+import tabs / [ editor_tree_view ]
+import ../editor_types
 
-type LeftPanelView* = ref object of View
+type LeftPanelView* = ref object of EditorTabPanel
+  tree: EditorTreeView
 
 method init*(v: LeftPanelView) =
   procCall v.View.init()
@@ -18,5 +20,7 @@ method init*(v: LeftPanelView) =
       top == prev.bottom
       height == super.height - 20
 
-  # if sc.segments.len == 1:
-  #     sc.hidden = true
+  v.tree = tree
+
+method tabs*(v: LeftPanelView): seq[EditorTabView] =
+  result.add(v.tree)

@@ -3,7 +3,7 @@ import nimx/property_editors/propedit_registry as npr
 
 export npr
 
-import rod/node
+import ../node
 import variant
 
 proc propertyEditorForProperty*(n: Node, title: string, v: Variant, onChangeCallback, changeInspectorCallback: proc() {.gcsafe.}): View =

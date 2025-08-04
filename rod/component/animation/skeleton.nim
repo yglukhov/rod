@@ -1,8 +1,8 @@
+import std / [ times, tables, hashes, json ]
 import nimx / [matrixes, types, context, portable_gl]
-import rod/[ rod_types, node ]
-import rod/material/shader
-import rod/tools/serializer
-import times, tables, hashes, json
+import ../../[rod_types, node]
+import ../../material/shader
+import ../../tools/serializer
 
 const BoneVertexShader = """
 attribute vec3 aPosition;

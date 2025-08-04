@@ -1,7 +1,7 @@
 import nimx / [ types, matrixes, animation, view, image, portable_gl ]
-import rod / message_queue
-import quaternion
-import tables
+import ./ message_queue
+import ./quaternion
+import std/tables
 const maxLightsCount* = 8
 
 when defined(rodedit):

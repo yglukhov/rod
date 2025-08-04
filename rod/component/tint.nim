@@ -1,7 +1,8 @@
 import nimx/[types, context, composition, portable_gl, property_visitor]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod/[component, tools/serializer]
-import json
+import ../utils/ [ property_desc, serialization_codegen ]
+import ../component
+import ../tools/serializer
+import std/json
 
 
 type Tint* = ref object of RenderComponent

@@ -1,10 +1,10 @@
-import json, strutils, tables, parseutils, logging
+import std / [ json, strutils, tables, parseutils, logging ]
 import nimx / [ types, matrixes, animation, property_visitor ]
 
 import variant
-import rod/[node,component, quaternion]
-import rod/animation/animation_sampler
-import rod/utils/bin_deserializer
+import ../[node,component, quaternion]
+import ../animation/animation_sampler
+import ../utils/bin_deserializer
 
 export animation
 

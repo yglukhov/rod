@@ -1,4 +1,4 @@
-import json, os, strutils
+import std/[json, os, strutils]
 import nimx / [ types, image, pathutils ]
 
 type JsonSerializer* = ref object

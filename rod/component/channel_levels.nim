@@ -1,8 +1,8 @@
 import nimx / [types, context, composition, portable_gl, property_visitor]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod / component
-import rod / tools / serializer
-import json
+import ../ utils / [ property_desc, serialization_codegen ]
+import ../ component
+import ../ tools / serializer
+import std/json
 
 type ChannelLevels* = ref object of RenderComponent
     inWhite*, inBlack*, inGamma*, outWhite*, outBlack*: Coord

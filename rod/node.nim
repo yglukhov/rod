@@ -1,14 +1,14 @@
+import std/[tables, typetraits, json, strutils, math, os]
 import nimx / [ context, types, animation, image, portable_gl, view, property_visitor, pathutils ]
 import nimx / assets / [ asset_manager, asset_loading ]
-import rod / utils / [ bin_deserializer, json_serializer, json_deserializer ]
-import rod / [ asset_bundle ]
-import rod / tools / serializer
-import quaternion, ray, rod_types
-import tables, typetraits, json, strutils, math, os
+import ./ utils / [ bin_deserializer, json_serializer, json_deserializer ]
+import ./ [ asset_bundle ]
+import ./ tools / serializer
+import ./[quaternion, ray, rod_types]
 
 
 when defined(rodedit):
-    import rod / editor / scene / components / editor_component
+    import ./ editor / scene / components / editor_component
 
 export Node
 
@@ -22,7 +22,7 @@ proc getGlobalAlpha*(n: Node): float32
 proc worldTransform*(n: Node): Matrix4 {.gcsafe.}
 proc isEnabledInTree*(n: Node): bool
 
-import rod/component
+import ./component
 
 iterator components*(n: Node): Component =
     for c in n.renderComponents: yield c
@@ -734,7 +734,7 @@ proc loadComposition*(comp: Composition, onComplete: proc() {.gcsafe.} = nil) =
             echo getCurrentException().getStackTrace()
             raise
 
-import rod/animation/property_animation
+import ./animation/property_animation
 
 proc deserialize*(n: Node, s: JsonDeserializer) =
     assert(s.compPath.len != 0)

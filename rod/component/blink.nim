@@ -1,7 +1,7 @@
 import nimx/[types, context, image, composition, property_visitor]
-import rod/[rod_types, viewport, component ]
-import rod / utils / [ property_desc, serialization_codegen ]
-import json
+import ../[rod_types, viewport, component ]
+import ../utils/[ property_desc, serialization_codegen ]
+import std/json
 
 const blinkComposition = newComposition """
 uniform Image uMask;
