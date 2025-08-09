@@ -3,7 +3,7 @@ import std/[tables, logging, strutils]
 import nimx / [ matrixes, window, autotest, layout ]
 # import rod / [ edit_view ]
 import ../rod/component/ all_components
-import ../rod / editor / [ editor_view, editor_types, editor_error_handling, editor_project_settings]
+import ../rod / editor / [ editor_view, editor_view_types, editor_error_handling, editor_project_settings]
 import ../rod / editor / editor
 
 

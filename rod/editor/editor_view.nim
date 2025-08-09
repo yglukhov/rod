@@ -1,14 +1,15 @@
-import ./editor_types
+import ./editor_view_types
 import nimx / [ types, view, split_view, layout, text_field ]
 import views / [ toolbar_view, leftpanel_view, rightpanel_view ]
+import ../rod_types
 
-type EditorView* = ref object of View
+type EditorView* = ref object of EditorBaseView
   toolBar: ToolBarView
-  leftPart: LeftPanelView
+  leftPanel: LeftPanelView
+  rightPanel: RightPanelView
   centralPart: View
   bottomPart: View
   center: SplitView
-  rightPart: RightPanelView
   commandsQueue: EditorCommandQueue
   tabs: seq[EditorTabView]
   bb: float
@@ -21,6 +22,14 @@ proc setEditorCommandsHandler*(v: EditorView, c: EditorCommandQueue) =
 proc setCurrentComposition*(v: EditorView, c: CompositionDocument) =
   for tab in v.tabs:
     tab.onCompositionChanged(c)
+
+method onEditorEvent*(v: EditorView, ev: EditorAPIEvent) =
+  for tab in v.tabs:
+    tab.onEditorEvent(ev)
+
+method setInspectedNode*(v: EditorView, n: Node) =
+  for tab in v.tabs:
+    tab.setInspectedNode(n)
 
 method init*(v: EditorView) =
   procCall v.View.init()
@@ -39,7 +48,7 @@ method init*(v: EditorView) =
       vertical: false
       resizable: true
 
-      - LeftPanelView as leftPart:
+      - LeftPanelView as leftPanel:
         x == 0
         width == 250 @ WEAK
         350 >= self.width
@@ -64,7 +73,7 @@ method init*(v: EditorView) =
           - View as centralPart:
             y == super
             width == super
-            backgroundColor: newColor(1.0, 0.0, 0.0, 1.0)
+            backgroundColor: newColor(0.133, 0.545, 0.133, 1.0)
             - Label:
               text: "Middle up"
               origin == super + 15
@@ -72,27 +81,26 @@ method init*(v: EditorView) =
           - View as bottomPart:
             width == super
             height == 150 @ WEAK
-            backgroundColor: newColor(0.0, 0.0, 1.0, 1.0)
+            backgroundColor: newColor(0.0, 0.749, 1.0, 1.0)
             - Label:
               text: "Middle bottom"
               origin == super + 15
 
-      - RightPanelView as rightPart:
+      - RightPanelView as rightPanel:
         leading == prev.trailing
         width == 250 @ WEAK
-        350 >= self.width
-        self.width >= 150
+        450 >= self.width
+        self.width >= 200
         height == super
 
   v.toolBar = toolbar
-  v.leftPart = leftPart
+  v.leftPanel = leftPanel
   v.centralPart = centralPart
   v.bottomPart = bottomPart
-  v.rightPart = rightPart
-  v.center = center
+  v.rightPanel = rightPanel
 
-  v.tabs.add(v.leftPart.tabs)
-  v.tabs.add(v.rightPart.tabs)
+  v.tabs.add(v.leftPanel.tabs)
+  v.tabs.add(v.rightPanel.tabs)
 
   v.toolBar.onViewClicked = proc() =
     # v.bottomPart.hidden = not v.bottomPart.hidden
@@ -103,4 +111,4 @@ method init*(v: EditorView) =
       v.bb = center.dividerPosition(0)
       v.bottomPart.removeFromSuperview()
 
-  echo "EditorView ini: ", v.leftPart != nil
+  echo "EditorView ini: ", v.leftPanel != nil

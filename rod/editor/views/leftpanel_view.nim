@@ -1,6 +1,6 @@
 import nimx / [ view, types, layout, text_field, button, formatted_text, segmented_control ]
 import tabs / [ editor_tree_view ]
-import ../editor_types
+import ../editor_view_types
 
 type LeftPanelView* = ref object of EditorTabPanel
   tree: EditorTreeView

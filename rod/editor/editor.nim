@@ -1,7 +1,7 @@
 import std/[json]
 import nimx / [ window, layout, animation ]
 import ../../ rod / [ rod_types, node, message_queue ]
-import ./[editor_types, editor_server]
+import ./[editor_view_types, editor_server]
 import ./[editor_view, editor_project_settings]
 
 type
@@ -11,18 +11,25 @@ type
     workspace: EditorView
     mCurrentComposition: CompositionDocument
     updateAnimation: Animation
-    apiHandler: EditorAPI
+    apiHandler: EditorServer
     # remoteEditorAPI: EditorAPI
 
+template rootNode(e: Editor): Node = e.mCurrentComposition.rootNode.children[0]
 template composition(e: Editor): CompositionDocument = e.mCurrentComposition
 proc `composition=`(e: Editor, c: CompositionDocument) =
   if e.composition != c:
     e.mCurrentComposition = c
+    e.apiHandler.setRootNodeLocally(e.rootNode) #todo: think about this
     e.workspace.setCurrentComposition(c)
 
-method post*(e: EditorCommandQueue, cmd: EditorCommand, msg: EditorMessage) =
-  # e.apiHandler.
-  discard
+method post*(e: Editor, id: MessageId, msg: EditorMessage) =
+  if id == EditorMessageNodeSelectionChanged.toEditorMessageId:
+    sandbox:
+      var changed = cast[EditorMessageNodeSelectionChanged](msg)
+      echo "select ", changed.path
+      e.workspace.setInspectedNode(e.rootNode.nodeAtPath(changed.path))
+  else:
+    e.apiHandler.consumeLocally(id, msg)
 
 proc initFakeComposition(): CompositionDocument =
   result = new(CompositionDocument)
@@ -30,11 +37,11 @@ proc initFakeComposition(): CompositionDocument =
   result.path = "123.s"
 
   var root = newNode("root")
-  for i in 0..10:
+  for i in 0 .. 10:
     var n = newNode($i)
     root.addChild(n)
 
-    for q in 0..< i:
+    for q in 0 ..< i:
       var ch = newNode($q)
       n.addChild(ch)
       n = ch
@@ -42,18 +49,9 @@ proc initFakeComposition(): CompositionDocument =
   result.rootNode.addChild(root)
 
 proc update(e: Editor) = discard
-  # e.apiHandler.update()
-  # for id, msg in e.messageQueue.popChunk(chunk = 50):
-  #   if id == $EditorCommand.node:
-  #     let addNode = cast[EditorMessageAddNode](msg)
-  #     echo addNode.parentPath, " nodename ", addNode.nodeName, " serialized ", %msg, " 2 ", %addNode
-  #   else:
-  #     echo "received msg ", cast[int](id)
 
 proc createEditor*(w: Window, proj: EditorProject): Editor =
   result.new()
-  # result.messageQueue.new()
-  # result.mode = EditorMode.edit
 
   w.makeLayout:
     title: "Project " & proj.name
@@ -64,7 +62,6 @@ proc createEditor*(w: Window, proj: EditorProject): Editor =
   result.workspace = editView
   result.workspace.setEditorCommandsHandler(result)
 
-  result.composition = initFakeComposition()
   result.updateAnimation = newAnimation()
   let editor = result
   result.updateAnimation.onAnimate = proc(p: float) =
@@ -72,3 +69,6 @@ proc createEditor*(w: Window, proj: EditorProject): Editor =
   w.window.addAnimation(result.updateAnimation)
 
   result.apiHandler = EditorServer.new()
+  result.apiHandler.setEventListner do(ev: EditorApiEvent) {.gcsafe.}:
+    editor.workspace.onEditorEvent(ev)
+  result.composition = initFakeComposition()

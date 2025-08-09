@@ -1,4 +1,4 @@
-import std/[tables, hashes]
+import std/[tables, hashes, sugar]
 import nimx / [ view, button, layout, types, text_field, scroll_view, property_visitor, popup_button ]
 import nimx/property_editors/[ standard_editors, propedit_registry ]
 import ../../../[ node, component, rod_types ]
@@ -37,6 +37,7 @@ proc createComponentsView(v: EditorInspectorView, n: Node) {.gcsafe.} =
     v.inspectedNodeChanged(n)
 
 proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
+
   v.content.removeAllSubviews()
   proc changeInspectorView() =
     # i.inspectedNode = n
@@ -69,7 +70,7 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
       top == prev.bottom
       leading == super.leading
       trailing == super.trailing
-    visitorView.content.addSubview(propView)
+    visitorView.addVisitor(propView)
     lasPropView = propView
 
   n.visitProperties(visitor)
@@ -81,11 +82,9 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
   var idx = 0
 
   for com in n.components:
-    # closureScope:
-    #   discard
+    let componentName = com.className
     visitorView = new(EditorPropertyVisitorView)
-    # lastCompView = compView
-    visitorView.setVisitorName(com.className)
+    visitorView.setVisitorName(componentName)
     visitorView.makeLayout:
       backgroundColor: uiBlue
       top == prev.bottom
@@ -94,16 +93,20 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
 
     v.content.addSubview(visitorView)
     com.visitProperties(visitor)
+    # no properties to visit, so fix layout
+    if visitorView.visitors.len == 0:
+      visitorView.content.subviews[0].makeLayout:
+        bottom == super.bottom
     if not lasPropView.isNil:
       lasPropView.makeLayout:
         bottom == super.bottom
 
-    visitorView.onRemove do():
-      echo "hi"
-
+    capture componentName, idx:
+      visitorView.onRemove do():
+        echo "removing component ", componentName, " at index ", idx
+        n.removeComponent(componentName)
+        v.inspectedNodeChanged(n)
     inc idx
-
-
 
   var lineView = new(View)
   lineView.makeLayout:

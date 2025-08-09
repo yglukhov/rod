@@ -577,6 +577,7 @@ proc nodeBounds*(n: Node): BBox =
 
 proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("name", n.name)
+    p.visitProperty("enabled", n.enabled)
     p.visitProperty("translation", n.position)
     p.visitProperty("worldPos", n.worldPos)
     p.visitProperty("scale", n.scale)
@@ -595,8 +596,6 @@ proc visitProperties*(n: Node, p: var PropertyVisitor) =
     p.visitProperty("sX", n.scaleX, { pfAnimatable })
     p.visitProperty("sY", n.scaleY, { pfAnimatable })
     p.visitProperty("sZ", n.scaleZ, { pfAnimatable })
-
-    p.visitProperty("enabled", n.enabled)
 
 proc reparentTo*(n, newParent: Node) {.deprecated.} =
     # Change parent of a node preserving its world transform

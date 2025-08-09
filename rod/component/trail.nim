@@ -911,8 +911,10 @@ proc `tiled=`*(t: Trail, v: bool) =
 method visitProperties*(t: Trail, p: var PropertyVisitor) =
     # art props
     p.visitProperty("color", t.color)
-    p.visitProperty("image", (t.trailImage, t.imagePercent))
-    p.visitProperty("matcap", (t.trailMatcap, t.matcapPercent))
+    p.visitProperty("image", t.trailImage)
+    p.visitProperty("imagePercent", t.imagePercent)
+    p.visitProperty("matcap", t.trailMatcap)
+    p.visitProperty("matcapPercent", t.matcapPercent)
     p.visitProperty("height", t.trailHeight)
     p.visitProperty("width", t.trailWidth)
     p.visitProperty("gravity", t.gravity)

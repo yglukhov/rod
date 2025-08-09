@@ -1,42 +1,54 @@
+import std/[hashes, strutils]
 import ../../ rod / [ rod_types, message_queue ]
-import ./editor_composition
-export message_queue
+import ./[ editor_composition, editor_api_msg, editor_api_events ]
+export message_queue, editor_api_msg, editor_api_events
+
+const loadingAndSavingAvailable* = not defined(android) and not defined(ios) and
+  not defined(emscripten) and not defined(js)
+
+const enableEditorSandbox = true
+
+when loadingAndSavingAvailable:
+  import os_files/dialog
+  import os
 
 type
-  #[
-      `editor` - editor state, like changing editing mode
-      `composition` - everything related to CompositionDocument like opening, saving etc
-      `tree` - Scene Graph realated - add node, remove, reparent
-      `node` - Node related, change its properties, add or remove component
-      `component` - Component related, change properties of it
-      `animation` - Animation related, play, stop, pause
-  ]#
-
-  EditorCommand* {.pure.} = enum
-    none = "invalid".toMessageId
-    tree = "tree".toMessageId
-    node = "node".toMessageId
-    component = "component".toMessageId
-    animation = "animation".toMessageId
-
-  EditorMessage* = ref object of RootObj
   EditorMessageQueue* = MessageQueue[EditorMessage]
-
-  EditorMessageAddNode* = ref object of EditorMessage
-    parentPath*: seq[int]
-    nodeName*: string
-
-  EditoMessageRemoveNode* = ref object of EditorMessage
-    path*: seq[int]
-
-  EditorMessageReparentNode* = ref object of EditorMessage
-    fromPath*: seq[int]
-    toPath*: seq[int]
-
-type
+  EditorApiListner* = proc(event: EditorApiEvent) {.gcsafe.}
   EditorAPI* = ref object of RootObj
   EditorCommandQueue* = ref object of RootObj
 
-method move*(api: EditorAPI, queue: EditorMessageQueue) {.base, gcsafe.} = discard
+method consumeLocally*(api: EditorAPI, id: MessageId, msg: EditorMessage) {.base, gcsafe.} = discard
+method setRootNodeLocally*(api: EditorAPI, node: Node) {.base, gcsafe.} = discard
+method setEventListner*(api: EditorApi, listner: EditorApiListner) {.base, gcsafe.} = discard
 
-method post*(e: EditorCommandQueue, cmd: EditorCommand, msg: EditorMessage) {.base, gcsafe.} = discard
+proc toEditorMessageId*[Msg](msg: typedesc[Msg]): MessageId {.compileTime.} =
+  result = ($Msg).toMessageId
+
+method post*(e: EditorCommandQueue, id: MessageId, msg: EditorMessage) {.base, gcsafe.} = discard
+proc post*[T](e: EditorCommandQueue, msg: T) = e.post(T.toEditorMessageId, msg)
+
+template sandboxed(body: untyped): untyped =
+  try:
+    body
+  except Exception as e:
+    echo instantiationInfo().filename, " at line:", instantiationInfo().line, " EditorServer got error ", e.msg, "\n", getStackTrace(e)
+
+template sandbox*(body: untyped): untyped =
+  when enableEditorSandbox:
+    sandboxed(body)
+  else:
+    body
+
+proc nodeAtPath*(rootNode: Node, path: seq[int]): Node =
+  result = rootNode
+  for i in path:
+    result = result.children[i]
+
+when loadingAndSavingAvailable:
+  proc relativeUrl*(url: string, base: string): string =
+    result = url
+    result.removePrefix("file://")
+    result = relativePath(result, base).replace("\\", "/")
+else:
+  proc relativeUrl*(url: string, base: string): string = url

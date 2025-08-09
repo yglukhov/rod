@@ -28,39 +28,39 @@ method init*(v: EditorPropertyVisitorView) =
         v.onRemoveCb()
 
   v.makeLayout:
-    - Label as name: #dummy
+    - Button as btn:
       origin == super
       height == 20
-      width == super.width - 100
-      text: "Node"
-
-    - Button as btn:
-      top == prev.top
-      height == prev.height
-      x == prev.trailing
-      # width >= 80
-      trailing == next.leading
-      title: "Hide"
+      width == 20
+      title: "▼"
+      hasBezel: false
       onAction:
         if v.content.superview.isNil:
-          btn.title = "Hide"
+          btn.title = "▼"
           dummyContent.removeFromSuperview()
           v.addSubview(v.content)
         else:
-          btn.title = "Show"
+          btn.title = "▶"
           v.content.removeFromSuperview()
           v.addSubview(dummyContent)
 
+    - Label as name: #dummy
+      top == prev
+      leading == prev.trailing
+      height == prev
+      text: "Node"
+
     - View as removePlaceholder:
       top == prev
-      trailing == super
       height == prev
+      leading == prev.trailing
+      trailing == super - 10
       width == 0 @ WEAK
 
     - View as content:
       top == prev.bottom
       leading == super.leading
-      trailing == super.trailing
+      trailing == super.trailing - 10
       bottom == super.bottom
       - View: # dummy for prev in constraints
         top == super

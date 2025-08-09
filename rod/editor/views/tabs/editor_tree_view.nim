@@ -1,7 +1,7 @@
 import variant, sets, intsets, system, algorithm
 import nimx / [ outline_view, text_field, view, button, layout, types, table_view_cell, scroll_view ]
 import ../../../../rod/[ node ]
-import ../../editor_types
+import ../../editor_view_types
 
 type EditorTreeView* = ref object of EditorTabView
   outlineView: OutlineView
@@ -21,45 +21,27 @@ proc onAddNodeClicked(v: EditorTreeView) =
   v.outlineView.expandRow(sip)
 
   var msg = EditorMessageAddNode.new()
-  msg.parentPath = sip
-  msg.nodeName = n.name
-  v.commandsQueue.post(EditorCommand.node, msg)
+  msg.parentPath = sip[1..^1]
+  msg.nodeName = "node"
+  v.commandsQueue.post(msg)
 
 proc onRemoveNodeClicked(v: EditorTreeView) =
   var sip = v.outlineView.selectedIndexPath
   if sip.len == 0:
     return
 
-  var msg = EditoMessageRemoveNode.new()
-  msg.path = sip
-  v.commandsQueue.post(EditorCommand.node, msg)
+  var msg = EditoMessageRemoveNode(path: sip[1..^1])
+  v.commandsQueue.post(msg)
 
 proc onDragAndDrop(v:EditorTreeView, fromIp, toIp: openarray[int]) =
-  # echo "drag from", fromIp, " to ", toIp
-  var msg = EditorMessageReparentNode.new()
-  msg.fromPath = @fromIp
-  msg.toPath = @toIp
-  v.commandsQueue.post(EditorCommand.node, msg)
+  var msg = EditorMessageReparentNode(fromPath: fromIp[1..^1], toPath: toIp[1..^1])
+  v.commandsQueue.post(msg)
 
-  # let f = v.outlineView.itemAtIndexPath(fromIp).get(Node)
-  # var tos = @toIp
-  # tos.setLen(tos.len - 1)
-  # let t = v.outlineView.itemAtIndexPath(tos).get(Node)
-  # let toIndex = toIp[^1]
-  # echo "from ", fromIp, ":", f.name, " to ", toIp, ":", t.name, " toIndex ", toIndex, " isSame parent ", f.parent == t
-  # if f.parent == t:
-  #   let cIndex = t.children.find(f)
-  #   if toIndex < cIndex:
-  #     t.children.delete(cIndex)
-  #     t.children.insert(f, toIndex)
-  #   elif toIndex > cIndex:
-  #     t.children.delete(cIndex)
-  #     t.children.insert(f, toIndex - 1)
-  # else:
-  #   f.removeFromParent()
-  #   t.insertChild(f, toIndex)
-
-  # v.outlineView.reloadData()
+proc onSelectionChanged(v: EditorTreeView) =
+  if v.outlineView.selectedIndexPath.len == 0:
+    return
+  var msg = EditorMessageNodeSelectionChanged(path: v.outlineView.selectedIndexPath[1..^1])
+  v.commandsQueue.post(msg)
 
 method init*(v: EditorTreeView) =
   procCall v.EditorTabView.init()
@@ -73,10 +55,8 @@ method init*(v: EditorTreeView) =
       width == 20
       x == 1
       onAction:
-        try:
+        sandbox:
           v.onAddNodeClicked()
-        except Exception as e:
-          echo "can't add ", e.msg, getStackTrace(e)
 
     - Button:
       title: "-"
@@ -85,10 +65,8 @@ method init*(v: EditorTreeView) =
       width == 20
       x == prev.trailing + 1
       onAction:
-        try:
+        sandbox:
           v.onRemoveNodeClicked()
-        except Exception as e:
-          echo "can't remove ", e.msg, getStackTrace(e)
 
     - ScrollView:
       frame == inset(super, 2, 22, 2, 2)
@@ -120,21 +98,20 @@ method init*(v: EditorTreeView) =
           l.text = s
 
         onSelectionChange do():
-          discard
+          sandbox:
+            v.onSelectionChanged()
 
         onDragAndDrop do(fromIp, toIp: openarray[int]):
-          try:
+          sandbox:
             v.onDragAndDrop(fromIp, toIp)
-          except Exception as e: echo e.msg
-
-    # - View:
-    #     backgroundColor: newColor(0.0, 0.7, 0.1, 1.0)
-    #     top == prev.bottom
-    #     width == super
-    #     height == 20
 
   v.outlineView = outline
 
 method onCompositionChanged*(v: EditorTreeView, c: CompositionDocument) =
   procCall v.EditorTabView.onCompositionChanged(c)
   v.outlineView.reloadData()
+
+method onEditorEvent*(v: EditorTreeView, ev: EditorAPIEvent) =
+  if ev.kind == EditorTreeChangedEvent.toEditorMessageId:
+    echo "tree changed"
+    v.outlineView.reloadData()
