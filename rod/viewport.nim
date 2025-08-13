@@ -182,7 +182,7 @@ proc removeAnimationRunner*(v: SceneView, ar: AnimationRunner) =
         if not v.window.isNil:
             v.window.removeAnimationRunner(ar)
 
-import component/ui_component, algorithm
+import component/ui_component
 
 method name*(v: SceneView): string =
     result = "SceneView"

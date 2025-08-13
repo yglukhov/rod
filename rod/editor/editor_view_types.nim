@@ -13,12 +13,31 @@ type
   EditorBaseView* = ref object of View
   EditorTabView* = ref object of EditorBaseView
     composition*: CompositionDocument
-    commandsQueue*: EditorCommandQueue
+    commandsQueue: EditorCommandQueue
 
   EditorTabPanel* = ref object of EditorBaseView
 
 method onCompositionChanged*(v: EditorTabView, c: CompositionDocument) {.base, gcsafe.} =
   v.composition = c
+
+proc getNodePath*(v: EditorTabView, n: Node): seq[int] =
+  if n.isNil:
+    return @[]
+
+  var node = n
+  while node.mParent != v.composition.rootNode.mParent:
+    var i = node.mParent.children.find(node)
+    result.insert(i, 0)
+    node = node.mParent
+
+proc setApi*(v: EditorTabView, queue: EditorCommandQueue) = v.commandsQueue = queue
+proc post*[T](v: EditorTabView, msg: T) = v.commandsQueue.post(T.toEditorMessageId, msg)
+proc postNodeSelected*(v: EditorTabView, n: Node) =
+  v.post(EditorMessageNodeSelectionChanged(path: v.getNodePath(n)))
+
+proc rootNode*(v: EditorTabView): Node =
+  if not v.composition.isNil:
+    return v.composition.rootNode
 
 method onEditorEvent*(v: EditorBaseView, ev: EditorAPIEvent) {.base, gcsafe.} = discard
 method setInspectedNode*(v: EditorBaseView, n: Node) {.base, gcsafe.} = discard

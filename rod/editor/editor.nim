@@ -12,9 +12,10 @@ type
     mCurrentComposition: CompositionDocument
     updateAnimation: Animation
     apiHandler: EditorServer
+    currentProject: EditorProject
     # remoteEditorAPI: EditorAPI
 
-template rootNode(e: Editor): Node = e.mCurrentComposition.rootNode.children[0]
+template rootNode(e: Editor): Node = e.mCurrentComposition.rootNode
 template composition(e: Editor): CompositionDocument = e.mCurrentComposition
 proc `composition=`(e: Editor, c: CompositionDocument) =
   if e.composition != c:
@@ -59,9 +60,9 @@ proc createEditor*(w: Window, proj: EditorProject): Editor =
       origin == super
       size == super
 
+  result.currentProject = proj
   result.workspace = editView
   result.workspace.setEditorCommandsHandler(result)
-
   result.updateAnimation = newAnimation()
   let editor = result
   result.updateAnimation.onAnimate = proc(p: float) =

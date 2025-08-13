@@ -28,15 +28,16 @@ proc toEditorMessageId*[Msg](msg: typedesc[Msg]): MessageId {.compileTime.} =
 method post*(e: EditorCommandQueue, id: MessageId, msg: EditorMessage) {.base, gcsafe.} = discard
 proc post*[T](e: EditorCommandQueue, msg: T) = e.post(T.toEditorMessageId, msg)
 
-template sandboxed(body: untyped): untyped =
+template sandboxed(body: untyped, instInfo: tuple[filename: string, line: int, column: int]): untyped =
   try:
     body
   except Exception as e:
-    echo instantiationInfo().filename, " at line:", instantiationInfo().line, " EditorServer got error ", e.msg, "\n", getStackTrace(e)
+    echo instInfo.filename, " at line:", instInfo.line, " EditorServer got error ", e.msg, "\n", getStackTrace(e)
 
 template sandbox*(body: untyped): untyped =
   when enableEditorSandbox:
-    sandboxed(body)
+    let instInfo = instantiationInfo()
+    sandboxed(body, instInfo)
   else:
     body
 
@@ -44,6 +45,7 @@ proc nodeAtPath*(rootNode: Node, path: seq[int]): Node =
   result = rootNode
   for i in path:
     result = result.children[i]
+    echo " i, ", i, " result ", result.name
 
 when loadingAndSavingAvailable:
   proc relativeUrl*(url: string, base: string): string =
@@ -52,3 +54,13 @@ when loadingAndSavingAvailable:
     result = relativePath(result, base).replace("\\", "/")
 else:
   proc relativeUrl*(url: string, base: string): string = url
+
+# Pasteboard
+const rodPbComposition* = "rod.composition"
+const rodPbSprite* = "rod.sprite"
+const rodPbFiles* = "rod.files"
+const NodePboardKind* = "io.github.yglukhov.rod.node"
+const BezierPboardKind* = "io.github.yglukhov.rod.bezier"
+
+# Editor's nodes
+const EditorRootNodeName* = "[EditorRoot]"

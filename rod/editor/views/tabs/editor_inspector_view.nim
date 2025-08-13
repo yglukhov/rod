@@ -38,17 +38,20 @@ proc createComponentsView(v: EditorInspectorView, n: Node) {.gcsafe.} =
 
 proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
 
-  v.content.removeAllSubviews()
   proc changeInspectorView() =
-    # i.inspectedNode = n
+    # v.inspectedNodeChanged(n)
     discard
+
+  v.content.removeAllSubviews()
+  # proc onChange() =
+  #   v.inspectedNodeChanged(n)
 
   var visitor : PropertyVisitor
   visitor.requireName = true
   visitor.requireSetter = true
   visitor.requireGetter = true
   # if i.editor.mode == emAnimation:
-  #     visitor.flags = { pfAnimatable }
+#     visitor.flags = { pfAnimatable }
   # else:
   visitor.flags = { pfEditable }
 
@@ -139,10 +142,10 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
 
 method onCompositionChanged*(v: EditorInspectorView, c: CompositionDocument) =
   procCall v.EditorTabView.onCompositionChanged(c)
-  echo "EditorInspectorView onCompositionChanged"
+  # echo "EditorInspectorView onCompositionChanged"
 
 method setInspectedNode*(v: EditorInspectorView, n: Node) =
-  echo "EditorInspectorView selectedNode = ", (if n.isNil: "nil" else: n.name)
+  # echo "EditorInspectorView selectedNode = ", (if n.isNil: "nil" else: n.name)
   v.inspectedNodeChanged(n)
 
 method onEditorEvent*(v: EditorInspectorView, ev: EditorAPIEvent) =

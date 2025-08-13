@@ -1,14 +1,16 @@
 import ./editor_view_types
-import nimx / [ types, view, split_view, layout, text_field ]
+import nimx / [ types, view, split_view, layout, text_field, clip_view ]
 import views / [ toolbar_view, leftpanel_view, rightpanel_view ]
 import ../rod_types
+import ./views/tabs/[ editor_scene_view]
+import ./assets/editor_assets_view
 
 type EditorView* = ref object of EditorBaseView
   toolBar: ToolBarView
   leftPanel: LeftPanelView
   rightPanel: RightPanelView
-  centralPart: View
-  bottomPart: View
+  sceneView: EditorSceneView
+  bottomPart: EditorAssetsView
   center: SplitView
   commandsQueue: EditorCommandQueue
   tabs: seq[EditorTabView]
@@ -17,7 +19,7 @@ type EditorView* = ref object of EditorBaseView
 proc setEditorCommandsHandler*(v: EditorView, c: EditorCommandQueue) =
   v.commandsQueue = c
   for tab in v.tabs:
-    tab.commandsQueue = c
+    tab.setApi(c)
 
 proc setCurrentComposition*(v: EditorView, c: CompositionDocument) =
   for tab in v.tabs:
@@ -70,21 +72,16 @@ method init*(v: EditorView) =
           vertical: true
           resizable: true
 
-          - View as centralPart:
+          - ClipView:
             y == super
             width == super
-            backgroundColor: newColor(0.133, 0.545, 0.133, 1.0)
-            - Label:
-              text: "Middle up"
-              origin == super + 15
+            - EditorSceneView as sceneView:
+              frame == super
 
-          - View as bottomPart:
+          - EditorAssetsView as bottomPart:
             width == super
             height == 150 @ WEAK
-            backgroundColor: newColor(0.0, 0.749, 1.0, 1.0)
-            - Label:
-              text: "Middle bottom"
-              origin == super + 15
+
 
       - RightPanelView as rightPanel:
         leading == prev.trailing
@@ -95,10 +92,11 @@ method init*(v: EditorView) =
 
   v.toolBar = toolbar
   v.leftPanel = leftPanel
-  v.centralPart = centralPart
+  v.sceneView = sceneView
   v.bottomPart = bottomPart
   v.rightPanel = rightPanel
 
+  v.tabs.add(v.sceneView)
   v.tabs.add(v.leftPanel.tabs)
   v.tabs.add(v.rightPanel.tabs)
 
@@ -110,5 +108,3 @@ method init*(v: EditorView) =
     else:
       v.bb = center.dividerPosition(0)
       v.bottomPart.removeFromSuperview()
-
-  echo "EditorView ini: ", v.leftPanel != nil

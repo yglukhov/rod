@@ -168,7 +168,14 @@ method afterDraw*(msk: Mask, index: int) =
 
 method visitProperties*(msk: Mask, p: var PropertyVisitor) =
   p.visitProperty("mask type", msk.maskType)
-  p.visitProperty("layer name", msk.maskNode)
+  proc maskNodeName(c: Mask): string =
+    result = "@not set@"
+    if not c.maskNode.isNil:
+      result = c.maskNode.name
+  proc `maskNodeName=`(c: Mask, name: string) =
+    c.maskNode = c.node.sceneView.rootNode.findNode(name)
+
+  p.visitProperty("layer name", msk.maskNodeName)
 
   proc prev(c: Mask): Image =
     if not c.maskTexture.isNil:

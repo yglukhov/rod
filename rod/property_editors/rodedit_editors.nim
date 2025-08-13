@@ -69,6 +69,7 @@ method onTouchEv*(v: NodeAnchorView, e: var Event): bool =
 
 proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX) {.gcsafe.}, getter: proc(): NodeAnchorAUX {.gcsafe.}): PropertyEditorView =
   let boxSize = 50.0
+  proc update() {.gcsafe.}
   let n = getter().node
   let bbox = n.nodeBounds()
   var minP = bbox.minPoint
@@ -86,8 +87,13 @@ proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX) {.gcsafe.}, get
       pY: n.anchor.y
       pSize: newSize(maxP.x - minP.x, maxP.y - minP.y)
 
-  v.onChanged = proc(p: Point) {.gcsafe.} =
-    getter().node.anchor = newVector3(p.x, p.y)
+  if v.pSize.width > 0 and v.pSize.height > 0:
+    v.onChanged = proc(p: Point) {.gcsafe.} =
+      getter().node.anchor = newVector3(p.x, p.y)
+      update()
+
+  proc update() {.gcsafe.} =
+    discard
 
 registerPropertyEditor(newNodeAnchorAUXPropertyView)
 
@@ -286,6 +292,7 @@ proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX) {.gcsafe.}, gett
       zComp.text.fromStr(v.z)
       wComp.text.fromStr(v.w)
       ninepart.segments = v
+      setter(NinePartSegmentsAUX(segments: ninepart.segments, image: ninepart.image, size: ninepart.size))
     except ValueError:
       discard
 

@@ -298,11 +298,26 @@ proc newNodePropertyView(setter: proc(s: Node) {.gcsafe.}, getter: proc(): Node 
     let n = getter()
     result = PropertyEditorView.new()
     result.makeLayout:
-        height == editorRowHeight
         - TextField as tf:
             font: editorFont()
+            height == editorRowHeight
+            top == super
+            leading == super
+            trailing == super
+            bottom == super
             onAction:
-                setter(n.sceneView.rootNode.findNode(tf.text))
+                try:
+                    if not n.isNil and not n.sceneView.isNil:
+                        setter(n.sceneView.rootNode.findNode(tf.text))
+                    else:
+                        var msg = ""
+                        if n.isNil:
+                            msg &= "node is nil"
+                        elif n.sceneView.isNil:
+                            msg &= "sceneview is nil"
+
+                        echo "can't find node ", tf.text, " because of:", msg
+                except: discard
 
     if n.isNil or n.name.len == 0:
         tf.text = "nil"
