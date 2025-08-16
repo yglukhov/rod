@@ -176,7 +176,7 @@ method setInspectedNode*(v: EditorSceneView, n: Node) =
 
 method init*(v: EditorSceneView) =
   procCall v.View.init()
-
+  v.dragDestination = new(EditorDropDelegate)
   v.makeLayout:
     backgroundColor: clearColor()
     - SceneView as sceneview:

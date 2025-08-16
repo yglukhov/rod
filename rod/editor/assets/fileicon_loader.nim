@@ -12,8 +12,5 @@ proc loadIconForPath*(path: string, size: int, cb: proc(i: Image){.gcsafe.}) {.g
     cb(imageWithBitmap(cast[ptr uint8](addr img_data[0]), 128, 128, 4))
 
 proc loadImagePreview*(path: string, size: int, cb: proc(i: Image){.gcsafe.}) {.gcsafe.} =
-  # when defined(rodedit):
-
-  # else:
   loadAsset[Image]("file://" & path) do(i: Image, err: string):
     cb(i)

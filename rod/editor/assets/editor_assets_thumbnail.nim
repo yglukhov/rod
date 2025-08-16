@@ -10,8 +10,8 @@ var gDirImageCache {.threadVar.}: seq[tuple[i:Image, p:string]]
 const imageSize = 128.Coord
 
 type
-  EditorAssetImageView = ref object of View
-    image: Image
+  EditorAssetImageView* = ref object of View
+    image*: Image
     rtiImage: SelfContainedImage
 
   EditorThumbnailView* = ref object of View
@@ -21,6 +21,11 @@ type
     gridConstraints*: seq[Constraint]
     imageHeightConstr*: Constraint
     curItem: PathNode
+    selected: bool
+    currentSize: Coord
+    firstInARow*: bool
+    lastInARow*: bool
+    loadingInProgressForNode: PathNode
 
 method draw*(v: EditorAssetImageView, r: Rect) =
   if v.image.isNil: return
@@ -29,7 +34,7 @@ method draw*(v: EditorAssetImageView, r: Rect) =
     let scale = imageSize/max(v.image.size.width, v.image.size.height)
     v.rtiImage = imageWithSize(newSize(imageSize, imageSize))
     v.rtiImage.draw:
-      c.drawImage(v.image, newRect(0,0,v.image.size.width*scale,v.image.size.height*scale))
+      c.drawImage(v.image, newRect(1, 1, v.image.size.width * scale - 1,v.image.size.height * scale - 1))
 
     v.image = v.rtiImage
     v.rtiImage = nil
@@ -44,7 +49,7 @@ method init*(v: EditorThumbnailView) =
       top == super
       leading == super.leading
       trailing == super.trailing
-      # height == 128
+      bottom == next.top
       backgroundColor: uiPink
     - Label as title:
       top == prev.bottom
@@ -52,28 +57,46 @@ method init*(v: EditorThumbnailView) =
       trailing == super.trailing
       height == 20
       bottom == super
-      text: "file.name"
+      text: "not.set"
 
   v.pathLabel = title
   v.imageView = imageView
 
+proc select*(v: EditorThumbnailView) =
+  v.selected = true
+  v.pathLabel.formattedText.boundingSize = newSize(2 * v.currentSize.Coord, 20)
+  v.backgroundColor = uiSelectionColor
+
+proc deselect*(v: EditorThumbnailView) =
+  v.selected = false
+  v.pathLabel.formattedText.boundingSize = newSize(v.currentSize.Coord, 20)
+  v.backgroundColor = clearColor()
+
 proc setup*(v: EditorThumbnailView, n: PathNode, size: float, dirSize: int) =
+  v.deselect()
   if v.curItem != n:
     v.imageView.image = nil
+
+  if n == nil:
+    v.pathLabel.text = "not.set"
+    return
 
   v.curItem = n
   if gDirImageCache.len != dirSize:
     gDirImageCache.setLen(0)
   gDirImageCache.setLen(dirSize)
 
-  v.pathLabel.formattedText.boundingSize = newSize(size.Coord, 20)
+  v.currentSize = size
+  v.pathLabel.formattedText.boundingSize = newSize(v.currentSize, 20)
   v.pathLabel.formattedText.truncationBehavior = tbCut
+  v.pathLabel.formattedText.horizontalAlignment = haCenter
+  v.pathLabel.formattedText.verticalAlignment = vaTop
   v.pathLabel.text = n.name
   if gCachedStandartIcons.isNil:
     gCachedStandartIcons = newTable[string, Image]()
 
   if v.imageView.image.isNil:
-    if n.ext in [".jpg", ".png", ".webp"]:
+    if n.isImage:
       var found = false
       for entry in gDirImageCache:
         if entry.p == n.path:
@@ -81,14 +104,22 @@ proc setup*(v: EditorThumbnailView, n: PathNode, size: float, dirSize: int) =
           found = true
 
       if not found:
-        loadImagePreview(n.path, 128) do(i: Image) {.gcsafe.}:
-          v.imageView.image = i
-          gDirImageCache.add((i: i, p: n.path))
+        if v.loadingInProgressForNode == nil or n != v.loadingInProgressForNode:
+          v.loadingInProgressForNode = n
+          loadImagePreview(n.path, 128) do(i: Image) {.gcsafe.}:
+            if v.loadingInProgressForNode == n:
+              v.imageView.image = i
+              gDirImageCache.add((i: i, p: n.path))
+              v.loadingInProgressForNode = nil
     else:
       let cachedImage = gCachedStandartIcons.getOrDefault(n.ext)
       if cachedImage.isNil:
-        loadIconForPath(n.path, 128) do(i: Image) {.gcsafe.}:
-          v.imageView.image = i
-          gCachedStandartIcons[n.ext] = v.imageView.image
+        if v.loadingInProgressForNode == nil or n != v.loadingInProgressForNode:
+          v.loadingInProgressForNode = n
+          loadIconForPath(n.path, 128) do(i: Image) {.gcsafe.}:
+            if v.loadingInProgressForNode == n:
+              v.imageView.image = i
+              gCachedStandartIcons[n.ext] = v.imageView.image
+              v.loadingInProgressForNode = nil
       else:
         v.imageView.image = cachedImage

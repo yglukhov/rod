@@ -80,3 +80,4 @@ const
   uiBlue*     = newColor(0.80, 0.88, 0.95) # Baby blue
   uiLavender* = newColor(0.87, 0.80, 0.95) # Soft lavender
   uiGray*     = newColor(0.90, 0.90, 0.90) # Warm light gray
+  uiSelectionColor* = newColor(0.0, 0.0, 0.5, 0.2)

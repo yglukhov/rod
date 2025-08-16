@@ -11,9 +11,15 @@ type
     dontNotifySelection: bool
     rootNode: PathNode
     mOnSelectCb: proc(p: PathNode) {.gcsafe.}
+    dontNotify: bool
 
 proc `onSelectionChanged=`*(v: EditorAssetsTreeView, cb: proc(p: PathNode) {.gcsafe.}) =
   v.mOnSelectCb = cb
+
+proc select*(v: EditorAssetsTreeView, n: PathNode) =
+  # v.dontNotify = true
+  v.outlineView.selectItemAtIndexPath(n.getNodePath())
+  # v.dontNotify = false
 
 method init*(v: EditorAssetsTreeView) =
   procCall v.View.init()
@@ -59,7 +65,7 @@ method init*(v: EditorAssetsTreeView) =
             var node = v.rootNode
             for idx, el in v.outlineView.selectedIndexPath:
               node = node.directories[el]
-            if not v.mOnSelectCb.isNil:
+            if not v.mOnSelectCb.isNil and v.dontNotify == false:
               v.mOnSelectCb(node)
 
   v.outlineView = outline

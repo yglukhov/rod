@@ -57,7 +57,8 @@ else:
 
 # Pasteboard
 const rodPbComposition* = "rod.composition"
-const rodPbSprite* = "rod.sprite"
+# const rodPbSprite* = "rod.sprite"
+const rodPbSprite* = "nimx.pb.image"
 const rodPbFiles* = "rod.files"
 const NodePboardKind* = "io.github.yglukhov.rod.node"
 const BezierPboardKind* = "io.github.yglukhov.rod.bezier"

@@ -10,12 +10,25 @@ type
     directories*: seq[PathNode]
     parent*: PathNode
 
+proc isComposition*(p: PathNode): bool = p.ext == ".jcomp"
+proc isImage*(p:PathNode): bool = p.ext in [".png", ".jpg", ".jpeg", ".gif", ".tif", ".tiff", ".tga", ".pvr", ".webp"]
+
 proc childAt*(p: PathNode, i: int): PathNode =
   let dirlen = p.directories.len
   if i < dirlen:
     return p.directories[i]
   if i < p.files.len + dirlen:
     return p.files[i - dirlen]
+
+proc getNodePath*(n: PathNode): seq[int] =
+  if n.isNil:
+    return @[]
+
+  var node = n
+  while node.parent != nil:
+    var i = node.parent.directories.find(node)
+    result.insert(i, 0)
+    node = node.parent
 
 proc expand(p: PathNode) =
   for kind, path in walkDir(p.path):
