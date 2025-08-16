@@ -1,12 +1,13 @@
-import std/[ math, tables, times ]
+import std/[ times ]
 import kiwi
 import nimx / [
   view, types, slider, layout, scroll_view, text_field, image, animation, drag_and_drop,
-  layout_vars, formatted_text, context, view_event_handling, event, image_preview
+  layout_vars, context, view_event_handling, event, image_preview
   ]
+
 import nimx/pasteboard/pasteboard_item
 import ../[editor_view_types]
-import ./[editor_assets_tree, path_node, fileicon_loader, editor_assets_thumbnail]
+import ./[editor_assets_tree, path_node, editor_assets_thumbnail]
 
 when not defined(android) and not defined(ios) and not defined(emscripten):
   import os_files/file_info
@@ -17,6 +18,19 @@ type
     assetsView: EditorAssetsView
     heightVar: Variable
     heightConst: Constraint
+    thumbWidth: Variable
+    thumbWidthConstr: Constraint
+    thumbYOffset: Variable
+    thumbYOffsetConstr: Constraint
+    currentThumbSize: float
+    currentFirstYOffset: float
+    currentHeight: float
+    offsetVar: Variable
+    thumbLeading: Constraint
+    thumbTop: Constraint
+    thumbFirstLeading: Constraint
+    thumbFirstTop: Constraint
+
     itemsInARow: int
     dragStarted: bool
     selectionRect: Rect
@@ -35,26 +49,13 @@ type
     content: EditorScrollContentView
     thumbnails: seq[EditorThumbnailView]
     lineBreakers: seq[EditorThumbnailView]
-    dontUpdate: bool
     currentDir: PathNode
     pathLabel: Label
-    prevFrame: Rect
-    predefinedConstraints: array[16, Constraint]
-    currentThumbSize: float
-    currentFirstYOffset: float
 
 proc recalc(v: EditorAssetsView) {.gcsafe.}
 
 method updateLayout*(v: EditorAssetsView) =
   procCall v.View.updateLayout()
-  if v.dontUpdate:
-    v.dontUpdate = false
-    return
-
-  # if v.frame == v.prevFrame:
-  #   return
-
-  # v.prevFrame = v.frame
   v.recalc()
 
 proc moveToDirectory(v: EditorAssetsView, p: PathNode) =
@@ -87,6 +88,9 @@ method init*(v: EditorAssetsView) =
         leading == super
         trailing == super
         assetsView: v
+        currentFirstYOffset: -1
+        currentThumbSize: -1
+        currentHeight: -1
 
     - Label as curDir:
       backgroundColor: uiBlue
@@ -116,6 +120,7 @@ method init*(v: EditorAssetsView) =
     sandbox:
       if v.currentDir.isNil: return
       var item = v.currentDir.childAt(i)
+      if item.isNil: return
       if item.isComposition:
         echo "open conposition ", item.path
       elif item.isImage:
@@ -168,6 +173,7 @@ method init*(v: EditorAssetsView) =
       for idx in items:
         var pbk = ""
         let pathNode = v.currentDir.childAt(idx)
+        if pathNode.isNil: continue
         if pathNode.isComposition:
           pbk = rodPbComposition
         elif pathNode.isImage:
@@ -197,85 +203,75 @@ method init*(v: EditorAssetsView) =
       #         discard v.window.makeFirstResponder(v.contentView)
           # discard v.contentView.makeFirstResponder()
 
-type Ct {.pure.} = enum
-  leading = 0
-  defaultLeading
-  defaultTop
-  trailing
-  topPrev
-  widthAdj
-  heightAdj
-  contentSize
-  firstYOffset
-
-proc recalcNew(v: EditorAssetsView) {.gcsafe.} =
-  # v.dontUpdate = true
+proc recalc(v: EditorAssetsView) {.gcsafe.} =
   let ct = epochTime()
   if v.currentDir.isNil: return
 
   let dirContentSize = v.currentDir.directories.len + v.currentDir.files.len
-  let offset = 50.0
   var size = interpolate(64, 256, v.slider.value)
   var itemsPerLine = int(v.content.frame.size.width) div size
-  var adjastedSize = size.float #v.content.frame.size.width / float(itemsPerLine) - (offset * 0.5)
-  let topVisibleLine = int(abs(v.content.frame.origin.y)) div (size + 20)
-  let visibleLines = int(v.content.superview.frame.height) div (size + 20) + 1
-  let bottomVisibleLine = visibleLines + topVisibleLine
+  let offset = 2.0 * (float) (int(v.content.frame.size.width) - itemsPerLine * size) / itemsPerLine #50.0
+  var adjastedSize = size.float
+  let topVisibleLine = int(abs(v.content.frame.origin.y)) div (adjastedSize.int + 20)
+  let visibleLines = int(v.content.superview.frame.height) div (adjastedSize.int + 20) + 2
   let thumbnailsCount = min(visibleLines * itemsPerLine, dirContentSize)
-  let firstYOffset = topVisibleLine * (size + 20)
+  let firstYOffset = float(topVisibleLine * (adjastedSize.int + 20))
 
-  if v.predefinedConstraints[Ct.leading.int] == nil:
-    v.predefinedConstraints[Ct.leading.int] = selfPHS.leading == superPHS.leading
-  if v.predefinedConstraints[Ct.topPrev.int] == nil:
-    v.predefinedConstraints[Ct.topPrev.int] = selfPHS.top == prevPHS.bottom
+  if v.content.offsetVar.isNil:
+    v.content.offsetVar = newVariable(offset)
+    v.window.layoutSolver.addEditVariable(v.content.offsetVar, MEDIUM)
+  v.window.layoutSolver.suggestValue(v.content.offsetVar, offset)
 
-  if v.predefinedConstraints[Ct.defaultLeading.int] == nil:
-    v.predefinedConstraints[Ct.defaultLeading.int] = selfPHS.leading == prevPHS.trailing
+  if v.content.thumbFirstLeading.isNil:
+    v.content.thumbFirstLeading = selfPHS.leading == superPHS.leading
+  if v.content.thumbFirstTop.isNil:
+    v.content.thumbFirstTop = selfPHS.top == prevPHS.bottom
+  if v.content.thumbLeading.isNil:
+    v.content.thumbLeading = selfPHS.leading == prevPHS.trailing + v.content.offsetVar * 0.5
+  if v.content.thumbTop.isNil:
+    v.content.thumbTop = selfPHS.top == prevPHS.top
 
-  if v.predefinedConstraints[Ct.defaultTop.int] == nil:
-    v.predefinedConstraints[Ct.defaultTop.int] = selfPHS.top == prevPHS.top
-  # if v.predefinedConstraints[Ct.trailing.int] == nil:
-  #   v.predefinedConstraints[Ct.trailing.int] = selfPHS.trailing == superPHS.trailing
+  let sizeChanged = abs(adjastedSize - v.content.currentThumbSize) > 0.001
+  v.content.currentThumbSize = adjastedSize
+  let firstYchanged = abs(v.content.currentFirstYOffset - firstYOffset) > 0.001
+  v.content.currentFirstYOffset = firstYOffset
 
-  let sizeChanged = abs(adjastedSize - v.currentThumbSize) > 0.001
-  v.currentThumbSize = adjastedSize
-
-  var contentHeight = max((dirContentSize div itemsPerLine + 3).float * (adjastedSize + 20), v.content.superview.frame.size.height)
-  if v.content.heightConst.isNil:
-    v.content.heightVar = newVariable(contentHeight)
-    v.content.window.layoutSolver.addEditVariable(v.content.heightVar, contentHeight)
-    v.content.heightConst = selfPHS.height == v.content.heightVar
-    v.content.addConstraint(v.content.heightConst)
-  else:
-    v.content.window.layoutSolver.suggestValue(v.content.heightVar, contentHeight)
+  let contentHeight = max((dirContentSize div itemsPerLine + 3).float * (adjastedSize + 20), v.content.superview.frame.size.height)
+  let contentHeightChanged = abs(contentHeight - v.content.currentHeight) > 0.001
+  v.content.currentHeight = contentHeight
+  if contentHeightChanged:
+    if v.content.heightConst.isNil:
+      v.content.heightVar = newVariable(contentHeight)
+      v.window.layoutSolver.addEditVariable(v.content.heightVar, MEDIUM)
+      v.content.heightConst = selfPHS.height == v.content.heightVar
+      v.content.addConstraint(v.content.heightConst)
+    v.window.layoutSolver.suggestValue(v.content.heightVar, contentHeight)
 
   if v.thumbnails.len == 0:
     var thumb = new(EditorThumbnailView)
     thumb.makeLayout:
       leading == super.leading
-      # top == super.top
       height == self.width + 20
 
-    v.predefinedConstraints[Ct.firstYOffset.int] = selfPHS.top == superPHS.top + firstYOffset.float
-    thumb.addConstraint(v.predefinedConstraints[Ct.firstYOffset.int])
     thumb.firstInARow = true
     v.thumbnails.add(thumb)
     v.content.addSubview(thumb)
 
   if sizeChanged:
-    if not v.predefinedConstraints[Ct.widthAdj.int].isNil:
-      v.thumbnails[0].removeConstraint(v.predefinedConstraints[Ct.widthAdj.int])
-    v.predefinedConstraints[Ct.widthAdj.int] = selfPHS.width == adjastedSize
-    v.thumbnails[0].addConstraint(v.predefinedConstraints[Ct.widthAdj.int])
+    if v.content.thumbWidth.isNil:
+      v.content.thumbWidth = newVariable(adjastedSize)
+      v.window.layoutSolver.addEditVariable(v.content.thumbWidth, MEDIUM)
+      v.content.thumbWidthConstr = selfPHS.width == v.content.thumbWidth
+      v.thumbnails[0].addConstraint(v.content.thumbWidthConstr)
+    v.window.layoutSolver.suggestValue(v.content.thumbWidth, adjastedSize)
 
-  let firstYchanged = abs(v.currentFirstYOffset - firstYOffset.float) > 0.001
   if firstYchanged:
-    if not v.predefinedConstraints[Ct.firstYOffset.int].isNil:
-      v.thumbnails[0].removeConstraint(v.predefinedConstraints[Ct.firstYOffset.int])
-    v.predefinedConstraints[Ct.firstYOffset.int] = selfPHS.top == superPHS.top + firstYOffset.float
-    v.thumbnails[0].addConstraint(v.predefinedConstraints[Ct.firstYOffset.int])
-    # echo "firstYOffset ", firstYOffset
-    v.currentFirstYOffset = firstYOffset.float
+    if v.content.thumbYOffset.isNil:
+      v.content.thumbYOffset = newVariable(firstYOffset)
+      v.window.layoutSolver.addEditVariable(v.content.thumbYOffset, MEDIUM)
+      v.content.thumbYOffsetConstr = selfPHS.top == superPHS.top + v.content.thumbYOffset
+      v.thumbnails[0].addConstraint(v.content.thumbYOffsetConstr)
+    v.window.layoutSolver.suggestValue(v.content.thumbYOffset, firstYOffset)
 
   while v.thumbnails.len < thumbnailsCount:
     var thumb = new(EditorThumbnailView)
@@ -283,8 +279,8 @@ proc recalcNew(v: EditorAssetsView) {.gcsafe.} =
       width == prev
       height == prev
 
-    thumb.addConstraint(v.predefinedConstraints[Ct.defaultLeading.int])
-    thumb.addConstraint(v.predefinedConstraints[Ct.defaultTop.int])
+    thumb.addConstraint(v.content.thumbLeading)
+    thumb.addConstraint(v.content.thumbTop)
     v.thumbnails.add(thumb)
     v.content.addSubview(thumb)
 
@@ -292,145 +288,30 @@ proc recalcNew(v: EditorAssetsView) {.gcsafe.} =
     let idx = topVisibleLine * itemsPerLine + i
     thumb.hidden = idx >= dirContentSize
     if thumb.hidden: continue
-    # let row = idx div itemsPerLine
-    if idx != 0:
+    if idx != 0: # first aready have correct constraints
       let indexInaRow = idx mod itemsPerLine
-      if indexInaRow == 0: # first aready have correct constraints
+      if indexInaRow == 0:
         if not thumb.firstInARow:
           thumb.firstInARow = true
-          thumb.removeConstraint(v.predefinedConstraints[Ct.defaultLeading.int])
-          thumb.removeConstraint(v.predefinedConstraints[Ct.defaultTop.int])
-          thumb.addConstraint(v.predefinedConstraints[Ct.topPrev.int])
-          thumb.addConstraint(v.predefinedConstraints[Ct.leading.int])
+          thumb.removeConstraint(v.content.thumbLeading)
+          thumb.removeConstraint(v.content.thumbTop)
+          thumb.addConstraint(v.content.thumbFirstTop)
+          thumb.addConstraint(v.content.thumbFirstLeading)
 
       elif thumb.firstInARow:
         thumb.firstInARow = false
-        thumb.removeConstraint(v.predefinedConstraints[Ct.topPrev.int])
-        thumb.removeConstraint(v.predefinedConstraints[Ct.leading.int])
-        thumb.addConstraint(v.predefinedConstraints[Ct.defaultLeading.int])
-        thumb.addConstraint(v.predefinedConstraints[Ct.defaultTop.int])
+        thumb.removeConstraint(v.content.thumbFirstTop)
+        thumb.removeConstraint(v.content.thumbFirstLeading)
+        thumb.addConstraint(v.content.thumbLeading)
+        thumb.addConstraint(v.content.thumbTop)
 
     let node = v.currentDir.childAt(idx)
     thumb.setup(node, adjastedSize, dirContentSize)
 
-  if sizeChanged or firstYchanged:
+  if sizeChanged or firstYchanged or contentHeightChanged:
     v.setNeedsLayout()
 
   echo "recalcNew: ", epochTime() - ct, " visibleLines ", visibleLines, " size ", adjastedSize, " topIndex ", topVisibleLine * itemsPerLine, " content ", v.content.frame #, " adjsize ", adjastedSize, " sizeChanged ", sizeChanged,  " thumbs ", dirContentSize, " perLine ", itemsPerLine #, " H ", contentH, " items ", dirContentSize, " line ", itemsPerLine, " top ", topVisibleLine
-
-    # let nodeName = if node.isNil: "nil" else: node.name
-    # echo "view i ", i, " global i ", idx, " visible ", nodename, " in ", [topVisibleLine, bottomVisibleLine], " frame ", thumb.frame
-
-  # while v.thumbnails.len < dirContentSize:
-  #   var thumb = new(EditorThumbnailView)
-  #   thumb.makeLayout:
-  #     width == prev
-  #     height == prev
-
-  #   thumb.addConstraint(v.predefinedConstraints[Ct.defaultLeading.int])
-  #   thumb.addConstraint(v.predefinedConstraints[Ct.defaultTop.int])
-  #   v.thumbnails.add(thumb)
-  #   v.content.addSubview(thumb)
-
-  # for idx, thumb in v.thumbnails:
-  #   thumb.hidden = idx >= dirContentSize
-  #   if thumb.hidden: continue
-  #   let row = idx div itemsPerLine
-  #   if idx != 0:
-  #     let indexInaRow = idx mod itemsPerLine
-  #     if indexInaRow == 0: # first aready have correct constraints
-  #       if not thumb.firstInARow:
-  #         thumb.firstInARow = true
-  #         thumb.removeConstraint(v.predefinedConstraints[Ct.defaultLeading.int])
-  #         thumb.removeConstraint(v.predefinedConstraints[Ct.defaultTop.int])
-  #         thumb.addConstraint(v.predefinedConstraints[Ct.topPrev.int])
-  #         thumb.addConstraint(v.predefinedConstraints[Ct.leading.int])
-
-  #     elif thumb.firstInARow:
-  #       thumb.firstInARow = false
-  #       thumb.removeConstraint(v.predefinedConstraints[Ct.topPrev.int])
-  #       thumb.removeConstraint(v.predefinedConstraints[Ct.leading.int])
-  #       thumb.addConstraint(v.predefinedConstraints[Ct.defaultLeading.int])
-  #       thumb.addConstraint(v.predefinedConstraints[Ct.defaultTop.int])
-
-  #   let node = v.currentDir.childAt(idx)
-  #   thumb.setup(node, adjastedSize, dirContentSize)
-  #   if row >= topVisibleLine and row < bottomVisibleLine:
-  #     let nodeName = if node.isNil: "nil" else: node.name
-  #     echo row, " visible ", nodename, " in ", [topVisibleLine, bottomVisibleLine]
-    # let si = v.content.subviews.find(thumb.View)
-    # echo si, " SETUP: ", nodename, " FIRST: ", thumb.firstInARow, " FRAME: ", thumb.frame
-
-
-proc recalcOld(v: EditorAssetsView) {.gcsafe.} =
-  v.dontUpdate = true
-  let ct = epochTime()
-  for idx, thumb in v.thumbnails:
-    for constr in thumb.gridConstraints:
-      thumb.removeConstraint(constr)
-    thumb.gridConstraints.setLen(0)
-    if not thumb.imageHeightConstr.isNil:
-      thumb.imageView.removeConstraint(thumb.imageHeightConstr)
-      thumb.imageHeightConstr = nil
-
-  var pt0 = epochTime()
-  v.content.removeAllSubviews()
-
-  if v.currentDir.isNil: return
-  var pt1 = epochTime()
-
-  let dirContentSize = v.currentDir.directories.len + v.currentDir.files.len
-  while v.thumbnails.len < dirContentSize:
-    v.thumbnails.add(new(EditorThumbnailView))
-
-  let offset = 50.0
-  var size = interpolate(64, 256, v.slider.value)
-  var itemsPerRow = int(v.content.frame.size.width) div size
-  v.content.itemsInARow = itemsPerRow
-  if itemsPerRow == 0: return
-  var adjastedSize = v.content.frame.size.width / float(itemsPerRow) - (offset * 0.5)
-  # echo " adjastedSize ", adjastedSize, " itemsPerRow ", itemsPerRow
-  # for idx, thumb in v.thumbnails:
-  for idx in 0 ..< dirContentSize:
-    let thumb = v.thumbnails[idx]
-    let row = idx div itemsPerRow
-    let rowOfPrevItem = (idx - 1) div itemsPerRow
-    let indexInaRow = idx mod itemsPerRow
-
-    var topConstr: Constraint
-    if row == 0 and indexInaRow == 0:
-      topConstr = thumb.layout.vars.top == superPHS.top + offset * 0.5
-    elif rowOfPrevItem == row:
-      topConstr = thumb.layout.vars.top == prevPHS.top
-    else:
-      topConstr = thumb.layout.vars.top == prevPHS.bottom + offset * 0.5
-
-    var leadingConstr: Constraint
-    if indexInaRow == 0:
-      leadingConstr = thumb.layout.vars.x == superPHS.x + offset * 0.25
-    else:
-      leadingConstr = thumb.layout.vars.leading == prevPHS.trailing + offset * 0.5
-
-    thumb.gridConstraints.add(topConstr)
-    thumb.gridConstraints.add(leadingConstr)
-    thumb.gridConstraints.add(thumb.layout.vars.width == adjastedSize.Coord)
-
-    thumb.imageHeightConstr = thumb.imageView.layout.vars.height == adjastedSize.Coord
-    thumb.imageView.addConstraint(thumb.imageHeightConstr)
-    thumb.setup(v.currentDir.childAt(idx), adjastedSize, dirContentSize)
-
-    # if idx == v.thumbnails.len - 1:
-    #   thumb.gridConstraints.add(thumb.layout.vars.bottom == superPHS.bottom)
-
-    for constr in thumb.gridConstraints:
-      thumb.addConstraint(constr)
-
-    v.content.addSubview(thumb)
-  echo "recalc: ", epochTime() - ct, " p0 ", pt0 - ct, " p1 ", pt1 - ct, " con ", v.content.frame , " pos ", cast[ScrollView](v.content.superview).scrollPosition
-
-proc recalc(v: EditorAssetsView) {.gcsafe.} =
-  recalcNew(v)
-  # recalcOld(v)
 
 proc thumbnailAtIndex(v: EditorScrollContentView, i: int): EditorThumbnailView =
   sandbox:
@@ -623,21 +504,51 @@ method onKeyDown*(v: EditorScrollContentView, e: var Event):bool=
 
   else: discard
 
-
 method clipType*(v: EditorScrollContentView): ClipType = ctDefaultClip
 
 method viewWillMoveToWindow*(v: EditorScrollContentView, w: Window) =
-  if w.isNil and not v.window.isNil and not v.heightConst.isNil:
-    v.removeConstraint(v.heightConst)
-    v.heightConst = nil
+  echo "EditorScrollContentView viewWillMoveToWindow ", w.isNil
+  if w.isNil and not v.window.isNil:
+    v.removeAllSubviews()
+    # these are removed by removeAllSubviews
+    v.thumbWidthConstr = nil
+    v.thumbYOffsetConstr = nil
+    v.thumbLeading = nil
+    v.thumbTop = nil
+    v.thumbFirstLeading = nil
+    v.thumbFirstTop = nil
+
+    if not v.assetsView.isNil:
+      v.assetsView.thumbnails.setLen(0)
+    if not v.heightConst.isNil:
+      v.removeConstraint(v.heightConst)
+      v.heightConst = nil
+
     let s = v.window.layoutSolver
-    if s.hasEditVariable(v.heightVar):
-      s.removeEditVariable(v.heightVar)
-    v.heightVar = nil
+    if not v.heightVar.isNil:
+      if s.hasEditVariable(v.heightVar):
+        s.removeEditVariable(v.heightVar)
+      v.heightVar = nil
+    if not v.thumbWidth.isNil:
+      if s.hasEditVariable(v.thumbWidth):
+        s.removeEditVariable(v.thumbWidth)
+      v.thumbWidth = nil
+    if not v.thumbYOffset.isNil:
+      if s.hasEditVariable(v.thumbYOffset):
+        s.removeEditVariable(v.thumbYOffset)
+      v.thumbYOffset = nil
+    if not v.offsetVar.isNil:
+      if s.hasEditVariable(v.offsetVar):
+        s.removeEditVariable(v.offsetVar)
+      v.offsetVar = nil
 
   procCall v.View.viewWillMoveToWindow(w)
 
 method viewDidMoveToWindow*(v: EditorScrollContentView) =
   procCall v.View.viewDidMoveToWindow()
-  if not v.assetsView.isNil and not v.window.isNil:
+  if v.window.isNil: return
+  v.currentFirstYOffset = -1
+  v.currentThumbSize = -1
+  v.currentHeight = -1
+  if not v.assetsView.isNil:
     v.assetsView.recalc()
