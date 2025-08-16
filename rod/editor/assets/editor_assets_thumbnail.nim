@@ -5,7 +5,7 @@ import ../[editor_view_types]
 import ./[path_node, fileicon_loader]
 
 var gCachedStandartIcons {.threadVar.}: TableRef[string, Image]
-var gDirImageCache {.threadVar.}: seq[tuple[i:Image, p:string]]
+var gDirImageCache {.threadVar.}: TableRef[string, Image]
 
 const imageSize = 128.Coord
 
@@ -13,6 +13,7 @@ type
   EditorAssetImageView* = ref object of View
     image*: Image
     rtiImage: SelfContainedImage
+    thumb: EditorThumbnailView
 
   EditorThumbnailView* = ref object of View
     path: string
@@ -21,6 +22,7 @@ type
     gridConstraints*: seq[Constraint]
     imageHeightConstr*: Constraint
     curItem: PathNode
+    parentDir: PathNode
     selected: bool
     currentSize: Coord
     firstInARow*: bool
@@ -37,6 +39,8 @@ method draw*(v: EditorAssetImageView, r: Rect) =
       c.drawImage(v.image, newRect(1, 1, v.image.size.width * scale - 1,v.image.size.height * scale - 1))
 
     v.image = v.rtiImage
+    if not v.thumb.curItem.isNil:
+      gDirImageCache[v.thumb.curItem.path] = v.image
     v.rtiImage = nil
 
   c.drawImage(v.image, r)
@@ -61,6 +65,7 @@ method init*(v: EditorThumbnailView) =
 
   v.pathLabel = title
   v.imageView = imageView
+  v.imageView.thumb = v
 
 proc select*(v: EditorThumbnailView) =
   v.selected = true
@@ -82,9 +87,11 @@ proc setup*(v: EditorThumbnailView, n: PathNode, size: float, dirSize: int) =
     return
 
   v.curItem = n
-  if gDirImageCache.len != dirSize:
-    gDirImageCache.setLen(0)
-  gDirImageCache.setLen(dirSize)
+  if v.curItem.parent != v.parentDir:
+    if gDirImageCache.isNil:
+      gDirImageCache = newTable[string, Image]()
+    # gDirImageCache.clear()
+  v.parentDir = v.curItem.parent
 
   v.currentSize = size
   v.pathLabel.formattedText.boundingSize = newSize(v.currentSize, 20)
@@ -97,20 +104,17 @@ proc setup*(v: EditorThumbnailView, n: PathNode, size: float, dirSize: int) =
 
   if v.imageView.image.isNil:
     if n.isImage:
-      var found = false
-      for entry in gDirImageCache:
-        if entry.p == n.path:
-          v.imageView.image = entry.i
-          found = true
-
-      if not found:
+      let cachedImage = gDirImageCache.getOrDefault(n.path)
+      if cachedImage.isNil:
         if v.loadingInProgressForNode == nil or n != v.loadingInProgressForNode:
           v.loadingInProgressForNode = n
           loadImagePreview(n.path, 128) do(i: Image) {.gcsafe.}:
             if v.loadingInProgressForNode == n:
               v.imageView.image = i
-              gDirImageCache.add((i: i, p: n.path))
+              gDirImageCache[n.path] = cachedImage
               v.loadingInProgressForNode = nil
+      else:
+        v.imageView.image = cachedImage
     else:
       let cachedImage = gCachedStandartIcons.getOrDefault(n.ext)
       if cachedImage.isNil:
