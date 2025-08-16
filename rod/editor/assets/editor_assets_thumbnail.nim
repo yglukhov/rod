@@ -1,11 +1,8 @@
 import std/[tables, math]
 import kiwi
-import nimx / [ view, types, layout, text_field, context, image, formatted_text, render_to_image, portable_gl ]
+import nimx / [ view, types, layout, text_field, context, image, formatted_text ]
 import ../[editor_view_types]
 import ./[path_node, fileicon_loader]
-
-var gCachedStandartIcons {.threadVar.}: TableRef[string, Image]
-var gDirImageCache {.threadVar.}: TableRef[string, Image]
 
 const imageSize = 128.Coord
 
@@ -30,20 +27,8 @@ type
     loadingInProgressForNode: PathNode
 
 method draw*(v: EditorAssetImageView, r: Rect) =
-  if v.image.isNil: return
-  let c = currentContext()
-  if v.image.size.width > imageSize or v.image.size.height > imageSize:
-    let scale = imageSize/max(v.image.size.width, v.image.size.height)
-    v.rtiImage = imageWithSize(newSize(imageSize, imageSize))
-    v.rtiImage.draw:
-      c.drawImage(v.image, newRect(1, 1, v.image.size.width * scale - 1,v.image.size.height * scale - 1))
-
-    v.image = v.rtiImage
-    if not v.thumb.curItem.isNil:
-      gDirImageCache[v.thumb.curItem.path] = v.image
-    v.rtiImage = nil
-
-  c.drawImage(v.image, r)
+  if v.thumb.isNil or v.thumb.curItem.isNil or v.thumb.curItem.image.isNil: return
+  currentContext().drawImage(v.thumb.curItem.image, r)
 
 method init*(v: EditorThumbnailView) =
   procCall v.View.init()
@@ -87,10 +72,6 @@ proc setup*(v: EditorThumbnailView, n: PathNode, size: float, dirSize: int) =
     return
 
   v.curItem = n
-  if v.curItem.parent != v.parentDir:
-    if gDirImageCache.isNil:
-      gDirImageCache = newTable[string, Image]()
-    # gDirImageCache.clear()
   v.parentDir = v.curItem.parent
 
   v.currentSize = size
@@ -99,31 +80,3 @@ proc setup*(v: EditorThumbnailView, n: PathNode, size: float, dirSize: int) =
   v.pathLabel.formattedText.horizontalAlignment = haCenter
   v.pathLabel.formattedText.verticalAlignment = vaTop
   v.pathLabel.text = n.name
-  if gCachedStandartIcons.isNil:
-    gCachedStandartIcons = newTable[string, Image]()
-
-  if v.imageView.image.isNil:
-    if n.isImage:
-      let cachedImage = gDirImageCache.getOrDefault(n.path)
-      if cachedImage.isNil:
-        if v.loadingInProgressForNode == nil or n != v.loadingInProgressForNode:
-          v.loadingInProgressForNode = n
-          loadImagePreview(n.path, 128) do(i: Image) {.gcsafe.}:
-            if v.loadingInProgressForNode == n:
-              v.imageView.image = i
-              gDirImageCache[n.path] = cachedImage
-              v.loadingInProgressForNode = nil
-      else:
-        v.imageView.image = cachedImage
-    else:
-      let cachedImage = gCachedStandartIcons.getOrDefault(n.ext)
-      if cachedImage.isNil:
-        if v.loadingInProgressForNode == nil or n != v.loadingInProgressForNode:
-          v.loadingInProgressForNode = n
-          loadIconForPath(n.path, 128) do(i: Image) {.gcsafe.}:
-            if v.loadingInProgressForNode == n:
-              v.imageView.image = i
-              gCachedStandartIcons[n.ext] = v.imageView.image
-              v.loadingInProgressForNode = nil
-      else:
-        v.imageView.image = cachedImage

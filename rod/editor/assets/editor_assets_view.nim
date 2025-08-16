@@ -30,7 +30,7 @@ type
     thumbTop: Constraint
     thumbFirstLeading: Constraint
     thumbFirstTop: Constraint
-
+    firstItemIndex: int
     itemsInARow: int
     dragStarted: bool
     selectionRect: Rect
@@ -70,12 +70,12 @@ method init*(v: EditorAssetsView) =
   procCall v.View.init()
 
   v.makeLayout:
-    backgroundColor: uiBackground
+    # backgroundColor: uiBackground
     - EditorAssetsTreeView as tree:
       top == super
       leading == super
       width >= 200 @ WEAK
-      bottom == super
+      bottom == super - 20
       onSelectionChanged do(p: PathNode):
         v.moveToDirectory(p)
 
@@ -83,7 +83,7 @@ method init*(v: EditorAssetsView) =
       top == super
       leading == prev.trailing
       trailing == super
-      backgroundColor: uiAccent
+      # backgroundColor: uiAccent
       - EditorScrollContentView as content:
         leading == super
         trailing == super
@@ -93,14 +93,14 @@ method init*(v: EditorAssetsView) =
         currentHeight: -1
 
     - Label as curDir:
-      backgroundColor: uiBlue
+      # backgroundColor: uiBlue
       top == prev.bottom
       leading == super
       height == 20
       text: "Current path"
 
     - Slider as slider:
-      backgroundColor: uiHighlight
+      # backgroundColor: uiHighlight
       top == prev
       leading == prev.trailing
       trailing == super.trailing
@@ -130,13 +130,8 @@ method init*(v: EditorAssetsView) =
           imagePreview.popupAtCenterOfWindow()
       elif item.isDirectory:
         tree.select(item)
-        # v.moveToDirectory(item)
       else:
         openInDefaultApp(item.path)
-      # let idx = i
-      # setTimeout(0.1) do():
-      # var fileView = v.content.subviews[idx].EditorThumbnailView
-      # fileView.doubleClicked()
 
   v.content.onItemsDelete = proc(selectedItems: seq[int])=
     sandbox:
@@ -170,6 +165,7 @@ method init*(v: EditorAssetsView) =
       var drag_data = ""
       var drag_kind = ""
 
+      var curPath: PathNode
       for idx in items:
         var pbk = ""
         let pathNode = v.currentDir.childAt(idx)
@@ -186,13 +182,13 @@ method init*(v: EditorAssetsView) =
           else:
             drag_kind = pbk
             drag_data = pathNode.path
+        curPath = pathNode
 
-      if drag_data.len > 0 and drag_kind.len > 0:
+      if drag_data.len > 0 and drag_kind.len > 0 and not curPath.isNil:
         var dpi = newPasteboardItem(drag_kind, drag_data)
-        var img: Image = v.thumbnails[items[0]].imageView.image
+        var img: Image = curPath.image
         startDrag(dpi, img)
-      # if not v.mOnDragStart.isNil:
-      #     v.mOnDragStart(fileViews)
+
 
   v.content.onItemRenamed = proc(item: int) =
     discard
@@ -204,7 +200,7 @@ method init*(v: EditorAssetsView) =
           # discard v.contentView.makeFirstResponder()
 
 proc recalc(v: EditorAssetsView) {.gcsafe.} =
-  let ct = epochTime()
+  # let ct = epochTime()
   if v.currentDir.isNil: return
 
   let dirContentSize = v.currentDir.directories.len + v.currentDir.files.len
@@ -216,6 +212,7 @@ proc recalc(v: EditorAssetsView) {.gcsafe.} =
   let visibleLines = int(v.content.superview.frame.height) div (adjastedSize.int + 20) + 2
   let thumbnailsCount = min(visibleLines * itemsPerLine, dirContentSize)
   let firstYOffset = float(topVisibleLine * (adjastedSize.int + 20))
+  v.content.firstItemIndex = topVisibleLine * itemsPerLine
 
   if v.content.offsetVar.isNil:
     v.content.offsetVar = newVariable(offset)
@@ -311,11 +308,9 @@ proc recalc(v: EditorAssetsView) {.gcsafe.} =
   if sizeChanged or firstYchanged or contentHeightChanged:
     v.setNeedsLayout()
 
-  echo "recalcNew: ", epochTime() - ct, " visibleLines ", visibleLines, " size ", adjastedSize, " topIndex ", topVisibleLine * itemsPerLine, " content ", v.content.frame #, " adjsize ", adjastedSize, " sizeChanged ", sizeChanged,  " thumbs ", dirContentSize, " perLine ", itemsPerLine #, " H ", contentH, " items ", dirContentSize, " line ", itemsPerLine, " top ", topVisibleLine
-
 proc thumbnailAtIndex(v: EditorScrollContentView, i: int): EditorThumbnailView =
   sandbox:
-    result = cast[EditorThumbnailView](v.subviews[i])
+    result = cast[EditorThumbnailView](v.subviews[i - v.firstItemIndex])
 
 proc selectItem(v: EditorScrollContentView, i: int, notify: bool = true)=
   sandbox:
@@ -339,9 +334,6 @@ method onTouchEv*(v: EditorScrollContentView, e: var Event): bool =
     v.dragStarted = false
     v.selectionRect = zeroRect
     v.selectionOrigin = e.localPosition
-    # for si in v.selectedItems:
-    #   v.deselectItem(si)
-    # v.selectedItems.setLen(0)
 
   elif e.buttonState == bsUnknown:
     if v.dragStarted: return false
@@ -350,11 +342,9 @@ method onTouchEv*(v: EditorScrollContentView, e: var Event): bool =
     var dragLen = v.selectionOrigin.distanceTo(e.localPosition)
     if not v.onItemsDragStart.isNil:
       for i, sub in v.subviews:
-        if sub.frame.contains(orig):
-          # v.selectedItems.setLen(0)
+        if sub.frame.contains(orig) and not sub.hidden:
           if dragLen > 10.0:
-            # sub.backgroundColor = selectionColor
-            v.onItemsDragStart(@[i])
+            v.onItemsDragStart(@[i + v.firstItemIndex])
             v.dragStarted = true
             return false
           return true
@@ -372,9 +362,9 @@ method onTouchEv*(v: EditorScrollContentView, e: var Event): bool =
 
     for i, subv in v.subviews:
       if subv.frame.intersect(v.selectionRect):
-        v.selectItem(i, false)
+        v.selectItem(i + v.firstItemIndex, false)
       else:
-        v.deselectItem(i, false)
+        v.deselectItem(i + v.firstItemIndex, false)
 
   else:
     if v.dragStarted:
@@ -389,15 +379,15 @@ method onTouchEv*(v: EditorScrollContentView, e: var Event): bool =
         # echo "hasSelectionRect"
         for i, subv in v.subviews:
           if subv.frame.intersect(v.selectionRect):
-            v.selectItem(i, false)
-            selected.add(i)
+            v.selectItem(i + v.firstItemIndex, false)
+            selected.add(i + v.firstItemIndex)
           elif i in v.selectedItems:
-            v.deselectItem(i)
+            v.deselectItem(i + v.firstItemIndex)
       else:
         if v.selectedItems.len > 1:
           # echo "selitems > 1"
           for si in v.selectedItems:
-            if v.subviews[si].frame.contains(v.selectionOrigin):
+            if v.subviews[si - v.firstItemIndex].frame.contains(v.selectionOrigin):
               v.selectItem(si)
               selected.add(si)
             else:
@@ -407,8 +397,8 @@ method onTouchEv*(v: EditorScrollContentView, e: var Event): bool =
         else:
           var dc = newSeq[int]()
 
-          for i, subv in v.subviews:
-            # echo "subv nil ", subv.isNil, " ", v.isNil
+          for idx, subv in v.subviews:
+            let i = idx + v.firstItemIndex
             if subv.frame.contains(v.selectionOrigin):
               if i in v.selectedItems and not v.onItemDoubleClick.isNil:
                 dc.add(i)
@@ -457,8 +447,8 @@ method onKeyDown*(v: EditorScrollContentView, e: var Event):bool=
   of VirtualKey.Up, VirtualKey.Down, VirtualKey.Left, VirtualKey.Right:
     if v.subviews.len == 0: return
     if v.selectedItems.len == 0:
-      v.selectedItems.add(0)
-      v.selectItem(0)
+      v.selectedItems.add(v.firstItemIndex)
+      v.selectItem(v.firstItemIndex)
     else:
       let itemsInLine = v.itemsInARow
       var step = if e.keyCode == VirtualKey.Left: -1
@@ -476,8 +466,9 @@ method onKeyDown*(v: EditorScrollContentView, e: var Event):bool=
       else:
         last = v.selectedItems[^1]
 
-      step = clamp(step + last, 0, v.subviews.len - 1)
-      v.selectedItems.add(step)
+      step = clamp(step + (last - v.firstItemIndex), 0, v.subviews.len - 1)
+      if not v.subviews[step].hidden:
+        v.selectedItems.add(step + v.firstItemIndex)
 
       for sel in v.selectedItems:
         last = sel

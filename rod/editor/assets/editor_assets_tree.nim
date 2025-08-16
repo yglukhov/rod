@@ -17,9 +17,7 @@ proc `onSelectionChanged=`*(v: EditorAssetsTreeView, cb: proc(p: PathNode) {.gcs
   v.mOnSelectCb = cb
 
 proc select*(v: EditorAssetsTreeView, n: PathNode) =
-  # v.dontNotify = true
   v.outlineView.selectItemAtIndexPath(n.getNodePath())
-  # v.dontNotify = false
 
 method init*(v: EditorAssetsTreeView) =
   procCall v.View.init()
@@ -29,9 +27,8 @@ method init*(v: EditorAssetsTreeView) =
       top == super
       leading == super
       trailing == super
-      # backgroundColor: blackColor()
+      height == super @ WEAK
       - OutlineView as outline:
-        # backgroundColor: grayColor()
         width == super
         height == super @ WEAK
         defaultRowHeight: 20
