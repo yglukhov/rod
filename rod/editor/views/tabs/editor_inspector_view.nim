@@ -10,6 +10,8 @@ import variant
 type EditorInspectorView* = ref object of EditorTabView
   content: View
   currentVisitors: seq[EditorPropertyVisitorView]
+  mode: EditorMode
+  currentNode: Node
 
 method init*(v: EditorInspectorView) =
   procCall v.EditorTabView.init()
@@ -17,10 +19,7 @@ method init*(v: EditorInspectorView) =
   v.makeLayout:
     backgroundColor: whiteColor()
     - ScrollView:
-      x == super.x
-      y == super.y
-      height == super
-      width == super
+      frame == super
       - View as content:
         width == super
 
@@ -43,6 +42,7 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
     discard
 
   v.content.removeAllSubviews()
+  if n.isNil: return
   # proc onChange() =
   #   v.inspectedNodeChanged(n)
 
@@ -50,10 +50,10 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
   visitor.requireName = true
   visitor.requireSetter = true
   visitor.requireGetter = true
-  # if i.editor.mode == emAnimation:
-#     visitor.flags = { pfAnimatable }
-  # else:
-  visitor.flags = { pfEditable }
+  if v.mode == EditorMode.animation:
+    visitor.flags = { pfAnimatable }
+  else:
+    visitor.flags = { pfEditable }
 
   var visitorView = new(EditorPropertyVisitorView)
   visitorView.setVisitorName("Node")
@@ -65,22 +65,49 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
 
   v.content.addSubview(visitorView)
   v.currentVisitors.add(visitorView)
-
+  var editedPropertyName = ""
   var lasPropView: View
   visitor.commit = proc() =
-    var propView = propertyEditorForProperty(visitor.name, visitor.setterAndGetter, nil, changeInspectorView)
-    propView.makeLayout:
+    var placeholder = new(View)
+    placeholder.makeLayout:
       top == prev.bottom
       leading == super.leading
       trailing == super.trailing
-    visitorView.addVisitor(propView)
-    lasPropView = propView
+
+    var propView = propertyEditorForProperty(visitor.name, visitor.setterAndGetter, nil, changeInspectorView)
+    lasPropView = placeholder
+    placeholder.addSubview(propView)
+    if v.mode == EditorMode.animation:
+      let sng = visitor.setterAndGetter
+      let propName = visitor.name
+      let epn = editedPropertyName
+      capture sng, propName, epn:
+        propView.makeLayout:
+          top == super
+          leading == super.leading
+          trailing == super.trailing - 25
+          bottom == super.bottom
+        placeholder.makeLayout:
+          - Button:
+            top == prev.top
+            leading == prev.trailing
+            trailing == super.trailing
+            height == 16
+            title:"●"
+            onAction:
+              echo "add edited property(", epn & "." & propName, ")"
+    else:
+      propView.makeLayout:
+        top == super
+        leading == super.leading
+        trailing == super.trailing
+        bottom == super.bottom
+    visitorView.addVisitor(placeholder)
 
   n.visitProperties(visitor)
   if not lasPropView.isNil:
     lasPropView.makeLayout:
       bottom == super.bottom
-
 
   var idx = 0
 
@@ -95,6 +122,7 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
       trailing == super.trailing
 
     v.content.addSubview(visitorView)
+    editedPropertyName = "." & $idx
     com.visitProperties(visitor)
     # no properties to visit, so fix layout
     if visitorView.visitors.len == 0:
@@ -109,6 +137,7 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
         echo "removing component ", componentName, " at index ", idx
         n.removeComponent(componentName)
         v.inspectedNodeChanged(n)
+
     inc idx
 
   var lineView = new(View)
@@ -139,7 +168,6 @@ proc inspectedNodeChanged(v: EditorInspectorView, n: Node) {.gcsafe.}=
 
   v.content.addSubview(bottomView)
 
-
 method onCompositionChanged*(v: EditorInspectorView, c: CompositionDocument) =
   procCall v.EditorTabView.onCompositionChanged(c)
   # echo "EditorInspectorView onCompositionChanged"
@@ -147,7 +175,12 @@ method onCompositionChanged*(v: EditorInspectorView, c: CompositionDocument) =
 method setInspectedNode*(v: EditorInspectorView, n: Node) =
   # echo "EditorInspectorView selectedNode = ", (if n.isNil: "nil" else: n.name)
   v.inspectedNodeChanged(n)
+  v.currentNode = n
 
 method onEditorEvent*(v: EditorInspectorView, ev: EditorAPIEvent) =
   if ev.kind == EditorMessageNodeSelectionChanged.toEditorMessageId:
     echo "node selection changed!"
+
+method onEditorModeChanged*(v: EditorInspectorView, mode: EditorMode) =
+  v.mode = mode
+  v.inspectedNodeChanged(v.currentNode)

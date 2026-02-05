@@ -1,41 +1,27 @@
 import nimx / [ view, types, layout, text_field, button, formatted_text ]
 
-type ToolBarView* = ref object of View
-  onViewClicked*: proc() {.gcsafe.}
+type
+  # ToolButtonKind* {.pure.} = enum
+  #   file, edit,
+  # ToolBarButton* = ref object of Button
 
-proc onFileClicked(v: ToolBarView) =
-  echo "File Clicked"
-
-proc onEditClicked(v: ToolBarView) =
-  echo "Edit Clicked"
-
-proc onViewClicked(v: ToolBarView) =
-  echo "View Clicked"
-  if not v.onViewClicked.isNil:
-    v.onViewClicked()
+  ToolBarView* = ref object of View
+    onViewClicked*: proc() {.gcsafe.}
+    onAnimationClicked*: proc() {.gcsafe.}
 
 method init*(v: ToolBarView) =
   procCall v.View.init()
 
   v.makeLayout:
     backgroundColor: newColor(1.0, 1.0, 0.7, 1.0)
-    - Button:
+    - Button as file:
       width >= 100
       y == super
       height == super
       x == super
       title: "File"
       onAction:
-        v.onFileClicked()
-
-    - Button:
-      width >= 100
-      y == prev.y
-      height == super
-      x == prev.trailing
-      title: "Edit"
-      onAction:
-        v.onEditClicked()
+        echo "File Clicked"
 
     - Button:
       width >= 100
@@ -44,7 +30,18 @@ method init*(v: ToolBarView) =
       x == prev.trailing
       title: "View"
       onAction:
-        v.onViewClicked()
+        if not v.onViewClicked.isNil:
+          v.onViewClicked()
+
+    - Button:
+      width >= 100
+      y == prev.y
+      height == super
+      x == prev.trailing
+      title: "Animation"
+      onAction:
+        if not v.onAnimationClicked.isNil:
+          v.onAnimationClicked()
 
     - Label:
       y == super

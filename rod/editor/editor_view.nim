@@ -4,6 +4,7 @@ import views / [ toolbar_view, leftpanel_view, rightpanel_view ]
 import ../rod_types
 import ./views/tabs/[ editor_scene_view]
 import ./assets/editor_assets_view
+import ./animation/editor_animation_view
 
 type EditorView* = ref object of EditorBaseView
   toolBar: ToolBarView
@@ -24,6 +25,10 @@ proc setEditorCommandsHandler*(v: EditorView, c: EditorCommandQueue) =
 proc setCurrentComposition*(v: EditorView, c: CompositionDocument) =
   for tab in v.tabs:
     tab.onCompositionChanged(c)
+
+proc setEditorMode*(v: EditorView, mode: EditorMode) =
+  for tab in v.tabs:
+    tab.onEditorModeChanged(mode)
 
 method onEditorEvent*(v: EditorView, ev: EditorAPIEvent) =
   for tab in v.tabs:
@@ -78,10 +83,11 @@ method init*(v: EditorView) =
             - EditorSceneView as sceneView:
               frame == super
 
-          - EditorAssetsView as bottomPart:
+          - View as bottomPlac:
             width == super
             height == 150 @ WEAK
-
+            - EditorAssetsView as bottomPart:
+              frame == super
 
       - RightPanelView as rightPanel:
         leading == prev.trailing
@@ -89,6 +95,10 @@ method init*(v: EditorView) =
         450 >= self.width
         self.width >= 200
         height == super
+
+  var animationEditor = new(EditorAnimationView)
+  animationEditor.makeLayout:
+    frame == super
 
   v.toolBar = toolbar
   v.leftPanel = leftPanel
@@ -101,10 +111,19 @@ method init*(v: EditorView) =
   v.tabs.add(v.rightPanel.tabs)
 
   v.toolBar.onViewClicked = proc() =
-    # v.bottomPart.hidden = not v.bottomPart.hidden
-    if v.bottomPart.superview.isNil:
-      center.addSubview(v.bottomPart)
+    if bottomPlac.superView.isNil:
+      center.addSubview(bottomPlac)
       center.setDividerPosition(v.bb, 0)
     else:
       v.bb = center.dividerPosition(0)
+      bottomPlac.removeFromSuperview()
+
+  v.toolBar.onAnimationClicked = proc() =
+    if v.bottomPart.superview.isNil:
+      bottomPlac.addSubview(v.bottomPart)
+      animationEditor.removeFromSuperview()
+      v.setEditorMode(EditorMode.edit)
+    else:
       v.bottomPart.removeFromSuperview()
+      bottomPlac.addSubview(animationEditor)
+      v.setEditorMode(EditorMode.animation)

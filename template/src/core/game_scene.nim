@@ -1,5 +1,5 @@
 import nimx/[view, types, button, animation, mini_profiler, matrixes, view_event_handling]
-import rod/[viewport, rod_types, node, component, component/ui_component, edit_view]
+import rod/[viewport, rod_types, node, component, component/ui_component]
 import ./asset_loader
 
 export asset_loader, viewport
@@ -30,7 +30,7 @@ method acceptsFirstResponder(v: GameScene): bool = true
 method onKeyDown*(gs: GameScene, e: var Event): bool =
     if e.keyCode == VirtualKey.E:
         ## start's editor
-        discard startEditingNodeInView(gs.rootNode, gs)
+        # discard startEditingNodeInView(gs.rootNode, gs)
         result = true
 
 method assetBundles*(gs: GameScene): seq[AssetBundleDescriptor] {.gcsafe, base.} = discard

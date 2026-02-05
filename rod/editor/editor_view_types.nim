@@ -1,6 +1,6 @@
-import nimx / [ view, app, layout]
+import nimx / [ view, app, layout, font]
 import ../../ rod / [ rod_types, message_queue ]
-import ./animation / animation_editor_types
+import ./animation / editor_animation_types
 import ./[editor_api, editor_composition]
 export editor_api, editor_composition, message_queue
 
@@ -41,6 +41,7 @@ proc rootNode*(v: EditorTabView): Node =
 
 method onEditorEvent*(v: EditorBaseView, ev: EditorAPIEvent) {.base, gcsafe.} = discard
 method setInspectedNode*(v: EditorBaseView, n: Node) {.base, gcsafe.} = discard
+method onEditorModeChanged*(v: EditorBaseView, mode: EditorMode) {.base, gcsafe.} = discard
 
 method tabs*(v: EditorTabPanel): seq[EditorTabView] {.base, gcsafe.} = @[]
 
@@ -81,3 +82,16 @@ const
   uiLavender* = newColor(0.87, 0.80, 0.95) # Soft lavender
   uiGray*     = newColor(0.90, 0.90, 0.90) # Warm light gray
   uiSelectionColor* = newColor(0.0, 0.0, 0.5, 0.2)
+
+var gRodeditIconsFont {.threadvar.}: Font
+
+when defined(macosx):
+  const
+    editorIconsFontName = "Apple Symbols.ttf"
+  proc rodeditIconsFont*(): Font {.gcsafe.} =
+    if gRodeditIconsFont.isNil: gRodeditIconsFont = newFontWithFace(editorIconsFontName, 16)
+    result = gRodeditIconsFont
+else:
+  proc rodeditIconsFont*(): Font {.gcsafe.} =
+    if gRodeditIconsFont.isNil: gRodeditIconsFont = systemFontOfSize(16)
+    result = gRodeditIconsFont

@@ -1,5 +1,5 @@
 import ../../ rod / rod_types
-import ./animation / animation_editor_types
+import ./animation / editor_animation_types
 
 type CompositionDocument* = ref object
   path*: string
