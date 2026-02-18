@@ -10,7 +10,7 @@ installExt    = @["nim"]
 # Dependencies
 requires "nimx"
 requires "https://github.com/SSPKrolik/nimasset#head"
-requires "variant"
+requires "variant >= 0.3"
 requires "os_files"
 requires "https://github.com/yglukhov/imgtools"
 requires "cligen"
@@ -20,3 +20,4 @@ requires "https://github.com/yglukhov/threadpools"
 requires "https://github.com/yglukhov/preferences"
 requires "sha1"
 requires "https://github.com/yglukhov/clipboard"
+requires "checksums"

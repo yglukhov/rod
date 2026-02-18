@@ -1,6 +1,6 @@
 import nimx/[image, resource, context, portable_gl, types]
 import nimasset/obj
-import strutils
+import std/strutils
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl

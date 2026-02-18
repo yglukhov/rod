@@ -1,7 +1,8 @@
 import nimx/[types, context, composition, portable_gl, property_visitor]
-import rod / [component, tools/serializer]
-import rod / utils / [ property_desc, serialization_codegen ]
-import json
+import ../component
+import ../tools/serializer
+import ../ utils / [ property_desc, serialization_codegen ]
+import std/json
 
 type ColorFill* = ref object of RenderComponent
     color*: Color
@@ -9,7 +10,8 @@ type ColorFill* = ref object of RenderComponent
 ColorFill.properties:
     color
 
-var effect = newPostEffect("""
+var effect {.threadvar.}: PostEffect
+proc createEffect(): PostEffect = newPostEffect("""
 void color_fill_effect(vec4 color, float dummy) {
     color.a *= gl_FragColor.a;
     gl_FragColor = color;
@@ -25,6 +27,8 @@ method beforeDraw*(c: ColorFill, index: int): bool =
                                 # that new `pushPostEffect` is conflicting with the
                                 # old one when number of uniforms is 1.
                                 # Should be cleaned up when old `pushPostEffect` is removed
+    if effect.isNil:
+        effect = createEffect()
     pushPostEffect(effect, c.color, dummyUniform)
 
 method afterDraw*(c: ColorFill, index: int) =

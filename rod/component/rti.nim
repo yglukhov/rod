@@ -1,7 +1,7 @@
 import nimx/[types, context, image, view, property_visitor, render_to_image, portable_gl]
-import rod/[viewport, quaternion, rod_types, node, component]
-import rod/component/[clipping_rect_component]
-import rod/tools/serializer
+import ../[viewport, quaternion, rod_types, node, component]
+import ./clipping_rect_component
+import ../tools/serializer
 
 import json, tables
 

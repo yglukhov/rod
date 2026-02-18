@@ -1,13 +1,13 @@
+import std/[json, strutils, os, strutils]
 import nimx / [ image, types, pathutils, assets/asset_manager ]
-import rod/quaternion
-import json, strutils, os, strutils
+import ../quaternion
 
 
 type JsonDeserializer* = ref object
     node*: JsonNode
     disableAwake*: bool
     compPath*: string # Path relative to bundle root
-    getImageForPath*: proc(path: string, offset: var Point): Image
+    getImageForPath*: proc(path: string, offset: var Point): Image {.gcsafe.}
 
 proc newJsonDeserializer*(): JsonDeserializer =
     result.new()

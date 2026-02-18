@@ -1,4 +1,5 @@
 nimcache/
+vendor/
 editor/main
 editor/nakefile
 build
@@ -24,3 +25,7 @@ editor/res/Jsondata/phys_box.json
 editor/res/Jsondata/test.json
 editor/res/Jsondata/wall.png
 editor/rodedit
+nimble.develop
+nimble.paths
+nimbledeps
+*_old

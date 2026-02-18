@@ -1,10 +1,10 @@
-import tables, streams, json, os, strutils
+import std/[tables, streams, json, os, strutils]
 import nimx / [image, types, pathutils ]
-import rod/quaternion
-import serialization_helpers
+import ../ quaternion
+import ./serialization_helpers
 
 when not defined(js):
-    import os
+    import std/os
 
 type
     BinSerializer* = ref object

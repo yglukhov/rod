@@ -1,4 +1,4 @@
-import math, algorithm
+import std / [ math, algorithm ]
 import nimx/[ animation, matrixes, types ]
 import variant
 
@@ -92,7 +92,7 @@ proc newKeyFrameAnimationSampler*[T](keys: seq[KeyFrame[T]]): KeyFrameAnimationS
 
         var k : KeyFrame[T]
         k.p = p
-        let lb = lowerBound(s.keys, k) do(a, b: KeyFrame[T]) -> int:
+        let lb = lowerBound(s.keys, k) do(a, b: KeyFrame[T]) -> int {.gcsafe.}:
             cmp(a.p, b.p)
 
         if lb == s.keys.len: return s.keys[^1].v

@@ -1,7 +1,7 @@
+import std/[streams, tables, json, strutils, os]
 import nimx / [ image, types, assets/asset_manager ]
-import rod / utils / [ property_desc, serialization_helpers ]
-import rod/quaternion
-import streams, tables, json, strutils, os
+import ./ [ property_desc, serialization_helpers ]
+import ../quaternion
 
 type
     BinDeserializer* = ref object
@@ -87,7 +87,7 @@ proc init(b: BinDeserializer) =
         # echo "len:", strLen
         b.strtab[i] = b.stream.readStr(strLen)
         # echo "str ", i, ": ", b.strtab[i]
-        shallow(b.strtab[i])
+        # TODO: Reviseshallow(b.strtab[i])
 
     b.compsTable = initTable[string, int32]()
     let compsLen = b.readInt16()

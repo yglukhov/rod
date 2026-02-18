@@ -1,13 +1,15 @@
-import deques, hashes, macros
+import std/[deques, hashes, macros]
 
 type
   MessageId* = distinct int
   MessageQueue*[M] = ref object
     messages: Deque[tuple[id: MessageId, msg: M]]
 
+proc toMessageId*(str: static string): MessageId {.compileTime.} = cast[MessageId](hash(str))
 proc toMessageId*(str: string): MessageId = cast[MessageId](hash(str))
 
 proc `==`*(id: MessageId, str: string): bool = int(id) == int(str.toMessageId)
+proc `==`*(a: MessageId, b: MessageId): bool = int(a) == int(b)
 
 proc `$`*(id: MessageId): string = $(int(id))
 

@@ -1,10 +1,10 @@
 import nimx/[matrixes, animation, context, types, portable_gl, view, image, property_visitor]
-import rod/[quaternion, node, component, rod_types, viewport]
-import rod/component/[particle_helpers,camera]
-import rod/material/shader
-import rod/tools/serializer
-import rod / utils / [property_desc, serialization_codegen ]
-import times, math, random, json, tables
+import ../[quaternion, node, component, rod_types, viewport]
+import ./[particle_helpers,camera]
+import ../material/shader
+import ../tools/serializer
+import ../utils/[property_desc, serialization_codegen ]
+import std/[times, math, random, json, tables]
 
 
 const ParticleVertexShader = """
@@ -362,7 +362,7 @@ proc fillIBuffer(ps: ParticleSystem) =
     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, ps.indexBuffer)
     gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, ib, gl.STATIC_DRAW)
 
-var particleShader: Shader
+var particleShader {.threadvar.}: Shader
 
 proc initSystem(ps: ParticleSystem) =
     let gl = currentContext().gl
@@ -1020,7 +1020,7 @@ method init(h: PSHolder) =
     h.distance = 40.0
     h.speed = 9.0
 
-proc recursiveDoProc(n: Node, pr: proc(ps: ParticleSystem) ) =
+proc recursiveDoProc(n: Node, pr: proc(ps: ParticleSystem) {.gcsafe.} ) =
     let ps = n.getComponent(ParticleSystem)
     if not ps.isNil:
         ps.pr()

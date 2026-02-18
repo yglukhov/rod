@@ -1,7 +1,8 @@
 import nimx / [types, context, composition, portable_gl, property_visitor]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod / [ component, tools/serializer ]
-import json
+import ../ utils / [ property_desc, serialization_codegen ]
+import ../component
+import ../tools/serializer
+import std/json
 
 type ColorBalanceHLS* = ref object of RenderComponent
     hue*: float32
@@ -20,7 +21,9 @@ ColorBalanceHLS.properties:
     hlsMin
     hlsMax
 
-var effect = newPostEffect("""
+var effect {.threadvar.}: PostEffect
+
+proc createHLSPostEffect(): PostEffect = newPostEffect("""
 float cbhls_effect_Epsilon = 1e-10;
 
 vec3 cbhls_effect_rgb2hcv(vec3 RGB) {
@@ -82,6 +85,8 @@ method serialize*(c: ColorBalanceHLS, s: Serializer): JsonNode =
 method beforeDraw*(c: ColorBalanceHLS, index: int): bool =
     c.enabled = not c.areValuesNormal()
     if c.enabled:
+        if effect.isNil:
+            effect = createHLSPostEffect()
         pushPostEffect(effect, c.hue, c.saturation, c.lightness, c.hlsMin, c.hlsMax)
 
 method afterDraw*(c: ColorBalanceHLS, index: int) =

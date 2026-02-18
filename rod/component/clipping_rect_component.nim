@@ -1,7 +1,8 @@
 import nimx/[types, context, composition, portable_gl, view, property_visitor]
-import rod/[ node, viewport, component, tools/serializer, rod_types]
-import rod / utils / [ property_desc, serialization_codegen ]
-import json
+import ../[ node, viewport, component, rod_types]
+import ../tools/serializer
+import ../utils/[ property_desc, serialization_codegen ]
+import std/json
 import opengl
 
 

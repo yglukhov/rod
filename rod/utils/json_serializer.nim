@@ -1,4 +1,4 @@
-import json, os, strutils
+import std/[json, os, strutils]
 import nimx / [ types, image, pathutils ]
 
 type JsonSerializer* = ref object
@@ -9,7 +9,7 @@ proc newJsonSerializer*(): JsonSerializer =
     result.new()
     result.node = newJObject()
 
-proc getRelativeResourcePath(b: JsonSerializer, path: string): string =
+proc getRelativeResourcePath(b: JsonSerializer, path: string): string  =
     var resourcePath = path
     when not defined(js) and not defined(android) and not defined(ios):
         resourcePath = urlParentDir(b.url)

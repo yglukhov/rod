@@ -1,5 +1,5 @@
 import nimx/naketools
-import osproc, os
+import std/[osproc, os]
 
 
 const additionalFonts: seq[string] = @[]
@@ -15,7 +15,8 @@ beforeBuild = proc(b: Builder) =
     b.mainFile = "main.nim"
     b.originalResourcePath = "res"
     # b.resourcePath = "build"
-    b.additionalNimFlags.add(@["--path:res", "--path:src"])
+    b.additionalNimFlags.add(@["--path:res", "--path:src", "--mm:refc"])
+    b.additionalNimFlags.add(@["--path:../"])
 
 
 preprocessResources = proc(b: Builder) =

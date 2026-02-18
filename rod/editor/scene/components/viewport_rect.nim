@@ -1,7 +1,7 @@
 import nimx / [ types ]
-import rod / [ rod_types, node, component, viewport ]
-import rod / tools / debug_draw
-import editor_component
+import ../../../[ rod_types, node, component, viewport ]
+import ../../../tools / debug_draw
+import ./editor_component
 
 type ViewportRect* = ref object of RenderComponent
 

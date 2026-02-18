@@ -1,5 +1,5 @@
 import nimx/[context, portable_gl, types, matrixes, event]
-import rod/[node, viewport]
+import ../../[node, viewport]
 
 type Gizmo* = ref object of RootObj
     gizmoNode*: Node
@@ -7,12 +7,12 @@ type Gizmo* = ref object of RootObj
     mEditedNode*: Node
     mPrevCastedAxis: Node
 
-method updateGizmo*(g: Gizmo) {.base.} = discard
-method startTransform*(g: Gizmo, selectedGizmo: Node, position: Point) {.base.} = discard
-method proccesTransform*(g: Gizmo, position: Point) {.base.} = discard
-method stopTransform*(g: Gizmo) {.base.} = discard
-method onMouseIn*(g: Gizmo, castedNode: Node) {.base.} = discard
-method onMouseOut*(g: Gizmo, castedNode: Node) {.base.} = discard
+method updateGizmo*(g: Gizmo) {.base, gcsafe.} = discard
+method startTransform*(g: Gizmo, selectedGizmo: Node, position: Point) {.base, gcsafe.} = discard
+method proccesTransform*(g: Gizmo, position: Point) {.base, gcsafe.} = discard
+method stopTransform*(g: Gizmo) {.base, gcsafe.} = discard
+method onMouseIn*(g: Gizmo, castedNode: Node) {.base, gcsafe.} = discard
+method onMouseOut*(g: Gizmo, castedNode: Node) {.base, gcsafe.} = discard
 
 proc newGizmo*(): Gizmo =
     result = new(Gizmo)

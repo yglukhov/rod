@@ -1,5 +1,5 @@
 import nimx/[types, image, animation, portable_gl]
-import math
+import std/math
 
 
 type AnimatedImage* = ref object of Image

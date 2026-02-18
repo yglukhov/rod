@@ -1,6 +1,6 @@
 import nimx/[view, types, button, animation, mini_profiler, matrixes, view_event_handling]
-import rod/[viewport, rod_types, node, component, component/ui_component, edit_view]
-import asset_loader
+import rod/[viewport, rod_types, node, component, component/ui_component]
+import ./asset_loader
 
 export asset_loader, viewport
 
@@ -30,14 +30,14 @@ method acceptsFirstResponder(v: GameScene): bool = true
 method onKeyDown*(gs: GameScene, e: var Event): bool =
     if e.keyCode == VirtualKey.E:
         ## start's editor
-        discard startEditingNodeInView(gs.rootNode, gs)
+        # discard startEditingNodeInView(gs.rootNode, gs)
         result = true
 
-method assetBundles*(gs: GameScene): seq[AssetBundleDescriptor] {.base.} = discard
-method onResourcesLoaded*(gs: GameScene) {.base.} = discard
+method assetBundles*(gs: GameScene): seq[AssetBundleDescriptor] {.gcsafe, base.} = discard
+method onResourcesLoaded*(gs: GameScene) {.gcsafe, base.} = discard
 
-method init*(gs: GameScene, frame: Rect)=
-    procCall gs.SceneView.init(frame)
+method init*(gs: GameScene) {.gcsafe.} =
+    procCall gs.SceneView.init()
     gs.rootNode = newNode("root")
     gs.addDefaultOrthoCamera("camera")
 
@@ -53,4 +53,3 @@ method init*(gs: GameScene, frame: Rect)=
 method viewOnExit*(gs: GameScene) =
     if gs.assetBundles().len > 0:
         gs.assetLoader.free()
-

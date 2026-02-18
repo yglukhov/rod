@@ -1,5 +1,5 @@
-import rod / [ rod_types, component, viewport, node ]
-import nimx / [ animation, animation_runner, window ]
+import ../[ rod_types, component, viewport, node ]
+import nimx/[ animation, animation_runner, window ]
 
 method init*(c: AnimationRunnerComponent) =
     c.runner = newAnimationRunner()

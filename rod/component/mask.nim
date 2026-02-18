@@ -2,8 +2,9 @@ import nimx / [
   types, context, image, view, matrixes, composition,
   property_visitor, portable_gl, render_to_image, window
 ]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod / [ rod_types, node, component, viewport, component/camera ]
+import ../ utils / [ property_desc, serialization_codegen ]
+import ../[ rod_types, node, component, viewport]
+import ./camera
 
 const comonSpritePrefix = """
 (sampler2D maskTexture, vec4 texCoords, vec4 mask_bounds, vec2 vp_size, float msk_alpha) {
@@ -48,15 +49,12 @@ const lumaInvertedPostfix = """
 }
 """
 
+var theQuad {.threadvar, noinit.}: array[4, GLfloat]
+
 template maskPost(name, src: string): PostEffect =
   newPostEffect("void " & name & src, name, ["sampler2D", "vec4", "vec4", "vec2", "float"])
 
-var effectSprite = [
-  maskPost("maskAlphaEffect", comonSpritePrefix & alphaPostfix), # tmAlpha
-  maskPost("maskAlphaInvertedEffect", comonSpritePrefix & alphaInvertedPostfix), # tmAlphaInverted
-  maskPost("maskLumaEffect", comonSpritePrefix & lumaPostfix), # tmLuma
-  maskPost("maskLumaInvertedEffect", comonSpritePrefix & lumaInvertedPostfix) # tmLumaInverted
-]
+var effectSprite {.threadvar.}: array[4, PostEffect]
 
 type MaskType* = enum
   tmNone, tmAlpha, tmAlphaInverted, tmLuma, tmLumaInverted
@@ -72,7 +70,6 @@ Mask.properties:
   maskType
   layerName:
     phantom: string
-
 
 template worldToWindow(c: Mask, w: Vector3): Point =
   let s = c.node.sceneView
@@ -91,8 +88,15 @@ proc drawMaskNode(c: Mask, mskN: Node) =
     gl.enable(gl.SCISSOR_TEST)
   mskN.enabled = e
 
-var theQuad {.noinit.}: array[4, GLfloat]
 proc setupMskPost(c: Mask): bool =
+  if effectSprite[0].isNil:
+    effectSprite = [
+      maskPost("maskAlphaEffect", comonSpritePrefix & alphaPostfix), # tmAlpha
+      maskPost("maskAlphaInvertedEffect", comonSpritePrefix & alphaInvertedPostfix), # tmAlphaInverted
+      maskPost("maskLumaEffect", comonSpritePrefix & lumaPostfix), # tmLuma
+      maskPost("maskLumaInvertedEffect", comonSpritePrefix & lumaInvertedPostfix) # tmLumaInverted
+    ]
+
   if c.rti.isNil:
     c.rti = newImageRenderTarget()
 
@@ -164,7 +168,14 @@ method afterDraw*(msk: Mask, index: int) =
 
 method visitProperties*(msk: Mask, p: var PropertyVisitor) =
   p.visitProperty("mask type", msk.maskType)
-  p.visitProperty("layer name", msk.maskNode)
+  proc maskNodeName(c: Mask): string =
+    result = "@not set@"
+    if not c.maskNode.isNil:
+      result = c.maskNode.name
+  proc `maskNodeName=`(c: Mask, name: string) =
+    c.maskNode = c.node.sceneView.rootNode.findNode(name)
+
+  p.visitProperty("layer name", msk.maskNodeName)
 
   proc prev(c: Mask): Image =
     if not c.maskTexture.isNil:

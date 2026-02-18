@@ -1,7 +1,7 @@
 import nimx / [matrixes, types, context, property_visitor, view]
-import rod / [component, rod_types, node]
-import rod / utils / [ property_desc, serialization_codegen ]
-import math
+import ../ [component, rod_types, node]
+import ../ utils / [ property_desc, serialization_codegen ]
+import std/math
 
 export CameraProjection
 export Camera

@@ -1,8 +1,7 @@
+import std/[json, tables, typetraits, streams, strutils, os]
 import nimx/[image, types, pathutils, matrixes, portable_gl, assets/asset_loading]
-import rod/utils/[json_serializer, json_deserializer]
-import rod/[rod_types, quaternion]
-import json, tables, typetraits, streams, strutils, os
-
+import ../utils/[json_serializer, json_deserializer]
+import ../[rod_types, quaternion]
 
 type Serializer* = ref object
     url*: string

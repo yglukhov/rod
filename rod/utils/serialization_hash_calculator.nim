@@ -1,6 +1,6 @@
+import std/hashes
 import nimx / [ types, image ]
-import rod/quaternion
-import hashes
+import ../quaternion
 
 type SerializationHashCalculator* = ref object
     hash*: Hash

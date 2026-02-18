@@ -1,6 +1,6 @@
 import nimx/[matrixes, types]
-import rod / rod_types
-import json, os, logging, options
+import ../rod_types
+import std/[json, os, logging, options]
 
 type
   EditorTabSettings* = object

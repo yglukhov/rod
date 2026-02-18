@@ -1,9 +1,9 @@
 import nimx / [ types, matrixes, animation, property_visitor ]
-import rod/animation/[animation_sampler, property_animation], rod / [ quaternion, rod_types ]
-import rod / utils / [ json_deserializer, json_serializer ]
-import rod / node
-import algorithm
-import variant, tables, json, math, strutils
+import ../../animation/[animation_sampler, property_animation]
+import ../../[node, quaternion, rod_types ]
+import ../../utils/[ json_deserializer, json_serializer ]
+import std/[algorithm,tables, json, math, strutils]
+import variant
 
 type
     EInterpolation* = object
@@ -20,14 +20,14 @@ type
         interpolation*: EInterpolation
 
     EditedProperty* = ref object
-        duration: float 
+        duration: float
         enabled*: bool
         rawName: string #nodeName.componentIndex.componentProperty, nodeName.nodeProperty, etc
         node: Node
         sng*: Variant
         keys*: seq[EditedKey]
 
-    EditedAnimation* = ref object 
+    EditedAnimation* = ref object
         fps*: int
         name*: string
         duration*: float
@@ -75,7 +75,7 @@ proc keyAtIndex*(e: EditedAnimation, pi, ki: int): EditedKey =
     let p = e.propertyAtIndex(pi)
     if p.isNil: return
     result = p.keyAtIndex(ki)
- 
+
 template keyValue(k: EditedKey, body: untyped) =
     template getKeyValueAUX(T: typedesc) =
         let value{.inject} = k.value.get(T)
@@ -83,21 +83,21 @@ template keyValue(k: EditedKey, body: untyped) =
     switchAnimatableTypeId(k.value.typeId, getTypeId, getKeyValueAUX)
 
 #todo: remove this serialization
-proc `%`(q: Quaternion): JsonNode = 
+proc `%`(q: Quaternion): JsonNode =
     result = newJArray()
     result.add(%q.x)
     result.add(%q.y)
     result.add(%q.z)
     result.add(%q.w)
 
-proc `%`(q: Color): JsonNode = 
+proc `%`(q: Color): JsonNode =
     result = newJArray()
     result.add(%q.r)
     result.add(%q.g)
     result.add(%q.b)
     result.add(%q.a)
 
-proc `%`*(a: EditedAnimation): JsonNode = 
+proc `%`*(a: EditedAnimation): JsonNode =
     result = newJObject()
     var meta = newJObject()
 
@@ -114,16 +114,16 @@ proc `%`*(a: EditedAnimation): JsonNode =
 
         jp["duration"] = %a.duration
         var keys = newJArray()
-        
+
         # dye to backward compatibility
         # we should save presampled buffers
         # by `values` key
-        var isPresampled: bool 
-        for k in prop.keys: 
+        var isPresampled: bool
+        for k in prop.keys:
             if k.interpolation.kind == KeyInterpolationKind.eiPresampled:
                 isPresampled = true
                 break
-        
+
         if not isPresampled:
             for k in prop.keys:
                 var jk = newJobject()
@@ -209,5 +209,3 @@ proc toEditedAnimation*(n: Node, j: JsonNode): EditedAnimation =
         a.duration = a.properties[0].duration
         a.fps = int(a.properties[0].keys.len.float / a.duration)
     result = a
-
-

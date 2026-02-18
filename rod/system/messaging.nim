@@ -1,5 +1,5 @@
-import rod / [ rod_types, message_queue, node, systems, viewport, component ]
-import strutils, typetraits, logging
+import ../[ rod_types, message_queue, node, systems, viewport, component ]
+import std/[strutils, typetraits, logging]
 
 export message_queue, systems
 

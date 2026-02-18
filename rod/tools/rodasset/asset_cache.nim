@@ -1,9 +1,9 @@
-import sha1, os, osproc, algorithm, strutils, times, hashes
-import rod/utils/serialization_hash_calculator
+import std/[os, osproc, algorithm, strutils, times, hashes]
 import nimx/class_registry
-import rod/component
-
-import settings
+import checksums/sha1
+import ../../utils/serialization_hash_calculator
+import ../../component
+import ./settings
 
 # When asset packing algorithm changes, we should increase `hashVersion`
 # to invalidate old caches.
@@ -106,7 +106,7 @@ proc dirHashImplGit(path, baseHash: string, s: Settings): string {.inline.} =
 
     result &= ";" & $hashVersion & ";" & $componentsHash()
 
-    result = sha1.compute(result).toHex()
+    result = $secureHash(result)
 
 proc dirHashImplNoGit(path: string, s: Settings): string =
     var hasSound = false
@@ -137,7 +137,7 @@ proc dirHashImplNoGit(path: string, s: Settings): string =
 
     hashStr &= $hashVersion & $componentsHash()
 
-    result = sha1.compute(hashStr).toHex()
+    result = $secureHash(hashStr)
 
 proc dirHash*(path: string, s: Settings): string {.inline.} =
 #    let startTime = epochTime()

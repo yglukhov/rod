@@ -1,5 +1,5 @@
 import nimx/[context, portable_gl, types, matrixes, property_visitor]
-import rod/[component, node, viewport ]
+import ../[component, node, viewport ]
 
 
 const vertexShader = """

@@ -1,11 +1,12 @@
 import nimx/[image, context, portable_gl, window, animation, matrixes, pathutils]
 import nimx/assets/[asset_loading, url_stream, asset_manager]
-import rod/[ node, vertex_data_info,
+import ./[ node, vertex_data_info,
     rod_types, quaternion, dae_animation
-    ]
-import rod/component/[mesh_component, material, animation/skeleton]
+]
+import ./component/[mesh_component, material]
+import ./component/animation/skeleton
 import nimasset/collada
-import streams, strutils, tables, hashes, math
+import std/[streams, strutils, tables, hashes, math]
 
 proc parseMatrix4(source: openarray[float32]): Matrix4 =
     var i = 0

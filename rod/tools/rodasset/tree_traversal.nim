@@ -1,4 +1,4 @@
-import json, lists
+import std/[json, lists]
 
 proc append[T](lst: var DoublyLinkedList[T], elems: openarray[T]) =
     for e in elems: lst.append(e)

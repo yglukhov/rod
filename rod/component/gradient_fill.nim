@@ -1,10 +1,12 @@
 import nimx/[view, context, matrixes, composition, portable_gl, property_visitor ]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod/[node, viewport, component, tools/serializer]
+import ../ utils / [ property_desc, serialization_codegen ]
+import ../[node, viewport, component]
+import ../tools/serializer
 
 import json
 
-var effectLinearLocal = newPostEffect("""
+var effectLinearLocal {.threadvar.} : PostEffect
+proc createEffectLinearLocal() : PostEffect = newPostEffect("""
 void grad_fill_effect_linear_local(vec2 gradientStartPos, vec2 gradientEndPos, vec4 startColor, vec4 endColor) {
     float  alpha = atan( -gradientEndPos.y + gradientStartPos.y, gradientEndPos.x - gradientStartPos.x );
     float  gradientStartPosRotatedX = gradientStartPos.x*cos(alpha) - gradientStartPos.y*sin(alpha);
@@ -19,7 +21,8 @@ void grad_fill_effect_linear_local(vec2 gradientStartPos, vec2 gradientEndPos, v
 }
 """, "grad_fill_effect_linear_local", ["vec2", "vec2", "vec4", "vec4"])
 
-var effectLinear = newPostEffect("""
+var effectLinear {.threadvar.} : PostEffect
+proc createEffectLinear() : PostEffect = newPostEffect("""
 void grad_fill_effect_linear(vec2 startPoint, vec2 diff, vec4 startColor, vec4 endColor) {
     float s = dot(gl_FragCoord.xy-startPoint, diff) / dot(diff, diff);
     vec4 color = mix(startColor, endColor, s);
@@ -28,7 +31,8 @@ void grad_fill_effect_linear(vec2 startPoint, vec2 diff, vec4 startColor, vec4 e
 }
 """, "grad_fill_effect_linear", ["vec2", "vec2", "vec4", "vec4"])
 
-var effectRadialLocal = newPostEffect("""
+var effectRadialLocal {.threadvar.} : PostEffect
+proc createEffectRadialLocal() : PostEffect = newPostEffect("""
 void grad_fill_effect_radial_local(vec2 center, float radius, vec4 startColor, vec4 endColor) {
     float dist = distance(center, vPos.xy);
     float d = smoothstep(0.0, 1.0, dist / radius);
@@ -38,7 +42,8 @@ void grad_fill_effect_radial_local(vec2 center, float radius, vec4 startColor, v
 }
 """, "grad_fill_effect_radial_local", ["vec2", "float", "vec4", "vec4"])
 
-var effectRadial = newPostEffect("""
+var effectRadial {.threadvar.} : PostEffect
+proc createEffectRadial() : PostEffect = newPostEffect("""
 void grad_fill_effect_radial(vec2 center, float radius, vec4 startColor, vec4 endColor) {
     float dist = distance(center, gl_FragCoord.xy);
     float d = dist / radius;
@@ -116,14 +121,22 @@ method beforeDraw*(gf: GradientFill, index: int): bool =
     if gf.shape == RadialRamp:
         let radius = distanceTo(tlp, brp)
         if gf.localCoords:
+            if effectRadialLocal.isNil:
+                effectRadialLocal = createEffectRadialLocal()
             pushPostEffect(effectRadialLocal, tlp, radius, gf.startColor, gf.endColor)
         else:
+            if effectRadial.isNil:
+                effectRadial = createEffectRadial()
             pushPostEffect(effectRadial, tlp, radius, gf.startColor, gf.endColor)
     else:
         let diff = brp - tlp
         if gf.localCoords:
+            if effectLinearLocal.isNil:
+                effectLinearLocal = createEffectLinearLocal()
             pushPostEffect(effectLinearLocal, tlp, brp, gf.startColor, gf.endColor)
         else:
+            if effectLinear.isNil:
+                effectLinear = createEffectLinear()
             pushPostEffect(effectLinear, tlp, brp, gf.startColor, gf.endColor)
 
 method afterDraw*(gf: GradientFill, index: int) =

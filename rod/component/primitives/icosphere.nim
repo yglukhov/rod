@@ -1,7 +1,7 @@
 import nimx/[matrixes, types, property_visitor, portable_gl]
-import rod/[vertex_data_info, component]
-import rod/component/[ mesh_component, material ]
-import math, json, tables
+import ../../[vertex_data_info, component]
+import ../../component/[ mesh_component, material ]
+import std/[math, json, tables]
 
 type MeshInfo = ref object
     vertices: seq[Vector3]

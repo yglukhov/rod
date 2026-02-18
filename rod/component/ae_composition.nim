@@ -1,9 +1,9 @@
 import nimx / [ types, context, animation, property_visitor ]
-import rod / utils / [property_desc, serialization_codegen, bin_deserializer, json_serializer, json_deserializer ]
-import rod/[ rod_types, node, component, viewport ]
-import rod/animation/property_animation
-import rod/tools/serializer
-import json, strutils, tables, times, sequtils
+import ../ utils / [property_desc, serialization_codegen, bin_deserializer, json_serializer, json_deserializer ]
+import ../[ rod_types, node, component, viewport ]
+import ../animation/property_animation
+import ../tools/serializer
+import std/[json, strutils, tables, times, sequtils]
 
 const aeAllCompositionAnimation = "aeAllCompositionAnimation"
 const delimiter = "/"
@@ -50,7 +50,8 @@ proc setCompositionMarker(c: AEComposition, m: AEMarker): Animation=
     result.numberOfLoops = 1
     result.loopDuration = m.duration
     result.animate prog in pStart..pEnd:
-        c.allCompAnim.onAnimate(prog)
+        {.cast(gcsafe).}:
+            c.allCompAnim.onAnimate(prog)
 
 proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[string] = @[]): Animation {.gcsafe.}
 
@@ -77,10 +78,11 @@ proc applyLayerSettings*(c: AEComposition, cl: AELayer, marker: AEMarker, except
         let oldCompAnimate = prop.onAnimate
 
         prop.animate prog in pIn..pOut:
-            if cl.timeRemapEnabled:
-                oldCompAnimate(cl.timeremap)
-            else:
-                oldCompAnimate(prog)
+            {.cast(gcsafe).}:
+                if cl.timeRemapEnabled:
+                    oldCompAnimate(cl.timeremap)
+                else:
+                    oldCompAnimate(prog)
 
         result = newComposeMarker(max(0.0, layerIn), min(layerOut, 1.0), prop)
 
@@ -119,7 +121,8 @@ proc compositionNamed*(c: AEComposition, marker_name: string, exceptions: seq[st
         result.loopDuration = marker.duration
         result.numberOfLoops = 1
         result.onAnimate = proc(p: float)=
-            ca.onProgress(p)
+            {.cast(gcsafe).}:
+                ca.onProgress(p)
 
 proc play*(c: AEComposition, name: string, exceptions: seq[string] = @[]): Animation {.discardable.} =
     result = c.compositionNamed(name, exceptions)

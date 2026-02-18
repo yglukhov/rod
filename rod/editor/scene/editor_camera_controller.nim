@@ -1,5 +1,5 @@
 import nimx/[matrixes, types, event, view]
-import rod/[viewport, rod_types, node, quaternion ]
+import ../../[viewport, rod_types, node, quaternion ]
 
 type EditorCameraController* = ref object
     camera*: Node
@@ -152,6 +152,3 @@ proc onMouseScrroll*(cc: EditorCameraController, e : var Event) =
     cc.camAnchor.worldPos = cc.camAnchor.worldPos + offset
 
     cc.updateCamera()
-
-
-

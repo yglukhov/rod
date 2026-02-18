@@ -1,8 +1,9 @@
 import nimx / [ types, context, image, animation, property_visitor ]
-import rod / [rod_types, node, component, tools/serializer]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod/component/sprite
-import json
+import ../ [rod_types, node, component]
+import ../tools/serializer
+import ../ utils / [ property_desc, serialization_codegen ]
+import ./sprite
+import std/json
 
 type NinePartSprite* = ref object of Sprite
   mSize: Size

@@ -1,15 +1,14 @@
 import nimx / [ context, types, image, portable_gl, window,
                 view, view_event_handling, animation ]
 
-import algorithm, logging, times, tables, strutils
-import rod_types, node, ray
-import component/camera
-import rod / [ component, systems ]
+import std/[algorithm, logging, times, tables, strutils]
+import ./[rod_types, node, ray, component, systems]
+import ./component/camera
 
 export SceneView
 
-var deltaTime = 0.0
-var oldTime = 0.0
+var deltaTime {.threadvar.}: float
+var oldTime {.threadvar.}: float
 
 proc getSystem*(v: SceneView, T: typedesc[System]): T =
     for s in v.systems:
@@ -183,7 +182,7 @@ proc removeAnimationRunner*(v: SceneView, ar: AnimationRunner) =
         if not v.window.isNil:
             v.window.removeAnimationRunner(ar)
 
-import component/ui_component, algorithm
+import component/ui_component
 
 method name*(v: SceneView): string =
     result = "SceneView"
@@ -241,8 +240,8 @@ method onTouchEv*(v: SceneView, e: var Event): bool =
     if not result:
         result = procCall v.View.onTouchEv(e)
 
-method viewOnEnter*(v:SceneView){.base.} = discard
-method viewOnExit*(v:SceneView){.base.} = discard
+method viewOnEnter*(v:SceneView){.gcsafe, base.} = discard
+method viewOnExit*(v:SceneView){.gcsafe, base.} = discard
 
 method viewDidMoveToWindow*(v:SceneView)=
     procCall v.View.viewDidMoveToWindow()
@@ -264,9 +263,11 @@ method viewWillMoveToWindow*(v: SceneView, w: Window) =
     for c in v.uiComponents:
         c.sceneViewWillMoveToWindow(w)
 
-method init*(v: SceneView, frame: Rect) =
-    procCall v.View.init(frame)
+method init*(v: SceneView) =
+    procCall v.View.init()
     v.addAnimationRunner(newAnimationRunner())
+    deltaTime = 0.0
+    oldTime = 0.0
 
     var updateAnim = newAnimation()
     updateAnim.tag = "deltaTimeAnimation"
@@ -280,8 +281,9 @@ method init*(v: SceneView, frame: Rect) =
         v.update(deltaTime)
     v.addAnimation(updateAnim)
 
-method resizeSubviews*(v: SceneView, oldSize: Size) =
-    procCall v.View.resizeSubviews(oldSize)
-    v.viewProjMatrix = v.getViewProjectionMatrix()
+# TODO: REVICE
+# method resizeSubviews*(v: SceneView, oldSize: Size) =
+#     procCall v.View.resizeSubviews(oldSize)
+#     v.viewProjMatrix = v.getViewProjectionMatrix()
 
 import component/all_components

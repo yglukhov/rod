@@ -1,6 +1,5 @@
-import json, os, strutils
-
-import tree_traversal
+import std/[json, os, strutils]
+import ./tree_traversal
 
 proc hasComponentOfType(n: JsonNode, typ: string): bool =
     for c in n.componentNodes:

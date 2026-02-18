@@ -1,8 +1,8 @@
 import nimx / [ types, matrixes, context, view, property_visitor ]
-import rod / [ rod_types, node, component, viewport ]
-import rod / tools / debug_draw
-import editor_component
-import math
+import ../../../[ rod_types, node, component, viewport ]
+import ../../../tools/debug_draw
+import ./editor_component
+import std/math
 
 type EditorGrid* = ref object of RenderComponent
   gridSize: Size

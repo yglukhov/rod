@@ -1,7 +1,7 @@
 import nimx / [ types, context, portable_gl, render_to_image, matrixes, view,
     image, property_visitor ]
-import rod / [node, viewport, component, postprocess_context]
-import rod/component/[camera, mesh_component]
+import ../[node, viewport, component, postprocess_context]
+import ./[camera, mesh_component]
 
 type BlurComponent* = ref object of RenderComponent
     motionMap: SelfContainedImage
@@ -22,7 +22,7 @@ type Attrib = enum
     aPosition
     aTexCoord
 
-let vertexShaderMotion = """
+const vertexShaderMotion = """
 attribute vec4 aPosition;
 uniform mat4 modelViewProjectionMatrix;
 uniform mat4 uCurrMVPMatrix;
@@ -35,7 +35,7 @@ void main() {
     gl_Position = modelViewProjectionMatrix * vec4(aPosition.xyz, 1.0);
 }
 """
-let fragmentShaderMotion = """
+const fragmentShaderMotion = """
 #ifdef GL_ES
 #extension GL_OES_standard_derivatives : enable
 precision mediump float;
@@ -54,7 +54,7 @@ void main() {
     gl_FragColor = vec4(velocity, 0, 1);
 }
 """
-let vertexShaderPost = """
+const vertexShaderPost = """
 attribute vec4 aPosition;
 attribute vec2 aTexCoord;
 uniform mat4 modelViewProjectionMatrix;
@@ -64,7 +64,7 @@ void main() {
     gl_Position = modelViewProjectionMatrix * vec4(aPosition.xyz, 1.0);
 }
 """
-let fragmentShaderPost = """
+const fragmentShaderPost = """
 #ifdef GL_ES
 #extension GL_OES_standard_derivatives : enable
 precision mediump float;

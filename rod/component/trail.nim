@@ -1,8 +1,9 @@
 import nimx/[context, portable_gl, types, image, matrixes, property_visitor, view]
-import rod/[component, quaternion, node, viewport]
-import rod/component/[material, camera]
-import rod / utils / [property_desc, serialization_codegen ]
-import math, opengl, json
+import ../[component, quaternion, node, viewport]
+import ./[material, camera]
+import ../utils/[property_desc, serialization_codegen ]
+import std/[math, json]
+import opengl
 
 const vertexShader = """
 attribute vec3 aPosition;
@@ -910,8 +911,10 @@ proc `tiled=`*(t: Trail, v: bool) =
 method visitProperties*(t: Trail, p: var PropertyVisitor) =
     # art props
     p.visitProperty("color", t.color)
-    p.visitProperty("image", (t.trailImage, t.imagePercent))
-    p.visitProperty("matcap", (t.trailMatcap, t.matcapPercent))
+    p.visitProperty("image", t.trailImage)
+    p.visitProperty("imagePercent", t.imagePercent)
+    p.visitProperty("matcap", t.trailMatcap)
+    p.visitProperty("matcapPercent", t.matcapPercent)
     p.visitProperty("height", t.trailHeight)
     p.visitProperty("width", t.trailWidth)
     p.visitProperty("gravity", t.gravity)

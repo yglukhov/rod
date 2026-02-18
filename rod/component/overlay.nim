@@ -1,10 +1,11 @@
 import nimx/[types, composition, portable_gl, matrixes]
-import rod / component
+import ../component
 
 type Overlay* = ref object of RenderComponent
 
-var overlayPostEffect = newPostEffect("""
+var overlayPostEffect {.threadvar.}: PostEffect
 
+proc createOverlayPostEffect(): PostEffect = newPostEffect("""
 void overlay_effect(float spike, float spike1) {
     vec4 maskColor = gl_FragColor;
     gl_FragColor.rgba = vec4(maskColor.a);
@@ -15,6 +16,8 @@ method beforeDraw*(o: Overlay, index: int): bool =
     let gl = currentContext().gl
     gl.blendFunc(gl.DST_COLOR, gl.ONE)
 
+    if overlayPostEffect.isNil:
+        overlayPostEffect = createOverlayPostEffect()
     pushPostEffect(overlayPostEffect, 0.0, 0.0)
 
 method afterDraw*(o: Overlay, index: int) =

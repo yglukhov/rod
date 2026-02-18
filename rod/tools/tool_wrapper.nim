@@ -1,4 +1,4 @@
-import os, osproc, strutils
+import std/[os, osproc, strutils]
 
 proc rodPluginFile(): string =
     result = getCurrentDir() / "rodplugin.nim"
@@ -15,10 +15,26 @@ proc nimblePath(package: string): string =
     if result.len == 0:
         raise newException(Exception, "Package " & package & " not found in nimble packages")
 
+proc getRodPackagePath(): string =
+    result = nimblePath("rod")
+    if fileExists("nimble.paths"):
+        echo "tring nimble.paths"
+        # --path:"/Users/bro/.nimble/pkgs2/opengl-1.2.9-87ece9f3a9f99d17332b50885e15a4dcb18c51b5"
+        for line in lines("nimble.paths"):
+            if line.startsWith("--path"):
+                let pathOverride = line[8 .. ^2]
+                echo "tring pathOverride: ", pathOverride, " exist ", fileExists(pathOverride / "rod.nimble")
+                if fileExists(pathOverride / "rod.nimble"):
+                    return pathOverride
+    if fileExists("rod.nimble"):
+        echo "seems like we run from rod dir itself"
+        result = getCurrentDir()
+
 proc compileRealBin(bin, toolName, mainNim: string, useDanger: bool,  cflags: seq[string]) =
     createDir(bin.parentDir())
+    # echo "rodasset compiles from directory: ", bin.parentDir()
     var args = @["c", "--threads:on", "-d:release",
-        "-d:rodplugin", "--warning[LockLevel]:off"]
+        "-d:rodplugin", "--warning[LockLevel]:off", "--mm:refc"]
     if useDanger:
         args.add(@["-d:danger" ])
     else:
@@ -30,7 +46,8 @@ proc compileRealBin(bin, toolName, mainNim: string, useDanger: bool,  cflags: se
     if plug.len != 0:
         args.add("-d:rodPluginFile=" & plug)
         args.add("--path:" & plug.parentDir / "src") # TODO: "src" should be gone
-    args.add(nimblePath("rod") / mainNim)
+    args.add("--path:" & getRodPackagePath())
+    args.add(getRodPackagePath() / mainNim)
     let nim = findExe("nim")
     echo nim, " ", args.join(" ")
     if startProcess(nim, args = args, options = {poParentStreams}).waitForExit != 0:
@@ -61,6 +78,7 @@ proc runWrapper*(toolName, pathToToolMainNim: string) =
     if prefix.len == 0:
         prefix = getTempDir()
     let cd = getCurrentDir()
+    echo "cur dir ", cd
     let projName = splitPath(cd).tail
     let bin = prefix / projName & "_" & toolName & (when defined(windows): ".exe" else: "")
     wrapperAUX(bin, toolName, pathToToolMainNim, useDanger = true)

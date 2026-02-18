@@ -3,7 +3,7 @@ from   nimx/assets/abstract_asset_bundle import nil
 import nimx / [ notification_center, abstract_window ]
 import rod / asset_bundle
 
-import logging
+import std/logging
 export asset_bundle
 
 type AssetsLoader* = object

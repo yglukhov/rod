@@ -1,5 +1,5 @@
-import nimx / [ context, portable_gl, types, matrixes ]
-import rod / [ component, node, viewport ]
+import nimx/[ context, portable_gl, types, matrixes ]
+import ../../[ component, node, viewport ]
 import opengl
 
 const vertexShader = """

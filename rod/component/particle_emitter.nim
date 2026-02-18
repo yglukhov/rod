@@ -1,6 +1,6 @@
 import nimx/[matrixes, animation, context, types, property_visitor ]
-import rod/[quaternion, node, component, rod_types, viewport]
-import times, random
+import ../[quaternion, node, component, rod_types, viewport]
+import std/[times, random]
 
 type ParticleData* = tuple
     coord: Vector3
@@ -53,7 +53,7 @@ method init(p: ParticleEmitter) =
     p.currentParticles = 0
     p.oneShot = false
 
-method particleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) {.base.} =
+method particleUpdate*(pa: ParticleAttractor, p: ParticleEmitter, part: var ParticleData, timeDiff: float, origin: Vector3) {.gcsafe, base.} =
     var destination = origin - part.coord
     const rad = 1.0.float
     let rad_m_resetRadius = 1.01

@@ -1,10 +1,10 @@
 import times, math, random, json
 import nimx/[matrixes, animation, types, property_visitor, portable_gl, context ]
-import rod / utils / [ property_desc, serialization_codegen ]
-import rod / [quaternion, component, rod_types, node, viewport]
-# import rod/component/camera
-# import rod/material/shader
-import rod/tools/[serializer,debug_draw]
+import ../utils/[ property_desc, serialization_codegen ]
+import ../[quaternion, component, rod_types, node, viewport]
+# import ./camera
+# import ../material/shader
+import ../tools/[serializer,debug_draw]
 
 
 type
@@ -82,10 +82,9 @@ PSModifierColor.properties:
 PSModifierSpiral.properties:
     force
 
-method generate*(pgs: PSGenShape): ParticleGenerationData {.base.} = discard
-
-method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.base.} = discard
-method updateParticle*(attr: PSModifier, part: var Particle) {.base.} = discard
+method generate*(pgs: PSGenShape): ParticleGenerationData {.gcsafe, base.} = discard
+method getForceAtPoint*(attr: PSModifier, point: Vector3): Vector3 {.gcsafe, base.} = discard
+method updateParticle*(attr: PSModifier, part: var Particle) {.gcsafe, base.} = discard
 
 # -------------------- cone generator --------------------------
 method init(pgs: ConePSGenShape) =

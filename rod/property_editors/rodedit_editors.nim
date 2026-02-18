@@ -1,28 +1,35 @@
+import std/strutils
 import nimx/[view, text_field, matrixes, image, button,
-    linear_layout, property_visitor, numeric_text_field,
+    property_visitor, numeric_text_field, layout,
     slider, animation, context, view_event_handling, event,
     font
 ]
-import rod/component/[nine_part_sprite ]
-import rod/property_editors/propedit_registry
-import nimx/property_editors/standard_editors #used
-import rod/[node, viewport, quaternion, rod_types]
+import nimx/property_editors/[standard_editors, propedit_registry] #used
+import ../component/[nine_part_sprite ]
+import ../[node, viewport, quaternion, rod_types]
 import variant
+
+template toStr(v: SomeFloat, precision: uint): string = formatFloat(v, ffDecimal, precision)
+template toStr(v: SomeInteger): string = $v
+
+template fromStr(v: string, t: var SomeFloat) = t = v.parseFloat()
+template fromStr(v: string, t: var SomeInteger) = t = type(t)(v.parseInt())
 
 type NodeAnchorView = ref object of View
   pX: float
   pY: float
-  size: Size
+  pSize: Size
   onChanged: proc(p: Point) {.gcsafe.}
 
-proc ppx(v: NodeAnchorView): float = v.pX / v.size.width
-proc ppy(v: NodeAnchorView): float = v.pY / v.size.height
+proc ppx(v: NodeAnchorView): float = v.pX / v.pSize.width
+proc ppy(v: NodeAnchorView): float = v.pY / v.pSize.height
 
 method draw(v: NodeAnchorView, r: Rect) =
   let dotSize = 10.0
 
   let c = currentContext()
-  c.fillColor = clearColor()
+  c.fillColor = v.backgroundColor
+  c.strokeColor = blackColor()
   c.strokeWidth = 3
   c.drawRect(r)
 
@@ -36,6 +43,10 @@ method draw(v: NodeAnchorView, r: Rect) =
   c.drawEllipseInRect(newRect(v.ppx * r.width - dotSize * 0.5, v.ppy * r.height - dotSize * 0.5, dotSize, dotSize))
 
 method onTouchEv*(v: NodeAnchorView, e: var Event): bool =
+  discard procCall v.View.onTouchEv(e)
+
+  echo "nodeAnchor setter ", e.localPosition
+
   var px = (e.localPosition.x / v.bounds.size.width)
   var py = (e.localPosition.y / v.bounds.size.height)
 
@@ -51,29 +62,38 @@ method onTouchEv*(v: NodeAnchorView, e: var Event): bool =
   py.algn()
 
   if (v.ppx != px or v.ppy != py) and not v.onChanged.isNil:
-    v.pX = px * v.size.width
-    v.pY = py * v.size.height
+    v.pX = px * v.pSize.width
+    v.pY = py * v.pSize.height
     v.onChanged(newPoint(v.pX, v.pY))
   result = true
 
 proc newNodeAnchorAUXPropertyView(setter: proc(s: NodeAnchorAUX) {.gcsafe.}, getter: proc(): NodeAnchorAUX {.gcsafe.}): PropertyEditorView =
-  let boxSize = 100.0
-  result = PropertyEditorView.new(newRect(0, 0, 208, boxSize + 10))
+  let boxSize = 50.0
+  proc update() {.gcsafe.}
   let n = getter().node
-
   let bbox = n.nodeBounds()
   var minP = bbox.minPoint
   var maxP = bbox.maxPoint
 
-  var v = NodeAnchorView.new(newRect(0, 5, boxSize, boxSize))
-  v.size = newSize(maxP.x - minP.x, maxP.y - minP.y)
-  v.pX = n.anchor.x
-  v.pY = n.anchor.y
-  if v.size.width > 0 and v.size.height > 0:
+  result = PropertyEditorView.new()
+  result.makeLayout:
+    - NodeAnchorView as v:
+      x == super.x + 5
+      y == super.y + 5
+      width == boxSize
+      height == boxSize
+      bottom == super - 5
+      pX: n.anchor.x
+      pY: n.anchor.y
+      pSize: newSize(maxP.x - minP.x, maxP.y - minP.y)
+
+  if v.pSize.width > 0 and v.pSize.height > 0:
     v.onChanged = proc(p: Point) {.gcsafe.} =
-      n.anchor = newVector3(p.x, p.y)
-  # echo "size ", v.size, " x ", v.pX, " y ", v.pY
-  result.addSubview(v)
+      getter().node.anchor = newVector3(p.x, p.y)
+      update()
+
+  proc update() {.gcsafe.} =
+    discard
 
 registerPropertyEditor(newNodeAnchorAUXPropertyView)
 
@@ -92,8 +112,8 @@ proc onAction(v: NinePartView, cb: proc() {.gcsafe.} ) =
     if not cb.isNil:
       cb()
 
-method init(v: NinePartView, r: Rect) =
-  procCall v.View.init(r)
+method init(v: NinePartView) =
+  procCall v.View.init()
   v.trackMouseOver(true)
 
 proc imageRect(v: NinePartView): Rect =
@@ -101,6 +121,7 @@ proc imageRect(v: NinePartView): Rect =
   result = newRect(zeroPoint, newSize(v.image.size.width * v.scale, v.image.size.height * v.scale))
 
 method draw(v: NinePartView, r: Rect) =
+  procCall v.View.draw(r)
   if v.image.isNil: return
 
   let c = currentContext()
@@ -198,33 +219,87 @@ method onMouseOut*(v: NinePartView, e: var Event) =
   v.clearHightlights()
 
 proc newNinePartViewEditor(setter: proc(s: NinePartSegmentsAUX) {.gcsafe.}, getter: proc(): NinePartSegmentsAUX {.gcsafe.}): PropertyEditorView =
-  let boxSize = 170.0
-  let pv = PropertyEditorView.new(newRect(0,0,208, boxSize + 30))
   let n = getter()
-  var v = NinePartView.new(newRect(0, 25, boxSize, boxSize))
-  v.autoresizingMask = {afFlexibleWidth, afFlexibleMaxY}
+  proc complexSetter() {.gcsafe.}
+  proc updateTfs(v: Vector4) {.gcsafe.}
+  var r = new (PropertyEditorView)
+  r.makeLayout:
+    - NinePartView as ninepart:
+      top == super
+      leading == super
+      # trailing == super
+      height == 170
+      width == 170
+      size: n.size
+      segments: n.segments
+      image: n.image
+      onAction:
+        setter(NinePartSegmentsAUX(segments: ninepart.segments, image: ninepart.image, size: ninepart.size))
+        updateTfs(ninepart.segments)
 
-  var sv: View
-  proc update() =
-    if not sv.isNil:
-      sv.removeFromSuperview()
-    var sng: SetterAndGetter[Vector4]
-    sng.setter = proc(val: Vector4) =
-        v.segments = val
-        setter(NinePartSegmentsAUX(segments: v.segments, image: v.image, size: v.size))
-    sng.getter = proc(): Vector4 =
-        v.segments
-    sv = propertyEditorForProperty(newVariant(), newVariant(sng))
-    pv.addSubview(sv)
+    - NumericTextField as xComp:
+      top == prev.bottom
+      bottom == super
+      leading == super
+      width == super * 0.25
+      height == editorRowHeight
+      name: "#0"
+      font: editorFont()
+      text: toStr(ninepart.segments[0], xComp.precision)
+      onAction:
+        complexSetter()
 
-  v.size = n.size
-  v.segments = n.segments
-  v.image = n.image
-  v.onAction do():
-    setter(NinePartSegmentsAUX(segments: v.segments, image: v.image, size: v.size))
-    update()
-  pv.addSubview(v)
-  update()
-  result = pv
+    - NumericTextField as yComp:
+      top == prev
+      width == prev
+      leading == prev.trailing
+      height == editorRowHeight
+      name: "#1"
+      font: editorFont()
+      text: toStr(ninepart.segments[1], xComp.precision)
+      onAction:
+        complexSetter()
+
+    - NumericTextField as zComp:
+      top == prev
+      width == prev
+      leading == prev.trailing
+      height == editorRowHeight
+      name: "#2"
+      font: editorFont()
+      text: toStr(ninepart.segments[2], xComp.precision)
+      onAction:
+        complexSetter()
+
+    - NumericTextField as wComp:
+      top == prev
+      width == prev
+      leading == prev.trailing
+      height == editorRowHeight
+      name: "#3"
+      font: editorFont()
+      text: toStr(ninepart.segments[3], xComp.precision)
+      onAction:
+        complexSetter()
+
+  result = r
+
+  proc complexSetter() {.gcsafe.} =
+    try:
+      var v: Vector4
+      xComp.text.fromStr(v.x)
+      yComp.text.fromStr(v.y)
+      zComp.text.fromStr(v.z)
+      wComp.text.fromStr(v.w)
+      ninepart.segments = v
+      setter(NinePartSegmentsAUX(segments: ninepart.segments, image: ninepart.image, size: ninepart.size))
+    except ValueError:
+      discard
+
+  proc updateTfs(v: Vector4) {.gcsafe.} =
+    xComp.text = toStr(v.x, xComp.precision)
+    yComp.text = toStr(v.y, yComp.precision)
+    zComp.text = toStr(v.z, zComp.precision)
+    wComp.text = toStr(v.w, wComp.precision)
 
 registerPropertyEditor(newNinePartViewEditor)

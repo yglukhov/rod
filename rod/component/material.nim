@@ -1,7 +1,7 @@
 import nimx / [ image, context, portable_gl, types, matrixes ]
-import rod/[node, quaternion, vertex_data_info, postprocess_context, rod_types ]
-import rod/component/[material_shaders, light ]
-import tables, hashes, streams
+import ../[node, quaternion, vertex_data_info, postprocess_context, rod_types ]
+import ./[material_shaders, light ]
+import std/[tables, hashes, streams]
 
 when not defined(ios) and not defined(android) and not defined(js):
     import opengl
@@ -123,6 +123,8 @@ type
         uniformLocationCache*: seq[UniformLocation]
         iUniform: int
 
+type ShaderCacheTyp = TableRef[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]
+
 const
     invalidShaderValue* = -60
     invalidValueThreshold = -50
@@ -130,7 +132,9 @@ const
 proc invalidShaderColor*(): Color = newColor(invalidShaderValue, 0, 0, 0)
 proc isValid(c: Color): bool = c.r >= invalidValueThreshold
 
-var shadersCache = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
+var shadersCache {.threadvar.}: ShaderCacheTyp # = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
+# var shadersCache = initTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
+
 
 template getUniformLocation*(gl: GL, m: Material, name: cstring): UniformLocation =
     inc m.iUniform
@@ -403,7 +407,7 @@ proc setupVertexAttributes*(m: Material, vertInfo: VertexDataInfo) =
         gl.vertexAttribPointer(aBinormal.GLuint, vertInfo.numOfCoordPerBinormal, gl.FLOAT, false, vertInfo.stride.GLsizei , offset)
         offset += vertInfo.numOfCoordPerBinormal * sizeof(GLfloat)
 
-var postContext: PostprocessContext
+var postContext {.threadvar.}: PostprocessContext
 
 proc setupShadow*(m: Material, pc: PostprocessContext) =
     postContext = pc
@@ -728,6 +732,9 @@ proc createShader(m: Material) =
     let c = currentContext()
     let gl = c.gl
 
+    if shadersCache == nil:
+        shadersCache = newTable[set[ShaderMacro], tuple[shader: ProgramRef, refCount: int]]()
+
     if not shadersCache.contains(m.shaderMacroFlags):
         var commonShaderDefines = ""
         for mcrs in m.shaderMacroFlags:
@@ -791,7 +798,7 @@ when false:
 
 method initSetup*(m: Material) {.base.} = discard
 
-method updateSetup*(m: Material, n: Node) {.base.} =
+method updateSetup*(m: Material, n: Node) {.gcsafe, base.} =
     let c = currentContext()
     let gl = c.gl
 

@@ -1,8 +1,8 @@
 import nimx / [ types, context, image, animation, property_visitor ]
-import rod / [rod_types, node, component, tools/serializer]
-import rod / utils / [ property_desc, serialization_codegen ]
-
-import json, logging
+import ../ [rod_types, node, component]
+import ../utils/ [ property_desc, serialization_codegen ]
+import ../tools/serializer
+import std/[json, logging]
 
 type Sprite* = ref object of RenderComponent
     offset*: Point
